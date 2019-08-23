@@ -3,7 +3,6 @@ package keeper
 import (
 	"errors"
 	"runtime"
-	"time"
 
 	"github.com/memoio/go-mefs/utils/metainfo"
 
@@ -20,12 +19,6 @@ var (
 	ErrPInfoTypeAssert       = errors.New("type asserts err in PInfo")
 	ErrNoChalInfo            = errors.New("can not find this chalinfo")
 )
-
-//tendermint启动时，获取启动信息中所需的时间参数。同组内时间参数需一致，目前用该函数获取
-func getTendermintTime() time.Time {
-	tendermintTime, _ := time.Parse("2006-01-02 15:04:05", "2019-03-30 13:00:00")
-	return tendermintTime
-}
 
 func addCredit(provider string) {
 	val, ok := localPeerInfo.Credit.Load(provider)

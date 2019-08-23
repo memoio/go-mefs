@@ -7,12 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func (gp *GroupService) getParamsForDeploy(localID string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
+func getParamsForDeploy(localID, passwd string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
 	var keepers, providers []common.Address
 	//得到参与部署智能合约的userID的正确格式
 	localAddress, err := ad.GetAddressFromID(localID)
@@ -36,11 +36,11 @@ func (gp *GroupService) getParamsForDeploy(localID string, localPeersInfo PeersI
 		providers = append(providers, providerAddress)
 	}
 	//得到user的私钥
-	pid, err := peer.IDB58Decode(gp.Userid)
+	pid, err := peer.IDB58Decode(localID)
 	if err != nil {
 		return "", localAddress, keepers, providers, err
 	}
-	hexPK, err := fr.GetHexPrivKeyFromKS(pid, gp.password)
+	hexPK, err := fr.GetHexPrivKeyFromKS(pid, passwd)
 	if err != nil {
 		return "", localAddress, keepers, providers, err
 	}

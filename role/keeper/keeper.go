@@ -60,7 +60,6 @@ type GroupsInfo struct {
 	Providers   []string
 	User        string
 	GroupID     string
-	RunLock     sync.Mutex
 	LocalKeeper *KeeperInGroup
 	upkeeping   contracts.UpKeepingItem
 }

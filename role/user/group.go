@@ -569,7 +569,7 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 }
 
 func (gp *GroupService) deployUpKeepingAndChannel() error {
-	hexPK, localAddress, keepers, providers, err := gp.getParamsForDeploy(gp.Userid, gp.localPeersInfo)
+	hexPK, localAddress, keepers, providers, err := getParamsForDeploy(gp.Userid, gp.password, gp.localPeersInfo)
 	if err != nil {
 		fmt.Println("getParams:", err)
 		return err
