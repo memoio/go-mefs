@@ -6,12 +6,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	mcl "github.com/memoio/go-mefs/bls12"
-	consensus_pb "github.com/memoio/go-mefs/consensus/pb"
-	"github.com/memoio/go-mefs/consensus/rpc"
 	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -55,8 +52,6 @@ func (keeper *KeeperHandlerV2) HandleMetaMessage(metaKey, metaValue, from string
 		go handleRepairResponse(km, metaValue, from)
 	case metainfo.Sync: //keeper 同步信息
 		go handleSync(km, metaValue, from)
-	case metainfo.TendermintRestart: //keeper 重新启动tendermint
-		go handleTendermintRestart(km, metaValue, from)
 	case metainfo.StorageSync:
 		go handleStorageSync(km, metaValue, from)
 	case metainfo.Query: //user查询信息
@@ -189,8 +184,6 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 		if !localPeerInfo.enableTendermint {
 			resValue = "simple"
 			fmt.Println("本节点不使用Tendermint，GroupID:", userID)
-		} else if localkeeper, err := getLocalKeeperInGroup(userID); err == nil && localkeeper.IP != "" {
-			resValue = strings.Join([]string{localkeeper.IP + ":" + strconv.Itoa(localkeeper.P2PPort), localkeeper.IP + ":" + strconv.Itoa(localkeeper.RpcPort)}, metainfo.DELIMITER)
 		}
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmRes.ToString(), resValue, "local") //放在本地供User或Provider启动的时候查询
 		if err != nil {
@@ -265,8 +258,6 @@ func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
 		err = syncChalPay(km, metaValue)
 	case metainfo.SyncTypeChalRes:
 		err = syncChalres(km, metaValue)
-	case metainfo.SyncTypeTInfo:
-		err = syncTendermintInfo(km, metaValue, from)
 	case metainfo.SyncTypeUID, metainfo.SyncTypePid, metainfo.SyncTypeKid:
 		err = syncKUPIDs(km, metaValue)
 	default:
@@ -275,71 +266,6 @@ func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
 	if err != nil {
 		fmt.Printf("handleSync()error:%s\nmetakey:%s\nmetavalue:%s\nfrom:%s\n", err, km.ToString(), metaValue, from)
 	}
-}
-
-//收到其他keeper tendermint重启信息的回调，整理组中本节点的tendermint信息，修改本地保存的对方节点的tendermint信息，用metasync的方式发送到对方节点
-func handleTendermintRestart(km *metainfo.KeyMeta, value string, from string) {
-	groupid := km.GetMid()
-	var thiskeeper *KeeperInGroup
-	valueSplited := strings.Split(value, metainfo.DELIMITER)
-	if len(valueSplited) < 5 {
-		fmt.Println(metainfo.ErrIllegalKey)
-		return
-	}
-	thisGroupsInfo, ok := getGroupsInfo(groupid)
-	if !ok {
-		fmt.Println("收到tendermint重启信息，但是本地Pinfo没有构造好，等待")
-		time.Sleep(15 * time.Second)
-	}
-	thisGroupsInfo, ok = getGroupsInfo(groupid)
-	if !ok {
-		fmt.Println("15s之后，还没有构造好Pinfo，直接返回")
-		return
-	}
-	for _, keeper := range thisGroupsInfo.Keepers { //获取对方节点信息
-		if strings.Compare(keeper.KID, from) == 0 {
-			thiskeeper = keeper
-		}
-	}
-	//将收到的信息填进对应结构体
-	thiskeeper.ID = valueSplited[0]
-	thiskeeper.IP = valueSplited[1]
-	thiskeeper.PubKey = valueSplited[2]
-	var err error
-	thiskeeper.P2PPort, err = strconv.Atoi(valueSplited[3])
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	thiskeeper.RpcPort, err = strconv.Atoi(valueSplited[4])
-	if err != nil {
-		fmt.Println(err)
-	}
-	localkeeper, err := getLocalKeeperInGroup(groupid)
-	if err != nil { //TODO：没有取到本地节点信息时的对策
-		fmt.Println("getLocalKeeperInGroup() err!", err)
-		fmt.Println(err)
-		return
-	}
-
-	peers := []string{}
-	for _, keeper := range thisGroupsInfo.Keepers {
-		if keeper.PubKey == "" {
-			fmt.Printf("没有收到%s的信息，不启动tendermint\n", keeper.KID)
-			return
-		}
-		peers = append(peers, keeper.ID+"@"+keeper.IP+":"+strconv.Itoa(keeper.P2PPort))
-	}
-	thisGroupsInfo.TendermintNode.ChangePeers(peers)
-
-	kmReq, err := metainfo.NewKeyMeta(groupid, metainfo.Sync, metainfo.SyncTypeTInfo)
-	if err != nil {
-		fmt.Println("NewKeyMeta()err", err)
-		return
-	}
-	metaValue := strings.Join([]string{localkeeper.ID, localkeeper.IP, localkeeper.PubKey, strconv.Itoa(localkeeper.P2PPort), strconv.Itoa(localkeeper.RpcPort)}, metainfo.DELIMITER)
-	metaSyncTo(kmReq, metaValue, from)
-	return
 }
 
 func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
@@ -355,37 +281,13 @@ func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 		return
 	}
 
-	//splitedBlock := strings.Split(blockID, "_")
-	thisGroupsInfo, ok := getGroupsInfo(bm.GetUid())
-	if !ok {
-		fmt.Println(ErrUnmatchedPeerID)
-		return //不是我的User，出错了
-	}
 	km.SetKeyType(metainfo.Local)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	//发给Tendermint
-	if thisGroupsInfo.Client != nil {
-		tKey := blockID + "/pid/offset"
-		tx, err := rpc.NewKvTx([]byte(tKey), []byte(metaValue), consensus_pb.KVType_BlockMeta, nil)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		txBytes, err := tx.Marshal()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		_, err = thisGroupsInfo.Client.BroadcastTxCommit(txBytes)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	}
+
 	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
 	if len(splitedValue) < 2 {
 		fmt.Println(metainfo.ErrIllegalValue)

@@ -84,53 +84,6 @@ func getTarget(mainID, syncType string) ([]string, error) {
 	return target, nil
 }
 
-//syncTendermintinfo 同步组内的tendermint信息。
-//每次收到其他节点发来的信息时都尝试启动一次tendermint,这个阶段不进行转发
-//需要考虑的问题：网络延迟信息无序，可能本地还没有构建Pinfo就收到了其他节点的tendermint信息，目前的想法是构建Pinfo之后等一段时间再进行tendermint信息的同步
-///uid/"sync"/"tendermintinfo",ID/IP/Pubkey/p2pport/rocport
-func syncTendermintInfo(km *metainfo.KeyMeta, metavalue string, from string) error {
-	groupid := km.GetMid()
-	if !localPeerInfo.enableTendermint { //这里要先判断是否用tendermint  一个同步组中 应该都使用或者都不使用才对，若不使用还是调用到这里 说明出问题了
-		fmt.Println("收到tendermint信息，但是本节点不使用tendermint  有问题")
-		return nil
-	}
-	valueSplited := strings.Split(metavalue, metainfo.DELIMITER)
-	if len(valueSplited) < 5 {
-		return metainfo.ErrIllegalValue
-	}
-	thisgroupInfo, ok := getGroupsInfo(groupid)
-	if !ok {
-		fmt.Println("没有取到Pinfo")
-		return ErrNoGroupsInfo
-	}
-	var thiskeeper *KeeperInGroup
-	for _, keeper := range thisgroupInfo.Keepers { //在本地PInfo中找到需要同步信息的keeper
-		if strings.Compare(keeper.KID, from) == 0 {
-			thiskeeper = keeper
-		}
-	}
-	if thiskeeper == nil {
-		fmt.Println("本组没有这个keeper,可能Pinfo还没构建，之后解决")
-	}
-	//填这个keeper的信息
-	thiskeeper.ID = valueSplited[0]
-	thiskeeper.IP = valueSplited[1]
-	thiskeeper.PubKey = valueSplited[2]
-	var err error
-	thiskeeper.P2PPort, err = strconv.Atoi(valueSplited[3])
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println("strconv.Atoi error!:", valueSplited[3])
-	}
-	thiskeeper.RpcPort, err = strconv.Atoi(valueSplited[4])
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println("strconv.Atoi error!:", valueSplited[4])
-	}
-	go startTendermintCore(groupid)
-	return nil
-}
-
 //该函数用于将master发来的支付信息，构造两份信息，一份为最近一次支付结果保存在本地，一份为支付信息，保存在内存中和本地
 //(groupid/"sync"/"chalpay"/pid/begin_time/end_time, spacetime/signature/proof)
 func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {

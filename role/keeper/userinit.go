@@ -3,7 +3,6 @@ package keeper
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -327,15 +326,6 @@ func fillPinfo(groupid string, keepers []*KeeperInGroup, providers []string, fro
 			fmt.Println(err)
 		}
 		fmt.Println("本节点不使用Tendermint，GroupID:", groupid)
-		return
 	}
-	initTendermintInfo(groupid)  //tendermint初始化,PInfo[groupid]相关信息在函数内填充
-	time.Sleep(20 * time.Second) //这里等待20s  为了保证所有keeper都构造好了Pinfo，接下来需要添加缓存信息的功能
-	km, err := metainfo.NewKeyMeta(groupid, metainfo.Sync, metainfo.SyncTypeTInfo)
-	if err != nil {
-		fmt.Println("fillPinfo NewKeyMeta err!", err)
-	}
-	metaValue := strings.Join([]string{localkeeper.ID, localkeeper.IP, localkeeper.PubKey, strconv.Itoa(localkeeper.P2PPort), strconv.Itoa(localkeeper.RpcPort)}, metainfo.DELIMITER)
-	metaSyncTo(km, metaValue)
-
+	return
 }

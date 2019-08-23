@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"sort"
 	"strings"
 	"sync"
@@ -14,7 +13,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	lru "github.com/hashicorp/golang-lru"
 	mcl "github.com/memoio/go-mefs/bls12"
-	tnode "github.com/memoio/go-mefs/consensus/tendermint"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	pb "github.com/memoio/go-mefs/role/pb"
@@ -23,7 +21,6 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
-	"github.com/tendermint/tendermint/rpc/client"
 )
 
 const (
@@ -54,24 +51,18 @@ type KeeperInGroup struct {
 	IP         string
 	ID         string
 	PubKey     string
-	P2PPort    int
-	RpcPort    int
 	MasterType KeeperType
 }
 
 //单个节点“拥有的”K P的对应关系，是对user和本地keeper的描述
 type GroupsInfo struct {
-	Keepers        []*KeeperInGroup
-	Providers      []string
-	User           string
-	GroupID        string
-	P2PListener    *net.TCPListener
-	RPCListener    *net.TCPListener
-	Client         client.Client
-	TendermintNode *tnode.Node
-	RunLock        sync.Mutex
-	LocalKeeper    *KeeperInGroup
-	upkeeping      contracts.UpKeepingItem
+	Keepers     []*KeeperInGroup
+	Providers   []string
+	User        string
+	GroupID     string
+	RunLock     sync.Mutex
+	LocalKeeper *KeeperInGroup
+	upkeeping   contracts.UpKeepingItem
 }
 
 //PInfo 存放U-K-P的对应关系，key为userid，value中存放与User相关的Group的信息
@@ -218,19 +209,6 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 	localPeerInfo.enableTendermint = enableTendermint
 	if !localPeerInfo.enableTendermint {
 		fmt.Println("本节点不使用Tendermint")
-	} else {
-		fmt.Println("启动tendermint")
-		PInfo.Range(func(uid, groupsinfo interface{}) bool { //循环起tendermint
-			thisuid, ok := uid.(string)
-			if ok { //类型断言检查
-				if uid != localNode.Identity.Pretty() {
-					go restartTendermintCore(thisuid)
-				}
-				return true
-			}
-			fmt.Println("uid.(string) false!uid:", uid)
-			return false
-		})
 	}
 
 	go persistLocalPeerInfoRegular(ctx)

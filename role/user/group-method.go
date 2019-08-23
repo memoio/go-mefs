@@ -2,17 +2,14 @@ package user
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
 
-	"github.com/memoio/go-mefs/consensus/rpc"
-	"github.com/memoio/go-mefs/consensus/util/code"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
@@ -367,46 +364,4 @@ func (gp *GroupService) DeleteBlocksFromProvider(blockID string, updateMeta bool
 	}
 
 	return nil
-}
-
-func (gp *GroupService) GetBlockProvidersFromChain(blockID string) (string, int, error) {
-	var pidstr string
-	var offset int
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
-	if err != nil {
-		return "", 0, err
-	}
-	key := km.ToString()
-	c := rpc.GetHTTPClient("tcp://0.0.0.0:30201")
-	res, err := c.ABCIQuery(string(code.BlockMetaPrefix), []byte(key))
-	if err != nil {
-		return "", 0, err
-	} else if res.Response.Code != code.CodeTypeOK {
-		return "", 0, errors.New(res.Response.Log)
-	}
-	pidAndOffset := res.Response.GetKey()
-	if len(pidAndOffset) == 0 {
-		return "", 0, ErrNoProviders
-	}
-	splitedValue := strings.Split(string(pidAndOffset), "/")
-	if len(splitedValue) < 2 {
-		return "", 0, ErrNoProviders
-	}
-	pidstr = splitedValue[0]
-	offset, err = strconv.Atoi(splitedValue[1])
-	if err != nil {
-		return "", 0, err
-	}
-	pid, err := peer.IDB58Decode(pidstr)
-	if err != nil {
-		return "", 0, err
-	}
-	if gp.localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-		if !sc.ConnectTo(context.Background(), gp.localNode, pidstr) { //连接不上此provider
-			return pidstr, offset, ErrCannotConnectProvider
-		}
-
-	}
-
-	return pidstr, offset, nil
 }
