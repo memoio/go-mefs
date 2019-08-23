@@ -1,5 +1,5 @@
 # golang utilities
-GO_MIN_VERSION = 1.11
+GO_MIN_VERSION = 1.12
 
 
 # pre-definitions
