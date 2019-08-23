@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+if [ -e "/root/.mefs/config" ]; then
+  echo "Found local MEFS fs-repo "
+else
+  echo "Run MEFS for the first time,do mefs init"
+  mefs init
+fi
+ 
+if [ -e "/root/.mefs/api" ]; then
+  echo "exit abnormally,please delete files:api and repo.lock"
+  exit
+fi
+
+
+mefs config Addresses.API /ip4/0.0.0.0/tcp/5001 
+mefs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080 
+mefs config Role $MEFSROLE
+mefs daemon >> /root/.mefs/daemon.stdout

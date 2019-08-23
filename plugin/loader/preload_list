@@ -1,0 +1,10 @@
+# this file contains plugins to be preloaded
+# empty lines or starting with '#' are ignored
+#
+# name             go-path                  number of the sub-plugin
+
+ipldgit github.com/memoio/go-mefs/plugin/plugins/git 0
+
+badgerds github.com/memoio/go-mefs/plugin/plugins/badgerds 0
+flatfs github.com/memoio/go-mefs/plugin/plugins/flatfs 0
+levelds github.com/memoio/go-mefs/plugin/plugins/levelds 0

@@ -1,0 +1,20 @@
+{
+  "genesis_time": "2019-03-15T09:15:39.262754Z",
+  "chain_id": "group-",
+  "consensus_params": {
+    "block_size": {
+      "max_bytes": "22020096",
+      "max_gas": "-1"
+    },
+    "evidence": {
+      "max_age": "100000"
+    },
+    "validator": {
+      "pub_key_types": [
+        "ed25519"
+      ]
+    }
+  },
+  "validators": [],
+  "app_hash": ""
+}

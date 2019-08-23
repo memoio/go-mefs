@@ -1,0 +1,49 @@
+syntax = "proto3";
+package user.pb;
+
+message SuperBlock {
+  map<int32, string> Buckets = 1; // User现有的Buckets
+  int32 MetaBackupCount = 2; //对于所有的元数据块，副本数
+  int32 NextBucketID = 3;
+  int32 MagicNumber = 4;
+  int32 Version = 5; //版本号
+}
+
+message BucketInfo {
+  string BucketName = 1;
+  int32 BucketID = 2;
+  int32 Policy = 3;     //错误(0)or存储策略-纠删(1)or多备份(2)
+  int32 DataCount = 4; //若为纠删，则为数据块数量，否则为为主块数量（目前为1）
+  int32 ParityCount = 5; //纠删下为校验块数量，多备份下为备份块数量
+  int32 CurStripe = 6;        //当前写到哪一个Stripe
+  int32 NextOffset = 7;        //当前写到哪一个Offset
+  string Ctime = 8;           //本Bucket的创建时间
+  string LastModified = 9;    //本Bucket内数据上次修改时间
+  int32 ObjectsBlockSize = 10; //本Bucket的ObjectsBlock序列化后占多少字节
+  uint64 SegmentSize = 11;   //本Bucket的segment size
+  uint64 TagFlag = 12;       //本Bucket的TagFLag
+  bool Deletion = 13;               //Bucket是否已删除
+}
+
+message ObjectInfo {
+  string ObjectName = 1;            //对象名称
+  int32 ObjectSize = 2;             //对象长度
+  string ContentType = 3;           //对象的类型，如文本、图片
+  string ETag = 4;                  //生成的校验码，S3使用MD5
+  int32 BucketID = 5;               //本对象所属的Bucket
+  map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
+  int32 StripeStart = 7;            //本对象的起始Stripe
+  int32 offsetStart = 8;            //本对象在起始Stripe的起始offset
+  string Ctime = 9;                 //对象创建时间
+  bool Deletion = 10;               //对象是否已删除
+  bool Dir = 11;                    //是否为目录
+  string NextPart = 12;             //此项保存此对象追加的下一个part的Key，下一个Part同样以Object形式存在
+}
+
+message SignForChannel {
+  bytes Sig = 1; // User签名信息
+  bytes UserPK = 2; //user公钥
+  string UserAddress = 3;
+  string ProviderAddress = 4;
+  bytes Money = 5;
+}

@@ -1,0 +1,45 @@
+syntax = "proto3";
+package role.pb;
+
+message chalnum{
+    int64 PubC = 1;
+    repeated string Indices = 2;
+}
+
+message pu{
+    string Provider = 1;
+    string User = 2;
+}
+
+message chalin{
+    map<string,cidin>Cidin = 1;
+    map<string,chalres>Chalres = 2;
+    uint32 maxlength = 3;
+}
+
+message LedgerInfo{
+    map<string,chalin>chalinfo = 1;
+}
+
+message cidin{
+    bool Res = 1;
+    int32 Repair = 2;
+    int64 Offset = 3;
+    string Avaltime = 4;
+}
+
+message chalres{
+    string Keeper = 1;
+    string Provider = 2;
+    string User = 3;
+    uint32 Sum = 4;
+    uint32 Length =5;
+    int64 H = 6;
+    bool Res = 7;
+    string Proof = 8;
+    string Seed = 9;
+}
+
+message credit{
+    map<string,uint32>scores = 1;
+}

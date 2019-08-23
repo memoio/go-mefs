@@ -1,0 +1,14 @@
+#!/usr/bin/expect
+spawn ssh root@58.210.46.6 -p 22101 '/root/update_all.sh'
+expect {
+    "Are you sure you want to continue connecting (yes/no)?" {
+        send "yes\r"
+        expect "root@58.210.46.6's password:"
+        send "{123qweASD}\r"
+    }
+
+    "root@58.210.46.6's password:" {
+        send "{123qweASD}\r"
+    }
+}
+interact
