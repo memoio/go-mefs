@@ -31,7 +31,6 @@ const (
 
 	DefaultGetBlockDelay = 30 * time.Second
 
-	BlockSize                    = 1024 * 1024 //暂定一个块中纯data的大小，1k
 	defaultMetaBackupCount int32 = 3
 	MAXLISTVALUE                 = 100
 	flushLocalBackup             = 1

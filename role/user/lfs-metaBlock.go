@@ -14,6 +14,7 @@ import (
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -50,10 +51,10 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *pb.SuperBlock) error {
 	var data []byte
 	breakFlag := false
 	for {
-		if SbBuffer.Len() > BlockSize {
-			data = make([]byte, BlockSize)
+		if SbBuffer.Len() > utils.BlockSize {
+			data = make([]byte, utils.BlockSize)
 			n, err := SbBuffer.Read(data)
-			if n != BlockSize {
+			if n != utils.BlockSize {
 				panic("read error")
 			}
 			if err != nil && err != io.EOF {
@@ -120,10 +121,10 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *pb.SuperBlock) error {
 	var data []byte
 	breakFlag := false
 	for {
-		if SbBuffer.Len() > BlockSize {
-			data = make([]byte, BlockSize)
+		if SbBuffer.Len() > utils.BlockSize {
+			data = make([]byte, utils.BlockSize)
 			n, err := SbBuffer.Read(data)
-			if n != BlockSize {
+			if n != utils.BlockSize {
 				panic("read error")
 			}
 			if err != nil && err != io.EOF {
@@ -292,7 +293,7 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]
 	objectsStripeID := 1 //ObjectInfo的stripe从1开始
 	objectsBlockLength := 0
 	for _, object := range entries {
-		if objectsBuffer.Len() >= BlockSize { //如果object的总长度大于规定的size，则分块
+		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
 			// dataEncoded, _, err := dataformat.DataEncode(objectsBuffer.Bytes(), dataformat.DefaultSegmentSize, MetaTagFlag)
 			bm, err := metainfo.NewBlockMeta(lfs.UserID, strconv.Itoa(int(-bucketID)), strconv.Itoa(objectsStripeID), "0")
@@ -378,7 +379,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 	objectsStripeID := 1
 	objectsBlockLength := 0
 	for _, object := range entries {
-		if objectsBuffer.Len() >= BlockSize { //如果object的总长度大于规定的size，则分块
+		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
 			bm, err := metainfo.NewBlockMeta(lfs.UserID, strconv.Itoa(int(-bucketID)), strconv.Itoa(objectsStripeID), "0")
 			if err != nil {
@@ -521,7 +522,7 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 		}
 		superBlock := &pb.SuperBlock{}
 		SbBuffer := bytes.NewBuffer(data)
-		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*BlockSize)
+		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*utils.BlockSize)
 		err = SbDelimitedReader.ReadMsg(superBlock)
 		if err == io.EOF {
 		} else if err != nil {
@@ -608,7 +609,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 			}
 			Bucket := &pb.BucketInfo{}
 			BucketBuffer := bytes.NewBuffer(data)
-			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*BlockSize)
+			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*utils.BlockSize)
 			err = BucketDelimitedReader.ReadMsg(Bucket)
 			if err != nil && err != io.EOF {
 				return err
@@ -697,7 +698,7 @@ func (lfs *LfsService) loadObjectsInfo(bucket *pb.BucketInfo) error {
 		stripeID++
 	}
 	ObjectsBuffer := bytes.NewBuffer(fullData)
-	ObjectsDelimitedReader := ggio.NewDelimitedReader(ObjectsBuffer, 2*BlockSize)
+	ObjectsDelimitedReader := ggio.NewDelimitedReader(ObjectsBuffer, 2*utils.BlockSize)
 	for {
 		Object := &pb.ObjectInfo{}
 		err := ObjectsDelimitedReader.ReadMsg(Object)

@@ -916,7 +916,7 @@ func (dl *Download) getMessage(ncid string, provider string) ([]byte, *big.Int, 
 		}
 		channelAddr = common.HexToAddress(Item.ChannelAddr)
 		// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
-		addValue := int64((BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
+		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 		money = money.Add(Item.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 	moneyByte := money.Bytes()
