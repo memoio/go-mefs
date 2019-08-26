@@ -28,7 +28,7 @@ func checkrepairlist(ctx context.Context) {
 		for {
 			select {
 			case cid := <-repch:
-				uid := cid[:IDLength]
+				uid := cid[:utils.IDLength]
 				fmt.Println("get need repair cid :", cid)
 				if localKeeperIsMaster(uid) {
 					fmt.Println("repairing cid :", cid)
@@ -113,7 +113,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 		fmt.Println("strconv.Atoi offset error :", err)
 		return
 	}
-	uid := blockID[:IDLength]
+	uid := blockID[:utils.IDLength]
 	pu := PU{
 		pid: pid,
 		uid: uid,

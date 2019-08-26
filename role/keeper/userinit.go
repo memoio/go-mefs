@@ -7,6 +7,7 @@ import (
 	"time"
 
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -115,11 +116,11 @@ func userInitInLocal(userID string, keeperCount, providerCount int) (string, err
 	var responseExisted bytes.Buffer //此变量暂存返回的peerIDs
 
 	if kids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), ""); kids != nil && err == nil { //如果DHT中有这个节点的信息，user的init是输错的
-		if remain := len(kids) % IDLength; remain != 0 {
+		if remain := len(kids) % utils.IDLength; remain != 0 {
 			kids = kids[:len(kids)-remain]
 		}
-		for i := 0; i < len(kids)/IDLength; i++ { //在dht返回结果中，看该user是否属于本节点
-			keeperID := string(kids[i*IDLength : (i+1)*IDLength])
+		for i := 0; i < len(kids)/utils.IDLength; i++ { //在dht返回结果中，看该user是否属于本节点
+			keeperID := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 			if keeperID == localID { //此User是本节点的
 				flag = 1
 			}
@@ -127,11 +128,11 @@ func userInitInLocal(userID string, keeperCount, providerCount int) (string, err
 		if flag == 1 { //只处理keeper列表里有自己的情况
 			responseExisted.WriteString(localID)
 			tempKeepers = append(tempKeepers, localID)
-			for i := 0; i < len(kids)/IDLength; i++ {
+			for i := 0; i < len(kids)/utils.IDLength; i++ {
 				if len(tempKeepers) == keeperCount {
 					break
 				}
-				keeperID := string(kids[i*IDLength : (i+1)*IDLength])
+				keeperID := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 				kmRole, err := metainfo.NewKeyMeta(keeperID, metainfo.Local, metainfo.SyncTypeRole)
 				if err != nil {
 					return "", err
@@ -173,12 +174,12 @@ func userInitInLocal(userID string, keeperCount, providerCount int) (string, err
 			responseExisted.WriteString(metainfo.DELIMITER)
 
 			if pids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmPid.ToString(), ""); pids != nil && err == nil {
-				if remain := len(pids) % IDLength; remain != 0 {
+				if remain := len(pids) % utils.IDLength; remain != 0 {
 					pids = pids[:len(pids)-remain]
 				}
 
-				for i := 0; i < len(pids)/IDLength; i++ {
-					providerID := string(pids[i*IDLength : (i+1)*IDLength])
+				for i := 0; i < len(pids)/utils.IDLength; i++ {
+					providerID := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 					kmRole, err := metainfo.NewKeyMeta(providerID, metainfo.Local, metainfo.SyncTypeRole)
 					if err != nil {
 						return "", err

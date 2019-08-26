@@ -150,21 +150,21 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 	//将value切分，生成好对应的keepers和providers列表
 	splited := strings.Split(metaValue, metainfo.DELIMITER)
 	kids := splited[0]
-	if remain := len(kids) % IDLength; remain != 0 {
+	if remain := len(kids) % utils.IDLength; remain != 0 {
 		kids = kids[:len(kids)-remain]
 	}
-	for i := 0; i < len(kids)/IDLength; i++ {
+	for i := 0; i < len(kids)/utils.IDLength; i++ {
 		keeper := &KeeperInGroup{
-			KID: string(kids[i*IDLength : (i+1)*IDLength]),
+			KID: string(kids[i*utils.IDLength : (i+1)*utils.IDLength]),
 		}
 		keepers = append(keepers, keeper)
 	}
 	pids := splited[1]
-	if remain := len(pids) % IDLength; remain != 0 {
+	if remain := len(pids) % utils.IDLength; remain != 0 {
 		pids = pids[:len(pids)-remain]
 	}
-	for i := 0; i < len(pids)/IDLength; i++ {
-		providerID := string(pids[i*IDLength : (i+1)*IDLength])
+	for i := 0; i < len(pids)/utils.IDLength; i++ {
+		providerID := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 		providers = append(providers, providerID)
 	}
 
@@ -267,7 +267,7 @@ func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
 
 func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 	blockID := km.GetMid()
-	if len(blockID) <= IDLength {
+	if len(blockID) <= utils.IDLength {
 		fmt.Println(ErrUnmatchedPeerID)
 		return
 	}
@@ -334,7 +334,7 @@ func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
 
 func handleDeleteBlockMeta(km *metainfo.KeyMeta, from string) { //立即删除某些块的元数据
 	blockID := km.GetMid()
-	if len(blockID) <= IDLength {
+	if len(blockID) <= utils.IDLength {
 		fmt.Println(ErrUnmatchedPeerID)
 		return
 	}
@@ -363,13 +363,13 @@ func handleNewProviderReq(km *metainfo.KeyMeta, metaValue string) (string, error
 	var res string
 	var flag int
 
-	if remain := len(metaValue) % IDLength; remain != 0 {
+	if remain := len(metaValue) % utils.IDLength; remain != 0 {
 		metaValue = metaValue[:len(metaValue)-remain]
 	}
 
 	var providers []string
-	for i := 0; i < len(metaValue)/IDLength; i++ {
-		provider := string(metaValue[i*IDLength : (i+1)*IDLength])
+	for i := 0; i < len(metaValue)/utils.IDLength; i++ {
+		provider := string(metaValue[i*utils.IDLength : (i+1)*utils.IDLength])
 		//添加到返回值
 		providers = append(providers, provider)
 	}
@@ -400,10 +400,10 @@ func handleQueryInfo(km *metainfo.KeyMeta) (string, error) {
 	queryType := options[0]
 	switch queryType {
 	case metainfo.QueryTypeLastChal:
-		if len(blockID) < IDLength {
+		if len(blockID) < utils.IDLength {
 			return "", ErrUnmatchedPeerID
 		}
-		userIDstr := blockID[:IDLength]
+		userIDstr := blockID[:utils.IDLength]
 		kmReq, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
 		if err != nil {
 			return "", ErrBlockNotExist

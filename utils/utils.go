@@ -18,7 +18,7 @@ const (
 	//SHOWTIME 用于输出给使用者
 	SHOWTIME = "2006-01-02 Mon 15:04:05 MST"
 
-	//IDLength  目前ID的长度
+	//utils.IDLength  目前ID的长度
 	IDLength = 30
 
 	//READPRICEPERMB 读支付中1MB内容需要支付的金额

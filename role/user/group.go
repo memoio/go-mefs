@@ -22,10 +22,6 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-const (
-	bftString = "bft"
-)
-
 func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int) *GroupService {
 	if privKey == nil {
 		return nil
@@ -156,7 +152,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 				resStr := string(res)
 				splitRes := strings.Split(resStr, metainfo.DELIMITER)
 				if len(splitRes) > 3 {
-					if splitRes[1] == bftString {
+					if splitRes[1] == metainfo.SyncTypeBft {
 						tempKeeper.IsBFT = true
 					}
 				}
@@ -362,11 +358,11 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 
 //  AddKeepersAndProviders 把keeper和provider的id加入groupservice的备选中
 func (gp *GroupService) addKeepersAndProviders(keepers, providers string) {
-	if remain := len(keepers) % IDLength; remain != 0 {
+	if remain := len(keepers) % utils.IDLength; remain != 0 {
 		keepers = keepers[:len(keepers)-remain]
 	}
-	for i := 0; i < len(keepers)/IDLength; i++ {
-		kid := keepers[i*IDLength : (i+1)*IDLength]
+	for i := 0; i < len(keepers)/utils.IDLength; i++ {
+		kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
 		if !utils.CheckDup(gp.tempKeepers, kid) {
 			continue
 		}
@@ -374,11 +370,11 @@ func (gp *GroupService) addKeepersAndProviders(keepers, providers string) {
 			gp.tempKeepers = append(gp.tempKeepers, kid)
 		}
 	}
-	if remain := len(providers) % IDLength; remain != 0 {
+	if remain := len(providers) % utils.IDLength; remain != 0 {
 		providers = providers[:len(providers)-remain]
 	}
-	for i := 0; i < len(providers)/IDLength; i++ {
-		pid := providers[i*IDLength : (i+1)*IDLength]
+	for i := 0; i < len(providers)/utils.IDLength; i++ {
+		pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
 		if !utils.CheckDup(gp.tempProviders, pid) {
 			continue
 		}
@@ -676,7 +672,7 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 			return ErrCannotConnectKeeper
 		}
 		if kids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), ""); kids != nil && err == nil { //先看本地有没有
-			if remain := len(kids) % IDLength; remain != 0 {
+			if remain := len(kids) % utils.IDLength; remain != 0 {
 				kids = kids[:len(kids)-remain]
 			}
 			//有的keeper连接不上
@@ -690,8 +686,8 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 						return ErrCannotConnectKeeper
 					}
 					tickCount++
-					for i := 0; i < len(kids)/IDLength; i++ {
-						kid := string(kids[i*IDLength : (i+1)*IDLength])
+					for i := 0; i < len(kids)/utils.IDLength; i++ {
+						kid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 						if sc.ConnectTo(ctx, localNode, kid) {
 							tempKeeper := &KeeperInfo{
 								KeeperID: kid,
@@ -705,7 +701,7 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 								resStr := string(res)
 								splitRes := strings.Split(resStr, metainfo.DELIMITER)
 								if len(splitRes) > 3 {
-									if splitRes[1] == bftString {
+									if splitRes[1] == metainfo.SyncTypeBft {
 										tempKeeper.IsBFT = true
 									}
 								}
@@ -741,12 +737,12 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 								return err
 							}
 							if pids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmPid.ToString(), ""); pids != nil && err == nil { //只尝试连接一次provider
-								if remain := len(pids) % IDLength; remain != 0 {
+								if remain := len(pids) % utils.IDLength; remain != 0 {
 									pids = pids[:len(pids)-remain]
 								}
 								providers := string(pids)
-								for i := 0; i < len(providers)/IDLength; i++ {
-									pid := providers[i*IDLength : (i+1)*IDLength]
+								for i := 0; i < len(providers)/utils.IDLength; i++ {
+									pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
 									if sc.ConnectTo(ctx, localNode, pid) {
 										fmt.Println("Connect to provider-", pid, "success.")
 									} else {

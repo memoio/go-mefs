@@ -11,6 +11,7 @@ import (
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -20,7 +21,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	var ret string
 	var sig []byte
 	blockID := km.GetMid()
-	userID := blockID[:IDLength]
+	userID := blockID[:utils.IDLength]
 	tmpPubKey, ok := usersConfigs.Load(userID)
 	if !ok {
 		tmpUserCongfig, err := getNewUserConfig(userID, keeper)

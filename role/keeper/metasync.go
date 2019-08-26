@@ -184,7 +184,7 @@ func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
 
 	}
 	blockID := km.GetMid()
-	uid := blockID[:IDLength]
+	uid := blockID[:utils.IDLength]
 	pid := splitedMetaValue[0]
 	offset, err := strconv.Atoi(splitedMetaValue[1])
 	if err != nil {

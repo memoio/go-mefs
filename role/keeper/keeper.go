@@ -23,10 +23,6 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-const (
-	IDLength = 30
-)
-
 type KeeperType uint8
 
 const (
@@ -506,12 +502,12 @@ func loadAllUser() error {
 
 	//将硬盘中保存的K、U、P信息取出，形成PInfo结构。
 	if users, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(usersLocal, "local"); users != nil && err == nil {
-		if remain := len(users) % IDLength; remain != 0 {
+		if remain := len(users) % utils.IDLength; remain != 0 {
 			users = users[:len(users)-remain]
 		}
 		fmt.Println("Load-User", string(users))
-		for i := 0; i < len(users)/IDLength; i++ { //对user进行循环，逐个恢复user信息
-			userID := string(users[i*IDLength : (i+1)*IDLength])
+		for i := 0; i < len(users)/utils.IDLength; i++ { //对user进行循环，逐个恢复user信息
+			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
 			var userPeersInfo GroupsInfo
 			PInfo.Store(userID, &userPeersInfo)
 			kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
@@ -528,11 +524,11 @@ func loadAllUser() error {
 			//填写peersinfo.keepers信息
 			//TODO:检查连接性，但由于还没写没连接上该怎么处理的逻辑，先不检查
 			if userKids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userkidsMeta, "local"); userKids != nil && err == nil {
-				if remain := len(userKids) % IDLength; remain != 0 {
+				if remain := len(userKids) % utils.IDLength; remain != 0 {
 					userKids = userKids[:len(userKids)-remain]
 				}
-				for i := 0; i < len(userKids)/IDLength; i++ {
-					keeperid := string(userKids[i*IDLength : (i+1)*IDLength])
+				for i := 0; i < len(userKids)/utils.IDLength; i++ {
+					keeperid := string(userKids[i*utils.IDLength : (i+1)*utils.IDLength])
 					keeper := &KeeperInGroup{
 						KID: keeperid,
 					}
@@ -542,11 +538,11 @@ func loadAllUser() error {
 
 			//填写peersinfo.providers信息
 			if userPids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userpidsMeta, "local"); userPids != nil && err == nil {
-				if remain := len(userPids) % IDLength; remain != 0 {
+				if remain := len(userPids) % utils.IDLength; remain != 0 {
 					userPids = userPids[:len(userPids)-remain]
 				}
-				for i := 0; i < len(userPids)/IDLength; i++ {
-					provider := string(userPids[i*IDLength : (i+1)*IDLength])
+				for i := 0; i < len(userPids)/utils.IDLength; i++ {
+					provider := string(userPids[i*utils.IDLength : (i+1)*utils.IDLength])
 					userPeersInfo.Providers = append(userPeersInfo.Providers, provider)
 				}
 			}
@@ -656,11 +652,11 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 	}
 	//尝试链接持久化保存的keeper信息
 	if kids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), "local"); kids != nil && err == nil {
-		if remain := len(kids) % IDLength; remain != 0 {
+		if remain := len(kids) % utils.IDLength; remain != 0 {
 			kids = kids[:len(kids)-remain]
 		}
-		for i := 0; i < len(kids)/IDLength; i++ {
-			kid := string(kids[i*IDLength : (i+1)*IDLength])
+		for i := 0; i < len(kids)/utils.IDLength; i++ {
+			kid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 			if sc.ConnectTo(ctx, localNode, kid) {
 				var j int
 				for j = 0; j < len(localPeerInfo.Keepers); j++ { //看本地已有此节点记录
@@ -677,12 +673,12 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 	} //连接其他keeper的过程
 
 	if pids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmPid.ToString(), "local"); pids != nil && err == nil {
-		if remain := len(pids) % IDLength; remain != 0 {
+		if remain := len(pids) % utils.IDLength; remain != 0 {
 			pids = pids[:len(pids)-remain]
 		}
 
-		for i := 0; i < len(pids)/IDLength; i++ {
-			pid := string(pids[i*IDLength : (i+1)*IDLength])
+		for i := 0; i < len(pids)/utils.IDLength; i++ {
+			pid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 			if sc.ConnectTo(ctx, localNode, pid) {
 				var j int
 				for j = 0; j < len(localPeerInfo.Providers); j++ {

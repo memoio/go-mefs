@@ -22,7 +22,6 @@ const (
 	DefaultCapacity int64 = 100     //单位：MB
 	DefaultDuration int64 = 10      //单位：天
 	DefaultPrice    int64 = 1000000 //单位：wei
-	IDLength              = 30
 
 	DefaultPassword       = "123456"
 	SegementCount   int32 = 256

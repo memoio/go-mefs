@@ -48,7 +48,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	for _, index := range hProto.Indices {
 		if len(index) > 0 {
 			bid, off, err := utils.SplitIndex(index)
-			uid = bid[:IDLength]
+			uid = bid[:utils.IDLength]
 			if err != nil {
 				return err
 			}

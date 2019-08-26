@@ -14,8 +14,6 @@ import (
 )
 
 const (
-	//IDLength implements id's length
-	IDLength = 30
 	//ReDeployOffer redeploy offer-contract,default is false
 	ReDeployOffer = false
 
