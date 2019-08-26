@@ -72,12 +72,12 @@ func (cs *ContractService) SaveChannel() error {
 		if err != nil {
 			return err
 		}
-		node := gp.localNode
-		valueByte, err := node.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), "local")
+
+		valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
 			fmt.Println("Can't get channel value in local,err :", err, ", so try to get from ", provider)
-			valueByte, err = node.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), provider)
+			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), provider)
 			if err != nil {
 				// provider上也没找到，value设为0
 				fmt.Println("Can't get channel price from ", provider, ",err :", err, ", so set channel price to 0.")

@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/memoio/go-mefs/core"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/memoio/go-mefs/core"
 )
-
-const connectTryCount = 3
 
 //连接试三次
 func ConnectTo(ctx context.Context, node *core.MefsNode, to string) bool {
@@ -23,6 +21,7 @@ func ConnectTo(ctx context.Context, node *core.MefsNode, to string) bool {
 	}
 
 	var retry = false
+	connectTryCount := 3
 	for i := 0; i <= connectTryCount; i++ {
 		if retry { // retry three times
 			ctx = context.WithValue(ctx, "ExternIP", true)

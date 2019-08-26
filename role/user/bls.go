@@ -1,14 +1,14 @@
 package user
 
 import (
-	"github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"fmt"
+	"github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"log"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	pb "github.com/memoio/go-mefs/role/pb"
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -76,7 +76,7 @@ func (gp *GroupService) userBLS12ConfigInit(password string) ([]byte, error) {
 	return userBLS12Config, nil
 }
 
-func (gp *GroupService) loadBLS12ConfigMeta() error {
+func (gp *GroupService) loadBLS12Config() error {
 	fmt.Printf("Loading BLS12 Sk and Pk for %s: \n", gp.Userid)
 	var userBLS12config []byte
 	var err error
@@ -85,7 +85,7 @@ func (gp *GroupService) loadBLS12ConfigMeta() error {
 		return err
 	}
 	UserBLS12ConfigKey := kmBls.ToString()
-	userBLS12config, err = gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(UserBLS12ConfigKey, "local")
+	userBLS12config, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(UserBLS12ConfigKey, "local")
 	if err == nil { //先从本地找，如果有就解析一下
 		if err = gp.parseBLS12ConfigMeta(userBLS12config); err != nil {
 			log.Println("Parse bls Config from local failed.", err)
@@ -96,7 +96,7 @@ func (gp *GroupService) loadBLS12ConfigMeta() error {
 	}
 	if gp.localPeersInfo.Keepers != nil { //然后去找Keeper要
 		for _, keeper := range gp.localPeersInfo.Keepers {
-			userBLS12config, err = gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(UserBLS12ConfigKey, keeper.KeeperID)
+			userBLS12config, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(UserBLS12ConfigKey, keeper.KeeperID)
 			if err == nil && userBLS12config != nil {
 				err = gp.parseBLS12ConfigMeta(userBLS12config)
 				if err != nil {

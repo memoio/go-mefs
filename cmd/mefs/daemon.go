@@ -422,7 +422,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			return err
 		}
 	case metainfo.RoleUser:
-		user.InitUserBook()
+		user.InitUserBook(node)
 
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.UserHandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
@@ -435,7 +435,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				return err
 			}
 			go func() {
-				err = us.StartUserService(us.Context, node, cfg.IsInit, defaultPassword, user.DefaultCapacity, user.DefaultDuration, user.DefaultPrice, user.KeeperSLA, user.ProviderSLA)
+				err = us.StartUserService(us.Context, cfg.IsInit, defaultPassword, user.DefaultCapacity, user.DefaultDuration, user.DefaultPrice, user.KeeperSLA, user.ProviderSLA)
 				if err != nil {
 					fmt.Println("Start local user failed:", err)
 					err := user.KillUser(node.Identity.Pretty())
