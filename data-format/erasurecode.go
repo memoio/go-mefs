@@ -7,6 +7,7 @@ import (
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
+	"github.com/memoio/go-mefs/utils"
 )
 
 // 将传入的n个数据块编码成n+m个数据冗余块组的形式，并返回该数据冗余块组
@@ -71,7 +72,7 @@ func RecoverData(datas [][]byte, dataCount, parityCount int, index ...int) ([][]
 
 // 将传入的Rawdata数据块编码成含前缀的规范化块组Stripe，并返回该Stripe及结束时的offset
 func EncodeDataToPreStripe(data []byte, ncidPrefix string, DataCount, ParityCount, tagflag int, SegmentSize uint64, keyset *mcl.KeySet) ([][]byte, int, error) {
-	if (MAXOFFSET+1)*SegmentSize*uint64(DataCount) < uint64(len(data)) {
+	if (utils.MAXOFFSET+1)*SegmentSize*uint64(DataCount) < uint64(len(data)) {
 		return nil, 0, ErrDataToolong
 	}
 	if len(data) == 0 {
@@ -103,7 +104,7 @@ func EncodeDataToPreStripe(data []byte, ncidPrefix string, DataCount, ParityCoun
 	tmpdata := creatGroup(DataCount+ParityCount, SegmentSize)
 	// 生成taggroup装一组的tag+tagP
 	taggroup := creatGroup((DataCount+ParityCount)*tagNum, tagSize)
-	for i := 0; i <= MAXOFFSET && data != nil; i++ {
+	for i := 0; i <= utils.MAXOFFSET && data != nil; i++ {
 		clearGroup(tmpdata)
 		clearGroup(taggroup)
 		for j := 0; j < DataCount; j++ {
@@ -141,7 +142,7 @@ func EncodeDataToPreStripe(data []byte, ncidPrefix string, DataCount, ParityCoun
 
 // 将传入的Rawdata数据块编码成不含前缀的块组Stripe，并返回该Stripe。便于发送给provider进行append操作
 func EncodeDataToNoPreStripe(data []byte, ncidPrefix string, dataCount, parityCount, tagflag, beginOffset int, segmentSize uint64, keyset *mcl.KeySet) ([][]byte, int, error) {
-	if (MAXOFFSET-beginOffset+1)*int(segmentSize)*dataCount < len(data) {
+	if (utils.MAXOFFSET-beginOffset+1)*int(segmentSize)*dataCount < len(data) {
 		return nil, 0, ErrDataToolong
 	}
 	if len(data) == 0 {
@@ -168,7 +169,7 @@ func EncodeDataToNoPreStripe(data []byte, ncidPrefix string, dataCount, parityCo
 	tmpdata := creatGroup(dataCount+parityCount, segmentSize)
 	// 生成taggroup装一组的tag+tagP
 	taggroup := creatGroup((dataCount+parityCount)*tagNum, tagSize)
-	for i := beginOffset; i <= MAXOFFSET && data != nil; i++ {
+	for i := beginOffset; i <= utils.MAXOFFSET && data != nil; i++ {
 		clearGroup(tmpdata)
 		clearGroup(taggroup)
 		for j := 0; j < dataCount; j++ {

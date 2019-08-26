@@ -8,11 +8,11 @@ import (
 	"strconv"
 
 	"github.com/memoio/go-mefs/bls12"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
 	DefaultSegmentSize = 4 * 1024 //(4k)
-	MAXOFFSET          = 255      // 一个Stripe最多有256个field，最大offset为255
 	RsPolicy           = 1
 	MulPolicy          = 2
 )
@@ -251,8 +251,8 @@ func VerifyBlockLength(blockData []byte, beginoffset, tagFlag, segmentSize, data
 	if len(noPreRawdata)%int(fieldSize) != 0 { //fields有问题
 		return false, ErrDataBroken
 	}
-	if dif+beginoffset*int(pre.SegmentSize)*dataCount > (MAXOFFSET+1)*int(pre.SegmentSize)*dataCount {
-		if len(noPreRawdata)/int(fieldSize) < MAXOFFSET+1 {
+	if dif+beginoffset*int(pre.SegmentSize)*dataCount > (utils.MAXOFFSET+1)*int(pre.SegmentSize)*dataCount {
+		if len(noPreRawdata)/int(fieldSize) < utils.MAXOFFSET+1 {
 			return false, ErrDataBroken
 		}
 	} else {

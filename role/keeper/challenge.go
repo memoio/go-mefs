@@ -102,7 +102,7 @@ func ChallengeProviderBLS12() {
 			}
 			str := key.(string) + "_" + strconv.Itoa(cInfo.offset)
 			ret = append(ret, str)
-			maxlength += uint32((df.MAXOFFSET + 1) * df.DefaultSegmentSize)
+			maxlength += uint32((utils.MAXOFFSET + 1) * df.DefaultSegmentSize)
 			sum += uint32((cInfo.offset + 1) * df.DefaultSegmentSize)
 			return true
 		})
@@ -300,7 +300,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 			thischalinfo.tmpCid.Delete(k)
 			return true
 		}
-		thischalinfo.maxlength += uint32((df.MAXOFFSET + 1) * df.DefaultSegmentSize)
+		thischalinfo.maxlength += uint32((utils.MAXOFFSET + 1) * df.DefaultSegmentSize)
 		thischalinfo.tmpCid.Delete(k)
 		return true
 	})
