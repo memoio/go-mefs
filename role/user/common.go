@@ -17,7 +17,7 @@ import (
 //-------Group Type------
 
 const (
-	KeeperSLA             = 4 //暂定
+	KeeperSLA             = 2 //暂定
 	ProviderSLA           = 6
 	DefaultCapacity int64 = 100     //单位：MB
 	DefaultDuration int64 = 10      //单位：天

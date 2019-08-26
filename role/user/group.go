@@ -56,11 +56,16 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	endpoint := config.Eth
 	balance, err := contracts.QueryBalance(endpoint, uaddr.Hex())
 	if err != nil {
-		return err
+		if config.Test {
+			balance = big.NewInt(0)
+		} else {
+			return err
+		}
+
 	}
 	fmt.Println(gp.Userid, "balance", balance)
 	// 说明该user没钱，该user为testuser;否则为有金额的实际用户
-	if balance.Cmp(big.NewInt(0)) <= 0 || config.Test {
+	if balance.Cmp(big.NewInt(0)) <= 0 {
 		// 判断是否为初始化启动
 		if isInit {
 			err := gp.findKeeperAndProviderInit(ctx)
@@ -122,6 +127,10 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 			time.Sleep(10 * time.Second) //没联网，等联网
 		}
 		waitTime++
+	}
+
+	if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
+		return nil
 	}
 
 	connectTryCount := 10
@@ -411,6 +420,7 @@ func (gp *GroupService) userInitNotif(km *metainfo.KeyMeta, userBLS12configkey, 
 	assignedKP := assignedKeeper + metainfo.DELIMITER + assignedProvider
 	km.SetKeyType(metainfo.UserInitNotif)
 
+	var wg sync.WaitGroup
 	notif := func(wg *sync.WaitGroup, keeper string) {
 		defer wg.Done()
 		fmt.Println("Notify keeper:", keeper)
@@ -420,7 +430,6 @@ func (gp *GroupService) userInitNotif(km *metainfo.KeyMeta, userBLS12configkey, 
 		}
 	}
 	//TODO:Keeper有没有错误的逻辑需要考虑，如果有一部分回复completed，一部分回复error怎么办
-	var wg sync.WaitGroup
 	for _, keeper := range gp.localPeersInfo.Keepers { //循环发消息
 		wg.Add(1)
 		go notif(&wg, keeper.KeeperID)

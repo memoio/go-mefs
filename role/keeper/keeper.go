@@ -855,6 +855,9 @@ func checkStorage(ctx context.Context) {
 
 func checkPeers(ctx context.Context) {
 	fmt.Println("CheckConnectedPeer() start!")
+	// sleep 1 minutes and then check
+	time.Sleep(time.Minute)
+	checkConnectedPeer()
 	ticker := time.NewTicker(CONPEERTIME)
 	defer ticker.Stop()
 	for {

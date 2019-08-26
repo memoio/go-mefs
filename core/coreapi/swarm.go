@@ -23,9 +23,8 @@ type connInfo struct {
 	conn inet.Conn
 	dir  inet.Direction
 
-	addr  ma.Multiaddr
-	peer  peer.ID
-	muxer string
+	addr ma.Multiaddr
+	peer peer.ID
 }
 
 func (api *SwarmAPI) Connect(ctx context.Context, pi peer.AddrInfo) error {

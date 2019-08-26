@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -53,6 +54,8 @@ func (keeper *KeeperHandlerV2) HandleMetaMessage(metaKey, metaValue, from string
 		go handleStorageSync(km, metaValue, from)
 	case metainfo.Query: //user查询信息
 		return handleQueryInfo(km)
+	case metainfo.GetPeerAddr:
+		return handlePeerAddr(km)
 	case metainfo.Test:
 		go handleTest(km)
 	default: //没有匹配的信息，丢弃
@@ -389,6 +392,20 @@ func handleNewProviderReq(km *metainfo.KeyMeta, metaValue string) (string, error
 		}
 	}
 	return res, nil
+}
+
+func handlePeerAddr(km *metainfo.KeyMeta) (string, error) {
+	peerID := km.GetMid()
+	conns := localNode.PeerHost.Network().Conns()
+	for _, c := range conns {
+		pid := c.RemotePeer()
+		if pid.Pretty() == peerID {
+			addr := c.RemoteMultiaddr()
+			fmt.Println(addr.String())
+			return addr.String(), nil
+		}
+	}
+	return "", errors.New("Donot have this peer")
 }
 
 func handleQueryInfo(km *metainfo.KeyMeta) (string, error) {

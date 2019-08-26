@@ -46,6 +46,7 @@ const (
 	Query
 	PutBlock
 	GetBlock
+	GetPeerAddr
 	Test MetaKeyType = 99
 )
 
@@ -72,6 +73,7 @@ var KeyTypeMap = map[MetaKeyType]int{
 	Query:                 3,
 	PutBlock:              1,
 	GetBlock:              1,
+	GetPeerAddr:           0,
 	Test:                  0,
 }
 
