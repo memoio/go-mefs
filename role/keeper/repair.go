@@ -7,8 +7,11 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -95,6 +98,133 @@ func RepairBlock(userID string, blockID string) {
 	if err != nil {
 		fmt.Println("err :", err)
 	}
+}
+
+func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
+	blockID := km.GetMid()
+	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
+	if len(splitedValue) != 4 {
+		fmt.Println(metainfo.ErrIllegalValue, metaValue)
+		return
+	}
+	pid := splitedValue[2]
+	offset, err := strconv.Atoi(splitedValue[3])
+	if err != nil {
+		fmt.Println("strconv.Atoi offset error :", err)
+		return
+	}
+	uid := blockID[:IDLength]
+	pu := PU{
+		pid: pid,
+		uid: uid,
+	}
+	if strings.Compare(splitedValue[0], RepairFailed) == 0 {
+		fmt.Println("修复失败 cid :", blockID)
+		thischalinfo, ok := getChalinfo(pu)
+		if ok {
+			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok {
+				thiscidinfo.(*cidInfo).res = false
+				thiscidinfo.(*cidInfo).repair = 0
+			}
+		} else {
+			fmt.Println("!ok blockID :", blockID, "\npid :", pid, "\nuid :", uid)
+			newcidinfo := &cidInfo{
+				repair: 0,
+				offset: offset,
+				res:    false,
+			}
+			var newCid, newTime sync.Map
+			newCid.Store(blockID, newcidinfo)
+			newchalinfo := &chalinfo{
+				Time: newTime,
+				Cid:  newCid,
+			}
+			LedgerInfo.Store(pu, newchalinfo)
+		}
+	} else {
+		pu1 := PU{
+			pid: provider,
+			uid: uid,
+		}
+		fmt.Println("修复成功 cid :", blockID)
+		newcidinfo := &cidInfo{
+			repair:    0,
+			availtime: utils.GetUnixNow(),
+			offset:    offset,
+		}
+
+		if thischalinfo, ok := getChalinfo(pu1); ok {
+			if thischalinfo.inChallenge == 1 {
+				thischalinfo.tmpCid.Store(blockID, newcidinfo)
+			} else if thischalinfo.inChallenge == 0 {
+				thischalinfo.Cid.Store(blockID, newcidinfo)
+			}
+		} else {
+			var newCid, newTime sync.Map
+			newCid.Store(blockID, newcidinfo)
+			newchalinfo := &chalinfo{
+				Time: newTime,
+				Cid:  newCid,
+			}
+			LedgerInfo.Store(pu1, newchalinfo)
+		}
+
+		oldchalinfo, isExist := getChalinfo(pu)
+		if isExist {
+			oldchalinfo.Cid.Delete(blockID)
+		}
+
+		addCredit(provider)
+
+		var NewPids string
+		var flag int
+		thisGroupsInfo, ok := getGroupsInfo(uid)
+		if !ok {
+			fmt.Println(ErrNoGroupsInfo)
+			return
+		}
+		for _, Pid := range thisGroupsInfo.Providers {
+			if strings.Compare(Pid, provider) == 0 {
+				break
+			} else {
+				flag++
+				NewPids += Pid
+			}
+		}
+		if flag == len(thisGroupsInfo.Providers) {
+			thisGroupsInfo.Providers = append(thisGroupsInfo.Providers, provider)
+		}
+		NewPids += provider
+
+		kmPid, err := metainfo.NewKeyMeta(uid, metainfo.Sync, metainfo.SyncTypePid)
+		if err != nil {
+			fmt.Println("construct SyncPidsK error :", err)
+			return
+		}
+		metaSyncTo(kmPid, NewPids)
+		kmPid.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmPid.ToString(), NewPids, "local")
+		if err != nil {
+			fmt.Println("construct SyncPidsK error :", err)
+			return
+		}
+		//更新block的meta信息
+		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Sync, metainfo.SyncTypeBlock)
+		if err != nil {
+			fmt.Println("construct Syncblock KV error :", err)
+			return
+		}
+		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
+		metaSyncTo(kmBlock, metaValue)
+		kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBlock.ToString(), metaValue, "local")
+		if err != nil {
+			fmt.Println("construct SyncPidsK error :", err)
+			return
+		}
+	}
+	return
+
 }
 
 //SearchNewProvider find a NEW provider for user
