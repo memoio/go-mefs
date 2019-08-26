@@ -22,6 +22,7 @@ import (
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
+	"github.com/memoio/go-mefs/role/user/task"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -156,7 +157,7 @@ type Upload struct { //一个上传任务实例
 	keepers     []string
 }
 
-func (lfs *LfsService) ConstructUpload(objectName, namePrefix, bucketName string, file files.Node) (*Upload, error) {
+func (lfs *LfsService) ConstructUpload(objectName, namePrefix, bucketName string, file files.Node) (task.Job, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
 		return nil, err
@@ -198,23 +199,45 @@ func (lfs *LfsService) ConstructUpload(objectName, namePrefix, bucketName string
 
 }
 
+func (ul *Upload) Stop(context.Context) error {
+	return nil
+}
+func (ul *Upload) Cancel(context.Context) error {
+	return nil
+}
+func (ul *Upload) Done() {
+	return
+}
+func (ul *Upload) Info() (interface{}, error) {
+	if ul == nil || ul.Object == nil {
+		return nil, ErrObjectNotExist
+	}
+	return ul, nil
+}
+
 //上传文件
-func (ul *Upload) PutObject(ctx context.Context) (*pb.ObjectInfo, error) {
+func (ul *Upload) Start(ctx context.Context) error {
 	if ul == nil {
-		return nil, ErrLfsIsNotRunning
+		return ErrLfsIsNotRunning
 	}
 	if err := checkObjectName(ul.ObjectName); err != nil {
-		return nil, err
+		return err
 	}
 	ObjectName := ul.NamePrefix + ul.ObjectName
 	if len(ul.ObjectName) > maxObjectNameLen {
-		return nil, ErrObjectNameToolong
+		return ErrObjectNameToolong
 	}
-
+	if Bucket, ok := ul.LfsService.CurrentLog.BucketByID[ul.BucketID]; !ok || Bucket.Deletion {
+		return ErrBucketNotExist
+	}
+	bucketInfo := ul.LfsService.CurrentLog.BucketByID[ul.BucketID]
+	if bucketInfo.Policy != dataformat.RsPolicy && bucketInfo.Policy != dataformat.MulPolicy {
+		return ErrPolicy
+	}
 	ul.LfsService.CurrentLog.State[ul.BucketID].Mu.Lock()
 	defer ul.LfsService.CurrentLog.State[ul.BucketID].Mu.Unlock()
 	if object, ok := ul.LfsService.CurrentLog.Entries[ul.BucketID][ObjectName]; ok || object != nil {
-		return nil, ErrObjectAlreadyExist
+		return ErrObjectAlreadyExist
 	}
 
 	object := &pb.ObjectInfo{
@@ -228,19 +251,16 @@ func (ul *Upload) PutObject(ctx context.Context) (*pb.ObjectInfo, error) {
 	}
 	ul.Object = object
 	ul.LfsService.CurrentLog.Entries[ul.BucketID][ObjectName] = object
-	bucketInfo := ul.LfsService.CurrentLog.BucketByID[ul.BucketID]
-	if bucketInfo.Policy != dataformat.RsPolicy && bucketInfo.Policy != dataformat.MulPolicy {
-		return nil, ErrPolicy
-	}
+
 	encodeOpt := dataformat.NewDataformat(bucketInfo.Policy, "", bucketInfo.DataCount, bucketInfo.ParityCount,
 		int32(bucketInfo.TagFlag), bucketInfo.NextOffset, bucketInfo.SegmentSize, GetGroupService(ul.LfsService.UserID).GetKeyset())
 	err := ul.putObject(ctx, encodeOpt)
 	if err != nil {
 		ul.LfsService.CurrentLog.State[ul.BucketID].Dirty = true //需要记录，可能上传一部分然后失败，空间已占用
-		return nil, err
+		return err
 	}
 	ul.LfsService.CurrentLog.State[ul.BucketID].Dirty = true
-	return object, nil
+	return nil
 }
 
 // 具体实现
@@ -488,18 +508,18 @@ type Download struct { //一个下载任务实例
 	closePipeWithError func(error) bool
 }
 
-func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (*Download, error) {
+func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (task.Job, io.Reader, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; !ok || bucket.Deletion {
-		return nil, ErrBucketNotExist
+		return nil, nil, ErrBucketNotExist
 	}
 	BucketID := lfs.CurrentLog.BucketByName[bucketName].BucketID
 	var object *pb.ObjectInfo
 	if object = lfs.CurrentLog.Entries[BucketID][objectName]; object == nil || object.Deletion {
-		return nil, ErrObjectNotExist
+		return nil, nil, ErrObjectNotExist
 	}
 	piper, pipew := io.Pipe()
 	//bufw := bufio.NewWriterSize(pipew, DefaultBufSize)
@@ -528,10 +548,26 @@ func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (*Downlo
 		pipeWriter:         pipew,
 		closePipeWithError: checkErrAndClosePipe,
 	}
+	return dl, piper, nil
+}
+
+func (dl *Download) Stop(context.Context) error {
+	return nil
+}
+func (dl *Download) Cancel(context.Context) error {
+	return nil
+}
+func (dl *Download) Done() {
+	return
+}
+func (dl *Download) Info() (interface{}, error) {
+	if dl == nil || dl.Object == nil {
+		return nil, ErrObjectNotExist
+	}
 	return dl, nil
 }
 
-func (dl *Download) GetObject(ctx context.Context) (io.Reader, error) {
+func (dl *Download) Start(ctx context.Context) error {
 	switch dl.LfsService.CurrentLog.BucketByID[dl.BucketID].Policy {
 	case dataformat.RsPolicy:
 		go func() {
@@ -548,9 +584,9 @@ func (dl *Download) GetObject(ctx context.Context) (io.Reader, error) {
 			}
 		}()
 	default:
-		return nil, ErrPolicy
+		return ErrPolicy
 	}
-	return dl.pipeReader, nil
+	return nil
 }
 
 func (dl *Download) getObjectWithEC(ctx context.Context) error {
