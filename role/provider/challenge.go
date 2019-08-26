@@ -91,7 +91,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 		return err
 	}
 	// 在发送之前检查生成的proof
-	boo, err := mcl.Verify(pubKey, chal, proof)
+	boo, err := mcl.VerifyProof(pubKey, chal, proof)
 	if err != nil {
 		fmt.Println("verify proof failed, err is: ", err)
 		return err

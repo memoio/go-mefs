@@ -242,9 +242,9 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		fmt.Println("getUserBLS12Config error! uid:", uid)
 		return
 	}
-	res, err := mcl.Verify(pubs.PubKey, h, proof)
+	res, err := mcl.VerifyProof(pubs.PubKey, h, proof)
 	if err != nil {
-		fmt.Println("mcl.Verify error!", err)
+		fmt.Println("mcl.VerifyProof error!", err)
 		return
 	}
 	if res {
