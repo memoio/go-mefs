@@ -25,8 +25,6 @@ import (
 )
 
 func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
-	//blk blocks.Block
-
 	// key is cid|ops|type|begin|end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	bcid := cid.NewCidV2([]byte(splitedNcid[0]))

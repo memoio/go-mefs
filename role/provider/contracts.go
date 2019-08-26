@@ -11,6 +11,35 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
+func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) error {
+	fmt.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
+	err := SaveUpkeeping(km.GetMid())
+	if err != nil {
+		fmt.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
+	} else {
+		fmt.Println("Save ", km.GetMid(), "'s Upkeeping success")
+	}
+	err = SaveChannel(km.GetMid())
+	if err != nil {
+		fmt.Println("Save ", km.GetMid(), "'s Channel err", err)
+	} else {
+		fmt.Println("Save ", km.GetMid(), "'s Channel success")
+	}
+	err = SaveQuery(km.GetMid())
+	if err != nil {
+		fmt.Println("Save ", km.GetMid(), "'s Query err", err)
+	} else {
+		fmt.Println("Save ", km.GetMid(), "'s Query success")
+	}
+	err = SaveOffer()
+	if err != nil {
+		fmt.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
+	} else {
+		fmt.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
+	}
+	return nil
+}
+
 func SaveUpkeeping(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
