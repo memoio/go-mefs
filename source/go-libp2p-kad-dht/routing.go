@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,9 +17,11 @@ import (
 	cid "github.com/ipfs/go-cid"
 	u "github.com/ipfs/go-ipfs-util"
 	logging "github.com/ipfs/go-log"
-	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	record "github.com/libp2p/go-libp2p-record"
+
+	"github.com/memoio/go-mefs/config"
+	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 )
 
 // asyncQueryBuffer is the size of buffered channels in async queries. This
@@ -587,16 +590,34 @@ func (dht *IpfsDHT) FindPeer(ctx context.Context, id peer.ID) (_ peer.AddrInfo, 
 		return pi, nil
 	}
 
-	peers := dht.routingTable.NearestPeers(kb.ConvertPeerID(id), AlphaValue)
-	if len(peers) == 0 {
-		return peer.AddrInfo{}, kb.ErrLookupFailure
-	}
+	var peers []peer.ID
+	isouter := ctx.Value("ExternIP")
+	if isouter != nil {
+		for _, defaultBootstrapAddress := range config.DefaultBootstrapAddresses {
+			addr := strings.Split(defaultBootstrapAddress, "/")
+			ID := addr[len(addr)-1]
+			peer, err := peer.IDB58Decode(ID)
+			if err != nil {
+				continue
+			}
+			peers = append(peers, peer)
+		}
+		if len(peers) == 0 {
+			fmt.Println("No bootstrap addresses, please add them to config")
+			return peer.AddrInfo{}, kb.ErrLookupFailure
+		}
+	} else {
+		peers = dht.routingTable.NearestPeers(kb.ConvertPeerID(id), AlphaValue)
+		if len(peers) == 0 {
+			return peer.AddrInfo{}, kb.ErrLookupFailure
+		}
 
-	// Sanity...
-	for _, p := range peers {
-		if p == id {
-			logger.Debug("found target peer in list of closest peers...")
-			return dht.peerstore.PeerInfo(p), nil
+		// Sanity...
+		for _, p := range peers {
+			if p == id {
+				logger.Debug("found target peer in list of closest peers...")
+				return dht.peerstore.PeerInfo(p), nil
+			}
 		}
 	}
 
