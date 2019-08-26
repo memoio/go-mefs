@@ -30,7 +30,10 @@ func ConnectTo(ctx context.Context, node *core.MefsNode, to string) bool {
 	connectTryCount := 3
 	for i := 0; i <= connectTryCount; i++ {
 		if retry { // retry three times
-			return getAddrAndConnect(ctx, node, to)
+			res := getAddrAndConnect(ctx, node, to)
+			if res {
+				return true
+			}
 		}
 
 		pi, err := node.Routing.FindPeer(ctx, id)
@@ -71,7 +74,7 @@ func getAddrAndConnect(ctx context.Context, node *core.MefsNode, to string) bool
 
 		pai, err := peersWithAddresses(paddr)
 		if err != nil {
-			return false
+			continue
 		}
 
 		if swrm, ok := node.PeerHost.Network().(*swarm.Swarm); ok {
@@ -82,7 +85,6 @@ func getAddrAndConnect(ctx context.Context, node *core.MefsNode, to string) bool
 		if err == nil {
 			return true
 		}
-
 	}
 	return false
 }
