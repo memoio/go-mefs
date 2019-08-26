@@ -574,8 +574,13 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		fmt.Println(err)
 		return err
 	}
-	endpoint := config.Eth                                             //通过config的Eth字段获得起rpc客户端的端点
-	balance, _ := contracts.QueryBalance(endpoint, localAddress.Hex()) //获得用户的账户余额
+	endpoint := config.Eth                                               //通过config的Eth字段获得起rpc客户端的端点
+	balance, err := contracts.QueryBalance(endpoint, localAddress.Hex()) //获得用户的账户余额
+	if err != nil {
+		if config.Test {
+			balance = big.NewInt(0)
+		}
+	}
 	fmt.Println("balance:", balance)
 
 	d := gp.storeDays
