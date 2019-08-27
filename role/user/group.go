@@ -15,7 +15,6 @@ import (
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/core"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -23,18 +22,13 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-const (
-	bftString = "bft"
-)
-
-func ConstructGroupService(userid string, privKey []byte, node *core.MefsNode, duration int64, capacity int64, price int64, ks int, ps int) *GroupService {
-	if privKey == nil || node == nil {
+func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int) *GroupService {
+	if privKey == nil {
 		return nil
 	}
 	return &GroupService{
 		Userid:         userid,
 		PrivateKey:     privKey,
-		localNode:      node,
 		localPeersInfo: PeersInfo{},
 		storeDays:      duration,
 		storeSize:      capacity,
@@ -46,7 +40,7 @@ func ConstructGroupService(userid string, privKey []byte, node *core.MefsNode, d
 
 //TODO:在使用provider之前都应该检查一下连接性
 func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isInit bool) error {
-	if gp == nil || gp.localNode == nil {
+	if gp == nil {
 		return ErrCannotConnectNetwork
 	}
 	gp.password = pwd
@@ -55,24 +49,29 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	if err != nil {
 		return err
 	}
-	config, err := gp.localNode.Repo.Config()
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		return err
 	}
 	endpoint := config.Eth
 	balance, err := contracts.QueryBalance(endpoint, uaddr.Hex())
 	if err != nil {
-		return err
+		if config.Test {
+			balance = big.NewInt(0)
+		} else {
+			return err
+		}
+
 	}
 	fmt.Println(gp.Userid, "balance", balance)
 	// 说明该user没钱，该user为testuser;否则为有金额的实际用户
-	if balance.Cmp(big.NewInt(0)) <= 0 || config.Test {
+	if balance.Cmp(big.NewInt(0)) <= 0 {
 		// 判断是否为初始化启动
 		if isInit {
 			err := gp.findKeeperAndProviderInit(ctx)
 			return err
 		}
-		// 代理启动
+
 		// 尝试以inited方式启动
 		err = gp.findKeeperAndProviderNotInit(ctx)
 		if err != nil {
@@ -114,25 +113,27 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 
 func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers, providers []common.Address) error {
 	fmt.Println("Begin to connect user's keepers and providers:", gp.Userid)
-	waitTime := 0
-	// 判断是否联网
+
+	waitTime := 0 //进行网络连接
 	for {
 		if waitTime > 60 { //连不上网？
-			log.Println("Cannot connect to other peer, please restart and try again.")
+			log.Println(ErrCannotConnectNetwork, "please restart and retry.")
 			return ErrCannotConnectNetwork
 		}
-		if connPeers := gp.localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
+		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
 			break //连上网了，退出
 		} else {
+			log.Println(ErrCannotConnectNetwork, "waiting...")
 			time.Sleep(10 * time.Second) //没联网，等联网
 		}
-		log.Println("Cannot connect to other peer, retrying...")
 		waitTime++
 	}
-	// 是否已经连接上足够的keepers
+
 	if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
 		return nil
 	}
+
+	connectTryCount := 10
 	// 第一次对所有keeper进行连接，第二次对连接失败的keeper进行连接，依次类推
 	for i := 0; i < connectTryCount; i++ {
 		var unsuccess []common.Address
@@ -143,7 +144,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 				continue
 			}
 			// 连接失败加入unsuccess
-			if !sc.ConnectTo(ctx, gp.localNode, kid) {
+			if !sc.ConnectTo(ctx, localNode, kid) {
 				unsuccess = append(unsuccess, keeper)
 				log.Println("Connect to keeper", kid, "failed.")
 				continue
@@ -155,15 +156,13 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 			if err != nil {
 				return err
 			}
-			res, err := gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), kid)
+			res, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), kid)
 			if err == nil && res != nil {
 				resStr := string(res)
 				splitRes := strings.Split(resStr, metainfo.DELIMITER)
 				if len(splitRes) > 3 {
-					if splitRes[1] == bftString {
+					if splitRes[1] == metainfo.SyncTypeBft {
 						tempKeeper.IsBFT = true
-						tempKeeper.P2PAddr = splitRes[1]
-						tempKeeper.RpcAddr = splitRes[2]
 					}
 				}
 			}
@@ -186,7 +185,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 			// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
 			if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
 				if gp.KeySet == nil {
-					err := gp.loadBLS12ConfigMeta()
+					err := gp.loadBLS12Config()
 					if err != nil {
 						log.Println("Load BLS12 Config error:", err)
 						return err
@@ -198,27 +197,27 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 						fmt.Println("Get pid error, the error is ", err)
 						continue
 					}
-					if sc.ConnectTo(ctx, gp.localNode, pid) {
+					if sc.ConnectTo(ctx, localNode, pid) {
 						fmt.Println("Connect to provider-", pid, "success.")
 					} else {
 						fmt.Println("Connect to provider-", pid, "failed.")
 					}
 					gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
 				}
-				// 构造key告诉keeper和provider自己已经部署好合约
+				// 构造key告诉keeper和provider自己已经启动
 				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
 				if err != nil {
 					fmt.Println("Construct Deployed key error", err)
 					return err
 				}
 				for _, keeper := range gp.localPeersInfo.Keepers {
-					_, err = gp.sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
+					_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
 					if err != nil {
 						fmt.Println("Send keeper", keeper.KeeperID, " err:", err)
 					}
 				}
 				for _, provider := range gp.localPeersInfo.Providers {
-					_, err = gp.sendMetaRequest(kmPid, gp.Userid, provider)
+					_, err = sendMetaRequest(kmPid, gp.Userid, provider)
 					if err != nil {
 						fmt.Println("Send provider", provider, " err:", err)
 					}
@@ -245,14 +244,14 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var queryAddr common.Address
-
 	//user部署query合约
-	config, err := gp.localNode.Repo.Config()
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+
+	var queryAddr common.Address
 	if !config.Test {
 		endPoint := config.Eth
 		balance, _ := contracts.QueryBalance(endPoint, addr.Hex()) //获得用户的账户余额
@@ -277,8 +276,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 		fmt.Println("测试环境，将不部署query合约")
 	}
 
-	fmt.Println("Begin to find Keeper for init...", "\nthe uid is: "+gp.Userid+"\nthe addr is: "+addr.String())
-	var userBLS12configkey string
+	fmt.Println("Begin to find Keepers for init...", "\nthe uid is: "+gp.Userid+"\nthe addr is: "+addr.String())
 
 	waitTime := 0 //进行网络连接
 	for {
@@ -286,7 +284,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			log.Println(ErrCannotConnectNetwork, "please restart and retry.")
 			return ErrCannotConnectNetwork
 		}
-		if connPeers := gp.localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
+		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
 			break //连上网了，退出
 		} else {
 			log.Println(ErrCannotConnectNetwork, "waiting...")
@@ -300,14 +298,13 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	userBLS12configkey = kmBls.ToString()
+
 	userBLS12config, err := gp.userBLS12ConfigInit(gp.password) //初始化配置
 	if err != nil {
 		log.Println("Cannot init BLS Config-", err)
 		return err
 	}
-	userBLS12configstring := string(userBLS12config)
-	err = gp.localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userBLS12configkey, userBLS12configstring, "local") //先在本地保存一份
+	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBls.ToString(), string(userBLS12config), "local") //先在本地保存一份
 	if err != nil {
 		fmt.Println("CmdPutTo()err")
 		return err
@@ -319,18 +316,18 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 		fmt.Println("findKeeperAndProviderInit()NewKeyMeta()error!")
 		return err
 	}
-	go gp.broadcastMetaMessage(kmInit, "")
+	go broadcastMetaMessage(kmInit, "")
 	err = SetUserState(gp.Userid, Collecting)
 	if err != nil {
 		return err
 	}
-	//十分钟超时
+	// 二十分钟超时
 	timeOutCount := 0
-	tick := time.Tick(20 * time.Second)
+	tick := time.Tick(30 * time.Second)
 	for {
 		select {
-		case <-tick: //每过20s 检查是否收到了足够的KP信息，如果不足，继续发送初始化请求，足够的时候进行KP的选择和确认
-			if timeOutCount >= 60 {
+		case <-tick: //每过30s 检查是否收到了足够的KP信息，如果不足，继续发送初始化请求，足够的时候进行KP的选择和确认
+			if timeOutCount >= 40 {
 				return ErrTimeOut
 			}
 			timeOutCount++
@@ -346,10 +343,10 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 					if err != nil {
 						return err
 					}
-					gp.userInitNotIf(kmInit, userBLS12configkey, userBLS12configstring)
+					gp.userInitNotif(kmInit, kmBls.ToString(), string(userBLS12config))
 				} else {
 					fmt.Printf("Timeout, No enough Keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(gp.tempKeepers), len(gp.tempProviders), gp.keeperSLA, gp.providerSLA)
-					go gp.broadcastMetaMessage(kmInit, "")
+					go broadcastMetaMessage(kmInit, "")
 				}
 			case CollectCompleted:
 				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
@@ -370,54 +367,64 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 
 //  AddKeepersAndProviders 把keeper和provider的id加入groupservice的备选中
 func (gp *GroupService) addKeepersAndProviders(keepers, providers string) {
-	if remain := len(keepers) % IDLength; remain != 0 {
+	if remain := len(keepers) % utils.IDLength; remain != 0 {
 		keepers = keepers[:len(keepers)-remain]
 	}
-	for i := 0; i < len(keepers)/IDLength; i++ {
-		kid := keepers[i*IDLength : (i+1)*IDLength]
+	for i := 0; i < len(keepers)/utils.IDLength; i++ {
+		kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
 		if !utils.CheckDup(gp.tempKeepers, kid) {
 			continue
 		}
-		if sc.ConnectTo(context.Background(), gp.localNode, kid) {
+		if sc.ConnectTo(context.Background(), localNode, kid) {
 			gp.tempKeepers = append(gp.tempKeepers, kid)
 		}
 	}
-	if remain := len(providers) % IDLength; remain != 0 {
+	if remain := len(providers) % utils.IDLength; remain != 0 {
 		providers = providers[:len(providers)-remain]
 	}
-	for i := 0; i < len(providers)/IDLength; i++ {
-		pid := providers[i*IDLength : (i+1)*IDLength]
+	for i := 0; i < len(providers)/utils.IDLength; i++ {
+		pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
 		if !utils.CheckDup(gp.tempProviders, pid) {
 			continue
 		}
-		if sc.ConnectTo(context.Background(), gp.localNode, pid) {
+		if sc.ConnectTo(context.Background(), localNode, pid) {
 			gp.tempProviders = append(gp.tempProviders, pid)
 		}
 	}
 }
 
 //userInitNotIf 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
-func (gp *GroupService) userInitNotIf(km *metainfo.KeyMeta, userBLS12configkey, userBLS12configstring string) {
-	assignedKeeper, assignedProvider, err := gp.chooseKeepersAndProviders()
+func (gp *GroupService) userInitNotif(km *metainfo.KeyMeta, userBLS12configkey, userBLS12configstring string) {
+	err := gp.chooseKeepersAndProviders()
 	if err != nil {
 		if err == ErrNoEnoughKeeper { //有keeper没有连接上，重新设置初始化状态为collecting
 			err := SetUserState(gp.Userid, Collecting)
 			if err != nil {
-				fmt.Println("userInitNotIf()SetUserState()err:", err)
+				fmt.Println("userInitNotif()SetUserState()err:", err)
 			}
 		}
 		fmt.Println(err)
 		return
 	}
 
+	//构造本节点keeper信息和provider信息 放入硬盘 id1id2id3.......(无分隔符)
+	var assignedKeeper, assignedProvider string
+	for _, keeper := range gp.localPeersInfo.Keepers {
+		assignedKeeper += keeper.KeeperID
+	}
+
+	for _, provider := range gp.localPeersInfo.Providers {
+		assignedProvider += provider
+	}
 	//构造发给keeper的初始化确认信息并发送给自己的所有keeper
 	assignedKP := assignedKeeper + metainfo.DELIMITER + assignedProvider
 	km.SetKeyType(metainfo.UserInitNotif)
+
 	var wg sync.WaitGroup
 	notif := func(wg *sync.WaitGroup, keeper string) {
 		defer wg.Done()
 		fmt.Println("Notify keeper:", keeper)
-		_, err := gp.sendMetaRequest(km, assignedKP, keeper) //发送确认信息
+		_, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
 		if err != nil {
 			fmt.Println("gp.localNode.Routing.MetaNewUserNotif failed :", err)
 		}
@@ -431,7 +438,7 @@ func (gp *GroupService) userInitNotIf(km *metainfo.KeyMeta, userBLS12configkey, 
 
 	//最后发送本节点的BLS12公钥到自己的keeper上保存
 	for _, keeper := range gp.localPeersInfo.Keepers {
-		err := gp.localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userBLS12configkey, userBLS12configstring, keeper.KeeperID)
+		err := localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userBLS12configkey, userBLS12configstring, keeper.KeeperID)
 		if err != nil {
 			fmt.Println("gp.localNode.Routing.CmdPut failed :", err)
 		}
@@ -440,28 +447,27 @@ func (gp *GroupService) userInitNotIf(km *metainfo.KeyMeta, userBLS12configkey, 
 }
 
 //chooseKeepersAndProviders 启动流程，收集到足够KP信息，从备选中 选出本节点的keeper和provider，选择keeper的时候，检查连接性
-func (gp *GroupService) chooseKeepersAndProviders() (string, string, error) {
+func (gp *GroupService) chooseKeepersAndProviders() error {
 	userState, err := GetUserServiceState(gp.Userid)
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	if userState != CollectCompleted {
-		return "", "", ErrWrongInitState
+		return ErrWrongInitState
 	}
 	fmt.Println("Has enough Keeper and Providers, choosing...")
 	gp.localPeersInfo.Keepers = make([]*KeeperInfo, 0, gp.keeperSLA)
 	gp.localPeersInfo.Providers = make([]string, 0, gp.providerSLA)
 	//选择keeper
-	for i := 0; i < len(gp.tempKeepers); i++ {
+	for i := 0; i < len(gp.tempKeepers); {
 		if i >= gp.keeperSLA {
 			break
 		}
 		kidStr := gp.tempKeepers[i]
 		kidB58, _ := peer.IDB58Decode(kidStr)
 		//判断是否链接，如果连不上，则从备选中删除，看下一个
-		if gp.localNode.PeerHost.Network().Connectedness(kidB58) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), gp.localNode, kidStr) {
-				gp.tempKeepers = append(gp.tempKeepers[:i], gp.tempKeepers[i+1])
+		if localNode.PeerHost.Network().Connectedness(kidB58) != inet.Connected {
+			if !sc.ConnectTo(context.Background(), localNode, kidStr) {
 				continue
 			}
 		}
@@ -469,43 +475,33 @@ func (gp *GroupService) chooseKeepersAndProviders() (string, string, error) {
 			KeeperID:  kidStr,
 			Connected: false,
 		}
+		i++
 		gp.localPeersInfo.Keepers = append(gp.localPeersInfo.Keepers, tempKeeper)
 	}
 	if len(gp.localPeersInfo.Keepers) < gp.keeperSLA {
-		return "", "", ErrNoEnoughKeeper
+		return ErrNoEnoughKeeper
 	}
+
 	//选择provider
-	gp.localPeersInfo.Providers = gp.tempProviders[:gp.providerSLA]
+	for i := 0; i < len(gp.tempProviders); {
+		if i >= gp.providerSLA {
+			break
+		}
+		pidStr := gp.tempProviders[i]
+		pidB58, _ := peer.IDB58Decode(pidStr)
+		//判断是否链接，如果连不上，则从备选中删除，看下一个
+		if localNode.PeerHost.Network().Connectedness(pidB58) != inet.Connected {
+			if !sc.ConnectTo(context.Background(), localNode, pidStr) {
+				continue
+			}
+		}
+		i++
+		gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pidStr)
+	}
+
 	fmt.Println("Choose completed, Providers:", gp.localPeersInfo.Providers)
 
-	//构造本节点keeper信息和provider信息 放入硬盘 id1id2id3.......(无分隔符)
-	var assignedKeeper, assignedProvider string
-	for _, keeper := range gp.localPeersInfo.Keepers {
-		assignedKeeper += keeper.KeeperID
-	}
-	kmKid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.Local, metainfo.SyncTypeKid)
-	if err != nil {
-		fmt.Println("chooseKeepersAndProviders()NewKeyMeta()err:", err)
-		return "", "", err
-	}
-	err = gp.localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmKid.ToString(), assignedKeeper, "local")
-	if err != nil {
-		fmt.Println("gp.localNode.Routing.CmdPut failed :", err)
-	}
-	for _, provider := range gp.localPeersInfo.Providers {
-		assignedProvider += provider
-	}
-	kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.Local, metainfo.SyncTypePid)
-	if err != nil {
-		fmt.Println("chooseKeepersAndProviders()NewKeyMeta()err:", err)
-		return "", "", err
-	}
-	err = gp.localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmPid.ToString(), assignedProvider, "local")
-	if err != nil {
-		fmt.Println("gp.localNode.Routing.CmdPut failed :", err)
-		return "", "", err
-	}
-	return assignedKeeper, assignedProvider, nil
+	return nil
 }
 
 // keeperConfirm 第四次握手 确认Keeper启动完毕
@@ -518,8 +514,6 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 		if strings.Compare(keeperInfo.KeeperID, keeper) == 0 && !keeperInfo.Connected {
 			if len(splitInitRes) >= 2 {
 				keeperInfo.IsBFT = true
-				keeperInfo.P2PAddr = splitInitRes[0]
-				keeperInfo.RpcAddr = splitInitRes[1]
 			}
 			keeperInfo.Connected = true
 			fmt.Printf("Receive %s's response, waiting for other keepers\n", keeper)
@@ -531,7 +525,7 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 	//与所有keeper都连接成功了
 	if ConnectedCount == len(gp.localPeersInfo.Keepers) {
 		fmt.Println("Receive all keepers' response")
-		err := gp.localNode.Repo.SetConfigKey("IsInit", false) //初始化过后，设置IsInit
+		err := localNode.Repo.SetConfigKey("IsInit", false) //初始化过后，设置IsInit
 		if err != nil {
 			fmt.Println("gp.localNode.Repo.SetConfigKey failed :", err)
 		}
@@ -547,13 +541,13 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 			return err
 		}
 		for _, keeper := range gp.localPeersInfo.Keepers {
-			_, err = gp.sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
+			_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
 			if err != nil {
 				fmt.Println("Send keeper", keeper.KeeperID, " err:", err)
 			}
 		}
 		for _, provider := range gp.localPeersInfo.Providers {
-			_, err = gp.sendMetaRequest(kmPid, gp.Userid, provider)
+			_, err = sendMetaRequest(kmPid, gp.Userid, provider)
 			if err != nil {
 				fmt.Println("Send provider", provider, " err:", err)
 			}
@@ -569,19 +563,24 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 }
 
 func (gp *GroupService) deployUpKeepingAndChannel() error {
-	hexPK, localAddress, keepers, providers, err := gp.getParamsForDeploy(gp.Userid, gp.localPeersInfo)
+	hexPK, localAddress, keepers, providers, err := getParamsForDeploy(gp.Userid, gp.password, gp.localPeersInfo)
 	if err != nil {
 		fmt.Println("getParams:", err)
 		return err
 	}
 
-	config, err := gp.localNode.Repo.Config()
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	endpoint := config.Eth                                             //通过config的Eth字段获得起rpc客户端的端点
-	balance, _ := contracts.QueryBalance(endpoint, localAddress.Hex()) //获得用户的账户余额
+	endpoint := config.Eth                                               //通过config的Eth字段获得起rpc客户端的端点
+	balance, err := contracts.QueryBalance(endpoint, localAddress.Hex()) //获得用户的账户余额
+	if err != nil {
+		if config.Test {
+			balance = big.NewInt(0)
+		}
+	}
 	fmt.Println("balance:", balance)
 
 	d := gp.storeDays
@@ -636,7 +635,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 			return err
 		}
 		key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
-		err = gp.localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -646,7 +645,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		if err != nil {
 			return err
 		}
-		err = gp.localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -664,15 +663,15 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 		fmt.Println("findKeeperAndProviderNotInit()NewKeyMeta()error:", err)
 		return err
 	}
-	// fmt.Println("findKeeperAndProviderNotInit 的 kidmeta:", kidsMeta)
-	waitTime := 0
+
 	// 判断是否联网
+	waitTime := 0
 	for {
 		if waitTime > 10 { //连不上网？
 			log.Println("Cannot connect to other peer, please restart and try again.")
 			return ErrCannotConnectNetwork
 		}
-		if connPeers := gp.localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
+		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
 			break //连上网了，退出
 		} else {
 			time.Sleep(10 * time.Second) //没联网，等联网
@@ -686,8 +685,8 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 			log.Println(gp.Userid, "Cannot find my keeper,please restart and try again.")
 			return ErrCannotConnectKeeper
 		}
-		if kids, err := gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), ""); kids != nil && err == nil { //先看本地有没有
-			if remain := len(kids) % IDLength; remain != 0 {
+		if kids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), ""); kids != nil && err == nil { //先看本地有没有
+			if remain := len(kids) % utils.IDLength; remain != 0 {
 				kids = kids[:len(kids)-remain]
 			}
 			//有的keeper连接不上
@@ -701,9 +700,9 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 						return ErrCannotConnectKeeper
 					}
 					tickCount++
-					for i := 0; i < len(kids)/IDLength; i++ {
-						kid := string(kids[i*IDLength : (i+1)*IDLength])
-						if sc.ConnectTo(ctx, gp.localNode, kid) {
+					for i := 0; i < len(kids)/utils.IDLength; i++ {
+						kid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+						if sc.ConnectTo(ctx, localNode, kid) {
 							tempKeeper := &KeeperInfo{
 								KeeperID: kid,
 							}
@@ -711,15 +710,13 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 							if err != nil {
 								return err
 							}
-							res, err := gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), kid)
+							res, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), kid)
 							if err == nil && res != nil {
 								resStr := string(res)
 								splitRes := strings.Split(resStr, metainfo.DELIMITER)
 								if len(splitRes) > 3 {
-									if splitRes[1] == bftString {
+									if splitRes[1] == metainfo.SyncTypeBft {
 										tempKeeper.IsBFT = true
-										tempKeeper.P2PAddr = splitRes[1]
-										tempKeeper.RpcAddr = splitRes[2]
 									}
 								}
 							}
@@ -743,7 +740,7 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 
 						if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
 							if gp.KeySet == nil {
-								err = gp.loadBLS12ConfigMeta()
+								err = gp.loadBLS12Config()
 								if err != nil {
 									log.Println("Load BLS12 Config error:", err)
 									return err
@@ -753,14 +750,14 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 							if err != nil {
 								return err
 							}
-							if pids, err := gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmPid.ToString(), ""); pids != nil && err == nil { //只尝试连接一次provider
-								if remain := len(pids) % IDLength; remain != 0 {
+							if pids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmPid.ToString(), ""); pids != nil && err == nil { //只尝试连接一次provider
+								if remain := len(pids) % utils.IDLength; remain != 0 {
 									pids = pids[:len(pids)-remain]
 								}
 								providers := string(pids)
-								for i := 0; i < len(providers)/IDLength; i++ {
-									pid := providers[i*IDLength : (i+1)*IDLength]
-									if sc.ConnectTo(ctx, gp.localNode, pid) {
+								for i := 0; i < len(providers)/utils.IDLength; i++ {
+									pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
+									if sc.ConnectTo(ctx, localNode, pid) {
 										fmt.Println("Connect to provider-", pid, "success.")
 									} else {
 										fmt.Println("Connect to provider-", pid, "failed.")

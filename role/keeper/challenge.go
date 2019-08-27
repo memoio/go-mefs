@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -13,39 +13,12 @@ import (
 	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/pb"
-	b58 "github.com/mr-tron/base58/base58"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	b58 "github.com/mr-tron/base58/base58"
 )
-
-//LedgerInfo 存放挑战信息的内存结构体
-//key为结构体PU，value为结构体*chalinfo
-var LedgerInfo sync.Map //key为PU结构体，value为chalinfo结构体
-
-//PU 作为其他结构体的key，
-//目前用PU做key的结构体有LedgerInfo，PayInfo,用pid和uid共同索引信息
-type PU struct {
-	pid string
-	uid string
-}
-
-//chalinfo 作为LedgerInfo的value
-type chalinfo struct {
-	Time        sync.Map //某provider下user数据在某时刻发起挑战的结果，key为挑战发起时间的时间戳，格式为int64,value为chalresult
-	Cid         sync.Map
-	tmpCid      sync.Map
-	inChallenge int
-	maxlength   uint32
-}
-
-type cidInfo struct {
-	res       bool
-	repair    int32
-	availtime int64
-	offset    int
-}
 
 //chalresult 挑战结果在内存中的结构
 //作为chalinfo.Time的value 记录单次挑战的各项信息
@@ -78,50 +51,6 @@ func getChalresult(thisPU PU, time int64) (*chalresult, bool) {
 	}
 	return thischalresult.(*chalresult), true
 }
-
-//getChalinfo 输入pid和uid 获取LedgerInfo中的chalinfo指针
-func getChalinfo(thisPU PU) (*chalinfo, bool) {
-	thischalinfo, ok := LedgerInfo.Load(thisPU)
-	if !ok {
-		return nil, false
-	}
-	return thischalinfo.(*chalinfo), true
-}
-
-func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) error {
-	pu := PU{
-		pid: pid,
-		uid: uid,
-	}
-
-	newcidinfo := &cidInfo{
-		availtime: utils.GetUnixNow(),
-		offset:    offset,
-		repair:    0,
-	}
-
-	if thischalinfo, ok := getChalinfo(pu); ok {
-		if thischalinfo.inChallenge == 1 {
-			thischalinfo.tmpCid.Store(blockid, newcidinfo)
-		} else if thischalinfo.inChallenge == 0 {
-			thischalinfo.Cid.Store(blockid, newcidinfo)
-		}
-		return nil
-	}
-
-	var Cid sync.Map
-	var Time sync.Map
-	Cid.Store(blockid, newcidinfo)
-	newchalinfo := &chalinfo{
-		Cid:  Cid,
-		Time: Time,
-	}
-	LedgerInfo.Store(pu, newchalinfo)
-	return nil
-
-}
-
-//==========================================================================
 
 // 挑战过程的起始函数 定时对本节点连接的provider发起挑战
 func challengeRegular(ctx context.Context) { //定期挑战
@@ -173,7 +102,7 @@ func ChallengeProviderBLS12() {
 			}
 			str := key.(string) + "_" + strconv.Itoa(cInfo.offset)
 			ret = append(ret, str)
-			maxlength += uint32((df.MAXOFFSET + 1) * df.DefaultSegmentSize)
+			maxlength += uint32((utils.MAXOFFSET + 1) * df.DefaultSegmentSize)
 			sum += uint32((cInfo.offset + 1) * df.DefaultSegmentSize)
 			return true
 		})
@@ -229,49 +158,162 @@ func doChallengeBLS12(pu PU, blocks []string, chaltime int64) error {
 
 }
 
-func checkLedger(ctx context.Context) {
-	fmt.Println("CheckLedger() start!")
-	time.Sleep(2 * CHALTIME)
-	ticker := time.NewTicker(CHECKTIME)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go func() {
-				LedgerInfo.Range(func(k, v interface{}) bool {
-					thischalinfo := v.(*chalinfo)
-					thischalinfo.Cid.Range(func(key, value interface{}) bool {
-						//fmt.Println("avaltime :", value.(*cidInfo).availtime)
-						if EXPIRETIME < (utils.GetUnixNow()-value.(*cidInfo).availtime) && value.(*cidInfo).repair < 3 {
-							fmt.Println("need repair cid :", key.(string))
-							value.(*cidInfo).repair += 1
-							repch <- key.(string)
-						}
-						return true
-					})
-					return true
-				})
-			}()
+func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
+	ops := km.GetOptions()
+	Indicesstr := ops[0]
+	chaltime := ops[1]
+	uid := km.GetMid()
+	var h mcl.Challenge
+	indices, _ := b58.Decode(Indicesstr)
+	splitedindex := strings.Split(string(indices), metainfo.DELIMITER)
+	var blocks []string
+
+	for _, index := range splitedindex {
+		if index != "" {
+			block, _, err := utils.SplitIndex(index)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			blocks = append(blocks, block)
 		}
 	}
+	if len(blocks) != 0 {
+		fmt.Println("Fault or NotFound blocks :", blocks)
+		reduceCredit(pid)
+	}
+	pu := PU{
+		pid: pid,
+		uid: uid,
+	}
+	challengetime := utils.StringToUnix(chaltime)
+	thischalinfo, ok := getChalinfo(pu)
+	if !ok {
+		fmt.Println("getChalinfo error!pu:", pu)
+		return
+	}
+	thischalresult, ok := thischalinfo.Time.Load(challengetime)
+	if !ok {
+		fmt.Println("thischalinfo.Time.Load error!challengetime:", challengetime)
+		fmt.Println("PU:", pu)
+		return
+	}
+	h.C = thischalresult.(*chalresult).h
+
+	var length uint32
+	var offset, electedOffset int
+	thischalinfo.Cid.Range(func(k, v interface{}) bool {
+		var flag int
+		if len(blocks) != 0 {
+			for _, block := range blocks {
+				if strings.Compare(k.(string), block) != 0 {
+					flag++
+					if flag == len(blocks) {
+						off := v.(*cidInfo).offset
+						if off < 0 {
+							return false
+						} else if off > 0 {
+							electedOffset = h.C % off
+						} else {
+							electedOffset = 0
+						}
+						h.Indices = append(h.Indices, k.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(electedOffset))
+					}
+				}
+			}
+		} else {
+			off := v.(*cidInfo).offset
+			if off < 0 {
+				return false
+			} else if off > 0 {
+				electedOffset = h.C % off
+			} else {
+				electedOffset = 0
+			}
+			h.Indices = append(h.Indices, k.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(electedOffset))
+		}
+		return true
+	})
+	if len(h.Indices) == 0 {
+		return
+	}
+	pubs, err := getUserBLS12Config(uid)
+	if err != nil {
+		fmt.Println("getUserBLS12Config error! uid:", uid)
+		return
+	}
+	res, err := mcl.VerifyProof(pubs.PubKey, h, proof)
+	if err != nil {
+		fmt.Println("mcl.VerifyProof error!", err)
+		return
+	}
+	if res {
+		//fmt.Println("verify success cid :", h.Indices)
+		for _, tmpindex := range h.Indices {
+			blockID, _, _ := utils.SplitIndex(tmpindex)
+			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok {
+				offset = thiscidinfo.(*cidInfo).offset
+			} else {
+				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				pidoff, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmBlock.ToString(), "")
+				if pidoff != nil && err == nil {
+					offset, _ = strconv.Atoi((strings.Split(string(pidoff), metainfo.DELIMITER))[1]) //*格式修改
+				}
+			}
+			newcidinfo := &cidInfo{
+				res:       true,
+				repair:    0,
+				availtime: challengetime,
+				offset:    offset,
+			}
+			length += uint32((newcidinfo.offset + 1) * df.DefaultSegmentSize)
+			thischalinfo.Cid.Store(blockID, newcidinfo)
+		}
+		newchalresult := &chalresult{
+			kid:            localNode.Identity.Pretty(),
+			pid:            pid,
+			uid:            uid,
+			challenge_time: challengetime,
+			sum:            thischalresult.(*chalresult).sum,
+			h:              thischalresult.(*chalresult).h,
+			res:            true,
+			proof:          proof,
+			length:         length,
+		}
+		thischalinfo.Time.Store(challengetime, newchalresult)
+		addCredit(pid)
+	} else {
+		fmt.Println("verify failed cid :", h.Indices)
+		reduceCredit(pid)
+	}
+
+	thischalinfo.inChallenge = 0
+
+	thischalinfo.tmpCid.Range(func(k, v interface{}) bool {
+		act, loaded := thischalinfo.Cid.LoadOrStore(k, v)
+		if loaded && act.(*cidInfo).offset < v.(*cidInfo).offset {
+			act.(*cidInfo).offset = v.(*cidInfo).offset
+			thischalinfo.tmpCid.Delete(k)
+			return true
+		}
+		thischalinfo.maxlength += uint32((utils.MAXOFFSET + 1) * df.DefaultSegmentSize)
+		thischalinfo.tmpCid.Delete(k)
+		return true
+	})
+
+	return
 }
 
 //获得用于证明的user的公用参数
 func getUserBLS12Config(userID string) (*UserBLS12Config, error) {
-	if !IsKeeperServiceRunning() {
-		return nil, ErrKeeperServiceNotReady
-	}
 	userPubKey := new(mcl.PublicKey)
 	userConfig := &UserBLS12Config{}
 
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
-	if err != nil {
-		return nil, err
-	}
-	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, "local")
+	userconfigbyte, err := getUserBLS12ConfigByte(userID)
 	if err != nil {
 		return userConfig, err
 	}

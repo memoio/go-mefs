@@ -57,7 +57,7 @@ func (gp *GroupService) handleUserInitRes(km *metainfo.KeyMeta, metaValue, from 
 	}
 	if userState == Collecting { //收集信息阶段，才继续
 		//确认和Keeper连接了
-		kids, err := gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), from) //尝试从该节点获取Kids
+		kids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), from) //尝试从该节点获取Kids
 		if len(kids) == 0 && err != nil {
 			fmt.Println("handleUserInitRes()error:", ErrCannotConnectKeeper)
 		}

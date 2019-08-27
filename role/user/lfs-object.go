@@ -339,7 +339,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 				if err != nil {
 					return err
 				}
-				err = ul.LfsService.CurrentLog.Node.Blocks.PutBlockTo(b, providers[i])
+				err = localNode.Blocks.PutBlockTo(b, providers[i])
 				if err != nil {
 					fmt.Println("Put Block", ncid, "to", providers[i], "failed:", err)
 				} else {
@@ -357,7 +357,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 						}
 						flag++
 						time.Sleep(500 * time.Millisecond)
-						offByte, err := ul.LfsService.CurrentLog.Node.Routing.(*dht.IpfsDHT).CmdGetFrom(key.ToString(), providers[i])
+						offByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key.ToString(), providers[i])
 						if err != nil {
 							continue
 						}
@@ -417,7 +417,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 				if err != nil {
 					return err
 				}
-				err = ul.LfsService.CurrentLog.Node.Blocks.PutBlockTo(b, provider)
+				err = localNode.Blocks.PutBlockTo(b, provider)
 				if err != nil {
 					fmt.Println("Append Block", ncid, "to", provider, "failed:", err)
 					err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
@@ -440,7 +440,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 						}
 						flag++
 						time.Sleep(500 * time.Millisecond)
-						offByte, err := ul.LfsService.CurrentLog.Node.Routing.(*dht.IpfsDHT).CmdGetFrom(key.ToString(), provider)
+						offByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key.ToString(), provider)
 						if err != nil {
 							continue
 						}
@@ -564,8 +564,7 @@ func (dl *Download) getObjectWithEC(ctx context.Context) error {
 	tmpkey := dl.LfsService.PrivateKey
 	tmpkey = append(tmpkey, byte(dl.BucketID))
 	skey := sha256.Sum256(tmpkey)
-	node := dl.LfsService.CurrentLog.Node
-	cfg, err := node.Repo.Config()
+	cfg, err := localNode.Repo.Config()
 	if err != nil {
 		log.Println("get config from Download failed.")
 		return err
@@ -596,12 +595,12 @@ func (dl *Download) getObjectWithEC(ctx context.Context) error {
 				continue
 			}
 
-			b, err := dl.LfsService.CurrentLog.Node.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
+			b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
 			if err != nil {
 				log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
 				continue
 			}
-			err = dl.LfsService.CurrentLog.Node.Blocks.DeleteBlock(cid.NewCidV2([]byte(ncid)))
+			err = localNode.Blocks.DeleteBlock(cid.NewCidV2([]byte(ncid)))
 			if err != nil {
 				log.Println("Delete block", ncid, "failed:", err)
 			}
@@ -715,7 +714,7 @@ func (dl *Download) getObjectWithMultireplic(ctx context.Context) error {
 	tmpkey := dl.LfsService.PrivateKey
 	tmpkey = append(tmpkey, byte(dl.BucketID))
 	skey := sha256.Sum256(tmpkey)
-	node := dl.LfsService.CurrentLog.Node
+	node := localNode
 	cfg, err := node.Repo.Config()
 	if err != nil {
 		log.Println("get config from Download failed.")
@@ -743,10 +742,10 @@ func (dl *Download) getObjectWithMultireplic(ctx context.Context) error {
 				continue
 			}
 
-			b, err := dl.LfsService.CurrentLog.Node.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
+			b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
 			if b != nil && err == nil {
 				blkData = b.RawData()
-				err := dl.LfsService.CurrentLog.Node.Blocks.DeleteBlock(cid.NewCidV2([]byte(ncid)))
+				err := localNode.Blocks.DeleteBlock(cid.NewCidV2([]byte(ncid)))
 				if err != nil {
 					log.Println("Delete block", ncid, "failed:", err)
 				}
@@ -846,7 +845,7 @@ func (lfs *LfsService) getLastChalTime(blockID string) (time.Time, error) {
 	var res string
 	var tempTime time.Time
 	for _, keeper := range conkeepers {
-		res, err = gp.sendMetaRequest(km, "", keeper)
+		res, err = sendMetaRequest(km, "", keeper)
 		if err != nil {
 			continue
 		}
@@ -896,7 +895,7 @@ func (dl *Download) getMessage(ncid string, provider string) ([]byte, *big.Int, 
 	var channelAddr common.Address
 
 	//判断是不是测试user，如果是，就将channelAddress设为0
-	node := dl.LfsService.CurrentLog.Node
+	node := localNode
 	cfg, err := node.Repo.Config()
 	if err != nil {
 		log.Println("get config from Download failed.")
@@ -917,7 +916,7 @@ func (dl *Download) getMessage(ncid string, provider string) ([]byte, *big.Int, 
 		}
 		channelAddr = common.HexToAddress(Item.ChannelAddr)
 		// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
-		addValue := int64((BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
+		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 		money = money.Add(Item.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 	moneyByte := money.Bytes()

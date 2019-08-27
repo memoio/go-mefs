@@ -15,12 +15,12 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/mgutz/ansi"
 
+	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/core/commands/e"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role/user"
-	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -379,7 +379,7 @@ var lfsStartUserCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		err = uService.StartUserService(uService.Context, node, false, pwd, capacity, duration, price, ks, ps)
+		err = uService.StartUserService(uService.Context, false, pwd, capacity, duration, price, ks, ps)
 		if err != nil {
 			user.KillUser(uid)
 			return err

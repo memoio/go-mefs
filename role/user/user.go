@@ -10,14 +10,16 @@ import (
 	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
+	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/repo/fsrepo"
-	config "github.com/memoio/go-mefs/config"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
 type UserState int32
+
+var localNode *core.MefsNode
 
 const (
 	Starting UserState = iota
@@ -41,7 +43,6 @@ var allUsers *UsersInfo
 
 type UserService struct {
 	UserID          string
-	localNode       *core.MefsNode
 	GroupService    *GroupService
 	LfsService      *LfsService
 	ContractService *ContractService
@@ -50,12 +51,12 @@ type UserService struct {
 	state           UserState
 }
 
-func (us *UserService) StartUserService(ctx context.Context, node *core.MefsNode, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int) error {
+func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int) error {
 	err := SetUserState(us.UserID, Starting)
 	if err != nil {
 		return err
 	}
-	us.localNode = node
+
 	// 读keystore下uid文件
 	keypath, err := config.Path("", path.Join("keystore", us.UserID))
 	if err != nil {
@@ -69,10 +70,10 @@ func (us *UserService) StartUserService(ctx context.Context, node *core.MefsNode
 	if err != nil {
 		return ErrGetSecreteKey
 	}
-	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, node, duration, capacity, price, ks, ps)
+	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps)
 	if !isInit {
 		//在这里先尝试获取一次Bls config，如果失败，在启动完Groupservice的时候会再试一次
-		err = gp.loadBLS12ConfigMeta()
+		err = gp.loadBLS12Config()
 		if err != nil {
 			log.Println("Load BLS12 Config error:", err)
 		}
@@ -107,7 +108,7 @@ func (us *UserService) StartUserService(ctx context.Context, node *core.MefsNode
 		fmt.Println("SetLfsService()err")
 		return err
 	}
-	err = lfs.StartLfsService(ctx, node)
+	err = lfs.StartLfsService(ctx)
 	if err != nil {
 		fmt.Println("StartLfsService()err")
 		return err
@@ -116,7 +117,8 @@ func (us *UserService) StartUserService(ctx context.Context, node *core.MefsNode
 	return nil
 }
 
-func InitUserBook() {
+func InitUserBook(node *core.MefsNode) {
+	localNode = node
 	allUsers = &UsersInfo{
 		UserBook: make(map[string]*UserService),
 	}
@@ -394,7 +396,7 @@ func ShowInfo(userID string) map[string]string {
 		outmap["error"] = "GetAddressFromID() err:" + err.Error()
 		return outmap
 	}
-	cfg, err := gp.localNode.Repo.Config()
+	cfg, err := localNode.Repo.Config()
 	if err != nil {
 		outmap["error"] = "Config() err:" + err.Error()
 		return outmap

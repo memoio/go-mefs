@@ -156,7 +156,7 @@ func splitSegmentToAtoms(segment []byte) ([][]byte, error) {
 	return atom, nil
 }
 
-// create tag for *SINGLE* segment
+// GenTag create tag for *SINGLE* segment
 func GenTag(keys *KeySet, segment []byte, index []byte) ([]byte, error) {
 	var uMiDel, HWi, r G1
 	var power Fr
@@ -322,7 +322,7 @@ func GenProof(key *PublicKey, chal Challenge, segments, tags [][]byte) (string, 
 }
 
 // check
-func Verify(key *PublicKey, chal Challenge, proofres string) (bool, error) {
+func VerifyProof(key *PublicKey, chal Challenge, proofres string) (bool, error) {
 	var mu, delta G1
 	var nu G2
 	// 反序列化

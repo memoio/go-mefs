@@ -9,12 +9,12 @@ import (
 	"strconv"
 
 	ggio "github.com/gogo/protobuf/io"
-	"github.com/memoio/go-mefs/core"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -51,10 +51,10 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *pb.SuperBlock) error {
 	var data []byte
 	breakFlag := false
 	for {
-		if SbBuffer.Len() > BlockSize {
-			data = make([]byte, BlockSize)
+		if SbBuffer.Len() > utils.BlockSize {
+			data = make([]byte, utils.BlockSize)
 			n, err := SbBuffer.Read(data)
-			if n != BlockSize {
+			if n != utils.BlockSize {
 				panic("read error")
 			}
 			if err != nil && err != io.EOF {
@@ -83,11 +83,11 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *pb.SuperBlock) error {
 		if err != nil {
 			return err
 		}
-		err = lfs.CurrentLog.Node.Blocks.DeleteBlock(bcid)
+		err = localNode.Blocks.DeleteBlock(bcid)
 		if err != nil && err != bs.ErrNotFound {
 			return err
 		}
-		err = lfs.CurrentLog.Node.Blocks.PutBlock(b)
+		err = localNode.Blocks.PutBlock(b)
 		if err != nil {
 			return ErrCannotAddBlock
 		}
@@ -121,10 +121,10 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *pb.SuperBlock) error {
 	var data []byte
 	breakFlag := false
 	for {
-		if SbBuffer.Len() > BlockSize {
-			data = make([]byte, BlockSize)
+		if SbBuffer.Len() > utils.BlockSize {
+			data = make([]byte, utils.BlockSize)
 			n, err := SbBuffer.Read(data)
-			if n != BlockSize {
+			if n != utils.BlockSize {
 				panic("read error")
 			}
 			if err != nil && err != io.EOF {
@@ -157,7 +157,7 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *pb.SuperBlock) error {
 			if err != nil {
 				return err
 			}
-			err = lfs.CurrentLog.Node.Blocks.PutBlockTo(b, providers[j])
+			err = localNode.Blocks.PutBlockTo(b, providers[j])
 			if err != nil {
 				return err
 			}
@@ -212,11 +212,11 @@ func (lfs *LfsService) flushBucketInfoLocal(bucket *pb.BucketInfo) error {
 	if err != nil {
 		return err
 	}
-	err = lfs.CurrentLog.Node.Blocks.DeleteBlock(bcid)
+	err = localNode.Blocks.DeleteBlock(bcid)
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}
-	err = lfs.CurrentLog.Node.Blocks.PutBlock(b)
+	err = localNode.Blocks.PutBlock(b)
 	if err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func (lfs *LfsService) flushBucketInfoToProvider(bucket *pb.BucketInfo) error {
 		if err != nil {
 			return err
 		}
-		err = lfs.CurrentLog.Node.Blocks.PutBlockTo(b, providers[j])
+		err = localNode.Blocks.PutBlockTo(b, providers[j])
 		if err != nil {
 			return err
 		}
@@ -293,7 +293,7 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]
 	objectsStripeID := 1 //ObjectInfo的stripe从1开始
 	objectsBlockLength := 0
 	for _, object := range entries {
-		if objectsBuffer.Len() >= BlockSize { //如果object的总长度大于规定的size，则分块
+		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
 			// dataEncoded, _, err := dataformat.DataEncode(objectsBuffer.Bytes(), dataformat.DefaultSegmentSize, MetaTagFlag)
 			bm, err := metainfo.NewBlockMeta(lfs.UserID, strconv.Itoa(int(-bucketID)), strconv.Itoa(objectsStripeID), "0")
@@ -312,11 +312,11 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]
 			if err != nil {
 				return err
 			}
-			err = lfs.CurrentLog.Node.Blocks.DeleteBlock(bcid)
+			err = localNode.Blocks.DeleteBlock(bcid)
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
-			err = lfs.CurrentLog.Node.Blocks.PutBlock(b)
+			err = localNode.Blocks.PutBlock(b)
 			if err != nil {
 				return ErrCannotAddBlock
 			}
@@ -351,11 +351,11 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]
 		if err != nil {
 			return err
 		}
-		err = lfs.CurrentLog.Node.Blocks.DeleteBlock(bcid)
+		err = localNode.Blocks.DeleteBlock(bcid)
 		if err != nil && err != bs.ErrNotFound {
 			return err
 		}
-		err = lfs.CurrentLog.Node.Blocks.PutBlock(b)
+		err = localNode.Blocks.PutBlock(b)
 		if err != nil {
 			return ErrCannotAddBlock
 		}
@@ -379,7 +379,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 	objectsStripeID := 1
 	objectsBlockLength := 0
 	for _, object := range entries {
-		if objectsBuffer.Len() >= BlockSize { //如果object的总长度大于规定的size，则分块
+		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
 			bm, err := metainfo.NewBlockMeta(lfs.UserID, strconv.Itoa(int(-bucketID)), strconv.Itoa(objectsStripeID), "0")
 			if err != nil {
@@ -400,7 +400,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 				if err != nil {
 					return err
 				}
-				err = lfs.CurrentLog.Node.Blocks.PutBlockTo(b, providers[j])
+				err = localNode.Blocks.PutBlockTo(b, providers[j])
 				if err != nil {
 					return err
 				}
@@ -445,7 +445,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 			if err != nil {
 				return err
 			}
-			err = lfs.CurrentLog.Node.Blocks.PutBlockTo(b, providers[j])
+			err = localNode.Blocks.PutBlockTo(b, providers[j])
 			if err != nil {
 				return err
 			}
@@ -467,7 +467,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 //--------------------Load SuperBlock--------------------------
 //lfs启动时加载超级块操作，返回结构体currentLog,主要填充其中的superblock字段
 //先从本地查找超级快信息，若没找到，就找自己的provider获取
-func (lfs *LfsService) loadSuperBlock(node *core.MefsNode) (*Logs, error) {
+func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 	fmt.Println("Begin to load superblock : ", lfs.UserID)
 	var b blocks.Block
 	var err error
@@ -481,9 +481,9 @@ func (lfs *LfsService) loadSuperBlock(node *core.MefsNode) (*Logs, error) {
 	if GetGroupService(lfs.UserID).GetKeyset() == nil {
 		return nil, ErrKeySetIsNil
 	}
-	if b, err = node.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, GetGroupService(lfs.UserID).GetKeyset().Pk) { //如果本地有这个块的话，无需麻烦Provider
+	if b, err = localNode.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, GetGroupService(lfs.UserID).GetKeyset().Pk) { //如果本地有这个块的话，无需麻烦Provider
 	} else { //若本地无超级块，向自己的provider进行查询
-		err = node.Blocks.DeleteBlock(bcidlocal)
+		err = localNode.Blocks.DeleteBlock(bcidlocal)
 		if err != nil && err != bs.ErrNotFound {
 			return nil, err
 		}
@@ -498,8 +498,8 @@ func (lfs *LfsService) loadSuperBlock(node *core.MefsNode) (*Logs, error) {
 				log.Println("Cannot load Lfs superblock.", err)
 				return nil, ErrCannotLoadMetaBlock
 			}
-			b, err = node.Blocks.GetBlockFrom(node.Context(), provider, ncid, DefaultGetBlockDelay, sig) //向指定provider查询超级块
-			if err != nil {                                                                              //*错误处理
+			b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //向指定provider查询超级块
+			if err != nil {                                                                                        //*错误处理
 				log.Printf("Get metablock %s from %s failed.\n", ncid, provider)
 				continue
 			}
@@ -522,7 +522,7 @@ func (lfs *LfsService) loadSuperBlock(node *core.MefsNode) (*Logs, error) {
 		}
 		superBlock := &pb.SuperBlock{}
 		SbBuffer := bytes.NewBuffer(data)
-		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*BlockSize)
+		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*utils.BlockSize)
 		err = SbDelimitedReader.ReadMsg(superBlock)
 		if err == io.EOF {
 		} else if err != nil {
@@ -538,7 +538,6 @@ func (lfs *LfsService) loadSuperBlock(node *core.MefsNode) (*Logs, error) {
 		}
 		fmt.Println("Lfs SuperBlock is loaded.")
 		return &Logs{
-			Node:         node,
 			Sb:           superBlock,
 			Entries:      entries,
 			BucketByID:   BucketByID,
@@ -573,9 +572,9 @@ func (lfs *LfsService) loadBucketInfo() error {
 		}
 		ncidlocal := bm.ToString()
 		bcidlocal := cid.NewCidV2([]byte(ncidlocal))
-		if b, err = lfs.CurrentLog.Node.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, GetGroupService(lfs.UserID).GetKeyset().Pk) { //如果本地有这个块的话，无需麻烦Provider
+		if b, err = localNode.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, GetGroupService(lfs.UserID).GetKeyset().Pk) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
-			err = lfs.CurrentLog.Node.Blocks.DeleteBlock(bcidlocal)
+			err = localNode.Blocks.DeleteBlock(bcidlocal)
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
@@ -588,7 +587,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 					log.Printf("load Bucket: %s's block: %s from provider: %s falied.\n", BucketName, ncid, provider)
 					continue
 				}
-				b, err = lfs.CurrentLog.Node.Blocks.GetBlockFrom(lfs.CurrentLog.Node.Context(), provider, ncid, DefaultGetBlockDelay, sig) //获取数据块
+				b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //获取数据块
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, GetGroupService(lfs.UserID).GetKeyset().Pk); !ok {
 						fmt.Println("Verify Block failed.", ncid, "from:", provider)
@@ -610,7 +609,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 			}
 			Bucket := &pb.BucketInfo{}
 			BucketBuffer := bytes.NewBuffer(data)
-			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*BlockSize)
+			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*utils.BlockSize)
 			err = BucketDelimitedReader.ReadMsg(Bucket)
 			if err != nil && err != io.EOF {
 				return err
@@ -655,9 +654,9 @@ func (lfs *LfsService) loadObjectsInfo(bucket *pb.BucketInfo) error {
 		}
 		ncidlocal := bm.ToString()
 		bcidlocal := cid.NewCidV2([]byte(ncidlocal))
-		if b, err = lfs.CurrentLog.Node.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, GetGroupService(lfs.UserID).GetKeyset().Pk) { //如果本地有这个块的话，无需麻烦Provider
+		if b, err = localNode.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, GetGroupService(lfs.UserID).GetKeyset().Pk) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
-			err = lfs.CurrentLog.Node.Blocks.DeleteBlock(bcidlocal)
+			err = localNode.Blocks.DeleteBlock(bcidlocal)
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
@@ -669,7 +668,7 @@ func (lfs *LfsService) loadObjectsInfo(bucket *pb.BucketInfo) error {
 				if err != nil && j == int(lfs.CurrentLog.Sb.MetaBackupCount)-1 {
 					return ErrCannotLoadMetaBlock
 				}
-				b, err = lfs.CurrentLog.Node.Blocks.GetBlockFrom(lfs.CurrentLog.Node.Context(), provider, ncid, DefaultGetBlockDelay, sig)
+				b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig)
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, GetGroupService(lfs.UserID).GetKeyset().Pk); !ok {
 						fmt.Println("Verify Block failed.", ncid, "from:", provider)
@@ -699,7 +698,7 @@ func (lfs *LfsService) loadObjectsInfo(bucket *pb.BucketInfo) error {
 		stripeID++
 	}
 	ObjectsBuffer := bytes.NewBuffer(fullData)
-	ObjectsDelimitedReader := ggio.NewDelimitedReader(ObjectsBuffer, 2*BlockSize)
+	ObjectsDelimitedReader := ggio.NewDelimitedReader(ObjectsBuffer, 2*utils.BlockSize)
 	for {
 		Object := &pb.ObjectInfo{}
 		err := ObjectsDelimitedReader.ReadMsg(Object)

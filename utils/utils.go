@@ -18,14 +18,21 @@ const (
 	//SHOWTIME 用于输出给使用者
 	SHOWTIME = "2006-01-02 Mon 15:04:05 MST"
 
-	//IDLength  目前ID的长度
+	//utils.IDLength  目前ID的长度
 	IDLength = 30
 
 	//READPRICEPERMB 读支付中1MB内容需要支付的金额
-	READPRICEPERMB = 100
+	READPRICEPERMB = 1000000
+
+	// Stored price 0.2$/GB*Month
+	// 1 eth=0.01$
+	// wei/MB*hour
+	STOREPRICEPEDOLLAR = 27000000000000
 
 	//BlockSize 暂定一个块中纯data的大小，1k
 	BlockSize = 1024 * 1024
+
+	MAXOFFSET = 255 // 一个Stripe最多有256个field，最大offset为255
 )
 
 //false 意味着有，true表示无重复

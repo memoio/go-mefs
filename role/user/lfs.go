@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/memoio/go-mefs/core"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -21,8 +20,8 @@ func ConstructLfsService(userID string, privKey []byte) *LfsService {
 	}
 }
 
-func (lfs *LfsService) StartLfsService(ctx context.Context, node *core.MefsNode) error {
-	err := lfs.startLfs(ctx, node)
+func (lfs *LfsService) StartLfsService(ctx context.Context) error {
+	err := lfs.startLfs(ctx)
 	if err != nil {
 		fmt.Println("Lfs start err : ", err)
 		return err
@@ -33,9 +32,9 @@ func (lfs *LfsService) StartLfsService(ctx context.Context, node *core.MefsNode)
 
 //lfs节点启动，从本地或者本节点provider处获取currentLog信息进行填充，填充不了才进行currentlog的初始化操作
 //填充顺序：超级块-Bucket数据-Bucket中Object数据
-func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error {
+func (lfs *LfsService) startLfs(ctx context.Context) error {
 	var err error
-	lfs.CurrentLog, err = lfs.loadSuperBlock(node) //先加载超级块
+	lfs.CurrentLog, err = lfs.loadSuperBlock() //先加载超级块
 	if err != nil || lfs.CurrentLog == nil {
 		log.Println("Cannot get metaBlock", err)
 		//启动失败，证明本地无metablock
@@ -68,10 +67,10 @@ func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error 
 				}
 			}
 		}
-		lfs.CurrentLog, err = lfs.loadSuperBlock(node) //找到keeper再加载一次超级块
+		lfs.CurrentLog, err = lfs.loadSuperBlock() //找到keeper再加载一次超级块
 		if err != nil || lfs.CurrentLog == nil {
 			fmt.Println("load superblock fail, so begin to init Lfs :", lfs.UserID)
-			lfs.CurrentLog, err = initLfs(node) //初始化
+			lfs.CurrentLog, err = initLfs() //初始化
 			if err != nil {
 				log.Println(ErrCannotStartLfsService)
 				return ErrCannotStartLfsService
@@ -104,22 +103,21 @@ func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error 
 	return nil
 }
 
-func initLfs(node *core.MefsNode) (*Logs, error) {
-	log, err := InitLogs(node)
+func initLfs() (*Logs, error) {
+	log, err := InitLogs()
 	if err != nil {
 		return nil, err
 	}
 	return log, err
 }
 
-func InitLogs(node *core.MefsNode) (*Logs, error) {
+func InitLogs() (*Logs, error) {
 	sb := newSuperBlock()
 	entries := make(map[int32]map[string]*pb.ObjectInfo)
 	bucketByID := make(map[int32]*pb.BucketInfo)
 	bucketByName := make(map[string]*pb.BucketInfo)
 	state := make(map[int32]*BucketState)
 	return &Logs{
-		Node:         node,
 		Sb:           sb,
 		SbModified:   true,
 		BucketByID:   bucketByID,
@@ -207,7 +205,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 			fmt.Println("NewKeyMeta err:", provider, err)
 			continue
 		}
-		err = lfs.CurrentLog.Node.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), channel.Value.String(), "local")
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), channel.Value.String(), "local")
 		if err != nil {
 			fmt.Println("CmdPutTo error", provider, err)
 			continue

@@ -10,9 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/core"
 	fr "github.com/memoio/go-mefs/repo/fsrepo"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 

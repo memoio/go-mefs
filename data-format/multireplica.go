@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	mcl "github.com/memoio/go-mefs/bls12"
+	"github.com/memoio/go-mefs/utils"
 )
 
 //将数据生成给定参数的多副本Stripe
@@ -27,16 +28,16 @@ func DataEncodeToMul(data []byte, ncidPrefix string, dataCount, parityCount int3
 	}
 
 	segmentCount := uint64(len(data)-1)/segmentSize + 1 //此data分解成segment的数量
-	if segmentCount > MAXOFFSET+1 {
+	if segmentCount > utils.MAXOFFSET+1 {
 		return nil, 0, ErrDataToolong
 	}
 
 	stripe := make([][]byte, BlockCount)
 	fieldSize := segmentSize + tagSize*uint64(BlockCount)
-	BlockSize := fieldSize*segmentCount + uint64(len(prefix))
+	blockSize := fieldSize*segmentCount + uint64(len(prefix))
 
 	for i := 0; i < int(BlockCount); i++ {
-		stripe[i] = make([]byte, 0, BlockSize)
+		stripe[i] = make([]byte, 0, blockSize)
 		stripe[i] = append(stripe[i], prefix...)
 	}
 	remainder := uint64(len(data)) % segmentSize
@@ -88,16 +89,16 @@ func DataEncodeToMulForAppend(data []byte, ncidPrefix string, dataCount, parityC
 	BlockCount := dataCount + parityCount
 
 	segmentCount := uint64(len(data)-1)/segmentSize + 1 //此data分解成segment的数量
-	if uint64(beginOffset)+segmentCount > MAXOFFSET+1 {
+	if uint64(beginOffset)+segmentCount > utils.MAXOFFSET+1 {
 		return nil, 0, ErrDataToolong
 	}
 
 	stripe := make([][]byte, BlockCount)
 	fieldSize := segmentSize + tagSize*uint64(BlockCount) //一个segment及附带的tag占的大小
-	BlockSize := fieldSize * segmentCount
+	blockSize := fieldSize * segmentCount
 
 	for i := 0; i < int(BlockCount); i++ { //提前分配好内存
-		stripe[i] = make([]byte, 0, BlockSize)
+		stripe[i] = make([]byte, 0, blockSize)
 	}
 	remainder := uint64(len(data)) % segmentSize
 	if remainder != 0 {
