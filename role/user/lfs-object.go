@@ -25,7 +25,6 @@ import (
 	"github.com/memoio/go-mefs/role/user/task"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -362,35 +361,14 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 				err = localNode.Blocks.PutBlockTo(b, providers[i])
 				if err != nil {
 					fmt.Println("Put Block", ncid, "to", providers[i], "failed:", err)
-				} else {
-					key, err := metainfo.NewKeyMeta(ncid, metainfo.HasBlock)
+					err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, providers[i], offset)
 					if err != nil {
-						fmt.Println("Put Block", ncid, "to", providers[i], "failed:", err)
-						continue
+						return err
 					}
-					MaxCount := 20
-					flag := 0
-					for {
-						if flag >= MaxCount {
-							fmt.Println("Put Block", ncid, "to", providers[i], "failed:", err)
-							break
-						}
-						flag++
-						time.Sleep(500 * time.Millisecond)
-						offByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key.ToString(), providers[i])
-						if err != nil {
-							continue
-						}
-						off, err := strconv.Atoi(string(offByte))
-						if err != nil {
-							fmt.Println(err)
-						}
-						if off == offset {
-							count++
-							break
-						}
-					}
+					continue
 				}
+				count++
+
 				err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, providers[i], offset)
 				if err != nil {
 					return err
@@ -445,35 +423,8 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 						return err
 					}
 					continue
-				} else {
-					key, err := metainfo.NewKeyMeta(ncid, metainfo.HasBlock)
-					if err != nil {
-						continue
-					}
-
-					MaxCount := 20
-					flag := 0
-					for {
-						if flag >= MaxCount {
-							fmt.Println("Append Block", ncid, "to", provider, "failed:", err)
-							break
-						}
-						flag++
-						time.Sleep(500 * time.Millisecond)
-						offByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key.ToString(), provider)
-						if err != nil {
-							continue
-						}
-						off, err := strconv.Atoi(string(offByte))
-						if err != nil {
-							fmt.Println(err)
-						}
-						if off == offset {
-							count++
-							break
-						}
-					}
 				}
+				count++
 				err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
 				if err != nil {
 					return err
@@ -636,10 +587,6 @@ func (dl *Download) getObjectWithEC(ctx context.Context) error {
 				log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
 				continue
 			}
-			err = localNode.Blocks.DeleteBlock(cid.NewCidV2([]byte(ncid)))
-			if err != nil {
-				log.Println("Delete block", ncid, "failed:", err)
-			}
 			blkData := b.RawData()
 			//需要检查数据块的长度也没问题
 			dif := dl.Object.ObjectSize - dl.sizeReceived
@@ -781,10 +728,6 @@ func (dl *Download) getObjectWithMultireplic(ctx context.Context) error {
 			b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
 			if b != nil && err == nil {
 				blkData = b.RawData()
-				err := localNode.Blocks.DeleteBlock(cid.NewCidV2([]byte(ncid)))
-				if err != nil {
-					log.Println("Delete block", ncid, "failed:", err)
-				}
 				//需要检查数据块的长度也没问题
 				dif := dl.Object.ObjectSize - dl.sizeReceived
 				ok, err := dataformat.VerifyBlockLength(blkData, int(offsetStart), int(bucket.TagFlag), int(bucket.SegmentSize), int(dataCount), int(parityCount), int(dif), bucket.Policy)
