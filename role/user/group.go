@@ -487,6 +487,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 		if i >= gp.providerSLA {
 			break
 		}
+		gp.tempProviders = disorderArray(gp.tempProviders)
 		pidStr := gp.tempProviders[i]
 		pidB58, _ := peer.IDB58Decode(pidStr)
 		//判断是否链接，如果连不上，则从备选中删除，看下一个
