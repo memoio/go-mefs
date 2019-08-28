@@ -24,11 +24,11 @@ func ConstructContractService(userID string) *ContractService {
 }
 
 func (cs *ContractService) SaveContracts() error {
-	err := cs.SaveChannel()
+	err := cs.SaveUpkeeping()
 	if err != nil {
 		return err
 	}
-	err = cs.SaveUpkeeping()
+	err = cs.SaveChannel()
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (cs *ContractService) SaveChannel() error {
 		return err
 	}
 	gp := GetGroupService(cs.UserID)
-	// 获得user的所有provider
+	// 获得user的所有provider, upkeeping合约
 	providers, err := gp.GetProviders(-1)
 	if err != nil {
 		return err

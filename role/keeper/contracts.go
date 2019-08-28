@@ -8,19 +8,16 @@ import (
 )
 
 func SaveUpkeeping(gp *GroupsInfo, userID string) error {
-	if gp == nil  {
+	if gp == nil {
 		return ErrIncorrectParams
 	}
-	localID := localNode.Identity.Pretty()
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
+
+	// get upkkeeping addr
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
-	localAddr, err := address.GetAddressFromID(localID)
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		return err
 	}
@@ -30,10 +27,18 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 		fmt.Println("get ", userID, "'s ukAddr err:", err)
 		return err
 	}
+
+	localID := localNode.Identity.Pretty()
+	localAddr, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return err
+	}
+	// get upkkeeping params
 	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUpKeepingParams(endPoint, localAddr, userAddr)
 	if err != nil {
 		return err
 	}
+
 	var keepers []string
 	var providers []string
 	for _, keeper := range keeperAddrs {

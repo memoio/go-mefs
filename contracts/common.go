@@ -2,8 +2,14 @@ package contracts
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
+	"time"
+
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
@@ -36,14 +42,17 @@ type UpKeepingItem struct {
 	ProviderSla   int32
 	Duration      int64
 	Capacity      int64
-	Price         int64 // 部署的价格
+	Price         int64     // 部署的价格
+	StartTime     time.Time // 部署的时间
 }
 
 type ChannelItem struct {
 	UserID      string // 部署Channel的userid
+	ProID       string
 	ChannelAddr string
 	Value       *big.Int
-	ProID       string
+	StartTime   time.Time // 部署的时间
+	Duration    int64     // timeout
 }
 
 type QueryItem struct {
@@ -65,8 +74,7 @@ type OfferItem struct {
 	Price      int64 // 合约给出的单价
 }
 
-type RoleItem struct{}
-
+// move to provider directory
 type ProviderContracts struct {
 	UpKeepingBook sync.Map // K-user的id, V-upkeeping
 	ChannelBook   sync.Map // K-user的id, V-Channel
@@ -75,3 +83,30 @@ type ProviderContracts struct {
 }
 
 var ProContracts *ProviderContracts
+
+//GetClient get rpc-client based the endPoint
+// common method
+func GetClient(endPoint string) *ethclient.Client {
+	client, err := rpc.Dial(endPoint)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return ethclient.NewClient(client)
+}
+
+//QueryBalance query the balance of account
+func QueryBalance(endPoint string, account string) (balance *big.Int, err error) {
+	var result string
+	client, err := rpc.Dial(endPoint)
+	if err != nil {
+		fmt.Println("rpc.dial err:", err)
+		return balance, err
+	}
+	err = client.Call(&result, "eth_getBalance", account, "latest")
+	if err != nil {
+		fmt.Println("client.call err:", err)
+		return balance, err
+	}
+	balance = utils.HexToBigInt(result)
+	return balance, nil
+}

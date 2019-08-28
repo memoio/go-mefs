@@ -44,7 +44,6 @@ const (
 //一个组中的keeper信息
 type KeeperInGroup struct {
 	KID        string
-	IP         string
 	ID         string
 	PubKey     string
 	MasterType KeeperType
@@ -61,8 +60,6 @@ type GroupsInfo struct {
 }
 
 //PInfo 存放U-K-P的对应关系，key为userid，value中存放与User相关的Group的信息
-//var PInfo map[string]*GroupsInfo
-
 var PInfo sync.Map
 
 //存本节点的相关信息的结构

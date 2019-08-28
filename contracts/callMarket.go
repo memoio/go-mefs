@@ -237,6 +237,7 @@ func DeployOffer(endPoint string, providerAddress common.Address, hexKey string,
 
 //GetQueryParams get user's query-params
 // 分别返回申请的容量、持久化时间、价格、keeper数量、provider数量、是否成功放进upkeeping中
+//Name
 func GetQueryParams(endPoint string, localAddress common.Address, queryAddress common.Address) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	query, err := market.NewQuery(queryAddress, GetClient(endPoint))
 	if err != nil {

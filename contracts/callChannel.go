@@ -151,7 +151,9 @@ func CloseChannel(endPoint string, hexKey string, localAddress common.Address, o
 	return nil
 }
 
-//getDeployedMapper()当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
+// getDeployedMapper 当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
+// 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
+// Name
 func getDeployedMapper(endPoint string, localAddress common.Address, ownerAddress common.Address, resolver *upKeeping.Resolver) (mapper *upKeeping.Mapper, err error) {
 	mapperAddr, err := resolver.Get(&bind.CallOpts{
 		From: localAddress,
@@ -172,7 +174,8 @@ func getDeployedMapper(endPoint string, localAddress common.Address, ownerAddres
 	return mapper, nil
 }
 
-//getChannel()当在ChannelTimeOut()中被调用，则localAddress为userAddr；当在CloseChannel()中被调用，则localAddress是providerAddr
+//getChannel()当在ChannelTimeOut()中被调用，则localAddress为userAddr；
+// 当在CloseChannel()中被调用，则localAddress是providerAddr
 func getChannel(endPoint string, mapper *upKeeping.Mapper, localAddress common.Address) (channelAddr common.Address, channelContract *channel.Channel, err error) {
 	channels, err := mapper.Get(&bind.CallOpts{
 		From: localAddress,

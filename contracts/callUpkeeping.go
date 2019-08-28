@@ -10,20 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
-	"github.com/memoio/go-mefs/utils"
 )
 
-//GetClient get rpc-client based the endPoint
-func GetClient(endPoint string) *ethclient.Client {
-	client, err := rpc.Dial(endPoint)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return ethclient.NewClient(client)
-}
-
+// common method
 func getResolverFromIndexer(endPoint string, localAddress common.Address, key string) (resolver *upKeeping.Resolver, err error) {
 	indexerAddr := common.HexToAddress(IndexerHex)
 	indexer, err := upKeeping.NewIndexer(indexerAddr, GetClient(endPoint))
@@ -52,6 +42,7 @@ func getResolverFromIndexer(endPoint string, localAddress common.Address, key st
 	return resolver, nil
 }
 
+// common method
 func getMapper(endPoint string, userAddress common.Address, resolver *upKeeping.Resolver, auth *bind.TransactOpts, client *ethclient.Client) (mapper *upKeeping.Mapper, err error) {
 	//试图从resolver中取出mapper地址：mapperAddr
 	var mapperAddr common.Address
@@ -101,6 +92,7 @@ func getMapper(endPoint string, userAddress common.Address, resolver *upKeeping.
 	return mapper, nil
 }
 
+// Name
 //Deploy deploy UpKeeping contracts between user, keepers and providers, and save contractAddress in mapper
 func Deploy(endPoint string, hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
 	fmt.Println("begin deploy upKeeping...")
@@ -246,23 +238,7 @@ func SpaceTimePay(uk *upKeeping.UpKeeping, endPoint string, userAddress common.A
 	return nil
 }
 
-//QueryBalance query the balance of account
-func QueryBalance(endPoint string, account string) (balance *big.Int, err error) {
-	var result string
-	client, err := rpc.Dial(endPoint)
-	if err != nil {
-		fmt.Println("rpc.dial err:", err)
-		return balance, err
-	}
-	err = client.Call(&result, "eth_getBalance", account, "latest")
-	if err != nil {
-		fmt.Println("client.call err:", err)
-		return balance, err
-	}
-	balance = utils.HexToBigInt(result)
-	return balance, nil
-}
-
+//Name
 //DeployResolver provider deploys resolver to save mapper
 func DeployResolver(endPoint string, hexKey string, localAddress common.Address, indexer *upKeeping.Indexer) (err error) {
 	fmt.Println("begin deploy resolver...")
@@ -322,6 +298,8 @@ func DeployResolver(endPoint string, hexKey string, localAddress common.Address,
 }
 
 // GetUpKeepingParams get Upkeeping-contract's params
+// from ukaddr instance
+// GetUpKeepingInfo
 func GetUpKeepingParams(endPoint string, localAddress, userAddress common.Address) (
 	common.Address, []common.Address, []common.Address, int64, int64, int64, error) {
 	var userAddr common.Address
