@@ -58,6 +58,7 @@ const (
 	secretKeyKwd              = "secretKey"
 	reDeployOfferKwd          = "reDeployOffer"
 	netKeyKwd                 = "netKey"
+	posKwd                    = "pos"
 )
 
 var (
@@ -132,6 +133,7 @@ environment variable:
 
 	Options: []cmds.Option{
 		cmds.BoolOption(initOptionKwd, "Initialize mefs with default settings if not already initialized"),
+		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
@@ -453,6 +455,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&provider.ProviderHandlerV2{Role: metainfo.RoleProvider})
 		if err != nil {
 			return err
+		}
+
+		pos, _ := req.Options[posKwd].(bool)
+		if pos {
+			fmt.Println("Start pos Service")
 		}
 	default:
 	}
