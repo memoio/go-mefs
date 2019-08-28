@@ -177,7 +177,7 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *pb.SuperBlock) error {
 
 //-----------------------Flush BucketMeta----------------------------
 
-func (lfs *LfsService) flushBucketInfo(bucket *pb.BucketInfo) error {
+func (lfs *LfsService) flushBucketInfo(bucket *Bucket) error {
 	err := lfs.flushBucketInfoLocal(bucket)
 	if err != nil {
 		return err
@@ -185,10 +185,12 @@ func (lfs *LfsService) flushBucketInfo(bucket *pb.BucketInfo) error {
 	return lfs.flushBucketInfoToProvider(bucket)
 }
 
-func (lfs *LfsService) flushBucketInfoLocal(bucket *pb.BucketInfo) error {
+func (lfs *LfsService) flushBucketInfoLocal(bucket *Bucket) error {
+	bucket.Lock.RLock()
+	defer bucket.Lock.RUnlock()
 	BucketBuffer := bytes.NewBuffer(nil)
 	BucketDelimitedWriter := ggio.NewDelimitedWriter(BucketBuffer)
-	err := BucketDelimitedWriter.WriteMsg(bucket)
+	err := BucketDelimitedWriter.WriteMsg(&bucket.BucketInfo)
 	if err != nil {
 		return err
 	}
@@ -223,7 +225,9 @@ func (lfs *LfsService) flushBucketInfoLocal(bucket *pb.BucketInfo) error {
 	return nil
 }
 
-func (lfs *LfsService) flushBucketInfoToProvider(bucket *pb.BucketInfo) error {
+func (lfs *LfsService) flushBucketInfoToProvider(bucket *Bucket) error {
+	bucket.Lock.RLock()
+	defer bucket.Lock.RUnlock()
 	MetaBackupCount := lfs.CurrentLog.Sb.MetaBackupCount
 	providers, _ := GetGroupService(lfs.UserID).GetProviders(int(MetaBackupCount))
 	if providers == nil {
@@ -231,7 +235,7 @@ func (lfs *LfsService) flushBucketInfoToProvider(bucket *pb.BucketInfo) error {
 	}
 	BucketBuffer := bytes.NewBuffer(nil)
 	BucketDelimitedWriter := ggio.NewDelimitedWriter(BucketBuffer)
-	err := BucketDelimitedWriter.WriteMsg(bucket)
+	err := BucketDelimitedWriter.WriteMsg(&bucket.BucketInfo)
 	if err != nil {
 		return err
 	}
@@ -275,24 +279,30 @@ func (lfs *LfsService) flushBucketInfoToProvider(bucket *pb.BucketInfo) error {
 //---------------------Flush objects' Meta for given Bucket--------
 
 //刷新具体某一个Bucket的object数据
-func (lfs *LfsService) flushObjectsInfo(bucketID int32, entries map[string]*pb.ObjectInfo) error {
-	if entries == nil {
+func (lfs *LfsService) flushObjectsInfo(bucket *Bucket) error {
+	if bucket == nil || bucket.Objects == nil {
 		return nil
 	}
-	err := lfs.flushObjectsInfoLocal(bucketID, entries)
+	err := lfs.flushObjectsInfoLocal(bucket)
 	if err != nil {
 		return err
 	}
-	return lfs.flushObjectsInfoToProvider(bucketID, entries)
+	return lfs.flushObjectsInfoToProvider(bucket)
 }
 
-func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]*pb.ObjectInfo) error {
+func (lfs *LfsService) flushObjectsInfoLocal(bucket *Bucket) error {
+	if bucket == nil || bucket.Objects == nil {
+		return nil
+	}
+	bucket.Lock.RLock()
+	defer bucket.Lock.RUnlock()
 	objectsBuffer := bytes.NewBuffer(nil)
 	objectDelimitedWriter := ggio.NewDelimitedWriter(objectsBuffer)
 
+	bucketID := bucket.BucketID
 	objectsStripeID := 1 //ObjectInfo的stripe从1开始
 	objectsBlockLength := 0
-	for _, object := range entries {
+	for _, object := range bucket.Objects {
 		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
 			// dataEncoded, _, err := dataformat.DataEncode(objectsBuffer.Bytes(), dataformat.DefaultSegmentSize, MetaTagFlag)
@@ -328,7 +338,7 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]
 			objectDelimitedWriter = ggio.NewDelimitedWriter(objectsBuffer)
 			objectsStripeID++
 		}
-		err := objectDelimitedWriter.WriteMsg(object)
+		err := objectDelimitedWriter.WriteMsg(&object.ObjectInfo)
 		if err != nil {
 			return err
 		}
@@ -368,7 +378,12 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucketID int32, entries map[string]
 	return nil
 }
 
-func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[string]*pb.ObjectInfo) error {
+func (lfs *LfsService) flushObjectsInfoToProvider(bucket *Bucket) error {
+	if bucket == nil || bucket.Objects == nil {
+		return nil
+	}
+	bucket.Lock.RLock()
+	defer bucket.Lock.RUnlock()
 	MetaBackupCount := lfs.CurrentLog.Sb.MetaBackupCount
 	providers, _ := GetGroupService(lfs.UserID).GetProviders(int(MetaBackupCount))
 	if providers == nil {
@@ -376,9 +391,11 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 	}
 	objectsBuffer := bytes.NewBuffer(nil)
 	objectDelimitedWriter := ggio.NewDelimitedWriter(objectsBuffer)
+
+	bucketID := bucket.BucketID
 	objectsStripeID := 1
 	objectsBlockLength := 0
-	for _, object := range entries {
+	for _, object := range bucket.Objects {
 		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
 			bm, err := metainfo.NewBlockMeta(lfs.UserID, strconv.Itoa(int(-bucketID)), strconv.Itoa(objectsStripeID), "0")
@@ -418,7 +435,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucketID int32, entries map[st
 			objectsBuffer = bytes.NewBuffer(nil) //重新开始处理下一个块
 			objectDelimitedWriter = ggio.NewDelimitedWriter(objectsBuffer)
 		}
-		err := objectDelimitedWriter.WriteMsg(object)
+		err := objectDelimitedWriter.WriteMsg(&object.ObjectInfo)
 		if err != nil {
 			return err
 		}
@@ -529,20 +546,17 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 			fmt.Println("Cannot load Lfs superblock.", err)
 			return nil, err
 		}
-		entries := make(map[int32]map[string]*pb.ObjectInfo)
-		BucketByID := make(map[int32]*pb.BucketInfo)
-		BucketByName := make(map[string]*pb.BucketInfo)
-		state := make(map[int32]*BucketState)
+		BucketByID := make(map[int32]*Bucket)
+		BucketNameToID := make(map[string]int32)
 		if superBlock.Buckets == nil {
 			superBlock.Buckets = make(map[int32]string)
 		}
 		fmt.Println("Lfs SuperBlock is loaded.")
 		return &Logs{
-			Sb:           superBlock,
-			Entries:      entries,
-			BucketByID:   BucketByID,
-			BucketByName: BucketByName,
-			State:        state,
+			Sb:             superBlock,
+			SbModified:     false,
+			BucketByID:     BucketByID,
+			BucketNameToID: BucketNameToID,
 		}, nil
 	}
 	fmt.Println("Cannot load Lfs superblock. Get metablock failed")
@@ -607,18 +621,21 @@ func (lfs *LfsService) loadBucketInfo() error {
 				fmt.Println("GetDataFromRawData err!", err)
 				return err
 			}
-			Bucket := &pb.BucketInfo{}
+			bucket := pb.BucketInfo{}
 			BucketBuffer := bytes.NewBuffer(data)
 			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*utils.BlockSize)
-			err = BucketDelimitedReader.ReadMsg(Bucket)
+			err = BucketDelimitedReader.ReadMsg(&bucket)
 			if err != nil && err != io.EOF {
 				return err
 			}
-			lfs.CurrentLog.BucketByID[BucketID] = Bucket
-			lfs.CurrentLog.BucketByName[BucketName] = Bucket
-			lfs.CurrentLog.Entries[BucketID] = make(map[string]*pb.ObjectInfo)
-			lfs.CurrentLog.State[BucketID] = &BucketState{Dirty: false}
-			fmt.Println("Bucket-ID:", Bucket.BucketID, "Name-", Bucket.BucketName, "is loaded")
+			objects := make(map[string]*Object)
+			lfs.CurrentLog.BucketByID[BucketID] = &Bucket{
+				BucketInfo: bucket,
+				Objects:    objects,
+				Dirty:      false,
+			}
+			lfs.CurrentLog.BucketNameToID[BucketName] = bucket.BucketID
+			fmt.Println("Bucket-ID:", bucket.BucketID, "Name-", bucket.BucketName, "is loaded")
 		}
 	}
 	return nil
@@ -626,7 +643,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 
 //------------------------------Load Objectinfo---------------------------------------
 //填充Entries字段，传入参数为bucket,记录传入bucket的数据信息
-func (lfs *LfsService) loadObjectsInfo(bucket *pb.BucketInfo) error {
+func (lfs *LfsService) loadObjectsInfo(bucket *Bucket) error {
 	var sig []byte
 	state, err := GetUserServiceState(lfs.UserID)
 	if err != nil {
@@ -697,17 +714,19 @@ func (lfs *LfsService) loadObjectsInfo(bucket *pb.BucketInfo) error {
 		}
 		stripeID++
 	}
-	ObjectsBuffer := bytes.NewBuffer(fullData)
-	ObjectsDelimitedReader := ggio.NewDelimitedReader(ObjectsBuffer, 2*utils.BlockSize)
+	objectsBuffer := bytes.NewBuffer(fullData)
+	objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*utils.BlockSize)
 	for {
-		Object := &pb.ObjectInfo{}
-		err := ObjectsDelimitedReader.ReadMsg(Object)
+		object := pb.ObjectInfo{}
+		err := objectsDelimitedReader.ReadMsg(&object)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-		lfs.CurrentLog.Entries[bucket.BucketID][Object.ObjectName] = Object //整理好的object 填充进结构体
+		bucket.Objects[object.ObjectName] = &Object{
+			ObjectInfo: object,
+		} //整理好的object 填充进结构体
 	}
 	return nil
 }

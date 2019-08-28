@@ -22,7 +22,6 @@ import (
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
-	"github.com/memoio/go-mefs/role/user/task"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
@@ -34,32 +33,31 @@ func (lfs *LfsService) DeleteObject(bucketName, objectName string) (*pb.ObjectIn
 	if err != nil {
 		return nil, err
 	}
-	var bucket *pb.BucketInfo
-	var ok bool
-	var object *pb.ObjectInfo
-	if lfs.CurrentLog.BucketByName == nil {
-		return nil, ErrObjectNotExist
+	if lfs.CurrentLog.BucketNameToID == nil {
+		return nil, ErrBucketNotExist
 	}
-	if bucket, ok = lfs.CurrentLog.BucketByName[bucketName]; !ok || bucket.Deletion {
+
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
 	// TODO:具体实现
-	lfs.CurrentLog.State[bucket.BucketID].Mu.Lock()
-	defer lfs.CurrentLog.State[bucket.BucketID].Mu.Unlock()
-	if lfs.CurrentLog.Entries == nil {
+	bucket.Lock.Lock()
+	defer bucket.Lock.Unlock()
+	if bucket.Objects == nil {
 		return nil, ErrObjectNotExist
 	}
-	objectMap, ok := lfs.CurrentLog.Entries[bucket.BucketID]
-	if !ok || objectMap == nil {
+	object, ok := bucket.Objects[objectName]
+	if !ok || object == nil {
 		return nil, ErrObjectNotExist
 	}
-	object, ok = objectMap[objectName]
-	if !ok || object == nil || object.Deletion {
-		return nil, ErrObjectNotExist
-	}
-	lfs.CurrentLog.Entries[bucket.BucketID][objectName].Deletion = true
-	lfs.CurrentLog.State[bucket.BucketID].Dirty = true
-	return object, nil
+	object.Deletion = true
+	bucket.Dirty = true
+	return &object.ObjectInfo, nil
 }
 
 func (lfs *LfsService) HeadObject(bucketName, objectName string) (*pb.ObjectInfo, string, error) {
@@ -67,20 +65,30 @@ func (lfs *LfsService) HeadObject(bucketName, objectName string) (*pb.ObjectInfo
 	if err != nil {
 		return nil, "", err
 	}
-	if lfs.CurrentLog.BucketByName == nil {
-		return nil, "", ErrObjectNotExist
-	}
-	if bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; ok && !bucket.Deletion {
-		if objectMap, ok := lfs.CurrentLog.Entries[bucket.BucketID]; ok {
-			if object := objectMap[objectName]; object != nil {
-				AvailTime, _ := lfs.GetObjectAvailTime(object)
-				return object, AvailTime, nil
-			}
-			return nil, "", ErrObjectNotExist
-		}
+	if lfs.CurrentLog.BucketNameToID == nil {
 		return nil, "", ErrBucketNotExist
 	}
-	return nil, "", ErrBucketNotExist
+
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, "", ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, "", ErrBucketNotExist
+	}
+	// TODO:具体实现
+	bucket.Lock.Lock()
+	defer bucket.Lock.Unlock()
+	if bucket.Objects == nil {
+		return nil, "", ErrObjectNotExist
+	}
+	object, ok := bucket.Objects[objectName]
+	if !ok || object == nil {
+		return nil, "", ErrObjectNotExist
+	}
+	AvailTime, _ := lfs.GetObjectAvailTime(object)
+	return &object.ObjectInfo, AvailTime, nil
 }
 
 func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
@@ -88,34 +96,39 @@ func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.Obj
 	if err != nil {
 		return nil, nil, err
 	}
-	if lfs.CurrentLog.BucketByName == nil {
+	if lfs.CurrentLog.BucketNameToID == nil {
 		return nil, nil, ErrObjectNotExist
+	}
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, nil, ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, nil, ErrBucketNotExist
 	}
 	var objects []*pb.ObjectInfo
 	var availTimes []string
-	if Bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; ok && !Bucket.Deletion {
-		for _, Object := range lfs.CurrentLog.Entries[Bucket.BucketID] {
-			if len(objects) > MAXLISTVALUE { //返回不要过多，应指定好过滤条件
-				break
+	for _, Object := range bucket.Objects {
+		if len(objects) > MAXLISTVALUE { //返回不要过多，应指定好过滤条件
+			break
+		}
+		if Object.Deletion {
+			continue
+		}
+		if avail {
+			if strings.HasPrefix(Object.ObjectName, pre) {
+				objects = append(objects, &Object.ObjectInfo)
+				availTime, _ := lfs.GetObjectAvailTime(Object)
+				availTimes = append(availTimes, availTime)
 			}
-			if Object.Deletion {
-				continue
-			}
-			if avail {
-				if strings.HasPrefix(Object.ObjectName, pre) {
-					objects = append(objects, Object)
-					availTime, _ := lfs.GetObjectAvailTime(Object)
-					availTimes = append(availTimes, availTime)
-				}
-			} else {
-				if strings.HasPrefix(Object.ObjectName, pre) {
-					objects = append(objects, Object)
-				}
+		} else {
+			if strings.HasPrefix(Object.ObjectName, pre) {
+				objects = append(objects, &Object.ObjectInfo)
 			}
 		}
-		return objects, availTimes, nil
 	}
-	return nil, nil, ErrBucketNotExist
+	return objects, availTimes, nil
 }
 
 func (lfs *LfsService) ShowStorageSpace(bucketName, pre string) (int, error) {
@@ -123,29 +136,31 @@ func (lfs *LfsService) ShowStorageSpace(bucketName, pre string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if lfs.CurrentLog.BucketByName == nil {
+	if lfs.CurrentLog.BucketNameToID == nil {
 		return 0, ErrBucketNotExist
 	}
-	if lfs.CurrentLog.Entries == nil {
-		return 0, ErrObjectNotExist
-	}
 
-	var storageSpace int
-	if Bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; ok && !Bucket.Deletion {
-		for _, Object := range lfs.CurrentLog.Entries[Bucket.BucketID] {
-			if Object.Deletion {
-				continue
-			}
-			storageSpace += int(Object.GetObjectSize())
-		}
-		return storageSpace, nil
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return 0, ErrBucketNotExist
 	}
-	return 0, ErrBucketNotExist
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return 0, ErrBucketNotExist
+	}
+	var storageSpace int
+	for _, Object := range bucket.Objects {
+		if Object.Deletion {
+			continue
+		}
+		storageSpace += int(Object.GetObjectSize())
+	}
+	return storageSpace, nil
 }
 
 type Upload struct { //一个上传任务实例
 	LfsService  *LfsService
-	Object      *pb.ObjectInfo
+	Object      *Object
 	BucketID    int32
 	ObjectName  string
 	Reader      io.Reader
@@ -156,46 +171,51 @@ type Upload struct { //一个上传任务实例
 	keepers     []string
 }
 
-func (lfs *LfsService) ConstructUpload(objectName, namePrefix, bucketName string, file files.Node) (task.Job, error) {
+func (lfs *LfsService) ConstructUpload(objectName, namePrefix, bucketName string, file files.Node) (Job, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
 		return nil, err
 	}
-	if lfs.CurrentLog.BucketByName == nil {
-		return nil, ErrObjectNotExist
+	if lfs.CurrentLog.BucketNameToID == nil {
+		return nil, ErrBucketNotExist
 	}
-	if Bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; ok && !Bucket.Deletion {
-		if object, ok := lfs.CurrentLog.Entries[Bucket.BucketID][namePrefix+objectName]; ok || object != nil {
-			return nil, ErrObjectAlreadyExist
-		}
-		var err error
-		gp := GetGroupService(lfs.UserID)
-		_, conkeepers, err := gp.GetKeepers(gp.keeperSLA)
-		if err != nil {
-			return nil, err
-		}
-		var fileNext files.File
-		switch f := file.(type) {
-		case files.Directory:
-			return nil, errors.New("unsupported now")
-		case files.File:
-			fileNext = f
-		}
-		ul := &Upload{
-			LfsService:  lfs,
-			TagFlag:     int32(Bucket.GetTagFlag()),
-			segmentSize: int32(Bucket.GetSegmentSize()),
-			startTime:   time.Now(),
-			NamePrefix:  namePrefix,
-			Reader:      fileNext,
-			BucketID:    Bucket.BucketID,
-			keepers:     conkeepers,
-			ObjectName:  objectName,
-		}
-		return ul, nil
-	}
-	return nil, ErrBucketNotExist
 
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, ErrBucketNotExist
+	}
+
+	if object, ok := bucket.Objects[namePrefix+objectName]; ok || object != nil {
+		return nil, ErrObjectAlreadyExist
+	}
+	gp := GetGroupService(lfs.UserID)
+	_, conkeepers, err := gp.GetKeepers(gp.keeperSLA)
+	if err != nil {
+		return nil, err
+	}
+	var fileNext files.File
+	switch f := file.(type) {
+	case files.Directory:
+		return nil, errors.New("unsupported now")
+	case files.File:
+		fileNext = f
+	}
+	ul := &Upload{
+		LfsService:  lfs,
+		TagFlag:     int32(bucket.GetTagFlag()),
+		segmentSize: int32(bucket.GetSegmentSize()),
+		startTime:   time.Now(),
+		NamePrefix:  namePrefix,
+		Reader:      fileNext,
+		BucketID:    bucket.BucketID,
+		keepers:     conkeepers,
+		ObjectName:  objectName,
+	}
+	return ul, nil
 }
 
 func (ul *Upload) Stop(context.Context) error {
@@ -226,50 +246,53 @@ func (ul *Upload) Start(ctx context.Context) error {
 	if len(ul.ObjectName) > maxObjectNameLen {
 		return ErrObjectNameToolong
 	}
-	if Bucket, ok := ul.LfsService.CurrentLog.BucketByID[ul.BucketID]; !ok || Bucket.Deletion {
+	bucket, ok := ul.LfsService.CurrentLog.BucketByID[ul.BucketID]
+	if !ok || bucket == nil || bucket.Deletion {
 		return ErrBucketNotExist
 	}
-	bucketInfo := ul.LfsService.CurrentLog.BucketByID[ul.BucketID]
-	if bucketInfo.Policy != dataformat.RsPolicy && bucketInfo.Policy != dataformat.MulPolicy {
+	if bucket.Policy != dataformat.RsPolicy && bucket.Policy != dataformat.MulPolicy {
 		return ErrPolicy
 	}
-	ul.LfsService.CurrentLog.State[ul.BucketID].Mu.Lock()
-	defer ul.LfsService.CurrentLog.State[ul.BucketID].Mu.Unlock()
-	if object, ok := ul.LfsService.CurrentLog.Entries[ul.BucketID][ObjectName]; ok || object != nil {
+	bucket.Lock.Lock()
+	defer bucket.Lock.Unlock()
+	if object, ok := bucket.Objects[ObjectName]; ok || object != nil {
 		return ErrObjectAlreadyExist
 	}
 
-	object := &pb.ObjectInfo{
-		ObjectName:  ObjectName,
-		BucketID:    ul.BucketID,
-		Ctime:       time.Now().Format(utils.BASETIME),
-		StripeStart: ul.LfsService.CurrentLog.BucketByID[ul.BucketID].CurStripe,
-		OffsetStart: ul.LfsService.CurrentLog.BucketByID[ul.BucketID].NextOffset,
-		Deletion:    false,
-		Dir:         false,
+	object := &Object{
+		ObjectInfo: pb.ObjectInfo{
+			ObjectName:  ObjectName,
+			BucketID:    ul.BucketID,
+			Ctime:       time.Now().Format(utils.BASETIME),
+			StripeStart: ul.LfsService.CurrentLog.BucketByID[ul.BucketID].CurStripe,
+			OffsetStart: ul.LfsService.CurrentLog.BucketByID[ul.BucketID].NextOffset,
+			Deletion:    false,
+			Dir:         false,
+		},
 	}
 	ul.Object = object
-	ul.LfsService.CurrentLog.Entries[ul.BucketID][ObjectName] = object
-
-	encodeOpt := dataformat.NewDataformat(bucketInfo.Policy, "", bucketInfo.DataCount, bucketInfo.ParityCount,
-		int32(bucketInfo.TagFlag), bucketInfo.NextOffset, bucketInfo.SegmentSize, GetGroupService(ul.LfsService.UserID).GetKeyset())
-	err := ul.putObject(ctx, encodeOpt)
+	bucket.Objects[ObjectName] = object
+	encoder := dataformat.NewDataEncoder(bucket.Policy, "", bucket.DataCount, bucket.ParityCount,
+		int32(bucket.TagFlag), bucket.SegmentSize, GetGroupService(ul.LfsService.UserID).GetKeyset())
+	err := ul.putObject(ctx, encoder)
 	if err != nil {
-		ul.LfsService.CurrentLog.State[ul.BucketID].Dirty = true //需要记录，可能上传一部分然后失败，空间已占用
+		bucket.Dirty = true //需要记录，可能上传一部分然后失败，空间已占用
 		return err
 	}
-	ul.LfsService.CurrentLog.State[ul.BucketID].Dirty = true
+	bucket.Dirty = true
 	return nil
 }
 
 // 具体实现
-func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.DataformatOption) error {
-	dataCount := encodeOpt.DataCount
-	parityCount := encodeOpt.ParityCount
+func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder) error {
+	ul.Object.Lock.Lock()
+	defer ul.Object.Lock.Unlock()
+	dataCount := encoder.DataCount
+	parityCount := encoder.ParityCount
 	blockCount := dataCount + parityCount
 	var readByte int32
 	// true为纠删
-	switch encodeOpt.Policy {
+	switch encoder.Policy {
 	case dataformat.RsPolicy:
 		readByte = SegementCount * ul.segmentSize * dataCount //每一次读取的数据，尽量读一个整的
 	case dataformat.MulPolicy:
@@ -280,10 +303,9 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 	var breakFlag = false
 	h := md5.New()
 	for { //循环上传每一个块
-		encodeOpt.BeginOffset = ul.LfsService.CurrentLog.BucketByID[ul.BucketID].NextOffset
-		curOffset := encodeOpt.BeginOffset
+		curOffset := ul.LfsService.CurrentLog.BucketByID[ul.BucketID].NextOffset
 		var data []byte
-		switch encodeOpt.Policy {
+		switch encoder.Policy {
 		case dataformat.RsPolicy:
 			if curOffset == 0 { //不为零则为追加模式
 				data = make([]byte, readByte)
@@ -333,8 +355,8 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 		if err != nil {
 			return err
 		}
-		encodeOpt.CidPrefix = bm.ToString(3)
-		encodedData, offset, err := encodeOpt.Encode(data)
+		encoder.CidPrefix = bm.ToString(3)
+		encodedData, offset, err := encoder.Encode(data, curOffset)
 		if err != nil {
 			return err
 		}
@@ -351,7 +373,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 			for ; i < len(providers); i++ {
 				bm.SetBid(strconv.Itoa(i))
 				ncid := bm.ToString()
-				km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
+				km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(offset))
 				updateKey := km.ToString()
 				bcid := cid.NewCidV2([]byte(updateKey))
 				b, err := blocks.NewBlockWithCid(encodedData[i], bcid)
@@ -408,7 +430,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 					continue
 				}
 
-				km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "append", strconv.Itoa(int(curOffset)), strconv.Itoa(int(offset)))
+				km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "append", strconv.Itoa(int(curOffset)), strconv.Itoa(offset))
 				appendKey := km.ToString()
 				bcid := cid.NewCidV2([]byte(appendKey))
 				b, err := blocks.NewBlockWithCid(encodedData[i], bcid)
@@ -451,7 +473,7 @@ func (ul *Upload) putObject(ctx context.Context, encodeOpt dataformat.Dataformat
 type Download struct { //一个下载任务实例
 	LfsService         *LfsService
 	BucketID           int32
-	Object             *pb.ObjectInfo
+	Object             *Object
 	sizeReceived       int32 //可以统计下载进度
 	startTime          time.Time
 	pipeReader         io.Reader
@@ -459,17 +481,26 @@ type Download struct { //一个下载任务实例
 	closePipeWithError func(error) bool
 }
 
-func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (task.Job, io.Reader, error) {
+func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (Job, io.Reader, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; !ok || bucket.Deletion {
+	if lfs.CurrentLog.BucketNameToID == nil {
 		return nil, nil, ErrBucketNotExist
 	}
-	BucketID := lfs.CurrentLog.BucketByName[bucketName].BucketID
-	var object *pb.ObjectInfo
-	if object = lfs.CurrentLog.Entries[BucketID][objectName]; object == nil || object.Deletion {
+
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, nil, ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, nil, ErrBucketNotExist
+	}
+
+	object, ok := bucket.Objects[objectName]
+	if !ok || object == nil || object.Deletion {
 		return nil, nil, ErrObjectNotExist
 	}
 	piper, pipew := io.Pipe()
@@ -478,22 +509,16 @@ func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (task.Jo
 	checkErrAndClosePipe := func(err error) bool {
 		if err != nil {
 			err = pipew.CloseWithError(err)
-			if err != nil {
-				return false
-			}
-			return true
+			return err == nil
 		}
 		err = pipew.Close()
-		if err != nil {
-			return false
-		}
-		return false
+		return err == nil
 	}
 
 	dl := &Download{
 		LfsService:         lfs,
 		Object:             object,
-		BucketID:           BucketID,
+		BucketID:           bucketID,
 		startTime:          time.Now(),
 		pipeReader:         piper,
 		pipeWriter:         pipew,
@@ -541,6 +566,8 @@ func (dl *Download) Start(ctx context.Context) error {
 }
 
 func (dl *Download) getObjectWithEC(ctx context.Context) error {
+	dl.Object.Lock.RLock()
+	defer dl.Object.Lock.RUnlock()
 	bucket := dl.LfsService.CurrentLog.BucketByID[dl.BucketID]
 	dataCount := bucket.DataCount
 	parityCount := bucket.ParityCount
@@ -687,6 +714,8 @@ func (dl *Download) getObjectWithEC(ctx context.Context) error {
 }
 
 func (dl *Download) getObjectWithMultireplic(ctx context.Context) error {
+	dl.Object.Lock.RLock()
+	defer dl.Object.Lock.RUnlock()
 	bucket := dl.LfsService.CurrentLog.BucketByID[dl.BucketID]
 	dataCount := bucket.DataCount
 	parityCount := bucket.ParityCount
@@ -837,7 +866,7 @@ func (lfs *LfsService) getLastChalTime(blockID string) (time.Time, error) {
 	return latestTime, err
 }
 
-func (lfs *LfsService) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
+func (lfs *LfsService) GetObjectAvailTime(object *Object) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := lfs.CurrentLog.BucketByID[object.BucketID]
 	blockCount := bucket.DataCount + bucket.ParityCount

@@ -113,17 +113,13 @@ func initLfs() (*Logs, error) {
 
 func InitLogs() (*Logs, error) {
 	sb := newSuperBlock()
-	entries := make(map[int32]map[string]*pb.ObjectInfo)
-	bucketByID := make(map[int32]*pb.BucketInfo)
-	bucketByName := make(map[string]*pb.BucketInfo)
-	state := make(map[int32]*BucketState)
+	bucketByID := make(map[int32]*Bucket)
+	bucketNameToID := make(map[string]int32)
 	return &Logs{
-		Sb:           sb,
-		SbModified:   true,
-		BucketByID:   bucketByID,
-		BucketByName: bucketByName,
-		Entries:      entries,
-		State:        state,
+		Sb:             sb,
+		SbModified:     true,
+		BucketByID:     bucketByID,
+		BucketNameToID: bucketNameToID,
 	}, nil
 }
 
@@ -141,10 +137,11 @@ func newSuperBlock() *pb.SuperBlock {
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (lfs *LfsService) PersistMetaBlock(ctx context.Context) error {
 	persistMetaInterval = 10 * time.Second
-	tick := time.Tick(persistMetaInterval)
+	tick := time.NewTicker(persistMetaInterval)
+	defer tick.Stop()
 	for {
 		select {
-		case <-tick:
+		case <-tick.C:
 			state, err := GetUserServiceState(lfs.UserID)
 			if err != nil {
 				return err
@@ -219,17 +216,17 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 		fmt.Println("Flush Superblock to local finish. The uid is ", lfs.UserID)
 	}
 
-	for BucketID, State := range lfs.CurrentLog.State { //bucket信息和object信息保存在本地
-		if State.Dirty || isForce {
-			err := lfs.flushObjectsInfoLocal(BucketID, lfs.CurrentLog.Entries[BucketID])
+	for _, bucket := range lfs.CurrentLog.BucketByID { //bucket信息和object信息保存在本地
+		if bucket.Dirty || isForce {
+			err := lfs.flushObjectsInfoLocal(bucket)
 			if err != nil {
 				return err
 			}
-			err = lfs.flushBucketInfoLocal(lfs.CurrentLog.BucketByID[BucketID])
+			err = lfs.flushBucketInfoLocal(bucket)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Flush %s BucketInfo and Objects Info to local finish. The uid is %s\n", lfs.CurrentLog.BucketByID[BucketID].BucketName, lfs.UserID)
+			fmt.Printf("Flush %s BucketInfo and Objects Info to local finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
 		}
 	}
 
@@ -242,18 +239,18 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 		fmt.Println("Flush Superblock to provider finish. The uid is ", lfs.UserID)
 	}
 
-	for BucketID, State := range lfs.CurrentLog.State {
-		if State.Dirty || isForce {
-			err := lfs.flushObjectsInfoToProvider(BucketID, lfs.CurrentLog.Entries[BucketID])
+	for _, bucket := range lfs.CurrentLog.BucketByID {
+		if bucket.Dirty || isForce {
+			err := lfs.flushObjectsInfoToProvider(bucket)
 			if err != nil {
 				return err
 			}
-			err = lfs.flushBucketInfoToProvider(lfs.CurrentLog.BucketByID[BucketID])
+			err = lfs.flushBucketInfoToProvider(bucket)
 			if err != nil {
 				return err
 			}
-			lfs.CurrentLog.State[BucketID].Dirty = false
-			fmt.Printf("Flush %s BucketInfo and Objects Info to provider finish. The uid is %s\n", lfs.CurrentLog.BucketByID[BucketID].BucketName, lfs.UserID)
+			bucket.Dirty = false
+			fmt.Printf("Flush %s BucketInfo and Objects Info to provider finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
 		}
 	}
 

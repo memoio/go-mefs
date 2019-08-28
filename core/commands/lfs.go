@@ -19,7 +19,6 @@ import (
 	dataformat "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role/user"
-	"github.com/memoio/go-mefs/role/user/task"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/mgutz/ansi"
@@ -551,7 +550,7 @@ var lfsPutObjectCmd = &cmds.Command{
 		BucketName := req.Arguments[0]
 		objectName := req.Options[ObjectName].(string)
 		f := req.Files.Entries()
-		var upload task.Job
+		var upload user.Job
 		//目前只上传第一个文件
 		if f.Next() {
 			if objectName == "" {
@@ -680,9 +679,9 @@ var lfsGetObjectCmd = &cmds.Command{
 			} else if stat.IsDir() {
 				rootIsDir = true
 			}
-			if rootIsDir == true {
+			if rootIsDir {
 				fpath = path.Join(outPath, req.Arguments[1])
-			} else if rootExists == false {
+			} else if !rootExists {
 				fpath = outPath
 			} else {
 				return errors.New("The outpath already has file: " + req.Arguments[1])

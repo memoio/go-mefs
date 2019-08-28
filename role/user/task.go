@@ -1,9 +1,11 @@
-package task
+package user
 
 import (
 	"context"
 	"errors"
 	"sync"
+
+	pb "github.com/memoio/go-mefs/role/user/pb"
 )
 
 var (
@@ -55,9 +57,9 @@ const (
 	//UnKnown 未知类型
 	UnKnown TaskType = iota
 	//Download 下载对象
-	Download
+	DownloadState
 	//Upload  上传对象
-	Upload
+	UploadState
 	//Copy 从一个Bucket复制到另一个Bucket
 	Copy
 	// Share 从一个Bucket分享对象
@@ -70,12 +72,14 @@ const (
 // B，Task里指明任务类型，及UserID等所需参数，Start的时候构造出临时Job运行
 // 暂停的时候保存好状态（如已上传的index等），将Job释放，重新Start再构建Job运行
 type TaskInfo struct {
-	Typ      TaskType    //任务类型
-	State    TaskState   //任务状态
-	Job      Job         //工作
-	SubTasks []*TaskInfo //子任务
-	Priority int         //任务的优先级
-	Err      error       //如出错，存储错误消息等待获取
+	LfsService *LfsService
+	Object     *pb.ObjectInfo
+	BucketID   int32
+	Job        Job
+	Typ        TaskType  //任务类型
+	State      TaskState //任务状态
+	Priority   int       //任务的优先级
+	Err        error     //如出错，存储错误消息等待获取
 }
 
 //Job 具体的工作接口，目前只实现Start，断点续传等后续再做
@@ -88,47 +92,25 @@ type Job interface {
 }
 
 //NewTask 为Job新建一个任务
-func NewTask(typ TaskType, job Job, priority int) (*TaskInfo, error) {
-	if job == nil {
-		return nil, ErrJobIsNil
-	}
+func NewTask(typ TaskType, priority int) (*TaskInfo, error) {
 	return &TaskInfo{
 		Typ:      typ,
 		State:    Pending,
-		Job:      job,
 		Priority: priority,
 	}, nil
 }
 
 func (t *TaskInfo) Start(ctx context.Context) error {
-	err := t.Job.Start(ctx)
-	if err != nil {
-		t.Err = err
-		t.State = Error
-		return err
-	}
 	t.State = Completed
 	return nil
 }
 
 func (t *TaskInfo) Stop(ctx context.Context) error {
-	err := t.Job.Stop(ctx)
-	if err != nil {
-		t.Err = err
-		t.State = Error
-		return err
-	}
 	t.State = Paused
 	return nil
 }
 
 func (t *TaskInfo) Cancel(ctx context.Context) error {
-	err := t.Job.Cancel(ctx)
-	if err != nil {
-		t.Err = err
-		t.State = Error
-		return err
-	}
 	t.State = Completed
 	return nil
 }
