@@ -19,10 +19,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	logging "github.com/ipfs/go-log"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
-	logging "github.com/ipfs/go-log"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var log = logging.Logger("flatfs")
@@ -283,7 +284,17 @@ func (fs *Datastore) ShardStr() string {
 
 func (fs *Datastore) encode(key datastore.Key) (dir, file string) {
 	noslash := key.String()[1:]
-	dir = fs.path
+	blkInfo, err := metainfo.GetBlockMeta(noslash)
+	if err != nil {
+		fmt.Printf("get block meta in encode error :", err)
+		return "", ""
+	}
+	uid := blkInfo.GetUid()
+	gid := blkInfo.GetGid()
+	//dir = fs.path
+	dir1 := filepath.Join(fs.path, uid)
+	fs.makeDir(dir1)
+	dir = filepath.Join(dir1, gid)
 	file = filepath.Join(dir, noslash+extension)
 	return dir, file
 }
