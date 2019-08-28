@@ -178,7 +178,7 @@ func BenchmarkGenProof(b *testing.B) {
 	}
 }
 
-func BenchmarkVerify(b *testing.B) {
+func BenchmarkVerifyProof(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		fmt.Println("Initialization panic.")
@@ -245,7 +245,7 @@ func BenchmarkVerify(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, err := Verify(keySet.Pk, h, proof)
+		result, err := VerifyProof(keySet.Pk, h, proof)
 		if err != nil {
 			panic("Error")
 		}
