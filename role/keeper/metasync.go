@@ -114,7 +114,7 @@ func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 }
 
 // syncProof 收到单次挑战信息同步的操作，保存在内存和硬盘中
-// uid/"sync"/"chalres"/pid/kid/time,length/result/proof
+// uid/"sync"/"chalres"/pid/kid/time,length/result/proof/sum/h
 func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	groupid := km.GetMid()
 	options := km.GetOptions()
@@ -122,6 +122,9 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		return metainfo.ErrIllegalKey
 	}
 	splitedMetaValue := strings.Split(metaValue, metainfo.DELIMITER)
+	if len(splitedMetaValue) < 5 {
+		return metainfo.ErrIllegalValue
+	}
 	timerec := utils.StringToUnix(options[3])   //转换收到的时间信息格式
 	l, err := strconv.Atoi(splitedMetaValue[0]) //转换长度信息格式
 	if err != nil {
@@ -132,14 +135,24 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	if res == "0" {
 		chalres = false
 	}
+	thisSum, err := strconv.Atoi(splitedMetaValue[3])
+	if err != nil {
+		return err
+	}
+	thisH, err := strconv.Atoi(splitedMetaValue[4])
+	if err != nil {
+		return err
+	}
 	thischalresult := &chalresult{ //构建挑战结果
 		kid:            options[2],
 		pid:            options[1],
 		uid:            groupid,
 		challenge_time: timerec,
+		sum:            uint32(thisSum),
+		h:              thisH,
+		res:            chalres,
 		proof:          splitedMetaValue[2],
 		length:         uint32(l),
-		res:            chalres,
 	}
 
 	pu := PU{
@@ -151,11 +164,6 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		return errors.New("getchalinfo error")
 	}
 	thischalinfo.Time.Store(timerec, thischalresult) //放到LedgerInfo里
-	km.SetKeyType(metainfo.Local)
-	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local") //保存在本地
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

@@ -25,7 +25,7 @@
   + 元数据同步
     + keytype:`"sync"`，第一个操作数表示是哪一类数据
     + block位置信息 key:`blockID/"sync"/"block"` value:`pid/offset`
-    + 挑战结果信息: key:`uid/"sync"/"chalres"/pid/kid/time` value: `length/result/proof`
+    + 挑战结果信息: key:`uid/"sync"/"chalres"/pid/kid/time` value: `length/result/proof/sum/h`
     + 挑战汇总信息(支付): key:`uid/"sync"/"chalpay"/pid/begin_time/end_time` value:`spacetime/signature/proof`
     + tendermint信息：key:`uid/"sync"/"tendermintinfo"` value:`id/ip/pubkey/p2pport/rpcport`
   + tendermint重新启动
@@ -33,7 +33,7 @@
     + key:`uid/"trestart"` value:`id/ip/pubkey/p2pport/rpcport`
   + 挑战流程
     + keytype:`"challenge"`/`"Proof"`
-    + keeper： key:`uid/"challenge"/h/chaltime` value:`userconfigByte`
+    + keeper： key:`uid/"challenge"/chaltime` value:`userconfigByte`
     + provider: key:`uid/"proof"/FaultBlock/chaltime` value:`proof`
   + 修复流程`Repair`
     + keeper: key：`blockID/"repair"` value:`rpid`

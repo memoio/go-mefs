@@ -158,6 +158,8 @@ func doChallengeBLS12(pu PU, blocks []string, chaltime int64) error {
 
 }
 
+//handleProofResultBls12 收到provider返回的挑战结果的回调
+//kv格式(uid/"proof"/FaultBlock/chaltime,proof)
 func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	ops := km.GetOptions()
 	Indicesstr := ops[0]
@@ -166,7 +168,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	var h mcl.Challenge
 	indices, _ := b58.Decode(Indicesstr)
 	splitedindex := strings.Split(string(indices), metainfo.DELIMITER)
-	var blocks []string
+	var blocks []string //存放挑战失败的blockid
 
 	for _, index := range splitedindex {
 		if index != "" {
@@ -192,7 +194,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		fmt.Println("getChalinfo error!pu:", pu)
 		return
 	}
-	thischalresult, ok := thischalinfo.Time.Load(challengetime)
+	thischalresult, ok := thischalinfo.Time.Load(challengetime) //获取之前建立好的挑战信息结构
 	if !ok {
 		fmt.Println("thischalinfo.Time.Load error!challengetime:", challengetime)
 		fmt.Println("PU:", pu)
@@ -202,9 +204,9 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 
 	var length uint32
 	var offset, electedOffset int
-	thischalinfo.Cid.Range(func(k, v interface{}) bool {
+	thischalinfo.Cid.Range(func(k, v interface{}) bool { //记录每个块的挑战结果
 		var flag int
-		if len(blocks) != 0 {
+		if len(blocks) != 0 {	//存在挑战失败的块
 			for _, block := range blocks {
 				if strings.Compare(k.(string), block) != 0 {
 					flag++
@@ -247,11 +249,12 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		fmt.Println("mcl.VerifyProof error!", err)
 		return
 	}
-	if res {
+	if res {	//验证proof通过后,循环记录每一个块的挑战信息（用于修复），和此次对provider的挑战信息
 		//fmt.Println("verify success cid :", h.Indices)
+		//更新thischalinfo.Cid的信息
 		for _, tmpindex := range h.Indices {
 			blockID, _, _ := utils.SplitIndex(tmpindex)
-			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok {
+			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok {	//获取当前blockid的offset,若内存中有则直接用，没有就在硬盘中查
 				offset = thiscidinfo.(*cidInfo).offset
 			} else {
 				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
@@ -273,17 +276,29 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 			length += uint32((newcidinfo.offset + 1) * df.DefaultSegmentSize)
 			thischalinfo.Cid.Store(blockID, newcidinfo)
 		}
+
+		//更新thischalinfo.Time的信息
+		thisSum := thischalresult.(*chalresult).sum
+		thisH := thischalresult.(*chalresult).h
 		newchalresult := &chalresult{
 			kid:            localNode.Identity.Pretty(),
 			pid:            pid,
 			uid:            uid,
 			challenge_time: challengetime,
-			sum:            thischalresult.(*chalresult).sum,
-			h:              thischalresult.(*chalresult).h,
+			sum:            thisSum,
+			h:              thisH,
 			res:            true,
 			proof:          proof,
 			length:         length,
 		}
+		//挑战信息验证通过后，同步给组内的其他keeper
+		kmChal, err := metainfo.NewKeyMeta(uid, metainfo.Sync, metainfo.SyncTypeChalRes, pid, localNode.Identity.Pretty(), chaltime)
+		if err != nil {
+			fmt.Println("metainfo.NewKeyMeta()err")
+			return
+		}
+		metavalue := strings.Join([]string{strconv.Itoa(int(length)), "1", proof, strconv.Itoa(int(thisSum)), strconv.Itoa(int(thisH))}, metainfo.DELIMITER)
+		metaSyncTo(kmChal, metavalue)
 		thischalinfo.Time.Store(challengetime, newchalresult)
 		addCredit(pid)
 	} else {
