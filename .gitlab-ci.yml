@@ -1,0 +1,165 @@
+image: limcos/mefs_compile_env:latest
+
+stages:
+  - golangci-lint
+  - compile
+  - updateKeeperAndProvider
+  - test
+
+before_script:
+  - mkdir -p $GOPATH/src/github.com/memoio
+  - cd $GOPATH/src/github.com/memoio
+  - \cp -rf $CI_PROJECT_DIR $GOPATH/src/github.com/memoio
+  - mv mefs go-ipfs
+  - cd $GOPATH/src/github.com/memoio/go-mefs
+  - git reset --hard
+
+role-golint:
+  stage: golangci-lint
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs/role
+    - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
+  tags:
+    - "47.92.5.51"
+  allow_failure: true
+
+bls12-golint:
+  stage: golangci-lint
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bls12
+    - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
+  tags:
+    - "47.92.5.51"
+  allow_failure: true
+
+contracts-golint:
+  stage: golangci-lint
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs/contracts
+    - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
+  tags:
+    - "47.92.5.51"
+  allow_failure: true
+
+data_format-golint:
+  stage: golangci-lint
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs/data-format
+    - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
+  tags:
+    - "47.92.5.51"
+  allow_failure: true
+
+utils-golint:
+  stage: golangci-lint
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs/utils
+    - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
+  tags:
+    - "47.92.5.51"
+  allow_failure: true
+
+mefs-golint:
+  stage: golangci-lint
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs/cmd
+    - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
+  tags:
+    - "47.92.5.51"
+  allow_failure: true
+
+compile:
+  stage: compile
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+  tags:
+    - "47.92.5.51"
+
+updateKeeperAndProvider:
+  stage: updateKeeperAndProvider
+  when: on_success
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 updateKeeper.exp
+    - ./updateKeeper.exp
+    - chmod 777 updateProvider.exp
+    - ./updateProvider.exp
+  tags:
+    - "47.92.5.51"
+
+unit_test:
+  stage: test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make test
+  tags:
+    - "47.92.5.51"
+
+challenge_test:
+  stage: test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 challengeTest.sh
+    - ./challengeTest.sh
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
+
+contract_test:
+  stage: test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
+    - ./ScTest.sh
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
+
+channel_test:
+  stage: test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
+    - ./Channel_test.sh
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
+
+js_API_test:
+  stage: test
+  when: always
+  script:
+    - ifconfig
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
+    - ./LfsTest.sh
+  after_script:
+    - cat ~/daemon.stdout1
+    - cat ~/daemon.stdout2
+  tags:
+    - "47.92.5.51"
+  retry:
+    max: 1
+    when: stuck_or_timeout_failure

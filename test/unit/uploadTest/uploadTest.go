@@ -4,28 +4,21 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"math/rand"
 	"strconv"
-	"strings"
 	"time"
-
-	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/metainfo"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	df "github.com/ipfs/go-ipfs/data-format"
+	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/utils/address"
 	shell "github.com/memoio/mefs-go-http-client"
 )
-
-//每个用户上传对象数目
-const ObjectCount = 1
 
 //随机文件最大大小
 const randomDataSize = 1024 * 1024 * 3
@@ -52,6 +45,7 @@ func ChallengeTest() error {
 		fmt.Println("address to id failed")
 		return err
 	}
+	fmt.Println("GetIDFromAddress success,uid is",uid)
 	transferTo(big.NewInt(1000000000000000000), addr)
 	for {
 		balance := queryBalance(addr)
@@ -74,7 +68,7 @@ func ChallengeTest() error {
 			continue
 		}
 		var opts []func(*shell.RequestBuilder) error
-		//设置某些选项
+		//set option of bucket
 		opts = append(opts, shell.SetAddress(addr))
 		opts = append(opts, shell.SetDataCount(dataCount))
 		opts = append(opts, shell.SetParityCount(parityCount))
@@ -89,8 +83,9 @@ func ChallengeTest() error {
 		fmt.Println(addr, "started, begin to upload")
 		break
 	}
-	//然后开始上传文件
-	for j := 0; j < ObjectCount; j++ {
+	//upload file
+	for {
+		i:= 0
 		r := rand.Int63n(randomDataSize)
 		data := make([]byte, r)
 		fillRandom(data)
@@ -100,107 +95,16 @@ func ChallengeTest() error {
 		beginTime := time.Now().Unix()
 		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
-			log.Println(addr, "Upload failed", err)
+			log.Println(addr, "Upload failed in file ",i,",", err)
 			return err
 		}
 		storagekb := float64(r) / 1024.0
 		endTime := time.Now().Unix()
 		speed := storagekb / float64(endTime-beginTime)
-		fmt.Println("  Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
+		fmt.Println("  Upload file",i,"success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
 		fmt.Println(ob.String() + "address: " + addr)
-
+		i++
 	}
-	check := 0
-	var LastChallengeTime string
-	for {
-		check++
-		if check > 5 {
-			return errors.New("ChallengeTest failed, Last challenge time not change")
-		}
-		time.Sleep(5 * time.Minute)
-		getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr))
-		if err != nil {
-			fmt.Println("List Objects failed :", err)
-			return err
-		}
-		log.Println("Object Name :", getOb.Objects[0].ObjectName, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
-		if check >= 2 && strings.Compare(LastChallengeTime, getOb.Objects[0].LatestChalTime) != 0 {
-			log.Println("Challenge success")
-			break
-		}
-		LastChallengeTime = getOb.Objects[0].LatestChalTime
-	}
-
-	keepers, err := sh.ListKeepers(shell.SetAddress(addr))
-	if err != nil {
-		fmt.Println("list keepers error :", err)
-		return err
-	}
-	keeper := keepers.Peers[0].PeerID
-	fmt.Println("keeper :", keepers.Peers[0].PeerID)
-	bm, err := metainfo.NewBlockMeta(uid, "1", "0", "0")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	cid := bm.ToString()
-	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.Local, metainfo.SyncTypeBlock)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	blockMeta := kmBlock.ToString()
-	fmt.Println("blockMeta : ", blockMeta)
-	var provider string
-	resPid, err := sh.GetFrom(blockMeta, keeper)
-	if err == nil {
-		provider = strings.Split(resPid.Extra, "|")[0]
-		fmt.Println("provider :", provider)
-	} else {
-		fmt.Println("get blockmeta error :", err)
-		return err
-	}
-	ret, err := getBlock(sh, cid, provider) //获取块的MD5
-	if err != nil || ret == "" {
-		fmt.Println("get block from old provider error :", err)
-		return err
-	}
-	fmt.Println("md5 of block`s rawdata :", ret)
-
-	//在provider上删除指定块
-	km, err := metainfo.NewKeyMeta(cid, metainfo.DeleteBlock)
-	if err != nil {
-		fmt.Println("construct del block KV error :", err)
-		return err
-	}
-	sh.ChallengeTest(km.ToString(), provider)
-	fmt.Println("delete block :", cid, " in provider")
-	time.Sleep(42 * time.Minute)
-
-	//获取新的provider，从新的provider上获得块的MD5
-	var newProvider string
-	res, err := sh.GetFrom(blockMeta, keeper)
-	if err == nil {
-		newProvider = strings.Split(res.Extra, "|")[0]
-		fmt.Println("newProvider :", newProvider)
-	} else {
-		fmt.Println("get newblockmeta error :", err)
-		return err
-	}
-
-	newRet, err := getBlock(sh, cid, newProvider)
-	if err != nil || newRet == "" {
-		fmt.Println("get block from new provider error :", err)
-		return err
-	}
-	fmt.Println("md5 of repaired block`s rawdata :", newRet)
-	if ret == newRet {
-		fmt.Println("Repair success")
-	} else {
-		fmt.Println("old and new block`s rawdata md5 not match")
-		return errors.New("Repair failed")
-	}
-	return nil
 }
 
 func ToStorageSize(r int64) string {
@@ -291,17 +195,3 @@ func queryBalance(addr string) *big.Int {
 	return balance
 }
 
-func getBlock(sh *shell.Shell, cid, provider string) (string, error) {
-	i := 0
-	var err error
-	for i < 10 {
-		ret, err := sh.GetBlockFrom(cid, provider)
-		if err == nil {
-			fmt.Println("Getblock success in ", i+1, " try")
-			return ret, nil
-		}
-		fmt.Println("get block failed, now try again")
-		i++
-	}
-	return "", err
-}
