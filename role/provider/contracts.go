@@ -100,7 +100,7 @@ func SaveChannel(userID string) error {
 	if err != nil {
 		return err
 	}
-	channelAddr, err := contracts.ProviderGetChannelAddr(localAddr, userAddr)
+	channelAddr, err := contracts.GetChannelAddr(localAddr, localAddr, userAddr)
 	if err != nil {
 		return err
 	}

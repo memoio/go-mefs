@@ -195,8 +195,8 @@ func getChannel(endPoint string, mapper *upKeeping.Mapper, localAddress common.A
 	return channelAddr, channelContract, nil
 }
 
-//UserGetChannelAddr get the channel contract's address
-func UserGetChannelAddr(localAddr, providerAddr common.Address) (common.Address, error) {
+//GetChannelAddr get the channel contract's address
+func GetChannelAddr(localAddr, providerAddr, ownerAddr common.Address) (common.Address, error) {
 	endPoint := EndPoint
 	var ChannelAddr common.Address
 	resolver, err := getResolverFromIndexer(endPoint, localAddr, providerAddr.String())
@@ -204,28 +204,7 @@ func UserGetChannelAddr(localAddr, providerAddr common.Address) (common.Address,
 		return ChannelAddr, err
 	}
 
-	mapper, err := getDeployedMapper(endPoint, localAddr, localAddr, resolver)
-	if err != nil {
-		return ChannelAddr, err
-	}
-
-	channelAddr, _, err := getChannel(endPoint, mapper, localAddr)
-	if err != nil {
-		return ChannelAddr, err
-	}
-	return channelAddr, nil
-}
-
-//ProviderGetChannelAddr get the channel contract's address
-func ProviderGetChannelAddr(localAddr, userAddr common.Address) (common.Address, error) {
-	endPoint := EndPoint
-	var ChannelAddr common.Address
-	resolver, err := getResolverFromIndexer(endPoint, localAddr, localAddr.String())
-	if err != nil {
-		return ChannelAddr, err
-	}
-
-	mapper, err := getDeployedMapper(endPoint, localAddr, userAddr, resolver)
+	mapper, err := getDeployedMapper(endPoint, localAddr, ownerAddr, resolver)
 	if err != nil {
 		return ChannelAddr, err
 	}
