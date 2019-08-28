@@ -54,6 +54,10 @@ func (cs *ContractService) SaveChannel() error {
 	if err != nil {
 		return err
 	}
+	config, err := localNode.Repo.Config()
+	if err != nil {
+		return err
+	}
 	for _, provider := range providers {
 		if _, ok := cs.channelBook[provider]; ok {
 			continue
@@ -62,7 +66,7 @@ func (cs *ContractService) SaveChannel() error {
 		if err != nil {
 			return err
 		}
-		chanAddr, err := contracts.GetChannelAddr(userAddr, proAddr, userAddr)
+		chanAddr, err := contracts.UserGetChannelAddr(config.Eth, userAddr, proAddr)
 		if err != nil {
 			return err
 		}
@@ -115,11 +119,15 @@ func (cs *ContractService) SaveUpkeeping() error {
 	if err != nil {
 		return err
 	}
-	uk, _, err := contracts.GetUKFromResolver(contracts.EndPoint, userAddr)
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		return err
 	}
-	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUpKeepingParams(contracts.EndPoint, userAddr, userAddr)
+	uk, _, err := contracts.GetUKFromResolver(config.Eth, userAddr)
+	if err != nil {
+		return err
+	}
+	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUpKeepingParams(config.Eth, userAddr, userAddr)
 	if err != nil {
 		return err
 	}
@@ -150,11 +158,15 @@ func (cs *ContractService) SaveQuery() error {
 	if err != nil {
 		return err
 	}
-	queryAddr, err := contracts.GetMarketAddr(contracts.EndPoint, userAddr, userAddr, contracts.Query)
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, ks, ps, completed, err := contracts.GetQueryParams(contracts.EndPoint, userAddr, queryAddr)
+	queryAddr, err := contracts.GetMarketAddr(config.Eth, userAddr, userAddr, contracts.Query)
+	if err != nil {
+		return err
+	}
+	capacity, duration, price, ks, ps, completed, err := contracts.GetQueryParams(config.Eth, userAddr, queryAddr)
 	if err != nil {
 		return err
 	}
@@ -182,6 +194,10 @@ func (cs *ContractService) SaveOffer() error {
 	if err != nil {
 		return err
 	}
+	config, err := localNode.Repo.Config()
+	if err != nil {
+		return err
+	}
 	for _, provider := range providers {
 		if _, ok := cs.offerBook[provider]; ok {
 			continue
@@ -190,12 +206,12 @@ func (cs *ContractService) SaveOffer() error {
 		if err != nil {
 			return err
 		}
-		offerAddr, err := contracts.GetMarketAddr(contracts.EndPoint, userAddr, proAddr, contracts.Offer)
+		offerAddr, err := contracts.GetMarketAddr(config.Eth, userAddr, proAddr, contracts.Offer)
 		if err != nil {
 			fmt.Println("get", provider, "'s offer address err ")
 			return err
 		}
-		capacity, duration, price, err := contracts.GetOfferParams(contracts.EndPoint, userAddr, offerAddr)
+		capacity, duration, price, err := contracts.GetOfferParams(config.Eth, userAddr, offerAddr)
 		if err != nil {
 			fmt.Println("get", provider, "'s offer params err ")
 			return err
@@ -228,10 +244,18 @@ func (cs *ContractService) GetOfferItem(proid string) (contracts.OfferItem, erro
 	return offerItem, nil
 }
 
-func (cs *ContractService) GetUpkeepingItem() contracts.UpKeepingItem {
-	return cs.upKeepingItem
+func (cs *ContractService) GetUpkeepingItem() (contracts.UpKeepingItem, error) {
+	if cs.upKeepingItem.UpKeepingAddr == "" || cs.upKeepingItem.UserID == "" {
+		fmt.Println("UpKeepingItem hasn't set")
+		return cs.upKeepingItem, ErrGetContractItem
+	}
+	return cs.upKeepingItem, nil
 }
 
-func (cs *ContractService) GetQueryItem() contracts.QueryItem {
-	return cs.queryItem
+func (cs *ContractService) GetQueryItem() (contracts.QueryItem, error) {
+	if cs.queryItem.QueryAddr == "" || cs.queryItem.UserID == "" {
+		fmt.Println("QueryItem hasn't set")
+		return cs.queryItem, ErrGetContractItem
+	}
+	return cs.queryItem, nil
 }

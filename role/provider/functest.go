@@ -6,22 +6,23 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts/upKeeping"
-	"github.com/memoio/go-mefs/utils"
-
-	"github.com/memoio/go-mefs/core"
-	"github.com/memoio/go-mefs/repo/fsrepo"
-	"github.com/memoio/go-mefs/utils/address"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/contracts/upKeeping"
+	"github.com/memoio/go-mefs/core"
+	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 //TestChannelTimeout test channelTimeout()
 func TestChannelTimeout(providerAddr common.Address, hexKey string) (err error) {
 	fmt.Println("==========开始测试channelTimeout=========")
-	ethEndPoint := contracts.EndPoint
-
+	config, err := localNode.Repo.Config()
+	if err != nil {
+		return err
+	}
+	ethEndPoint := config.Eth
 	balance, err := contracts.QueryBalance(ethEndPoint, providerAddr.String()) //查看账户余额
 	if err != nil {
 		fmt.Println("contracts.QueryBalanceErr:", err)
@@ -91,9 +92,11 @@ func TestCloseChannel(n *core.MefsNode) (err error) {
 		fmt.Println("getHexPKErr", err)
 		return err
 	}
-
-	ethEndPoint := contracts.EndPoint
-
+	config, err := localNode.Repo.Config()
+	if err != nil {
+		return err
+	}
+	ethEndPoint := config.Eth
 	fmt.Println("==========开始测试closeChannel=========")
 	balance, err := contracts.QueryBalance(ethEndPoint, providerAddr.String()) //查看账户余额
 	if err != nil {

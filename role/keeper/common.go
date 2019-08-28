@@ -18,6 +18,8 @@ var (
 	ErrNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
 	ErrPInfoTypeAssert       = errors.New("type asserts err in PInfo")
 	ErrNoChalInfo            = errors.New("can not find this chalinfo")
+	ErrGetContractItem           = errors.New("Can't get contract Item")
+	ErrIncorrectParams = errors.New("Input incorrect params.")
 )
 
 func addCredit(provider string) {

@@ -15,9 +15,6 @@ const (
 	spaceTimePayGasPrice = 100
 )
 
-//EndPoint eth端口的全局变量
-var EndPoint string
-
 var (
 	//ErrNotDeployedMapper the user has not deployed mapper in the specified resolver
 	ErrNotDeployedMapper = errors.New("has not deployed mapper")

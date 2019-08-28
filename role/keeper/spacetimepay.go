@@ -67,10 +67,15 @@ func spaceTimePay() {
 			return true
 		}
 		for _, pidString := range thisGroupsInfo.Providers { //循环当前user的provider
+			uk, err := GetUpkeeping(thisGroupsInfo)
+			if err != nil {
+				fmt.Println("getUpkeeping err:", err)
+				continue
+			}
 			materials = append(materials, &payMaterial{
 				groupid: thisGroupid,
 				pid:     pidString,
-				price:   GetUpkeeping(thisGroupsInfo).Price,
+				price:   uk.Price,
 			})
 		}
 		return true

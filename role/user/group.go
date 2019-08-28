@@ -268,7 +268,11 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		queryAddr, err = contracts.GetMarketAddr(contracts.EndPoint, addr, addr, contracts.Query) //获取query合约地址
+		config, err := localNode.Repo.Config()
+		if err != nil {
+			return err
+		}
+		queryAddr, err = contracts.GetMarketAddr(config.Eth, addr, addr, contracts.Query) //获取query合约地址
 		if err != nil {
 			return err
 		}

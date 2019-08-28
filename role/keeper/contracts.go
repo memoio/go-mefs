@@ -8,6 +8,10 @@ import (
 )
 
 func SaveUpkeeping(gp *GroupsInfo, userID string) error {
+	if gp == nil  {
+		return ErrIncorrectParams
+	}
+	localID := localNode.Identity.Pretty()
 	config, err := localNode.Repo.Config()
 	if err != nil {
 		return err
@@ -16,17 +20,17 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	if err != nil {
 		return err
 	}
-	localAddr, err := address.GetAddressFromID(config.PeerID)
+	localAddr, err := address.GetAddressFromID(localID)
 	if err != nil {
 		return err
 	}
-	endPoint := config.Eth //获取endPoint
+	endPoint := config.Eth
 	ukAddr, _, err := contracts.GetUKFromResolver(endPoint, userAddr)
 	if err != nil {
 		fmt.Println("get ", userID, "'s ukAddr err:", err)
 		return err
 	}
-	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUpKeepingParams(contracts.EndPoint, localAddr, userAddr)
+	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUpKeepingParams(endPoint, localAddr, userAddr)
 	if err != nil {
 		return err
 	}
@@ -52,8 +56,12 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	return nil
 }
 
-func GetUpkeeping(gp *GroupsInfo) contracts.UpKeepingItem {
-	return gp.upkeeping
+func GetUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
+	if gp.upkeeping.UserID == "" || gp.upkeeping.UpKeepingAddr == "" {
+		fmt.Println("OfferItem hasn't set")
+		return gp.upkeeping, ErrGetContractItem
+	}
+	return gp.upkeeping, nil
 }
 
 func SaveQuery(userID string) error {
@@ -70,7 +78,7 @@ func SaveQuery(userID string) error {
 	if err != nil {
 		return err
 	}
-	endPoint := config.Eth //获取endPoint
+	endPoint := config.Eth
 	queryAddr, err := contracts.GetMarketAddr(endPoint, localAddr, userAddr, contracts.Query)
 	if err != nil {
 		return err
@@ -93,14 +101,15 @@ func SaveQuery(userID string) error {
 	return nil
 }
 
-func GetQuery(userID string) contracts.QueryItem {
+func GetQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := localPeerInfo.queryBook.Load(userID)
 	if !ok {
 		fmt.Println("Not find ", userID, "'s queryItem in querybook")
+		return queryItem, ErrGetContractItem
 	}
 	queryItem = value.(contracts.QueryItem)
-	return queryItem
+	return queryItem, nil
 }
 
 func SaveOffer(providerID string) error {
@@ -137,12 +146,13 @@ func SaveOffer(providerID string) error {
 	return nil
 }
 
-func GetOffer(providerID string) contracts.OfferItem {
+func GetOffer(providerID string) (contracts.OfferItem, error) {
 	var offerItem contracts.OfferItem
 	value, ok := localPeerInfo.offerBook.Load(providerID)
 	if !ok {
 		fmt.Println("Not find ", providerID, "'s offerItem in offerBook")
+		return offerItem, ErrGetContractItem
 	}
 	offerItem = value.(contracts.OfferItem)
-	return offerItem
+	return offerItem, nil
 }
