@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -169,4 +170,20 @@ func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
 	ctx = context.WithValue(ctx, "caller", caller)*/
 	_, err := localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
 	return err
+}
+
+
+// 对数组进行乱序操作，以便user随机选择providers
+func disorderArray(array []string) []string {
+	var temp string
+	var num int 
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(array) - 1; i >= 0; i-- {
+		num = r.Intn(i+1)
+		temp = array[i]
+		array[i] = array[num]
+		array[num] = temp
+	}
+
+	return array
 }
