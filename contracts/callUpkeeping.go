@@ -102,7 +102,7 @@ func getMapper(endPoint string, userAddress common.Address, resolver *upKeeping.
 }
 
 //Deploy deploy UpKeeping contracts between user, keepers and providers, and save contractAddress in mapper
-func Deploy(endPoint string, hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, moneyAccount *big.Int) error {
+func Deploy(endPoint string, hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
 	fmt.Println("begin deploy upKeeping...")
 	//获得resolver
 	resolver, err := getResolverFromIndexer(endPoint, userAddress, "memoriae")
@@ -341,4 +341,21 @@ func GetUpKeepingParams(endPoint string, localAddress, userAddress common.Addres
 	moneyPerDay = moneyPerDay.Quo(moneyAccount, duration)
 	price = price.Quo(moneyPerDay, capacity)
 	return userAddr, keeperAddrs, providerAddrs, duration.Int64(), capacity.Int64(), price.Int64(), nil
+}
+
+//AddProvider add a provider to upKeeping
+func AddProvider(endPoint string, hexKey string, userAddress common.Address, providerAddress []common.Address) error {
+	_, uk, err := GetUKFromResolver(endPoint, userAddress)
+	if err != nil {
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(key)
+
+	_, err = uk.AddProvider(auth, providerAddress)
+	if err != nil {
+		return err
+	}
+	return nil
 }

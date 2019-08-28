@@ -57,7 +57,7 @@ func ChannelContract(endPoint string, hexKey string, localAddress common.Address
 
 	//验证channelAddr是否已经放进了mapper中
 	for i := 1; ; i++ {
-		if i%10 == 0 { //每隔10次如果还get不到合约地址，就在触发一次添加合约到mapper
+		if i%10 == 0 { //每隔10次如果还get不到合约地址，就再触发一次添加合约到mapper
 			auth = bind.NewKeyedTransactor(key)
 			_, err = mapper.Add(auth, channelAddr)
 			if err != nil {

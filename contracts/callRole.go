@@ -3,6 +3,7 @@ package contracts
 import (
 	"fmt"
 	"log"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -99,7 +100,9 @@ func KeeperContract(endPoint string, hexKey string) (err error) {
 	auth := bind.NewKeyedTransactor(key)
 	client := GetClient(endPoint)
 
-	keeperContractAddr, _, _, err := role.DeployKeeper(auth, client)
+	//暂时将质押金额设为0
+	deposit := big.NewInt(0)
+	keeperContractAddr, _, _, err := role.DeployKeeper(auth, client, deposit)
 	if err != nil {
 		fmt.Println("deployKeeperErr:", err)
 		return err
@@ -141,7 +144,10 @@ func ProviderContract(endPoint string, hexKey string) (err error) {
 	auth := bind.NewKeyedTransactor(key)
 	client := GetClient(endPoint)
 
-	providerContractAddr, _, _, err := role.DeployProvider(auth, client)
+	//暂时将存储容量、质押金额设为0
+	size := big.NewInt(0)
+	deposit := big.NewInt(0)
+	providerContractAddr, _, _, err := role.DeployProvider(auth, client, size, deposit)
 	if err != nil {
 		fmt.Println("deployProviderErr:", err)
 		return err

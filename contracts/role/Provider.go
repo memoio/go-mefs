@@ -28,18 +28,18 @@ var (
 )
 
 // ProviderABI is the input ABI used to generate the binding from.
-const ProviderABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"bool\"}],\"name\":\"set\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"isProvider\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getAllAddress\",\"outputs\":[{\"name\":\"\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"value\",\"type\":\"bool\"}],\"name\":\"Set\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\"}]"
+const ProviderABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"signature\":\"0x0ca05f9f\"},{\"constant\":true,\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0x893d20e8\"},{\"inputs\":[{\"name\":\"_size\",\"type\":\"uint256\"},{\"name\":\"_deposit\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"signature\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"value\",\"type\":\"bool\"}],\"name\":\"Set\",\"type\":\"event\",\"signature\":\"0xa09d518561e304be3f7de32d470dadb560b3bc168a5bad632dba82666dda9589\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"acc\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"money\",\"type\":\"uint256\"}],\"name\":\"Pledge\",\"type\":\"event\",\"signature\":\"0x5e91ea8ea1c46300eb761859be01d7b16d44389ef91e03a163a87413cbf55b95\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"acc\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"money\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"status\",\"type\":\"bool\"}],\"name\":\"CancelPledge\",\"type\":\"event\",\"signature\":\"0xa70461ebff4d11e6f321ed483fa2998132842461adfbbae6d10dc5f3b9b23058\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"acc\",\"type\":\"address\"}],\"name\":\"ApplyCancelPledge\",\"type\":\"event\",\"signature\":\"0x8444089032f19005a69aa5d9fa82009aee6241c0c090430f53abe2d6d890697c\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\",\"signature\":\"0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\",\"signature\":\"0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90\"},{\"constant\":false,\"inputs\":[{\"name\":\"_size\",\"type\":\"uint256\"}],\"name\":\"setSize\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"signature\":\"0x170ab405\"},{\"constant\":true,\"inputs\":[],\"name\":\"getSize\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0xde8fa431\"},{\"constant\":false,\"inputs\":[{\"name\":\"_deposit\",\"type\":\"uint256\"}],\"name\":\"setDeposit\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"signature\":\"0xf5bade66\"},{\"constant\":true,\"inputs\":[],\"name\":\"getDeposit\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0xc399ec88\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"bool\"}],\"name\":\"set\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"signature\":\"0x35e3b25a\"},{\"constant\":true,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"isProvider\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0x6b074a07\"},{\"constant\":true,\"inputs\":[],\"name\":\"getAllAddress\",\"outputs\":[{\"name\":\"\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0x715b208b\"},{\"constant\":true,\"inputs\":[{\"name\":\"_size\",\"type\":\"uint256\"}],\"name\":\"getPledgeMoney\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0xe1493261\"},{\"constant\":false,\"inputs\":[{\"name\":\"_size\",\"type\":\"uint256\"}],\"name\":\"pledge\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\",\"signature\":\"0x7326c9c0\"},{\"constant\":false,\"inputs\":[],\"name\":\"cancelPledge\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\",\"signature\":\"0x28c418cf\"},{\"constant\":false,\"inputs\":[{\"name\":\"acc\",\"type\":\"address\"},{\"name\":\"sum\",\"type\":\"uint256\"},{\"name\":\"status\",\"type\":\"bool\"}],\"name\":\"setCancelPledgeStatus\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\",\"signature\":\"0xd78ed5da\"},{\"constant\":true,\"inputs\":[{\"name\":\"acc\",\"type\":\"address\"}],\"name\":\"info\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0x0aae7a6b\"}]"
 
 // ProviderBin is the compiled bytecode used for deploying new contracts.
-const ProviderBin = `0x6080604052600080546001600160a01b03191633179055610601806100256000396000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80630ca05f9f1461005c57806335e3b25a146100965780636b074a07146100c4578063715b208b146100ea578063893d20e814610142575b600080fd5b6100826004803603602081101561007257600080fd5b50356001600160a01b0316610166565b604080519115158252519081900360200190f35b610082600480360360408110156100ac57600080fd5b506001600160a01b038135169060200135151561023d565b610082600480360360208110156100da57600080fd5b50356001600160a01b03166103d3565b6100f2610420565b60408051602080825283518183015283519192839290830191858101910280838360005b8381101561012e578181015183820152602001610116565b505050509050019250505060405180910390f35b61014a61056d565b604080516001600160a01b039092168252519081900360200190f35b600080546001600160a01b03163314156101e357600080546001600160a01b038481166001600160a01b0319831681179093556040805191909216808252602082019390935281517f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90929181900390910190a16001915050610238565b604080516020808252600e90820152600160911b6d725ed0725c46f34c57b7bbb732b9028183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a15b919050565b600080546001600160a01b031633141561037857600061025c8461057c565b905060001981146102a257826001828154811061027557fe5b60009182526020909120018054911515600160a01b02600160a01b60ff0219909216919091179055610329565b604080518082019091526001600160a01b0380861682528415156020830190815260018054808201825560009190915292517fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6909301805491511515600160a01b02600160a01b60ff0219949093166001600160a01b031990921691909117929092161790555b604080516001600160a01b0386168152841515602082015281517fa09d518561e304be3f7de32d470dadb560b3bc168a5bad632dba82666dda9589929181900390910190a160019150506103cd565b604080516020808252600e90820152600160911b6d725ed0725c46f34c57b7bbb732b9028183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a15b92915050565b6000806103df8361057c565b9050600019811461041657600181815481106103f757fe5b600091825260209091200154600160a01b900460ff1691506102389050565b6000915050610238565b606080600180549050604051908082528060200260200182016040528015610452578160200160208202803883390190505b5090506000805b6001548110156104ea576001818154811061047057fe5b600091825260209091200154600160a01b900460ff161515600114156104e2576001818154811061049d57fe5b60009182526020909120015483516001600160a01b03909116908490849081106104c357fe5b6001600160a01b03909216602092830291909101909101526001909101905b600101610459565b50606081604051908082528060200260200182016040528015610517578160200160208202803883390190505b50905060005b828110156105655783818151811061053157fe5b602002602001015182828151811061054557fe5b6001600160a01b039092166020928302919091019091015260010161051d565b509250505090565b6000546001600160a01b031690565b6000805b6001548110156105cb57826001600160a01b0316600182815481106105a157fe5b6000918252602090912001546001600160a01b031614156105c3579050610238565b600101610580565b506000199291505056fea165627a7a723058208755d32afd499687c905a611e749d66cf2991c7a93a83cb40f90a49ce569bafd0029`
+const ProviderBin = `0x608060405234801561001057600080fd5b506040516040806119eb8339810180604052604081101561003057600080fd5b810190808051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555081600281905550806003819055505050611941806100aa6000396000f3fe6080604052600436106100d0576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680630aae7a6b146100d55780630ca05f9f14610145578063170ab405146101ae57806328c418cf1461020157806335e3b25a146102235780636b074a0714610298578063715b208b146103015780637326c9c01461036d578063893d20e8146103b3578063c399ec881461040a578063d78ed5da14610435578063de8fa431146104a7578063e1493261146104d2578063f5bade6614610521575b600080fd5b3480156100e157600080fd5b50610124600480360360208110156100f857600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610574565b60405180831515151581526020018281526020019250505060405180910390f35b34801561015157600080fd5b506101946004803603602081101561016857600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610616565b604051808215151515815260200191505060405180910390f35b3480156101ba57600080fd5b506101e7600480360360208110156101d157600080fd5b81019080803590602001909291905050506107e7565b604051808215151515815260200191505060405180910390f35b6102096108c1565b604051808215151515815260200191505060405180910390f35b34801561022f57600080fd5b5061027e6004803603604081101561024657600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803515159060200190929190505050610a8e565b604051808215151515815260200191505060405180910390f35b3480156102a457600080fd5b506102e7600480360360208110156102bb57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610d1c565b604051808215151515815260200191505060405180910390f35b34801561030d57600080fd5b50610316610d94565b6040518080602001828103825283818151815260200191508051906020019060200280838360005b8381101561035957808201518184015260208101905061033e565b505050509050019250505060405180910390f35b6103996004803603602081101561038357600080fd5b8101908080359060200190929190505050610f7d565b604051808215151515815260200191505060405180910390f35b3480156103bf57600080fd5b506103c861125b565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b34801561041657600080fd5b5061041f611284565b6040518082815260200191505060405180910390f35b61048d6004803603606081101561044b57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291908035906020019092919080351515906020019092919050505061128e565b604051808215151515815260200191505060405180910390f35b3480156104b357600080fd5b506104bc61154d565b6040518082815260200191505060405180910390f35b3480156104de57600080fd5b5061050b600480360360208110156104f557600080fd5b8101908080359060200190929190505050611557565b6040518082815260200191505060405180910390f35b34801561052d57600080fd5b5061055a6004803603602081101561054457600080fd5b8101908080359060200190929190505050611585565b604051808215151515815260200191505060405180910390f35b60008060006105828461165f565b90507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8114156105bc576000808090509250925050610611565b6001818154811015156105cb57fe5b906000526020600020906002020160000160149054906101000a900460ff166001828154811015156105f957fe5b90600052602060002090600202016001015492509250505b915091565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614156107745760008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a160019150506107e1565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a16107e2565b5b919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561084e5781600281905550600190506108bb565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a16108bc565b5b919050565b6000806108cd3361165f565b90507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff811415610969577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600f8152602001807fe682a8e4b88de698af6b6565706572000000000000000000000000000000000081525060200191505060405180910390a16000915050610a8b565b61097233611728565b156109e9577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa6040518080602001828103825260208152602001807fe682a8e698af6d696e65722ce5bf85e9a1bbe58588e98080e587ba6d696e657281525060200191505060405180910390a16000915050610a8b565b60006001828154811015156109fa57fe5b906000526020600020906002020160000160146101000a81548160ff0219169083151502179055507f8444089032f19005a69aa5d9fa82009aee6241c0c090430f53abe2d6d890697c33604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390a160019150505b90565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161415610ca8576000610af08461165f565b90507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81141515610b585782600182815481101515610b2b57fe5b906000526020600020906002020160000160146101000a81548160ff021916908315150217905550610c2f565b60016060604051908101604052808673ffffffffffffffffffffffffffffffffffffffff168152602001851515815260200160008152509080600181540180825580915050906001820390600052602060002090600202016000909192909190915060008201518160000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060208201518160000160146101000a81548160ff021916908315150217905550604082015181600101555050505b7fa09d518561e304be3f7de32d470dadb560b3bc168a5bad632dba82666dda95898484604051808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001821515151581526020019250505060405180910390a16001915050610d15565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a1610d16565b5b92915050565b600080610d288361165f565b90507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81141515610d8957600181815481101515610d6257fe5b906000526020600020906002020160000160149054906101000a900460ff16915050610d8f565b60009150505b919050565b606080600180549050604051908082528060200260200182016040528015610dcb5781602001602082028038833980820191505090505b509050600080905060008090505b600180549050811015610ec15760011515600182815481101515610df957fe5b906000526020600020906002020160000160149054906101000a900460ff1615151415610eb457600181815481101515610e2f57fe5b906000526020600020906002020160000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff168383815181101515610e6f57fe5b9060200190602002019073ffffffffffffffffffffffffffffffffffffffff16908173ffffffffffffffffffffffffffffffffffffffff168152505081806001019250505b8080600101915050610dd9565b50606081604051908082528060200260200182016040528015610ef35781602001602082028038833980820191505090505b50905060008090505b82811015610f73578381815181101515610f1257fe5b906020019060200201518282815181101515610f2a57fe5b9060200190602002019073ffffffffffffffffffffffffffffffffffffffff16908173ffffffffffffffffffffffffffffffffffffffff16815250508080600101915050610efc565b5080935050505090565b6000610f8882611557565b34101561106d577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252602f8152602001807fe682a8e4baa4e79a84e992b1e4b88de5a49fe8b4a8e68abce79a84e98791e9a281526020017f9d2ce99c80e8a6816465706f736974000000000000000000000000000000000081525060400191505060405180910390a13373ffffffffffffffffffffffffffffffffffffffff166108fc349081150290604051600060405180830381858888f19350505050158015611063573d6000803e3d6000fd5b5060009050611256565b60006110783361165f565b90507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8114151561110e57600180828154811015156110b357fe5b906000526020600020906002020160000160146101000a81548160ff021916908315150217905550346001828154811015156110eb57fe5b9060005260206000209060020201600101600082825401925050819055506111e5565b60016060604051908101604052803373ffffffffffffffffffffffffffffffffffffffff168152602001600115158152602001348152509080600181540180825580915050906001820390600052602060002090600202016000909192909190915060008201518160000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060208201518160000160146101000a81548160ff021916908315150217905550604082015181600101555050505b7f5e91ea8ea1c46300eb761859be01d7b16d44389ef91e03a163a87413cbf55b953334604051808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018281526020019250505060405180910390a160019150505b919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6000600354905090565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614156114d85760006112f03361165f565b9050600080851415611307576000925050506114d3565b60018281548110151561131657fe5b9060005260206000209060020201600101548511156113575760018281548110151561133e57fe5b906000526020600020906002020160010154905061135b565b8490505b8060018381548110151561136b57fe5b9060005260206000209060020201600101600082825403925050819055508315611453578573ffffffffffffffffffffffffffffffffffffffff166108fc829081150290604051600060405180830381858888f193505050501580156113d5573d6000803e3d6000fd5b507fa70461ebff4d11e6f321ed483fa2998132842461adfbbae6d10dc5f3b9b2305886826001604051808473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200183815260200182151515158152602001935050505060405180910390a16114cc565b7fa70461ebff4d11e6f321ed483fa2998132842461adfbbae6d10dc5f3b9b2305886826000604051808473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200183815260200182151515158152602001935050505060405180910390a15b6001925050505b611545565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a1611546565b5b9392505050565b6000600254905090565b6000806002548381151561156757fe5b049050600081141561157857600190505b8060035402915050919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614156115ec578160038190555060019050611659565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a161165a565b5b919050565b600080600090505b6001805490508110156116fe578273ffffffffffffffffffffffffffffffffffffffff1660018281548110151561169a57fe5b906000526020600020906002020160000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614156116f15780915050611723565b8080600101915050611667565b507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff90505b919050565b600080739e4af0964ef92095ca3d2ae0c05b472837d8bd3790506000808273ffffffffffffffffffffffffffffffffffffffff1663693ec85e6040518163ffffffff167c01000000000000000000000000000000000000000000000000000000000281526004018080602001828103825260058152602001807f6d696e6572000000000000000000000000000000000000000000000000000000815250602001915050604080518083038186803b1580156117e257600080fd5b505afa1580156117f6573d6000803e3d6000fd5b505050506040513d604081101561180c57600080fd5b81019080805190602001909291908051906020019092919050505091509150600081905060008173ffffffffffffffffffffffffffffffffffffffff1663c2bc2efc886040518263ffffffff167c0100000000000000000000000000000000000000000000000000000000028152600401808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060206040518083038186803b1580156118cb57600080fd5b505afa1580156118df573d6000803e3d6000fd5b505050506040513d60208110156118f557600080fd5b81019080805190602001909291905050509050809550505050505091905056fea165627a7a72305820520756699747b5341274d3b24d02393a210ea90c5f2728084ae15eb0e9ef09ca0029`
 
 // DeployProvider deploys a new Ethereum contract, binding an instance of Provider to it.
-func DeployProvider(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Provider, error) {
+func DeployProvider(auth *bind.TransactOpts, backend bind.ContractBackend, _size *big.Int, _deposit *big.Int) (common.Address, *types.Transaction, *Provider, error) {
 	parsed, err := abi.JSON(strings.NewReader(ProviderABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(ProviderBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(ProviderBin), backend, _size, _deposit)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -214,6 +214,32 @@ func (_Provider *ProviderCallerSession) GetAllAddress() ([]common.Address, error
 	return _Provider.Contract.GetAllAddress(&_Provider.CallOpts)
 }
 
+// GetDeposit is a free data retrieval call binding the contract method 0xc399ec88.
+//
+// Solidity: function getDeposit() constant returns(uint256)
+func (_Provider *ProviderCaller) GetDeposit(opts *bind.CallOpts) (*big.Int, error) {
+	var (
+		ret0 = new(*big.Int)
+	)
+	out := ret0
+	err := _Provider.contract.Call(opts, out, "getDeposit")
+	return *ret0, err
+}
+
+// GetDeposit is a free data retrieval call binding the contract method 0xc399ec88.
+//
+// Solidity: function getDeposit() constant returns(uint256)
+func (_Provider *ProviderSession) GetDeposit() (*big.Int, error) {
+	return _Provider.Contract.GetDeposit(&_Provider.CallOpts)
+}
+
+// GetDeposit is a free data retrieval call binding the contract method 0xc399ec88.
+//
+// Solidity: function getDeposit() constant returns(uint256)
+func (_Provider *ProviderCallerSession) GetDeposit() (*big.Int, error) {
+	return _Provider.Contract.GetDeposit(&_Provider.CallOpts)
+}
+
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
 // Solidity: function getOwner() constant returns(address)
@@ -238,6 +264,88 @@ func (_Provider *ProviderSession) GetOwner() (common.Address, error) {
 // Solidity: function getOwner() constant returns(address)
 func (_Provider *ProviderCallerSession) GetOwner() (common.Address, error) {
 	return _Provider.Contract.GetOwner(&_Provider.CallOpts)
+}
+
+// GetPledgeMoney is a free data retrieval call binding the contract method 0xe1493261.
+//
+// Solidity: function getPledgeMoney(uint256 _size) constant returns(uint256)
+func (_Provider *ProviderCaller) GetPledgeMoney(opts *bind.CallOpts, _size *big.Int) (*big.Int, error) {
+	var (
+		ret0 = new(*big.Int)
+	)
+	out := ret0
+	err := _Provider.contract.Call(opts, out, "getPledgeMoney", _size)
+	return *ret0, err
+}
+
+// GetPledgeMoney is a free data retrieval call binding the contract method 0xe1493261.
+//
+// Solidity: function getPledgeMoney(uint256 _size) constant returns(uint256)
+func (_Provider *ProviderSession) GetPledgeMoney(_size *big.Int) (*big.Int, error) {
+	return _Provider.Contract.GetPledgeMoney(&_Provider.CallOpts, _size)
+}
+
+// GetPledgeMoney is a free data retrieval call binding the contract method 0xe1493261.
+//
+// Solidity: function getPledgeMoney(uint256 _size) constant returns(uint256)
+func (_Provider *ProviderCallerSession) GetPledgeMoney(_size *big.Int) (*big.Int, error) {
+	return _Provider.Contract.GetPledgeMoney(&_Provider.CallOpts, _size)
+}
+
+// GetSize is a free data retrieval call binding the contract method 0xde8fa431.
+//
+// Solidity: function getSize() constant returns(uint256)
+func (_Provider *ProviderCaller) GetSize(opts *bind.CallOpts) (*big.Int, error) {
+	var (
+		ret0 = new(*big.Int)
+	)
+	out := ret0
+	err := _Provider.contract.Call(opts, out, "getSize")
+	return *ret0, err
+}
+
+// GetSize is a free data retrieval call binding the contract method 0xde8fa431.
+//
+// Solidity: function getSize() constant returns(uint256)
+func (_Provider *ProviderSession) GetSize() (*big.Int, error) {
+	return _Provider.Contract.GetSize(&_Provider.CallOpts)
+}
+
+// GetSize is a free data retrieval call binding the contract method 0xde8fa431.
+//
+// Solidity: function getSize() constant returns(uint256)
+func (_Provider *ProviderCallerSession) GetSize() (*big.Int, error) {
+	return _Provider.Contract.GetSize(&_Provider.CallOpts)
+}
+
+// Info is a free data retrieval call binding the contract method 0x0aae7a6b.
+//
+// Solidity: function info(address acc) constant returns(bool, uint256)
+func (_Provider *ProviderCaller) Info(opts *bind.CallOpts, acc common.Address) (bool, *big.Int, error) {
+	var (
+		ret0 = new(bool)
+		ret1 = new(*big.Int)
+	)
+	out := &[]interface{}{
+		ret0,
+		ret1,
+	}
+	err := _Provider.contract.Call(opts, out, "info", acc)
+	return *ret0, *ret1, err
+}
+
+// Info is a free data retrieval call binding the contract method 0x0aae7a6b.
+//
+// Solidity: function info(address acc) constant returns(bool, uint256)
+func (_Provider *ProviderSession) Info(acc common.Address) (bool, *big.Int, error) {
+	return _Provider.Contract.Info(&_Provider.CallOpts, acc)
+}
+
+// Info is a free data retrieval call binding the contract method 0x0aae7a6b.
+//
+// Solidity: function info(address acc) constant returns(bool, uint256)
+func (_Provider *ProviderCallerSession) Info(acc common.Address) (bool, *big.Int, error) {
+	return _Provider.Contract.Info(&_Provider.CallOpts, acc)
 }
 
 // IsProvider is a free data retrieval call binding the contract method 0x6b074a07.
@@ -287,6 +395,48 @@ func (_Provider *ProviderTransactorSession) AlterOwner(newOwner common.Address) 
 	return _Provider.Contract.AlterOwner(&_Provider.TransactOpts, newOwner)
 }
 
+// CancelPledge is a paid mutator transaction binding the contract method 0x28c418cf.
+//
+// Solidity: function cancelPledge() returns(bool)
+func (_Provider *ProviderTransactor) CancelPledge(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _Provider.contract.Transact(opts, "cancelPledge")
+}
+
+// CancelPledge is a paid mutator transaction binding the contract method 0x28c418cf.
+//
+// Solidity: function cancelPledge() returns(bool)
+func (_Provider *ProviderSession) CancelPledge() (*types.Transaction, error) {
+	return _Provider.Contract.CancelPledge(&_Provider.TransactOpts)
+}
+
+// CancelPledge is a paid mutator transaction binding the contract method 0x28c418cf.
+//
+// Solidity: function cancelPledge() returns(bool)
+func (_Provider *ProviderTransactorSession) CancelPledge() (*types.Transaction, error) {
+	return _Provider.Contract.CancelPledge(&_Provider.TransactOpts)
+}
+
+// Pledge is a paid mutator transaction binding the contract method 0x7326c9c0.
+//
+// Solidity: function pledge(uint256 _size) returns(bool)
+func (_Provider *ProviderTransactor) Pledge(opts *bind.TransactOpts, _size *big.Int) (*types.Transaction, error) {
+	return _Provider.contract.Transact(opts, "pledge", _size)
+}
+
+// Pledge is a paid mutator transaction binding the contract method 0x7326c9c0.
+//
+// Solidity: function pledge(uint256 _size) returns(bool)
+func (_Provider *ProviderSession) Pledge(_size *big.Int) (*types.Transaction, error) {
+	return _Provider.Contract.Pledge(&_Provider.TransactOpts, _size)
+}
+
+// Pledge is a paid mutator transaction binding the contract method 0x7326c9c0.
+//
+// Solidity: function pledge(uint256 _size) returns(bool)
+func (_Provider *ProviderTransactorSession) Pledge(_size *big.Int) (*types.Transaction, error) {
+	return _Provider.Contract.Pledge(&_Provider.TransactOpts, _size)
+}
+
 // Set is a paid mutator transaction binding the contract method 0x35e3b25a.
 //
 // Solidity: function set(address addr, bool value) returns(bool)
@@ -306,6 +456,69 @@ func (_Provider *ProviderSession) Set(addr common.Address, value bool) (*types.T
 // Solidity: function set(address addr, bool value) returns(bool)
 func (_Provider *ProviderTransactorSession) Set(addr common.Address, value bool) (*types.Transaction, error) {
 	return _Provider.Contract.Set(&_Provider.TransactOpts, addr, value)
+}
+
+// SetCancelPledgeStatus is a paid mutator transaction binding the contract method 0xd78ed5da.
+//
+// Solidity: function setCancelPledgeStatus(address acc, uint256 sum, bool status) returns(bool)
+func (_Provider *ProviderTransactor) SetCancelPledgeStatus(opts *bind.TransactOpts, acc common.Address, sum *big.Int, status bool) (*types.Transaction, error) {
+	return _Provider.contract.Transact(opts, "setCancelPledgeStatus", acc, sum, status)
+}
+
+// SetCancelPledgeStatus is a paid mutator transaction binding the contract method 0xd78ed5da.
+//
+// Solidity: function setCancelPledgeStatus(address acc, uint256 sum, bool status) returns(bool)
+func (_Provider *ProviderSession) SetCancelPledgeStatus(acc common.Address, sum *big.Int, status bool) (*types.Transaction, error) {
+	return _Provider.Contract.SetCancelPledgeStatus(&_Provider.TransactOpts, acc, sum, status)
+}
+
+// SetCancelPledgeStatus is a paid mutator transaction binding the contract method 0xd78ed5da.
+//
+// Solidity: function setCancelPledgeStatus(address acc, uint256 sum, bool status) returns(bool)
+func (_Provider *ProviderTransactorSession) SetCancelPledgeStatus(acc common.Address, sum *big.Int, status bool) (*types.Transaction, error) {
+	return _Provider.Contract.SetCancelPledgeStatus(&_Provider.TransactOpts, acc, sum, status)
+}
+
+// SetDeposit is a paid mutator transaction binding the contract method 0xf5bade66.
+//
+// Solidity: function setDeposit(uint256 _deposit) returns(bool)
+func (_Provider *ProviderTransactor) SetDeposit(opts *bind.TransactOpts, _deposit *big.Int) (*types.Transaction, error) {
+	return _Provider.contract.Transact(opts, "setDeposit", _deposit)
+}
+
+// SetDeposit is a paid mutator transaction binding the contract method 0xf5bade66.
+//
+// Solidity: function setDeposit(uint256 _deposit) returns(bool)
+func (_Provider *ProviderSession) SetDeposit(_deposit *big.Int) (*types.Transaction, error) {
+	return _Provider.Contract.SetDeposit(&_Provider.TransactOpts, _deposit)
+}
+
+// SetDeposit is a paid mutator transaction binding the contract method 0xf5bade66.
+//
+// Solidity: function setDeposit(uint256 _deposit) returns(bool)
+func (_Provider *ProviderTransactorSession) SetDeposit(_deposit *big.Int) (*types.Transaction, error) {
+	return _Provider.Contract.SetDeposit(&_Provider.TransactOpts, _deposit)
+}
+
+// SetSize is a paid mutator transaction binding the contract method 0x170ab405.
+//
+// Solidity: function setSize(uint256 _size) returns(bool)
+func (_Provider *ProviderTransactor) SetSize(opts *bind.TransactOpts, _size *big.Int) (*types.Transaction, error) {
+	return _Provider.contract.Transact(opts, "setSize", _size)
+}
+
+// SetSize is a paid mutator transaction binding the contract method 0x170ab405.
+//
+// Solidity: function setSize(uint256 _size) returns(bool)
+func (_Provider *ProviderSession) SetSize(_size *big.Int) (*types.Transaction, error) {
+	return _Provider.Contract.SetSize(&_Provider.TransactOpts, _size)
+}
+
+// SetSize is a paid mutator transaction binding the contract method 0x170ab405.
+//
+// Solidity: function setSize(uint256 _size) returns(bool)
+func (_Provider *ProviderTransactorSession) SetSize(_size *big.Int) (*types.Transaction, error) {
+	return _Provider.Contract.SetSize(&_Provider.TransactOpts, _size)
 }
 
 // ProviderAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the Provider contract.
@@ -411,6 +624,252 @@ func (_Provider *ProviderFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink ch
 				// New log arrived, parse the event and forward to the user
 				event := new(ProviderAlterOwner)
 				if err := _Provider.contract.UnpackLog(event, "AlterOwner", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ProviderApplyCancelPledgeIterator is returned from FilterApplyCancelPledge and is used to iterate over the raw logs and unpacked data for ApplyCancelPledge events raised by the Provider contract.
+type ProviderApplyCancelPledgeIterator struct {
+	Event *ProviderApplyCancelPledge // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *ProviderApplyCancelPledgeIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ProviderApplyCancelPledge)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(ProviderApplyCancelPledge)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *ProviderApplyCancelPledgeIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *ProviderApplyCancelPledgeIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// ProviderApplyCancelPledge represents a ApplyCancelPledge event raised by the Provider contract.
+type ProviderApplyCancelPledge struct {
+	Acc common.Address
+	Raw types.Log // Blockchain specific contextual infos
+}
+
+// FilterApplyCancelPledge is a free log retrieval operation binding the contract event 0x8444089032f19005a69aa5d9fa82009aee6241c0c090430f53abe2d6d890697c.
+//
+// Solidity: event ApplyCancelPledge(address acc)
+func (_Provider *ProviderFilterer) FilterApplyCancelPledge(opts *bind.FilterOpts) (*ProviderApplyCancelPledgeIterator, error) {
+
+	logs, sub, err := _Provider.contract.FilterLogs(opts, "ApplyCancelPledge")
+	if err != nil {
+		return nil, err
+	}
+	return &ProviderApplyCancelPledgeIterator{contract: _Provider.contract, event: "ApplyCancelPledge", logs: logs, sub: sub}, nil
+}
+
+// WatchApplyCancelPledge is a free log subscription operation binding the contract event 0x8444089032f19005a69aa5d9fa82009aee6241c0c090430f53abe2d6d890697c.
+//
+// Solidity: event ApplyCancelPledge(address acc)
+func (_Provider *ProviderFilterer) WatchApplyCancelPledge(opts *bind.WatchOpts, sink chan<- *ProviderApplyCancelPledge) (event.Subscription, error) {
+
+	logs, sub, err := _Provider.contract.WatchLogs(opts, "ApplyCancelPledge")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(ProviderApplyCancelPledge)
+				if err := _Provider.contract.UnpackLog(event, "ApplyCancelPledge", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ProviderCancelPledgeIterator is returned from FilterCancelPledge and is used to iterate over the raw logs and unpacked data for CancelPledge events raised by the Provider contract.
+type ProviderCancelPledgeIterator struct {
+	Event *ProviderCancelPledge // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *ProviderCancelPledgeIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ProviderCancelPledge)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(ProviderCancelPledge)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *ProviderCancelPledgeIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *ProviderCancelPledgeIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// ProviderCancelPledge represents a CancelPledge event raised by the Provider contract.
+type ProviderCancelPledge struct {
+	Acc    common.Address
+	Money  *big.Int
+	Status bool
+	Raw    types.Log // Blockchain specific contextual infos
+}
+
+// FilterCancelPledge is a free log retrieval operation binding the contract event 0xa70461ebff4d11e6f321ed483fa2998132842461adfbbae6d10dc5f3b9b23058.
+//
+// Solidity: event CancelPledge(address acc, uint256 money, bool status)
+func (_Provider *ProviderFilterer) FilterCancelPledge(opts *bind.FilterOpts) (*ProviderCancelPledgeIterator, error) {
+
+	logs, sub, err := _Provider.contract.FilterLogs(opts, "CancelPledge")
+	if err != nil {
+		return nil, err
+	}
+	return &ProviderCancelPledgeIterator{contract: _Provider.contract, event: "CancelPledge", logs: logs, sub: sub}, nil
+}
+
+// WatchCancelPledge is a free log subscription operation binding the contract event 0xa70461ebff4d11e6f321ed483fa2998132842461adfbbae6d10dc5f3b9b23058.
+//
+// Solidity: event CancelPledge(address acc, uint256 money, bool status)
+func (_Provider *ProviderFilterer) WatchCancelPledge(opts *bind.WatchOpts, sink chan<- *ProviderCancelPledge) (event.Subscription, error) {
+
+	logs, sub, err := _Provider.contract.WatchLogs(opts, "CancelPledge")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(ProviderCancelPledge)
+				if err := _Provider.contract.UnpackLog(event, "CancelPledge", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -553,6 +1012,129 @@ func (_Provider *ProviderFilterer) WatchError(opts *bind.WatchOpts, sink chan<- 
 	}), nil
 }
 
+// ProviderPledgeIterator is returned from FilterPledge and is used to iterate over the raw logs and unpacked data for Pledge events raised by the Provider contract.
+type ProviderPledgeIterator struct {
+	Event *ProviderPledge // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *ProviderPledgeIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ProviderPledge)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(ProviderPledge)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *ProviderPledgeIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *ProviderPledgeIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// ProviderPledge represents a Pledge event raised by the Provider contract.
+type ProviderPledge struct {
+	Acc   common.Address
+	Money *big.Int
+	Raw   types.Log // Blockchain specific contextual infos
+}
+
+// FilterPledge is a free log retrieval operation binding the contract event 0x5e91ea8ea1c46300eb761859be01d7b16d44389ef91e03a163a87413cbf55b95.
+//
+// Solidity: event Pledge(address acc, uint256 money)
+func (_Provider *ProviderFilterer) FilterPledge(opts *bind.FilterOpts) (*ProviderPledgeIterator, error) {
+
+	logs, sub, err := _Provider.contract.FilterLogs(opts, "Pledge")
+	if err != nil {
+		return nil, err
+	}
+	return &ProviderPledgeIterator{contract: _Provider.contract, event: "Pledge", logs: logs, sub: sub}, nil
+}
+
+// WatchPledge is a free log subscription operation binding the contract event 0x5e91ea8ea1c46300eb761859be01d7b16d44389ef91e03a163a87413cbf55b95.
+//
+// Solidity: event Pledge(address acc, uint256 money)
+func (_Provider *ProviderFilterer) WatchPledge(opts *bind.WatchOpts, sink chan<- *ProviderPledge) (event.Subscription, error) {
+
+	logs, sub, err := _Provider.contract.WatchLogs(opts, "Pledge")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(ProviderPledge)
+				if err := _Provider.contract.UnpackLog(event, "Pledge", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
 // ProviderSetIterator is returned from FilterSet and is used to iterate over the raw logs and unpacked data for Set events raised by the Provider contract.
 type ProviderSetIterator struct {
 	Event *ProviderSet // Event containing the contract specifics and raw log
@@ -675,4 +1257,3 @@ func (_Provider *ProviderFilterer) WatchSet(opts *bind.WatchOpts, sink chan<- *P
 		}
 	}), nil
 }
-

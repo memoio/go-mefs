@@ -587,6 +587,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	d := gp.storeDays
 	s := gp.storeSize
 	price := gp.storePrice
+
 	var moneyPerDay = new(big.Int)
 	var moneyAccount = new(big.Int)
 	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
@@ -602,7 +603,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		return ErrBalance
 	}
 
-	err = contracts.Deploy(endpoint, hexPK, localAddress, keepers, providers, d, s, moneyAccount)
+	err = contracts.Deploy(endpoint, hexPK, localAddress, keepers, providers, d, s, price, moneyAccount)
 	if err != nil {
 		return err
 	}
