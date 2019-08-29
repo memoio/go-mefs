@@ -115,7 +115,8 @@ func UploadTest() error {
 					fmt.Println(addr, " not start, waiting, err : ", err)
 					continue
 				}
-				errNum=1
+				errNum = 1
+				fileNum++
 			} else {
 				return err
 			}
