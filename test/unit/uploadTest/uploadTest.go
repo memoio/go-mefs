@@ -21,18 +21,17 @@ import (
 )
 
 //随机文件最大大小
-const randomDataSize = 1024 * 1024 * 3
-const bucketName = "Bucket01"
+const randomDataSize = 1024 * 1024 * 10
 const dataCount = 3
 const parityCount = 2
 
 func main() {
-	if err := ChallengeTest(); err != nil {
+	if err := UploadTest(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func ChallengeTest() error {
+func UploadTest() error {
 	sh := shell.NewShell("localhost:5001")
 	testuser, err := sh.CreateUser()
 	if err != nil {
@@ -45,6 +44,7 @@ func ChallengeTest() error {
 		fmt.Println("address to id failed")
 		return err
 	}
+
 	fmt.Println("GetIDFromAddress success,uid is",uid)
 	transferTo(big.NewInt(1000000000000000000), addr)
 	for {
@@ -60,6 +60,7 @@ func ChallengeTest() error {
 		fmt.Println("Start user failed :", err)
 		return err
 	}
+
 	for {
 		err := sh.ShowStorage(shell.SetAddress(addr))
 		if err != nil {
@@ -73,6 +74,7 @@ func ChallengeTest() error {
 		opts = append(opts, shell.SetDataCount(dataCount))
 		opts = append(opts, shell.SetParityCount(parityCount))
 		opts = append(opts, shell.SetPolicy(df.RsPolicy))
+		bucketName := "Bucket0"
 		bk, err := sh.CreateBucket(bucketName, opts...)
 		if err != nil {
 			time.Sleep(20 * time.Second)
@@ -84,26 +86,47 @@ func ChallengeTest() error {
 		break
 	}
 	//upload file
+	bucketName := "Bucket0"
+	bucketNum := 0
+	errNum := 0
+	fileNum := 0
 	for {
-		i:= 0
 		r := rand.Int63n(randomDataSize)
 		data := make([]byte, r)
 		fillRandom(data)
 		buf := bytes.NewBuffer(data)
 		objectName := addr + "_" + strconv.Itoa(int(r))
-		fmt.Println("  Begin to upload", objectName, "Size is", ToStorageSize(r), "addr", addr)
+		fmt.Println("  Begin to upload file",fileNum,"，Filename is", objectName, "Size is", ToStorageSize(r), "addr", addr)
 		beginTime := time.Now().Unix()
 		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
-			log.Println(addr, "Upload failed in file ",i,",", err)
-			return err
+			log.Println(addr, "Upload failed in file ",fileNum,",", err)
+			if errNum == 0 {
+				bucketNum++
+				var opts []func(*shell.RequestBuilder) error
+				opts = append(opts, shell.SetAddress(addr))
+				opts = append(opts, shell.SetDataCount(dataCount))
+				opts = append(opts, shell.SetParityCount(parityCount))
+				opts = append(opts, shell.SetPolicy(df.RsPolicy))
+				bucketName = "Bucket"+string(bucketNum)
+				_, errBucket := sh.CreateBucket(bucketName, opts...)
+				if errBucket != nil {
+					time.Sleep(20 * time.Second)
+					fmt.Println(addr, " not start, waiting, err : ", err)
+					continue
+				}
+				errNum=1
+			} else {
+				return err
+			}
 		}
 		storagekb := float64(r) / 1024.0
 		endTime := time.Now().Unix()
 		speed := storagekb / float64(endTime-beginTime)
-		fmt.Println("  Upload file",i,"success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
+		fmt.Println("  Upload file",fileNum,"success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
 		fmt.Println(ob.String() + "address: " + addr)
-		i++
+		fileNum++
+		errNum = 0
 	}
 }
 
