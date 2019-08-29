@@ -10,7 +10,6 @@ before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
   - cd $GOPATH/src/github.com/memoio
   - \cp -rf $CI_PROJECT_DIR $GOPATH/src/github.com/memoio
-  - mv mefs go-ipfs
   - cd $GOPATH/src/github.com/memoio/go-mefs
   - git reset --hard
 
