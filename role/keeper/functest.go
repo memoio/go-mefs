@@ -151,7 +151,7 @@ func deployUKTest(endPoint, hexKey string, userAddr common.Address, listKeeperAd
 	auth := bind.NewKeyedTransactor(key)
 	auth.Value = big.NewInt(2457600)
 	client := contracts.GetClient(endPoint)
-	ukaddr, _, uk, err := upKeeping.DeployUpKeeping(auth, client, userAddr, listKeeperAddr, listProviderAddr, big.NewInt(10), big.NewInt(1024))
+	ukaddr, _, uk, err := upKeeping.DeployUpKeeping(auth, client, userAddr, listKeeperAddr, listProviderAddr, big.NewInt(10), big.NewInt(1024), big.NewInt(1111))
 	if err != nil {
 		return common.Address{}, nil, err
 	}
