@@ -62,7 +62,7 @@ func (cs *ContractService) SaveChannel() error {
 		if err != nil {
 			return err
 		}
-		chanAddr, err := contracts.UserGetChannelAddr(userAddr, proAddr)
+		chanAddr, err := contracts.GetChannelAddr(userAddr, proAddr, userAddr)
 		if err != nil {
 			return err
 		}

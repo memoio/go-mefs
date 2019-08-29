@@ -57,7 +57,7 @@ func ChannelContract(endPoint string, hexKey string, localAddress common.Address
 
 	//验证channelAddr是否已经放进了mapper中
 	for i := 1; ; i++ {
-		if i%10 == 0 { //每隔10次如果还get不到合约地址，就在触发一次添加合约到mapper
+		if i%10 == 0 { //每隔10次如果还get不到合约地址，就再触发一次添加合约到mapper
 			auth = bind.NewKeyedTransactor(key)
 			_, err = mapper.Add(auth, channelAddr)
 			if err != nil {
@@ -195,8 +195,8 @@ func getChannel(endPoint string, mapper *upKeeping.Mapper, localAddress common.A
 	return channelAddr, channelContract, nil
 }
 
-//UserGetChannelAddr get the channel contract's address
-func UserGetChannelAddr(localAddr, providerAddr common.Address) (common.Address, error) {
+//GetChannelAddr get the channel contract's address
+func GetChannelAddr(localAddr, providerAddr, ownerAddr common.Address) (common.Address, error) {
 	endPoint := EndPoint
 	var ChannelAddr common.Address
 	resolver, err := getResolverFromIndexer(endPoint, localAddr, providerAddr.String())
@@ -204,28 +204,7 @@ func UserGetChannelAddr(localAddr, providerAddr common.Address) (common.Address,
 		return ChannelAddr, err
 	}
 
-	mapper, err := getDeployedMapper(endPoint, localAddr, localAddr, resolver)
-	if err != nil {
-		return ChannelAddr, err
-	}
-
-	channelAddr, _, err := getChannel(endPoint, mapper, localAddr)
-	if err != nil {
-		return ChannelAddr, err
-	}
-	return channelAddr, nil
-}
-
-//ProviderGetChannelAddr get the channel contract's address
-func ProviderGetChannelAddr(localAddr, userAddr common.Address) (common.Address, error) {
-	endPoint := EndPoint
-	var ChannelAddr common.Address
-	resolver, err := getResolverFromIndexer(endPoint, localAddr, localAddr.String())
-	if err != nil {
-		return ChannelAddr, err
-	}
-
-	mapper, err := getDeployedMapper(endPoint, localAddr, userAddr, resolver)
+	mapper, err := getDeployedMapper(endPoint, localAddr, ownerAddr, resolver)
 	if err != nil {
 		return ChannelAddr, err
 	}

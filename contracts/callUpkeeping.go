@@ -102,7 +102,7 @@ func getMapper(endPoint string, userAddress common.Address, resolver *upKeeping.
 }
 
 //Deploy deploy UpKeeping contracts between user, keepers and providers, and save contractAddress in mapper
-func Deploy(endPoint string, hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, moneyAccount *big.Int) error {
+func Deploy(endPoint string, hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
 	fmt.Println("begin deploy upKeeping...")
 	//获得resolver
 	resolver, err := getResolverFromIndexer(endPoint, userAddress, "memoriae")
@@ -131,7 +131,7 @@ func Deploy(endPoint string, hexKey string, userAddress common.Address, keeperAd
 	auth.Value = moneyAccount
 	ukAddr, _, _, err := upKeeping.DeployUpKeeping(auth, client,
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
-		userAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size))
+		userAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price))
 	if err != nil {
 		fmt.Println("deployUkErr:", err)
 		return err
@@ -329,16 +329,29 @@ func GetUpKeepingParams(endPoint string, localAddress, userAddress common.Addres
 	if err != nil {
 		return userAddr, nil, nil, 0, 0, 0, err
 	}
-	userAddr, keeperAddrs, providerAddrs, duration, capacity, moneyAccount, err := uk.GetOrder(&bind.CallOpts{
+	userAddr, keeperAddrs, providerAddrs, duration, capacity, price, err := uk.GetOrder(&bind.CallOpts{
 		From: localAddress,
 	})
 	if err != nil {
 		fmt.Println("getOfferParamsErr:", err)
 		return userAddr, nil, nil, 0, 0, 0, err
 	}
-	var price = new(big.Int)
-	var moneyPerDay = new(big.Int)
-	moneyPerDay = moneyPerDay.Quo(moneyAccount, duration)
-	price = price.Quo(moneyPerDay, capacity)
 	return userAddr, keeperAddrs, providerAddrs, duration.Int64(), capacity.Int64(), price.Int64(), nil
+}
+
+//AddProvider add a provider to upKeeping
+func AddProvider(endPoint string, hexKey string, userAddress common.Address, providerAddress []common.Address) error {
+	_, uk, err := GetUKFromResolver(endPoint, userAddress)
+	if err != nil {
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(key)
+
+	_, err = uk.AddProvider(auth, providerAddress)
+	if err != nil {
+		return err
+	}
+	return nil
 }
