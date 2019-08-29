@@ -3,7 +3,6 @@ image: limcos/mefs_compile_env:latest
 stages:
   - golangci-lint
   - compile
-  - updateKeeperAndProvider
   - test
 
 before_script:
@@ -79,20 +78,6 @@ compile:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - make install
-  tags:
-    - "47.92.5.51"
-
-updateKeeperAndProvider:
-  stage: updateKeeperAndProvider
-  when: on_success
-  script:
-    - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
-    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
-    - chmod 777 updateKeeper.exp
-    - ./updateKeeper.exp
-    - chmod 777 updateProvider.exp
-    - ./updateProvider.exp
   tags:
     - "47.92.5.51"
 
