@@ -248,3 +248,35 @@ func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.In
 	verify = crypto.VerifySignature(userPubKey, hash, sig[:64])
 	return verify, nil
 }
+
+//GetChannelStartDate used to get the startDate of channel-contract
+func GetChannelStartDate(endPoint string, localAddress common.Address, providerAddress common.Address) (string, error) {
+	resolver, err := getResolverFromIndexer(endPoint, localAddress, providerAddress.String())
+	if err != nil {
+		fmt.Println("getResolverErr:", err)
+		return "", err
+	}
+
+	mapper, err := getDeployedMapper(endPoint, localAddress, localAddress, resolver)
+	if err != nil {
+		return "", err
+	}
+
+	_, channelContract, err := getChannel(endPoint, mapper, localAddress)
+	if err != nil {
+		return "", err
+	}
+
+	startDateBigInt, err := channelContract.GetStartDate(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		fmt.Println("GetStartDateErr:", err)
+		return "", err
+	}
+
+	startDate := utils.UnixToTime(startDateBigInt.Int64()).Format(utils.SHOWTIME)
+	fmt.Println(startDate)
+
+	return startDate, nil
+}
