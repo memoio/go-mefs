@@ -57,6 +57,12 @@ func TestChannelTimeout(providerAddr common.Address, hexKey string) (err error) 
 	}
 	fmt.Println("channel合约的balance:", balance)
 
+	_, err = contracts.GetChannelStartDate(ethEndPoint, providerAddr, providerAddr)
+	if err != nil {
+		fmt.Println("GetChannelStartDateErr:", err)
+		return err
+	}
+
 	//触发channelTimeout()
 	err = contracts.ChannelTimeout(ethEndPoint, hexKey, providerAddr, providerAddr)
 	if err != nil {
