@@ -49,7 +49,13 @@ func spaceTimePayRegular(ctx context.Context) {
 
 //spaceTimePay 每隔一段时间触发的时空支付过程。对管理的所有user-provider进行一次支付
 func spaceTimePay() {
-	PInfo.Range(func(groupid, groupsInfo interface{}) bool {
+	type payMaterial struct {
+		groupid string
+		pid     string
+		price   int64
+	}
+	var materials []*payMaterial
+	PInfo.Range(func(groupid, groupsInfo interface{}) bool { //循环user
 		thisGroupid, ok := groupid.(string)
 		if !ok {
 			fmt.Println("spaceTimePay()", ErrPInfoTypeAssert)
@@ -60,12 +66,19 @@ func spaceTimePay() {
 			fmt.Println("spaceTimePay()", ErrPInfoTypeAssert)
 			return true
 		}
-		for _, pid := range thisGroupsInfo.Providers {
-			price := GetUpkeeping(thisGroupsInfo).Price
-			doSpaceTimePay(thisGroupid, pid, price)
+		for _, pidString := range thisGroupsInfo.Providers { //循环当前user的provider
+			materials = append(materials, &payMaterial{
+				groupid: thisGroupid,
+				pid:     pidString,
+				price:   GetUpkeeping(thisGroupsInfo).Price,
+			})
 		}
 		return true
 	})
+	//避免链操作时间过长，先收集数据，再进行支付操作
+	for _, material := range materials {
+		doSpaceTimePay(material.groupid, material.pid, material.price)
+	}
 
 }
 

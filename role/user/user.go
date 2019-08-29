@@ -428,7 +428,6 @@ func ShowInfo(userID string) map[string]string {
 	var moneyAccount = new(big.Int)
 	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
-	fmt.Printf("%v", upkeeping)
 	outmap["upkeeping cost:"] = big.NewInt(0).Sub(moneyAccount, amountUpkeeping).String()
 	outmap["upkeeping.Duration:"] = big.NewInt(upkeeping.Duration).String()
 	outmap["upkeeping.Capacity"] = big.NewInt(upkeeping.Capacity).String()
