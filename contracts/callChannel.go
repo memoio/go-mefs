@@ -275,7 +275,7 @@ func GetChannelStartDate(endPoint string, localAddress common.Address, providerA
 		return "", err
 	}
 
-	startDate := utils.UnixToTime(startDateBigInt.Int64()).Format("2006-01-02 15:04:05")
+	startDate := utils.UnixToTime(startDateBigInt.Int64()).Format(utils.SHOWTIME)
 	fmt.Println(startDate)
 
 	return startDate, nil
