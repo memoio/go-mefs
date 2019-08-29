@@ -6,22 +6,23 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts/upKeeping"
-	"github.com/memoio/go-mefs/utils"
-
-	"github.com/memoio/go-mefs/core"
-	"github.com/memoio/go-mefs/repo/fsrepo"
-	"github.com/memoio/go-mefs/utils/address"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/contracts/indexer"
+	"github.com/memoio/go-mefs/core"
+	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 //TestChannelTimeout test channelTimeout()
 func TestChannelTimeout(providerAddr common.Address, hexKey string) (err error) {
 	fmt.Println("==========开始测试channelTimeout=========")
-	ethEndPoint := contracts.EndPoint
-
+	config, err := localNode.Repo.Config()
+	if err != nil {
+		return err
+	}
+	ethEndPoint := config.Eth
 	balance, err := contracts.QueryBalance(ethEndPoint, providerAddr.String()) //查看账户余额
 	if err != nil {
 		fmt.Println("contracts.QueryBalanceErr:", err)
@@ -31,7 +32,7 @@ func TestChannelTimeout(providerAddr common.Address, hexKey string) (err error) 
 
 	//部署channel合约，测试中这个provider账户与自己部署channel合约
 	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err
@@ -43,7 +44,7 @@ func TestChannelTimeout(providerAddr common.Address, hexKey string) (err error) 
 	}
 	timeout := big.NewInt(60)
 	moneyToChannel := big.NewInt(1000000)
-	channelAddr, err := contracts.ChannelContract(ethEndPoint, hexKey, providerAddr, providerAddr, timeout, moneyToChannel)
+	channelAddr, err := contracts.DeployChannelContract(ethEndPoint, hexKey, providerAddr, providerAddr, timeout, moneyToChannel)
 	if err != nil {
 		fmt.Println("deployChannelErr:", err)
 		return err
@@ -97,9 +98,11 @@ func TestCloseChannel(n *core.MefsNode) (err error) {
 		fmt.Println("getHexPKErr", err)
 		return err
 	}
-
-	ethEndPoint := contracts.EndPoint
-
+	config, err := localNode.Repo.Config()
+	if err != nil {
+		return err
+	}
+	ethEndPoint := config.Eth
 	fmt.Println("==========开始测试closeChannel=========")
 	balance, err := contracts.QueryBalance(ethEndPoint, providerAddr.String()) //查看账户余额
 	if err != nil {
@@ -110,7 +113,7 @@ func TestCloseChannel(n *core.MefsNode) (err error) {
 
 	//部署channel合约，测试中这个provider账户与自己部署channel合约
 	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err
@@ -122,7 +125,7 @@ func TestCloseChannel(n *core.MefsNode) (err error) {
 	}
 	timeout := big.NewInt(120)
 	moneyToChannel := big.NewInt(1000000)
-	channelAddr, err := contracts.ChannelContract(ethEndPoint, hexKey, providerAddr, providerAddr, timeout, moneyToChannel)
+	channelAddr, err := contracts.DeployChannelContract(ethEndPoint, hexKey, providerAddr, providerAddr, timeout, moneyToChannel)
 	if err != nil {
 		fmt.Println("deployChannelErr:", err)
 		return err

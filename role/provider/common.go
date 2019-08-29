@@ -25,6 +25,7 @@ const (
 var (
 	ErrUnmatchedPeerID         = errors.New("Peer ID is not match")
 	ErrProviderServiceNotReady = errors.New("Provider service is not ready")
+	ErrGetContractItem           = errors.New("Can't get contract Item")
 )
 
 type ProviderContracts struct {

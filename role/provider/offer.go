@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/upKeeping"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/core"
 	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	ad "github.com/memoio/go-mefs/utils/address"
@@ -45,7 +44,7 @@ func getParamsForDeployContract(node *core.MefsNode) (endPoint string, hexPK str
 	return endPoint, hexPK, localAddress, nil
 }
 
-func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duration int64, price int64, reDeployOffer bool) (err error) {
+func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duration int64, price int64, reDeployOffer bool) error {
 	//得到部署resolver所需的参数
 	endPoint, hexPK, localAddress, err := getParamsForDeployContract(node)
 	if err != nil {
@@ -54,7 +53,7 @@ func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duratio
 
 	//得到indexer实例
 	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, contracts.GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err

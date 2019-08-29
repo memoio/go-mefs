@@ -12,7 +12,7 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func getParamsForDeploy(userID, passwd string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
+func getBuildUKParams(userID, passwd string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
 	var keepers, providers []common.Address
 	//得到参与部署智能合约的userID的正确格式
 	userAddress, err := ad.GetAddressFromID(userID)
@@ -48,7 +48,7 @@ func getParamsForDeploy(userID, passwd string, localPeersInfo PeersInfo) (string
 	return hexPK, userAddress, keepers, providers, nil
 }
 
-func getParamsForSign(userID string, providerID string, privateKey []byte) (common.Address, common.Address, string, error) {
+func getBuildSignParams(userID string, providerID string, privateKey []byte) (common.Address, common.Address, string, error) {
 	var userAddress, providerAddress common.Address
 	providerAddress, err := ad.GetAddressFromID(providerID)
 	if err != nil {

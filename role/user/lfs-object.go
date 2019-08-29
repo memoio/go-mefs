@@ -894,9 +894,9 @@ func (dl *Download) getMessage(ncid string, provider string) ([]byte, *big.Int, 
 	//user给channel合约签名，发给provider
 	userID := dl.LfsService.UserID
 	privateKey := dl.LfsService.PrivateKey
-	localAddress, providerAddress, hexSK, err := getParamsForSign(userID, provider, privateKey)
+	localAddress, providerAddress, hexSK, err := getBuildSignParams(userID, provider, privateKey)
 	if err != nil {
-		log.Printf("getParamsForSign about Block %s from %s failed.\n", ncid, provider)
+		log.Printf("getBuildSignParams about Block %s from %s failed.\n", ncid, provider)
 		return nil, nil, err
 	}
 

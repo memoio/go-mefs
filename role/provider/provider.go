@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -15,10 +14,12 @@ var localNode *core.MefsNode
 
 var usersConfigs sync.Map
 
+var ProContracts *ProviderContracts
+
 //StartProviderService start provider service
 func StartProviderService(node *core.MefsNode, capacity int64, duration int64, price int64, reDeployOffer bool) (err error) {
 	localNode = node
-	contracts.ProContracts = &contracts.ProviderContracts{}
+	ProContracts = &ProviderContracts{}
 	if cfg, _ := node.Repo.Config(); !cfg.Test {
 		//部署resolver和offer
 		for {
@@ -37,7 +38,7 @@ func StartProviderService(node *core.MefsNode, capacity int64, duration int64, p
 }
 
 func PersistBeforeExit() error {
-	if localNode == nil || contracts.ProContracts == nil {
+	if localNode == nil || ProContracts == nil {
 		return ErrProviderServiceNotReady
 	}
 	channels := GetChannels()

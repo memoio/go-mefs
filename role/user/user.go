@@ -414,7 +414,11 @@ func ShowInfo(userID string) map[string]string {
 		return outmap
 	}
 	//计算当前合约的花费(合约总金额-当前余额)
-	upkeeping := cs.GetUpkeepingItem()
+	upkeeping, err := cs.GetUpkeepingItem()
+	if err != nil {
+		outmap["error"] = "GetUpkeepingItem() err:" + err.Error()
+		return outmap
+	}
 	outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr
 	amountUpkeeping, err := contracts.QueryBalance(cfg.Eth, upkeeping.UpKeepingAddr)
 	if err != nil {

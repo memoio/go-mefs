@@ -83,11 +83,11 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		}
 	} else {
 		// getUK
-		_, _, err := contracts.GetUKFromResolver(endpoint, uaddr)
+		_, uk, err := contracts.GetUKFromResolver(endpoint, uaddr)
 		switch err {
 		case nil: //部署过
 			fmt.Println("begin to find keepers and providers to start user : ", gp.Userid)
-			_, keepers, providers, _, _, _, err := contracts.GetUpKeepingParams(endpoint, uaddr, uaddr)
+			_, keepers, providers, _, _, _, err := contracts.GetUKInfoFromUK(endpoint, uaddr, uk)
 			if err != nil {
 				return err
 			}
@@ -268,7 +268,11 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		queryAddr, err = contracts.GetMarketAddr(contracts.EndPoint, addr, addr, contracts.Query) //获取query合约地址
+		config, err := localNode.Repo.Config()
+		if err != nil {
+			return err
+		}
+		queryAddr, err = contracts.GetMarketAddr(config.Eth, addr, addr, contracts.Query) //获取query合约地址
 		if err != nil {
 			return err
 		}
@@ -564,7 +568,7 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 }
 
 func (gp *GroupService) deployUpKeepingAndChannel() error {
-	hexPK, localAddress, keepers, providers, err := getParamsForDeploy(gp.Userid, gp.password, gp.localPeersInfo)
+	hexPK, localAddress, keepers, providers, err := getBuildUKParams(gp.Userid, gp.password, gp.localPeersInfo)
 	if err != nil {
 		fmt.Println("getParams:", err)
 		return err
@@ -603,13 +607,13 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		return ErrBalance
 	}
 
-	err = contracts.Deploy(endpoint, hexPK, localAddress, keepers, providers, d, s, price, moneyAccount)
+	err = contracts.DeployUpkeeping(endpoint, hexPK, localAddress, keepers, providers, d, s, price, moneyAccount)
 	if err != nil {
 		return err
 	}
 
 	//部署好upKeeping合约后，将user部署的query合约的completed参数设为true
-	queryAddr, err := contracts.GetQueryAddress(endpoint, localAddress)
+	queryAddr, err := contracts.GetMarketAddr(endpoint, localAddress, localAddress, contracts.Query)
 	if err != nil {
 		return err
 	}
@@ -623,7 +627,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	var moneyToChannel = new(big.Int)
 	moneyToChannel = moneyToChannel.Mul(big.NewInt(s), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
 	for _, providerAddr := range providers {
-		channelAddr, err := contracts.ChannelContract(endpoint, hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
+		channelAddr, err := contracts.DeployChannelContract(endpoint, hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
 		if err == contracts.ErrNotDeployedResolver {
 			fmt.Println("the provider" + providerAddr.String() + "has not deployed resolver")
 			continue

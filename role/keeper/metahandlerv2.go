@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/memoio/go-mefs/contracts"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -99,7 +98,12 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 	} else {
 		fmt.Println("部署过query合约，从合约中查询需求")
 		localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty())
-		_, _, _, ks, ps, complete, err := contracts.GetQueryParams(contracts.EndPoint, localAddr, common.HexToAddress(queryAddr))
+		config, err := localNode.Repo.Config()
+		if err != nil {
+			fmt.Println("get config err:", err)
+			return
+		}
+		_, _, _, ks, ps, complete, err := contracts.GetQueryInfo(config.Eth, localAddr, common.HexToAddress(queryAddr))
 		if complete || err != nil {
 			fmt.Println("complete:", complete, "error:", err)
 			return

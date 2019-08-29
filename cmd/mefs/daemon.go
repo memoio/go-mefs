@@ -12,6 +12,8 @@ import (
 	"sort"
 	"sync"
 
+	cmds "github.com/ipfs/go-ipfs-cmds"
+	mprome "github.com/ipfs/go-metrics-prometheus"
 	version "github.com/memoio/go-mefs"
 	mcl "github.com/memoio/go-mefs/bls12"
 	utilmain "github.com/memoio/go-mefs/cmd/mefs/util"
@@ -27,9 +29,6 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-
-	cmds "github.com/ipfs/go-ipfs-cmds"
-	mprome "github.com/ipfs/go-metrics-prometheus"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"github.com/prometheus/client_golang/prometheus"
@@ -321,8 +320,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}
 		}
 	}
-	contracts.EndPoint = cfg.Eth
-
 	value := cfg.Role //角色信息的value
 	err = node.Routing.(*dht.IpfsDHT).CmdPutTo(keystring, value, "local")
 	if err != nil {
