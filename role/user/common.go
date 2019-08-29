@@ -76,23 +76,29 @@ type GroupService struct {
 //------LFS Type--------
 type LfsService struct {
 	CurrentLog *Logs //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
+	InProcess  int   //表示此lfs上是否有操作，如上传下载，避免过程中user被Kill
 	UserID     string
 	PrivateKey []byte
 }
 
 type Logs struct {
-	Sb           *pb.SuperBlock
-	SbMux        sync.Mutex
-	SbModified   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
-	BucketByName map[string]*pb.BucketInfo           //通过BucketName找到Bucket信息
-	BucketByID   map[int32]*pb.BucketInfo            //通过BucketID知道到Bucket信息
-	Entries      map[int32]map[string]*pb.ObjectInfo //通过BucketID检索Bucket下文件
-	State        map[int32]*BucketState              //通过BucketID确定Bucket的状态
+	Sb             *pb.SuperBlock
+	SbMux          sync.Mutex
+	SbModified     bool              //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+	BucketNameToID map[string]int32  //通过BucketName找到Bucket信息
+	BucketByID     map[int32]*Bucket //通过BucketID知道到Bucket信息
 }
 
-type BucketState struct {
-	Dirty bool
-	Mu    sync.Mutex
+type Bucket struct {
+	pb.BucketInfo
+	Objects map[string]*Object //通过BucketID检索Bucket下文件
+	Dirty   bool
+	Lock    sync.RWMutex
+}
+
+type Object struct {
+	pb.ObjectInfo
+	Lock sync.RWMutex
 }
 
 var (
@@ -172,14 +178,13 @@ func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
 	return err
 }
 
-
 // 对数组进行乱序操作，以便user随机选择providers
 func disorderArray(array []string) []string {
 	var temp string
-	var num int 
+	var num int
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := len(array) - 1; i >= 0; i-- {
-		num = r.Intn(i+1)
+		num = r.Intn(i + 1)
 		temp = array[i]
 		array[i] = array[num]
 		array[num] = temp

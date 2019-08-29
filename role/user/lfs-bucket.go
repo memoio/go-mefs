@@ -15,7 +15,8 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 	if err != nil {
 		return nil, err
 	}
-	if bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; ok || bucket != nil {
+	bucketID := lfs.CurrentLog.BucketNameToID[bucketName]
+	if bucket, ok := lfs.CurrentLog.BucketByID[bucketID]; ok || bucket != nil {
 		return nil, ErrBucketAlreadyExist
 	}
 	lfs.CurrentLog.SbMux.Lock()
@@ -26,18 +27,25 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 		dataCount = 1
 		parityCount = Sum - 1
 	}
-	bucket := &pb.BucketInfo{
-		BucketName:  bucketName,
-		BucketID:    lfs.CurrentLog.Sb.NextBucketID,
-		Policy:      int32(policy),
-		DataCount:   int32(dataCount),
-		ParityCount: int32(parityCount),
-		CurStripe:   0,
-		NextOffset:  0,
-		Ctime:       time.Now().Format(utils.BASETIME),
-		SegmentSize: dataformat.DefaultSegmentSize,
-		TagFlag:     dataformat.BLS12,
-		Deletion:    false,
+
+	objects := make(map[string]*Object)
+	bucket := &Bucket{
+		BucketInfo: pb.BucketInfo{
+			BucketName:  bucketName,
+			BucketID:    lfs.CurrentLog.Sb.NextBucketID,
+			Policy:      int32(policy),
+			DataCount:   int32(dataCount),
+			ParityCount: int32(parityCount),
+			CurStripe:   0,
+			NextOffset:  0,
+			Ctime:       time.Now().Format(utils.BASETIME),
+			SegmentSize: dataformat.DefaultSegmentSize,
+			TagFlag:     dataformat.BLS12,
+			Deletion:    false,
+			Encryption:  true,
+		},
+		Dirty:   true,
+		Objects: objects,
 	}
 	//将此Bucket信息添加到LFS中
 	lfs.CurrentLog.Sb.Buckets[bucket.BucketID] = bucket.BucketName
@@ -45,10 +53,8 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 	lfs.CurrentLog.SbModified = true
 
 	lfs.CurrentLog.BucketByID[bucket.BucketID] = bucket
-	lfs.CurrentLog.BucketByName[bucket.BucketName] = bucket
-	lfs.CurrentLog.Entries[bucket.BucketID] = make(map[string]*pb.ObjectInfo)
-	lfs.CurrentLog.State[bucket.BucketID] = &BucketState{Dirty: true}
-	return bucket, nil
+	lfs.CurrentLog.BucketNameToID[bucket.BucketName] = bucket.BucketID
+	return &bucket.BucketInfo, nil
 }
 
 //Delete a bucket from a specified LFSservice
@@ -57,11 +63,15 @@ func (lfs *LfsService) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if lfs.CurrentLog.BucketByName == nil {
+	if lfs.CurrentLog.BucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	bucket, ok := lfs.CurrentLog.BucketByName[bucketName]
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -69,8 +79,8 @@ func (lfs *LfsService) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 		return nil, ErrBucketNotEmpty
 	}
 	bucket.Deletion = true
-	lfs.CurrentLog.State[bucket.BucketID].Dirty = true
-	return bucket, nil
+	bucket.Dirty = true
+	return &bucket.BucketInfo, nil
 }
 
 //Get a Bucket's metainfo
@@ -79,11 +89,17 @@ func (lfs *LfsService) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if lfs.CurrentLog.BucketByName == nil {
+	if lfs.CurrentLog.BucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
-	if bucket, ok := lfs.CurrentLog.BucketByName[bucketName]; ok && bucket != nil && !bucket.Deletion {
-		return bucket, nil
+
+	bucketID, ok := lfs.CurrentLog.BucketNameToID[bucketName]
+	if !ok {
+		return nil, ErrBucketNotExist
+	}
+	bucket, ok := lfs.CurrentLog.BucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, ErrBucketNotExist
 	}
 	return nil, ErrBucketNotExist
 }
@@ -106,7 +122,7 @@ func (lfs *LfsService) ListBucket(pre string) ([]*pb.BucketInfo, error) {
 			continue
 		}
 		if strings.HasPrefix(Bucket.BucketName, pre) {
-			buckets = append(buckets, Bucket)
+			buckets = append(buckets, &Bucket.BucketInfo)
 		}
 	}
 	return buckets, nil

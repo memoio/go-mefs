@@ -6,18 +6,13 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
-	u "github.com/ipfs/go-ipfs-util"
-	recpb "github.com/libp2p/go-libp2p-record/pb"
-
 	"github.com/memoio/go-mefs/contracts"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -65,23 +60,22 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
-		addBlockRecord(bcid.String(), endOffset)
 	case "update":
-		if has, _ := localNode.Blockstore.Has(bcid); true == has {
-			err := localNode.Blockstore.DeleteBlock(bcid)
-			if err != nil {
-				fmt.Printf("Error delete block %s: %s", bcid.String(), err)
-			}
-		}
 		_, err := strconv.Atoi(splitedNcid[3])
 		if err != nil {
 			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
-		endOffset, err := strconv.Atoi(splitedNcid[4])
+		_, err = strconv.Atoi(splitedNcid[4])
 		if err != nil {
 			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
+		}
+		if has, _ := localNode.Blockstore.Has(bcid); true == has {
+			err := localNode.Blockstore.DeleteBlock(bcid)
+			if err != nil {
+				fmt.Printf("Error delete block %s: %s", bcid.String(), err)
+			}
 		}
 		Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
 		if err != nil {
@@ -93,7 +87,6 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 			fmt.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
 			return err
 		}
-		addBlockRecord(bcid.String(), endOffset)
 	default:
 		fmt.Printf("Wrong type in put block")
 	}
@@ -142,25 +135,6 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 	}
 
 	return "", nil
-}
-
-func addBlockRecord(BlockID string, offset int) error {
-	key, err := metainfo.NewKeyMeta(BlockID, metainfo.HasBlock)
-	if err != nil {
-		return err
-	}
-	rec := new(recpb.Record)
-	rec.Key = key.ToByte()
-	rec.Value = []byte(strconv.Itoa(offset))
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
-	data, err := proto.Marshal(rec)
-	if err != nil {
-		fmt.Printf("addBlockRecord: %s", err)
-		return err
-	}
-
-	dataStore := localNode.Repo.Datastore()
-	return dataStore.Put(ds.NewKey(key.ToString()), data)
 }
 
 // verify verifies the transaction

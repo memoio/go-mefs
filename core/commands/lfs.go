@@ -13,8 +13,6 @@ import (
 	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
-	"github.com/mgutz/ansi"
-
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/core/commands/e"
@@ -23,6 +21,7 @@ import (
 	"github.com/memoio/go-mefs/role/user"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
+	"github.com/mgutz/ansi"
 )
 
 type ObjectStat struct {
@@ -551,7 +550,7 @@ var lfsPutObjectCmd = &cmds.Command{
 		BucketName := req.Arguments[0]
 		objectName := req.Options[ObjectName].(string)
 		f := req.Files.Entries()
-		var upload *user.Upload
+		var upload user.Job
 		//目前只上传第一个文件
 		if f.Next() {
 			if objectName == "" {
@@ -564,10 +563,13 @@ var lfsPutObjectCmd = &cmds.Command{
 		} else {
 			return errNoFileToUpload
 		}
-		object, err := upload.PutObject(req.Context)
+		//此处Context是否应改为User的Context，否则在过程中kill user时，行为未定义
+		err = upload.Start(req.Context)
 		if err != nil {
 			return err
 		}
+		ul := upload.(*user.Upload)
+		object := ul.Object
 		ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
 		objectStat := ObjectStat{
 			ObjectName: object.GetObjectName(),
@@ -642,11 +644,13 @@ var lfsGetObjectCmd = &cmds.Command{
 		if lfsService == nil {
 			return errLfsServiceNotReady
 		}
-		dl, err := lfsService.ConstructDownload(req.Arguments[0], req.Arguments[1])
+		dl, reader, err := lfsService.ConstructDownload(req.Arguments[0], req.Arguments[1])
 		if err != nil {
 			return err
 		}
-		reader, err := dl.GetObject(req.Context)
+
+		//此处Context是否应改为User的Context，否则在过程中kill user时，行为未定义
+		err = dl.Start(req.Context)
 		if err != nil {
 			return err
 		}
@@ -675,9 +679,9 @@ var lfsGetObjectCmd = &cmds.Command{
 			} else if stat.IsDir() {
 				rootIsDir = true
 			}
-			if rootIsDir == true {
+			if rootIsDir {
 				fpath = path.Join(outPath, req.Arguments[1])
-			} else if rootExists == false {
+			} else if !rootExists {
 				fpath = outPath
 			} else {
 				return errors.New("The outpath already has file: " + req.Arguments[1])

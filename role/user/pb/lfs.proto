@@ -23,6 +23,7 @@ message BucketInfo {
   uint64 SegmentSize = 11;   //本Bucket的segment size
   uint64 TagFlag = 12;       //本Bucket的TagFLag
   bool Deletion = 13;               //Bucket是否已删除
+  bool Encryption = 14;  //Bucket
 }
 
 message ObjectInfo {
