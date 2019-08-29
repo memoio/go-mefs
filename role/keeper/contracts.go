@@ -11,7 +11,6 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	if gp == nil {
 		return ErrIncorrectParams
 	}
-
 	// get upkkeeping addr
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
@@ -22,23 +21,21 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 		return err
 	}
 	endPoint := config.Eth
-	ukAddr, _, err := contracts.GetUKFromResolver(endPoint, userAddr)
+	ukAddr, uk, err := contracts.GetUKFromResolver(endPoint, userAddr)
 	if err != nil {
 		fmt.Println("get ", userID, "'s ukAddr err:", err)
 		return err
 	}
-
-	localID := localNode.Identity.Pretty()
-	localAddr, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return err
-	}
 	// get upkkeeping params
-	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUpKeepingParams(endPoint, localAddr, userAddr)
+	keeperID := localNode.Identity.Pretty()
+	keeperAddr, err := address.GetAddressFromID(keeperID)
 	if err != nil {
 		return err
 	}
-
+	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUKInfoFromUK(endPoint, keeperAddr, uk)
+	if err != nil {
+		return err
+	}
 	var keepers []string
 	var providers []string
 	for _, keeper := range keeperAddrs {
@@ -70,25 +67,25 @@ func GetUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
 }
 
 func SaveQuery(userID string) error {
-	localID := localNode.Identity.Pretty()
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	localAddr, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return err
-	}
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
-	endPoint := config.Eth
-	queryAddr, err := contracts.GetMarketAddr(endPoint, localAddr, userAddr, contracts.Query)
+	config, err := localNode.Repo.Config()
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, ks, ps, completed, err := contracts.GetQueryParams(endPoint, localAddr, queryAddr)
+	endPoint := config.Eth
+	keeperID := localNode.Identity.Pretty()
+	keeperAddr, err := address.GetAddressFromID(keeperID)
+	if err != nil {
+		return err
+	}
+	queryAddr, err := contracts.GetMarketAddr(endPoint, keeperAddr, userAddr, contracts.Query)
+	if err != nil {
+		return err
+	}
+	capacity, duration, price, ks, ps, completed, err := contracts.GetQueryInfo(endPoint, keeperAddr, queryAddr)
 	if err != nil {
 		return err
 	}
@@ -118,12 +115,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 }
 
 func SaveOffer(providerID string) error {
-	localID := localNode.Identity.Pretty()
 	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	localAddr, err := address.GetAddressFromID(localID)
 	if err != nil {
 		return err
 	}
@@ -132,11 +124,16 @@ func SaveOffer(providerID string) error {
 	if err != nil {
 		return err
 	}
-	offerAddr, err := contracts.GetMarketAddr(endPoint, localAddr, proAddr, contracts.Offer)
+	keeperID := localNode.Identity.Pretty()
+	keeperAddr, err := address.GetAddressFromID(keeperID)
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, err := contracts.GetOfferParams(endPoint, localAddr, offerAddr)
+	offerAddr, err := contracts.GetMarketAddr(endPoint, keeperAddr, proAddr, contracts.Offer)
+	if err != nil {
+		return err
+	}
+	capacity, duration, price, err := contracts.GetOfferInfo(endPoint, keeperAddr, offerAddr)
 	if err != nil {
 		return err
 	}

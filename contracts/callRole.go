@@ -8,13 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
-	"github.com/memoio/go-mefs/contracts/upKeeping"
 )
 
 func getKeeperContractFromIndexer(endPoint string, localAddress common.Address) (keeperContract *role.Keeper, err error) {
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return keeperContract, err
@@ -55,7 +55,7 @@ func IsKeeper(endPoint string, localAddress common.Address) (bool, error) {
 
 func getProviderContractFromIndexer(endPoint string, localAddress common.Address) (providerContract *role.Provider, err error) {
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return providerContract, err
@@ -110,7 +110,7 @@ func KeeperContract(endPoint string, hexKey string) (err error) {
 	log.Println("keeperContractAddr:", keeperContractAddr.String())
 
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err
@@ -155,7 +155,7 @@ func ProviderContract(endPoint string, hexKey string) (err error) {
 	log.Println("providerContractAddr:", providerContractAddr.String())
 
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := upKeeping.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err

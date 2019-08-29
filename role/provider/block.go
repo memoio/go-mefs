@@ -112,7 +112,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			return "", errors.New("Block is not found")
 		}
 		if key != "" {
-			item, ok := contracts.ProContracts.ChannelBook.Load(userID)
+			item, ok := ProContracts.channelBook.Load(userID)
 			if !ok {
 				return "", errors.New("Find channelItem in channelBook error")
 			}
@@ -122,7 +122,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			}
 			fmt.Println("下载成功，更改内存中channel.value并持久化:", value.String())
 			channelItem.Value = value
-			contracts.ProContracts.ChannelBook.Store(userID, channelItem)
+			ProContracts.channelBook.Store(userID, channelItem)
 			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value.String(), "local")
 			if err != nil {
 				fmt.Println("cmdPutErr:", err)
@@ -167,7 +167,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	if err != nil {
 		return false, "", "", nil, err
 	}
-	item, ok := contracts.ProContracts.ChannelBook.Load(userID)
+	item, ok := ProContracts.channelBook.Load(userID)
 	if !ok {
 		fmt.Println("Not find ", userID, "'s channelItem in channelBook.")
 		return false, "", "", nil, errors.New("Find channelItem in channelBook error")
@@ -194,7 +194,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 		return false, "", "", nil, err
 	}
 	endPoint := config.Eth
-	channelAddr, err := contracts.ProviderGetChannelAddr(endPoint, providerAddr, userAddr)
+	channelAddr, err := contracts.GetChannelAddr(endPoint, providerAddr, providerAddr, userAddr)
 	if err != nil {
 		return false, "", "", nil, err
 	}

@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -12,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/market"
-	"github.com/memoio/go-mefs/contracts/upKeeping"
+	"github.com/memoio/go-mefs/contracts/resolver"
 )
 
 //MarketType 类型声明
@@ -38,7 +37,7 @@ func DeployQuery(endPoint string, userAddress common.Address, sk *ecdsa.PrivateK
 	//获得mapper
 	auth := bind.NewKeyedTransactor(sk)
 	client := GetClient(endPoint)
-	mapper, err := getMapper(endPoint, userAddress, resolver, auth, client)
+	mapper, err := deployMapper(endPoint, userAddress, resolver, auth, client)
 	if err != nil {
 		return err
 	}
@@ -101,45 +100,6 @@ func DeployQuery(endPoint string, userAddress common.Address, sk *ecdsa.PrivateK
 
 }
 
-func GetQueryAddress(endPoint string, userAddress common.Address) (common.Address, error) {
-	var queryAddr common.Address
-	//获得resolver
-	resolver, err := getResolverFromIndexer(endPoint, userAddress, "query")
-	if err != nil {
-		fmt.Println("getResolverErr:", err)
-		return queryAddr, err
-	}
-
-	//获得mapper
-	mapperAddr, err := resolver.Get(&bind.CallOpts{
-		From: userAddress,
-	}, userAddress)
-	if err != nil {
-		fmt.Println("getMapperErr:", err)
-		return queryAddr, err
-	}
-	mapper, err := upKeeping.NewMapper(mapperAddr, GetClient(endPoint))
-	if err != nil {
-		fmt.Println("newMapperErr:", err)
-		return queryAddr, err
-	}
-
-	//获得queryAddress
-	queryAddresses, err := mapper.Get(&bind.CallOpts{
-		From: userAddress,
-	})
-	if err != nil {
-		fmt.Println("getQueryAddressesErr:", err)
-		return queryAddr, err
-	}
-	length := len(queryAddresses)
-	if length < 1 || queryAddresses[length-1].String() == InvalidAddr {
-		fmt.Println("user don't have query-contract")
-		return queryAddr, errors.New("user don't have query-contract")
-	}
-	return queryAddresses[length-1], nil
-}
-
 //SetQueryCompleted when user has found providers and keepers needed, user call this function
 func SetQueryCompleted(endPoint string, hexKey string, userAddress common.Address, queryAddress common.Address) error {
 	query, err := market.NewQuery(queryAddress, GetClient(endPoint))
@@ -161,6 +121,24 @@ func SetQueryCompleted(endPoint string, hexKey string, userAddress common.Addres
 	return nil
 }
 
+//GetQueryInfo get user's query-info
+// 分别返回申请的容量、持久化时间、价格、keeper数量、provider数量、是否成功放进upkeeping中
+func GetQueryInfo(endPoint string, localAddress common.Address, queryAddress common.Address) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
+	query, err := market.NewQuery(queryAddress, GetClient(endPoint))
+	if err != nil {
+		fmt.Println("newQueryErr:", err)
+		return nil, nil, nil, nil, nil, false, err
+	}
+	capacity, duration, price, ks, ps, completed, err := query.Get(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		fmt.Println("getQueryParamsErr:", err)
+		return nil, nil, nil, nil, nil, false, err
+	}
+	return capacity, duration, price, ks, ps, completed, nil
+}
+
 //DeployOffer provider use it to deploy offer-contract
 func DeployOffer(endPoint string, providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64) error {
 	fmt.Println("begin to deploy offer-contract...")
@@ -179,7 +157,7 @@ func DeployOffer(endPoint string, providerAddress common.Address, hexKey string,
 	}
 	auth := bind.NewKeyedTransactor(key)
 	client := GetClient(endPoint)
-	mapper, err := getMapper(endPoint, providerAddress, resolver, auth, client)
+	mapper, err := deployMapper(endPoint, providerAddress, resolver, auth, client)
 	if err != nil {
 		return err
 	}
@@ -235,27 +213,8 @@ func DeployOffer(endPoint string, providerAddress common.Address, hexKey string,
 
 }
 
-//GetQueryParams get user's query-params
-// 分别返回申请的容量、持久化时间、价格、keeper数量、provider数量、是否成功放进upkeeping中
-//Name
-func GetQueryParams(endPoint string, localAddress common.Address, queryAddress common.Address) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
-	query, err := market.NewQuery(queryAddress, GetClient(endPoint))
-	if err != nil {
-		fmt.Println("newQueryErr:", err)
-		return nil, nil, nil, nil, nil, false, err
-	}
-	capacity, duration, price, ks, ps, completed, err := query.Get(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		fmt.Println("getQueryParamsErr:", err)
-		return nil, nil, nil, nil, nil, false, err
-	}
-	return capacity, duration, price, ks, ps, completed, nil
-}
-
-//GetOfferParams get provider's offer-params
-func GetOfferParams(endPoint string, localAddress common.Address, offerAddress common.Address) (*big.Int, *big.Int, *big.Int, error) {
+//GetOfferInfo get provider's offer-info
+func GetOfferInfo(endPoint string, localAddress common.Address, offerAddress common.Address) (*big.Int, *big.Int, *big.Int, error) {
 	offer, err := market.NewOffer(offerAddress, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newOfferErr:", err)
@@ -271,19 +230,20 @@ func GetOfferParams(endPoint string, localAddress common.Address, offerAddress c
 	return capacity, duration, price, nil
 }
 
+// GetMarketAddr get query/offer address by MarketType
 func GetMarketAddr(endPoint string, localAddr, ownerAddr common.Address, addrType MarketType) (common.Address, error) {
 	var marketAddr common.Address
-	var resolver *upKeeping.Resolver
+	var resolverInstance *resolver.Resolver
 	var err error
 	switch addrType {
 	case Offer:
-		resolver, err = getResolverFromIndexer(endPoint, localAddr, "offer")
+		resolverInstance, err = getResolverFromIndexer(endPoint, localAddr, "offer")
 		if err != nil {
 			fmt.Println("getResolverErr:", err)
 			return marketAddr, err
 		}
 	case Query:
-		resolver, err = getResolverFromIndexer(endPoint, localAddr, "query")
+		resolverInstance, err = getResolverFromIndexer(endPoint, localAddr, "query")
 		if err != nil {
 			fmt.Println("getResolverErr:", err)
 			return marketAddr, err
@@ -291,19 +251,19 @@ func GetMarketAddr(endPoint string, localAddr, ownerAddr common.Address, addrTyp
 	default:
 		return marketAddr, ErrMarketType
 	}
-	mapper, err := getDeployedMapper(endPoint, localAddr, ownerAddr, resolver)
+	mapper, err := getMapperInstance(endPoint, localAddr, ownerAddr, resolverInstance)
 	if err != nil {
 		fmt.Println("getMapperErr:", err)
 		return marketAddr, err
 	}
-	offerAddresses, err := mapper.Get(&bind.CallOpts{
+	Addresses, err := mapper.Get(&bind.CallOpts{
 		From: ownerAddr,
 	})
 	if err != nil {
-		fmt.Println("getOfferAddressesErr:", err)
+		fmt.Println("getMarketAddressesErr:", err)
 		return marketAddr, err
 	}
-	// 返回最新的offer地址
-	marketAddr = offerAddresses[len(offerAddresses)-1]
+	// 返回最新的offer、query地址
+	marketAddr = Addresses[len(Addresses)-1]
 	return marketAddr, nil
 }

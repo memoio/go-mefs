@@ -103,7 +103,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 			fmt.Println("get config err:", err)
 			return
 		}
-		_, _, _, ks, ps, complete, err := contracts.GetQueryParams(config.Eth, localAddr, common.HexToAddress(queryAddr))
+		_, _, _, ks, ps, complete, err := contracts.GetQueryInfo(config.Eth, localAddr, common.HexToAddress(queryAddr))
 		if complete || err != nil {
 			fmt.Println("complete:", complete, "error:", err)
 			return
