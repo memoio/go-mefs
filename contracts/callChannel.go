@@ -236,7 +236,7 @@ func GetChannelStartDate(endPoint string, localAddress common.Address, providerA
 		return "", err
 	}
 
-	mapper, err := getDeployedMapper(endPoint, localAddress, localAddress, resolver)
+	mapper, err := getMapperInstance(endPoint, localAddress, localAddress, resolver)
 	if err != nil {
 		return "", err
 	}
