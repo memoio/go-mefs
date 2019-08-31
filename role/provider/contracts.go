@@ -57,30 +57,13 @@ func SaveUpkeeping(userID string) error {
 	if err != nil {
 		return err
 	}
-	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUKInfoFromUK(config.Eth, proAddr, uk)
+	item, err := contracts.GetUpkeepingInfo(config.Eth, proAddr, uk)
 	if err != nil {
 		return err
 	}
-	var keepers []string
-	var providers []string
-	for _, keeper := range keeperAddrs {
-		keepers = append(keepers, keeper.String())
-	}
-	for _, provider := range providerAddrs {
-		providers = append(providers, provider.String())
-	}
-	upKeepingItem := contracts.UpKeepingItem{
-		UserID:        userID,
-		UpKeepingAddr: ukAddr,
-		KeeperAddrs:   keepers,
-		KeeperSla:     int32(len(keeperAddrs)),
-		ProviderAddrs: providers,
-		ProviderSla:   int32(len(providerAddrs)),
-		Duration:      duration,
-		Capacity:      capacity,
-		Price:         price,
-	}
-	ProContracts.upKeepingBook.Store(userID, upKeepingItem)
+	item.UserID = userID
+	item.UpKeepingAddr = ukAddr
+	ProContracts.upKeepingBook.Store(userID, item)
 	return nil
 }
 
@@ -133,11 +116,16 @@ func SaveChannel(userID string) error {
 		}
 	}
 	fmt.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
+	time, err := contracts.GetChannelStartDate(config.Eth, proAddr, proAddr)
+	if err != nil {
+		return err
+	}
 	channel := contracts.ChannelItem{
 		UserID:      userID,
 		ChannelAddr: channelAddr.String(),
 		ProID:       proID,
 		Value:       value,
+		StartTime:   time,
 	}
 	ProContracts.channelBook.Store(userID, channel)
 	return nil
@@ -186,20 +174,12 @@ func SaveQuery(userID string) error {
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, ks, ps, completed, err := contracts.GetQueryInfo(endPoint, proAddr, queryAddr)
+	queryItem, err := contracts.GetQueryInfo(endPoint, proAddr, queryAddr)
 	if err != nil {
 		return err
 	}
-	queryItem := contracts.QueryItem{
-		UserID:       userID,
-		QueryAddr:    queryAddr.String(),
-		Capacity:     capacity.Int64(),
-		Duration:     duration.Int64(),
-		Price:        price.Int64(),
-		KeeperNums:   int32(ks.Int64()),
-		ProviderNums: int32(ps.Int64()),
-		Completed:    completed,
-	}
+	queryItem.UserID = userID
+	queryItem.QueryAddr = queryAddr.String()
 	ProContracts.queryBook.Store(userID, queryItem)
 	return nil
 }
@@ -230,17 +210,13 @@ func SaveOffer() error {
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, err := contracts.GetOfferInfo(endPoint, proAddr, offerAddr)
+	offerItem, err := contracts.GetOfferInfo(endPoint, proAddr, offerAddr)
 	if err != nil {
 		return err
 	}
-	ProContracts.offer = contracts.OfferItem{
-		ProviderID: proID,
-		OfferAddr:  offerAddr.String(),
-		Capacity:   capacity.Int64(),
-		Duration:   duration.Int64(),
-		Price:      price.Int64(),
-	}
+	offerItem.ProviderID = proID
+	offerItem.OfferAddr = offerAddr.String()
+	ProContracts.offer = offerItem
 	return nil
 }
 

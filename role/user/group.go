@@ -87,14 +87,14 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		switch err {
 		case nil: //部署过
 			fmt.Println("begin to find keepers and providers to start user : ", gp.Userid)
-			_, keepers, providers, _, _, _, err := contracts.GetUKInfoFromUK(endpoint, uaddr, uk)
+			item, err := contracts.GetUpkeepingInfo(endpoint, uaddr, uk)
 			if err != nil {
 				return err
 			}
 			// keeper数量、provider的数量应以合约约定为主
-			gp.keeperSLA = len(keepers)
-			gp.providerSLA = len(providers)
-			err = gp.ConnectKeepersAndProviders(ctx, keepers, providers)
+			gp.keeperSLA = int(item.KeeperSla)
+			gp.providerSLA = int(item.ProviderSla)
+			err = gp.ConnectKeepersAndProviders(ctx, item.KeeperAddrs, item.ProviderAddrs)
 			if err != nil {
 				return err
 			}
@@ -111,9 +111,8 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	return nil
 }
 
-func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers, providers []common.Address) error {
+func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
 	fmt.Println("Begin to connect user's keepers and providers:", gp.Userid)
-
 	waitTime := 0 //进行网络连接
 	for {
 		if waitTime > 60 { //连不上网？
@@ -136,27 +135,22 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 	connectTryCount := 10
 	// 第一次对所有keeper进行连接，第二次对连接失败的keeper进行连接，依次类推
 	for i := 0; i < connectTryCount; i++ {
-		var unsuccess []common.Address
+		var unsuccess []string
 		for _, keeper := range keepers {
-			kid, err := address.GetIDFromAddress(keeper.String())
-			if err != nil {
-				fmt.Println("Get kid error, the error is ", err)
-				continue
-			}
 			// 连接失败加入unsuccess
-			if !sc.ConnectTo(ctx, localNode, kid) {
+			if !sc.ConnectTo(ctx, localNode, keeper) {
 				unsuccess = append(unsuccess, keeper)
-				log.Println("Connect to keeper", kid, "failed.")
+				log.Println("Connect to keeper", keeper, "failed.")
 				continue
 			}
 			tempKeeper := &KeeperInfo{
-				KeeperID: kid,
+				KeeperID: keeper,
 			}
 			kmKid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.Local, metainfo.SyncTypeKid)
 			if err != nil {
 				return err
 			}
-			res, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), kid)
+			res, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), keeper)
 			if err == nil && res != nil {
 				resStr := string(res)
 				splitRes := strings.Split(resStr, metainfo.DELIMITER)
@@ -169,7 +163,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 			// 检查该keeper是否已添加
 			var repeat int
 			for repeat = 0; repeat < len(gp.localPeersInfo.Keepers); repeat++ {
-				if kid == gp.localPeersInfo.Keepers[repeat].KeeperID {
+				if keeper == gp.localPeersInfo.Keepers[repeat].KeeperID {
 					break
 				}
 			}
@@ -192,17 +186,12 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 					}
 				}
 				for _, provider := range providers {
-					pid, err := address.GetIDFromAddress(provider.String())
-					if err != nil {
-						fmt.Println("Get pid error, the error is ", err)
-						continue
-					}
-					if sc.ConnectTo(ctx, localNode, pid) {
-						fmt.Println("Connect to provider-", pid, "success.")
+					if sc.ConnectTo(ctx, localNode, provider) {
+						fmt.Println("Connect to provider-", provider, "success.")
 					} else {
-						fmt.Println("Connect to provider-", pid, "failed.")
+						fmt.Println("Connect to provider-", provider, "failed.")
 					}
-					gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
+					gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, provider) //将Provider加入内存缓冲
 				}
 				// 构造key告诉keeper和provider自己已经启动
 				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
@@ -568,7 +557,7 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 }
 
 func (gp *GroupService) deployUpKeepingAndChannel() error {
-	hexPK, localAddress, keepers, providers, err := getBuildUKParams(gp.Userid, gp.password, gp.localPeersInfo)
+	hexPK, localAddress, keepers, providers, err := buildUKParams(gp.Userid, gp.password, gp.localPeersInfo)
 	if err != nil {
 		fmt.Println("getParams:", err)
 		return err

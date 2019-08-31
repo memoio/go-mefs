@@ -32,29 +32,13 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	if err != nil {
 		return err
 	}
-	_, keeperAddrs, providerAddrs, duration, capacity, price, err := contracts.GetUKInfoFromUK(endPoint, keeperAddr, uk)
+	item, err := contracts.GetUpkeepingInfo(endPoint, keeperAddr, uk)
 	if err != nil {
 		return err
 	}
-	var keepers []string
-	var providers []string
-	for _, keeper := range keeperAddrs {
-		keepers = append(keepers, keeper.String())
-	}
-	for _, provider := range providerAddrs {
-		providers = append(providers, provider.String())
-	}
-	gp.upkeeping = contracts.UpKeepingItem{
-		UserID:        userID,
-		UpKeepingAddr: ukAddr,
-		KeeperAddrs:   keepers,
-		KeeperSla:     int32(len(keeperAddrs)),
-		ProviderAddrs: providers,
-		ProviderSla:   int32(len(providerAddrs)),
-		Duration:      duration,
-		Capacity:      capacity,
-		Price:         price,
-	}
+	item.UserID = userID
+	item.UpKeepingAddr = ukAddr
+	gp.upkeeping = item
 	return nil
 }
 
@@ -85,20 +69,12 @@ func SaveQuery(userID string) error {
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, ks, ps, completed, err := contracts.GetQueryInfo(endPoint, keeperAddr, queryAddr)
+	queryItem, err := contracts.GetQueryInfo(endPoint, keeperAddr, queryAddr)
 	if err != nil {
 		return err
 	}
-	queryItem := contracts.QueryItem{
-		UserID:       userID,
-		QueryAddr:    queryAddr.String(),
-		Capacity:     capacity.Int64(),
-		Duration:     duration.Int64(),
-		Price:        price.Int64(),
-		KeeperNums:   int32(ks.Int64()),
-		ProviderNums: int32(ps.Int64()),
-		Completed:    completed,
-	}
+	queryItem.UserID = userID
+	queryItem.QueryAddr = queryAddr.String()
 	localPeerInfo.queryBook.Store(userID, queryItem)
 	return nil
 }
@@ -133,17 +109,12 @@ func SaveOffer(providerID string) error {
 	if err != nil {
 		return err
 	}
-	capacity, duration, price, err := contracts.GetOfferInfo(endPoint, keeperAddr, offerAddr)
+	offerItem, err := contracts.GetOfferInfo(endPoint, keeperAddr, offerAddr)
 	if err != nil {
 		return err
 	}
-	offerItem := contracts.OfferItem{
-		ProviderID: providerID,
-		OfferAddr:  offerAddr.String(),
-		Capacity:   capacity.Int64(),
-		Duration:   duration.Int64(),
-		Price:      price.Int64(),
-	}
+	offerItem.ProviderID = providerID
+	offerItem.OfferAddr = offerAddr.String()
 	localPeerInfo.offerBook.Store(providerID, offerItem)
 	return nil
 }
