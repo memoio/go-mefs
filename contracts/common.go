@@ -48,8 +48,8 @@ type UpKeepingItem struct {
 	ProviderSla   int32
 	Duration      int64
 	Capacity      int64
-	Price         int64     // 部署的价格
-	StartTime     time.Time // 部署的时间
+	Price         int64  // 部署的价格
+	StartTime     string // 部署的时间
 }
 
 type ChannelItem struct {
@@ -57,8 +57,8 @@ type ChannelItem struct {
 	ProID       string
 	ChannelAddr string
 	Value       *big.Int
-	StartTime   time.Time // 部署的时间
-	Duration    int64     // timeout
+	StartTime   string // 部署的时间
+	Duration    int64  // timeout
 }
 
 type QueryItem struct {

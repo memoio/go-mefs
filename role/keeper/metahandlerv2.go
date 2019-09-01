@@ -103,13 +103,13 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 			fmt.Println("get config err:", err)
 			return
 		}
-		_, _, _, ks, ps, complete, err := contracts.GetQueryInfo(config.Eth, localAddr, common.HexToAddress(queryAddr))
-		if complete || err != nil {
-			fmt.Println("complete:", complete, "error:", err)
+		item, err := contracts.GetQueryInfo(config.Eth, localAddr, common.HexToAddress(queryAddr))
+		if item.Completed || err != nil {
+			fmt.Println("complete:", item.Completed, "error:", err)
 			return
 		}
-		keeperCount = int(ks.Int64())
-		providerCount = int(ps.Int64())
+		keeperCount = int(item.KeeperNums)
+		providerCount = int(item.ProviderNums)
 	}
 	fmt.Println("keeperCount:", keeperCount, "providerCount:", providerCount)
 	//查询出user的keeper和provider

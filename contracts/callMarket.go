@@ -123,20 +123,29 @@ func SetQueryCompleted(endPoint string, hexKey string, userAddress common.Addres
 
 //GetQueryInfo get user's query-info
 // 分别返回申请的容量、持久化时间、价格、keeper数量、provider数量、是否成功放进upkeeping中
-func GetQueryInfo(endPoint string, localAddress common.Address, queryAddress common.Address) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
+func GetQueryInfo(endPoint string, localAddress common.Address, queryAddress common.Address) (QueryItem, error) {
+	var item QueryItem
 	query, err := market.NewQuery(queryAddress, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newQueryErr:", err)
-		return nil, nil, nil, nil, nil, false, err
+		return item, err
 	}
 	capacity, duration, price, ks, ps, completed, err := query.Get(&bind.CallOpts{
 		From: localAddress,
 	})
 	if err != nil {
 		fmt.Println("getQueryParamsErr:", err)
-		return nil, nil, nil, nil, nil, false, err
+		return item, err
 	}
-	return capacity, duration, price, ks, ps, completed, nil
+	item = QueryItem{
+		Capacity:     capacity.Int64(),
+		Duration:     duration.Int64(),
+		Price:        price.Int64(),
+		KeeperNums:   int32(ks.Int64()),
+		ProviderNums: int32(ps.Int64()),
+		Completed:    completed,
+	}
+	return item, nil
 }
 
 //DeployOffer provider use it to deploy offer-contract
@@ -214,20 +223,26 @@ func DeployOffer(endPoint string, providerAddress common.Address, hexKey string,
 }
 
 //GetOfferInfo get provider's offer-info
-func GetOfferInfo(endPoint string, localAddress common.Address, offerAddress common.Address) (*big.Int, *big.Int, *big.Int, error) {
+func GetOfferInfo(endPoint string, localAddress common.Address, offerAddress common.Address) (OfferItem, error) {
+	var item OfferItem
 	offer, err := market.NewOffer(offerAddress, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("newOfferErr:", err)
-		return nil, nil, nil, err
+		return item, err
 	}
 	capacity, duration, price, err := offer.Get(&bind.CallOpts{
 		From: localAddress,
 	})
 	if err != nil {
 		fmt.Println("getOfferParamsErr:", err)
-		return nil, nil, nil, err
+		return item, err
 	}
-	return capacity, duration, price, nil
+	item = OfferItem{
+		Capacity: capacity.Int64(),
+		Duration: duration.Int64(),
+		Price:    price.Int64(),
+	}
+	return item, nil
 }
 
 // GetMarketAddr get query/offer address by MarketType
