@@ -702,6 +702,7 @@ func checkLocalPeers() {
 		if err != nil {
 			continue
 		}
+		sc.ConnectTo(context.Background(), localNode, keeper)
 		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 			tmpKeepers = append(tmpKeepers, keeper)
 		}
@@ -714,6 +715,7 @@ func checkLocalPeers() {
 		if err != nil {
 			continue
 		}
+		sc.ConnectTo(context.Background(), localNode, provider)
 		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 			tmpProviders = append(tmpProviders, provider)
 		}
