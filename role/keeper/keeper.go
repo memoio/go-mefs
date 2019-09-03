@@ -12,6 +12,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	lru "github.com/hashicorp/golang-lru"
+	inet "github.com/libp2p/go-libp2p-core/network"
+	peer "github.com/libp2p/go-libp2p-peer"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
@@ -693,15 +695,42 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 	return nil
 }
 
+func checkLocalPeers() {
+	var tmpKeepers []string
+	for _, keeper := range localPeerInfo.Keepers {
+		kid, err := peer.IDB58Decode(keeper)
+		if err != nil {
+			continue
+		}
+		sc.ConnectTo(context.Background(), localNode, keeper)
+		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
+			tmpKeepers = append(tmpKeepers, keeper)
+		}
+	}
+	localPeerInfo.Keepers = tmpKeepers
+
+	var tmpProviders []string
+	for _, provider := range localPeerInfo.Providers {
+		pid, err := peer.IDB58Decode(provider)
+		if err != nil {
+			continue
+		}
+		sc.ConnectTo(context.Background(), localNode, provider)
+		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
+			tmpProviders = append(tmpProviders, provider)
+		}
+	}
+	localPeerInfo.Providers = tmpProviders
+}
+
 func checkConnectedPeer() error {
 	if !IsKeeperServiceRunning() {
 		return ErrKeeperServiceNotReady
 	}
+	checkLocalPeers()
 
 	fmt.Println("checkConnectedPeer")
-
 	localID := localNode.Identity.Pretty() //本地id
-
 	kmKid, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeKid)
 	if err != nil {
 		return err
