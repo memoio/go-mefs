@@ -87,7 +87,6 @@ type Job interface {
 	Start(context.Context) error  //启动Job
 	Stop(context.Context) error   //停止Job
 	Cancel(context.Context) error //取消Job
-	Done()                        //回调通知任务完成
 	Info() (interface{}, error)   //获取Job信息及状态
 }
 

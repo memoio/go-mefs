@@ -8,7 +8,6 @@ import (
 
 type DataEncoder struct {
 	Policy      int32 // flase为多副本，true为RScode
-	CidPrefix   string
 	DataCount   int32 // 若为多副本，则副本总数等于DataCount+ParityCount
 	ParityCount int32 // 若为多副本，
 	TagFlag     int32
@@ -17,16 +16,13 @@ type DataEncoder struct {
 }
 
 // 构建一个dataformat配置
-func NewDataEncoder(policy int32, cidPrefix string, dataCount, pairtyCount, tagflag int32, segmentSize uint64, keyset *mcl.KeySet) *DataEncoder {
+func NewDataEncoder(policy int32, dataCount, pairtyCount, tagflag int32, segmentSize uint64, keyset *mcl.KeySet) *DataEncoder {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
 	}
-	if tagflag == CRC32 {
-		cidPrefix = ""
-	}
+
 	newOpt := &DataEncoder{
 		Policy:      policy,
-		CidPrefix:   cidPrefix,
 		DataCount:   dataCount,
 		ParityCount: pairtyCount,
 		TagFlag:     tagflag,
@@ -38,18 +34,18 @@ func NewDataEncoder(policy int32, cidPrefix string, dataCount, pairtyCount, tagf
 
 // Encode的策略选择
 // 传入数据，返回编码后的stripe或者多副本
-func (opt *DataEncoder) Encode(data []byte, beginOffset int32) ([][]byte, int, error) {
+func (opt *DataEncoder) Encode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int, error) {
 	var stripe [][]byte
 	var offset int32
 	var err error
 	switch opt.Policy {
 	case RsPolicy:
-		stripe, offset, err = opt.rsEncode(data, beginOffset)
+		stripe, offset, err = opt.rsEncode(data, ncidPrefix, beginOffset)
 		if err != nil {
 			return nil, 0, err
 		}
 	case MulPolicy:
-		stripe, offset, err = opt.mulEncode(data, beginOffset)
+		stripe, offset, err = opt.mulEncode(data, ncidPrefix, beginOffset)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -57,6 +53,37 @@ func (opt *DataEncoder) Encode(data []byte, beginOffset int32) ([][]byte, int, e
 		return nil, 0, ErrWrongPolicy
 	}
 	return stripe, int(offset), nil
+}
+
+func (opt *DataEncoder) mulEncode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int32, error) {
+	if beginOffset == 0 {
+		stripe, offset, err := DataEncodeToMul(data, ncidPrefix, opt.DataCount, opt.ParityCount, opt.SegmentSize, uint64(opt.TagFlag), opt.KeySet)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		return stripe, int32(offset), nil
+	}
+	stripe, offset, err := DataEncodeToMulForAppend(data, ncidPrefix, opt.DataCount, opt.ParityCount, opt.SegmentSize, uint64(opt.TagFlag), int(beginOffset), opt.KeySet)
+	if err != nil {
+		return nil, 0, err
+	}
+	return stripe, int32(offset), nil
+}
+
+func (opt *DataEncoder) rsEncode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int32, error) {
+	if beginOffset == 0 {
+		stripe, offset, err := EncodeDataToPreStripe(data, ncidPrefix, int(opt.DataCount), int(opt.ParityCount), int(opt.TagFlag), opt.SegmentSize, opt.KeySet)
+		if err != nil {
+			return nil, 0, err
+		}
+		return stripe, int32(offset), nil
+	}
+	stripe, offset, err := EncodeDataToNoPreStripe(data, ncidPrefix, int(opt.DataCount), int(opt.ParityCount), int(opt.TagFlag), int(beginOffset), opt.SegmentSize, opt.KeySet)
+	if err != nil {
+		return nil, 0, err
+	}
+	return stripe, int32(offset), nil
 }
 
 //DataDecoder 用于用一个stripe中获取纯数据，无tag
@@ -146,37 +173,6 @@ func Repair(stripe [][]byte) ([][]byte, error) {
 		return nil, ErrWrongPolicy
 	}
 	return nil, ErrRepairCrash
-}
-
-func (opt *DataEncoder) mulEncode(data []byte, beginOffset int32) ([][]byte, int32, error) {
-	if beginOffset == 0 {
-		stripe, offset, err := DataEncodeToMul(data, opt.CidPrefix, opt.DataCount, opt.ParityCount, opt.SegmentSize, uint64(opt.TagFlag), opt.KeySet)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		return stripe, int32(offset), nil
-	}
-	stripe, offset, err := DataEncodeToMulForAppend(data, opt.CidPrefix, opt.DataCount, opt.ParityCount, opt.SegmentSize, uint64(opt.TagFlag), int(beginOffset), opt.KeySet)
-	if err != nil {
-		return nil, 0, err
-	}
-	return stripe, int32(offset), nil
-}
-
-func (opt *DataEncoder) rsEncode(data []byte, beginOffset int32) ([][]byte, int32, error) {
-	if beginOffset == 0 {
-		stripe, offset, err := EncodeDataToPreStripe(data, opt.CidPrefix, int(opt.DataCount), int(opt.ParityCount), int(opt.TagFlag), opt.SegmentSize, opt.KeySet)
-		if err != nil {
-			return nil, 0, err
-		}
-		return stripe, int32(offset), nil
-	}
-	stripe, offset, err := EncodeDataToNoPreStripe(data, opt.CidPrefix, int(opt.DataCount), int(opt.ParityCount), int(opt.TagFlag), int(beginOffset), opt.SegmentSize, opt.KeySet)
-	if err != nil {
-		return nil, 0, err
-	}
-	return stripe, int32(offset), nil
 }
 
 // TODO:修改成多ptag修复模式
