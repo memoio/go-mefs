@@ -7,12 +7,19 @@ import (
 )
 
 type DataEncoder struct {
-	Policy      int32 // flase为多副本，true为RScode
+	Policy      int32 // 1为RS纠删码，2为Mul多副本
 	DataCount   int32 // 若为多副本，则副本总数等于DataCount+ParityCount
 	ParityCount int32 // 若为多副本，
 	TagFlag     int32
 	SegmentSize uint64
 	KeySet      *mcl.KeySet
+}
+
+//DataDecoder 用于用一个stripe中获取纯数据，无tag
+type DataDecoder struct {
+	Policy      int32 // 1为RS纠删码，2为Mul多副本
+	DataCount   int32 // 若为多副本，则副本总数等于DataCount+ParityCount
+	ParityCount int32 // 若为多副本，
 }
 
 // 构建一个dataformat配置
@@ -84,13 +91,6 @@ func (opt *DataEncoder) rsEncode(data []byte, ncidPrefix string, beginOffset int
 		return nil, 0, err
 	}
 	return stripe, int32(offset), nil
-}
-
-//DataDecoder 用于用一个stripe中获取纯数据，无tag
-type DataDecoder struct {
-	Policy      int32 // flase为多副本，true为RScode
-	DataCount   int32 // 若为多副本，则副本总数等于DataCount+ParityCount
-	ParityCount int32 // 若为多副本，
 }
 
 func NewDataDecoder(policy, dataCount, pairtyCount int32) (*DataDecoder, error) {
