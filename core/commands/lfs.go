@@ -650,10 +650,8 @@ var lfsGetObjectCmd = &cmds.Command{
 		}
 
 		//此处Context是否应改为User的Context，否则在过程中kill user时，行为未定义
-		err = dl.Start(req.Context)
-		if err != nil {
-			return err
-		}
+		go dl.Start(req.Context)
+
 		return res.Emit(reader)
 	},
 	PostRun: cmds.PostRunMap{
@@ -686,7 +684,6 @@ var lfsGetObjectCmd = &cmds.Command{
 			} else {
 				return errors.New("The outpath already has file: " + req.Arguments[1])
 			}
-
 			var file *os.File
 			if _, err := os.Stat(fpath); err != nil && os.IsNotExist(err) {
 				file, err = os.Create(fpath)
