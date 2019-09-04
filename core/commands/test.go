@@ -11,15 +11,18 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role/keeper"
-	"github.com/memoio/go-mefs/role/provider"
 	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -307,18 +310,26 @@ var channelTimeoutCmd = &cmds.Command{
 		ShortDescription: "deploy channel-contract between two accounts, then one account call the channelTimeout()",
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		n, _ := cmdenv.GetNode(env) //获取当前ipfsnode
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
 		id := n.Identity.Pretty()
 		localAddress, err := ad.GetAddressFromID(id)
 		if err != nil {
 			return err
 		}
-		hexPK, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
+		hexKey, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
 		if err != nil {
 			fmt.Println("getHexPKErr", err)
 			return err
 		}
-		err = provider.TestChannelTimeout(localAddress, hexPK)
+		config, err := n.Repo.Config()
+		if err != nil {
+			return err
+		}
+		ethEndPoint := config.Eth
+		err = testChannelTimeout(localAddress, hexKey, ethEndPoint)
 		if err != nil {
 			fmt.Println("channelTimeout failed")
 			return err
@@ -341,8 +352,26 @@ var closeChannelCmd = &cmds.Command{
 		ShortDescription: "deploy channel-contract between two accounts, then one account call the channelTimeout()",
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		n, _ := cmdenv.GetNode(env) //获取当前ipfsnode
-		err := provider.TestCloseChannel(n)
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+		hexKey, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
+		if err != nil {
+			fmt.Println("getHexPKErr", err)
+			return err
+		}
+		config, err := n.Repo.Config()
+		if err != nil {
+			return err
+		}
+		ethEndPoint := config.Eth
+		err = testCloseChannel(localAddress, hexKey, ethEndPoint)
 		if err != nil {
 			return err
 		}
@@ -403,4 +432,159 @@ var showBalanceCmd = &cmds.Command{
 		}
 		return cmds.EmitOnce(res, balances)
 	},
+}
+
+//TestChannelTimeout test channelTimeout()
+func testChannelTimeout(localAddr common.Address, hexKey string, ethEndPoint string) (err error) {
+	fmt.Println("==========开始测试channelTimeout=========")
+	balance, err := contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看账户余额
+	if err != nil {
+		fmt.Println("contracts.QueryBalanceErr:", err)
+		return err
+	}
+	fmt.Println("部署前balance:", balance)
+
+	//部署channel合约，测试中这个账户与自己部署channel合约
+	indexerAddr := common.HexToAddress(contracts.IndexerHex)
+	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
+	if err != nil {
+		fmt.Println("newIndexerErr:", err)
+		return err
+	}
+	err = contracts.DeployResolver(ethEndPoint, hexKey, localAddr, indexer)
+	if err != nil {
+		fmt.Println("deployResolverErr:", err)
+		return err
+	}
+	timeout := big.NewInt(60)
+	moneyToChannel := big.NewInt(1000000)
+	channelAddr, err := contracts.DeployChannelContract(ethEndPoint, hexKey, localAddr, localAddr, timeout, moneyToChannel)
+	if err != nil {
+		fmt.Println("deployChannelErr:", err)
+		return err
+	}
+
+	time.Sleep(120 * time.Second)
+	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看部署的channel合约的账户余额
+	if err != nil {
+		fmt.Println("contracts.QueryBalanceErr:", err)
+		return err
+	}
+	fmt.Println("channel合约的balance:", balance)
+
+	_, err = contracts.GetChannelStartDate(ethEndPoint, localAddr, localAddr)
+	if err != nil {
+		fmt.Println("GetChannelStartDateErr:", err)
+		return err
+	}
+
+	//触发channelTimeout()
+	err = contracts.ChannelTimeout(ethEndPoint, hexKey, localAddr, localAddr)
+	if err != nil {
+		fmt.Println("channelTimeoutErr:", err)
+		return err
+	}
+
+	time.Sleep(120 * time.Second)
+	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看触发channelTimeout后的合约余额
+	if err != nil {
+		fmt.Println("contracts.QueryBalanceErr:", err)
+		return err
+	}
+	fmt.Println("触发channelTimeout后的合约balance:", balance)
+	if balance.Cmp(big.NewInt(0)) != 0 {
+		return errors.New("channel timeout failed")
+	}
+	return nil
+}
+
+//TestCloseChannel test CloseChannel()
+//因为是同一个账户，所以只能保证流程是通的，但是无法确认金额是否转给provider
+//看合约代码，应该是会转过去的，所以closeChannel应该是测通的，当然还需要能连上服务器上节点时再进行本地测试
+func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint string) (err error) {
+	fmt.Println("==========开始测试closeChannel=========")
+	balance, err := contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看账户余额
+	if err != nil {
+		fmt.Println("QueryBalanceErr", err)
+		return err
+	}
+	fmt.Println("部署前balance:", balance)
+
+	//部署channel合约，测试中这个provider账户与自己部署channel合约
+	indexerAddr := common.HexToAddress(contracts.IndexerHex)
+	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
+	if err != nil {
+		fmt.Println("newIndexerErr:", err)
+		return err
+	}
+	err = contracts.DeployResolver(ethEndPoint, hexKey, localAddr, indexer)
+	if err != nil {
+		fmt.Println("deployResolverErr:", err)
+		return err
+	}
+	timeout := big.NewInt(120)
+	moneyToChannel := big.NewInt(1000000)
+	channelAddr, err := contracts.DeployChannelContract(ethEndPoint, hexKey, localAddr, localAddr, timeout, moneyToChannel)
+	if err != nil {
+		fmt.Println("deployChannelErr:", err)
+		return err
+	}
+
+	//签名
+	value := big.NewInt(100)
+	sig, err := contracts.SignForChannel(channelAddr, value, hexKey)
+	if err != nil {
+		fmt.Println("SignForChannelErr:", err)
+		return err
+	}
+
+	//账户验证签名
+	pubKey, err := utils.GetCompressedPkFromHexSk(hexKey)
+	if err != nil {
+		fmt.Println("GetCompressedPkFromHexSkErr:", err)
+		return err
+	}
+	verify, err := contracts.VerifySig(pubKey, sig, channelAddr, value)
+	if err != nil {
+		fmt.Println("verifyErr:", err)
+		return err
+	}
+	if !verify {
+		fmt.Println("verify失败")
+		return errors.New("verify失败")
+	}
+
+	time.Sleep(60 * time.Second)
+	balance, err = contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看部署channel合约后的账户余额
+	if err != nil {
+		fmt.Println("QueryBalanceErr:", err)
+		return err
+	}
+	fmt.Println("部署后balance:", balance)
+	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看channel合约的账户余额
+	if err != nil {
+		fmt.Println("QueryBalanceErr:", err)
+		return err
+	}
+	if balance.Cmp(moneyToChannel) != 0 {
+		return errors.New("channel-balance is not true")
+	}
+	fmt.Println("channel合约的balance:", balance)
+
+	//触发CloseChannel()
+	err = contracts.CloseChannel(ethEndPoint, hexKey, localAddr, localAddr, sig, value)
+	if err != nil {
+		fmt.Println("CloseChannelErr:", err)
+		return err
+	}
+
+	time.Sleep(120 * time.Second)
+	balance, err = contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看触发Closechannel合约后的账户余额
+	fmt.Println("触发后balance:", balance)
+	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看channel合约的账户余额
+	fmt.Println("channel合约的balance:", balance)
+	if balance.Cmp(big.NewInt(0)) != 0 {
+		return errors.New("close channel failed")
+	}
+	return nil
 }
