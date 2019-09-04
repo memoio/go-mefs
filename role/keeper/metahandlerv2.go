@@ -38,7 +38,7 @@ func (keeper *KeeperHandlerV2) HandleMetaMessage(metaKey, metaValue, from string
 	case metainfo.UserDeployedContracts: //user部署好合约
 		go handleUserDeloyedContracts(km, metaValue, from)
 	case metainfo.DeleteBlock: //user删除块
-		go handleDeleteBlockMeta(km, from)
+		go handleDeleteBlockMeta(km)
 	case metainfo.NewKPReq: //user申请新的provider
 		return handleNewProviderReq(km, metaValue)
 	case metainfo.BlockMetaInfo: //user发送块元数据
@@ -55,6 +55,10 @@ func (keeper *KeeperHandlerV2) HandleMetaMessage(metaKey, metaValue, from string
 		return handleQueryInfo(km)
 	case metainfo.GetPeerAddr:
 		return handlePeerAddr(km)
+	case metainfo.PosAdd:
+		go handlePosAdd(km, metaValue, from)
+	case metainfo.PosDelete:
+		go handlePosDelete(km, metaValue, from)
 	case metainfo.Test:
 		go handleTest(km)
 	default: //没有匹配的信息，丢弃
@@ -274,11 +278,6 @@ func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
 
 func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 	blockID := km.GetMid()
-	if len(blockID) <= utils.IDLength {
-		fmt.Println(ErrUnmatchedPeerID)
-		return
-	}
-
 	bm, err := metainfo.GetBlockMeta(blockID)
 	if err != nil {
 		fmt.Println(err)
@@ -339,10 +338,11 @@ func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
 	localPeerInfo.Storage.Store(pid, tmpStorageInfo)
 }
 
-func handleDeleteBlockMeta(km *metainfo.KeyMeta, from string) { //立即删除某些块的元数据
+func handleDeleteBlockMeta(km *metainfo.KeyMeta) { //立即删除某些块的元数据 由user发送给所有keeper
 	blockID := km.GetMid()
-	if len(blockID) <= utils.IDLength {
-		fmt.Println(ErrUnmatchedPeerID)
+	bm, err := metainfo.GetBlockMeta(blockID)
+	if err != nil {
+		fmt.Println("handleDeleteBlockMeta GetBlockMeta()err:", err)
 		return
 	}
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
@@ -350,10 +350,23 @@ func handleDeleteBlockMeta(km *metainfo.KeyMeta, from string) { //立即删除�
 		fmt.Println(err)
 		return
 	}
+
+	//获取保存这个块的provider
+	metavalueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmBlock.ToString(), "local")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	splitedValue := strings.Split(string(metavalueByte), metainfo.DELIMITER)
+	if len(splitedValue) < 2 {
+		fmt.Println(metainfo.ErrIllegalValue)
+		return
+	}
 	err = localNode.Routing.(*dht.IpfsDHT).DeleteLocal(kmBlock.ToString())
 	if err != nil && err != ds.ErrNotFound {
 		fmt.Println(err)
 	}
+	deleteBlockInLedger(splitedValue[0], bm)
 }
 
 func handleNewProviderReq(km *metainfo.KeyMeta, metaValue string) (string, error) {

@@ -9,7 +9,11 @@ import (
 	"strings"
 	"time"
 
+	ad "github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/pos"
+
 	mcl "github.com/memoio/go-mefs/bls12"
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
@@ -55,6 +59,35 @@ func getKeySet() *mcl.KeySet {
 func posSerivce() {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
+}
+
+func getKeepers() ([]string, error) {
+	config, _ := localNode.Repo.Config()
+	endPoint := config.Eth
+	userAddr, err := ad.GetAddressFromID(pos.PosId)
+	if err != nil {
+		fmt.Println("getKeepers GetAddressFromID() error", err)
+		return nil, err
+	}
+	_, uk, err := contracts.GetUKFromResolver(endPoint, userAddr)
+	if err != nil {
+		fmt.Println("getKeepers GetUKFromResolver() error", err)
+		return nil, err
+	}
+	ukItem, err := contracts.GetUpkeepingInfo(endPoint, userAddr, uk)
+	if err != nil {
+		fmt.Println("getKeepers GetUpkeepingInfo() error", err)
+		return nil, err
+	}
+	out := []string{}
+	for _, addr := range ukItem.KeeperAddrs {
+		pid, err := ad.GetIDFromAddress(addr)
+		if err != nil {
+			fmt.Println("getKeepers GetIDFromAddress() error", err, "addr:", addr)
+		}
+		out = append(out, pid)
+	}
+	return out, nil
 }
 
 // getDiskUsage gets the disk usage
@@ -203,6 +236,12 @@ func generatePosBlocks(increaseSpace uint64) {
 			return
 		}
 
+		keepers, err := getKeepers()
+		if err != nil {
+			fmt.Println("generatePosBlocks getKeepers()err:", err)
+		}
+		blockList := []string{}
+
 		//做成块，放到本地
 		for i, dataBlock := range data {
 			blockID := opt.CidPrefix + "_" + strconv.Itoa(i)
@@ -218,26 +257,33 @@ func generatePosBlocks(increaseSpace uint64) {
 				fmt.Println("add block failed, error :", err)
 				return
 			}
-
-			//向keeper发送元数据
-			/*kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockMetaInfo, metainfo.SyncTypeBlock)
-			if err != nil {
-				fmt.Println("construct put blockMeta KV error :", err)
-				return
-			}
-			metaValue := localNode.Identity.Pretty() + metainfo.DELIMITER + strconv.Itoa(offset)*/
+			blockList = append(blockList, blockID)
 		}
+		//向keeper发送元数据
+		metaValue := strings.Join(blockList, metainfo.DELIMITER)
+		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosAdd)
+		for _, keeper := range keepers {
+			sendMetaMessage(km, metaValue, keeper)
+		}
+
 	}
 }
 
 func deletePosBlocks(decreseSpace uint64) {
 	// delete last blocks
 	var totalDecresed uint64
+
+	keepers, err := getKeepers()
+	if err != nil {
+		fmt.Println("generatePosBlocks getKeepers()err:", err)
+	}
+
 	for {
 		if totalDecresed >= decreseSpace {
 			break
 		}
 		//删除块
+		deleteBlocks := []string{}
 		for i := 0; i < 5; i++ {
 			blockID := opt.CidPrefix + "_" + strconv.Itoa(i)
 			ncid := cid.NewCidV2([]byte(blockID))
@@ -249,15 +295,20 @@ func deletePosBlocks(decreseSpace uint64) {
 			fmt.Println("delete block :", blockID, "success")
 			totalDecresed += uint64(5 * Mullen)
 
-			// send BlockMeta deletion to keepers
-			//发送元数据到keeper
-			/*kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.DeleteBlock)
-			if err != nil {
-				fmt.Println("construct put blockMeta KV error :", err)
-				return
-			}*/
+			deleteBlocks = append(deleteBlocks, blockID)
 		}
-		//跟新Gid,Sid
+		// send BlockMeta deletion to keepers
+		//发送元数据到keeper
+		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosDelete)
+		if err != nil {
+			fmt.Println("construct put blockMeta KV error :", err)
+			return
+		}
+		metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
+		for _, keeper := range keepers {
+			sendMetaMessage(km, metavalue, keeper)
+		}
+		//更新Gid,Sid
 		fmt.Println("current gid :", curGid, "\n cursid :", curSid)
 		curSid = (curSid + 9) % 10
 		if curSid == 9 {

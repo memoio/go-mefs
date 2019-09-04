@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/utils/metainfo"
+
 	"github.com/memoio/go-mefs/utils"
 )
 
@@ -20,7 +22,7 @@ type PU struct {
 	uid string
 }
 
-//chalinfo 作为LedgerInfo的value
+//chalinfo 作为LedgerInfo的value key是PU对
 type chalinfo struct {
 	Time        sync.Map //某provider下user数据在某时刻发起挑战的结果，key为挑战发起时间的时间戳，格式为int64,value为chalresult
 	Cid         sync.Map
@@ -45,6 +47,7 @@ func getChalinfo(thisPU PU) (*chalinfo, bool) {
 	return thischalinfo.(*chalinfo), true
 }
 
+//doAddBlocktoLedger 将block信息加入本地LedgerInfo结构体里的Cid字段，用于挑战
 func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) error {
 	pu := PU{
 		pid: pid,
@@ -76,6 +79,18 @@ func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) erro
 	LedgerInfo.Store(pu, newchalinfo)
 	return nil
 
+}
+
+//deleteBlockInLedger 删除LedgerInfo中的块信息，传入保存这个块的pid和块信息结构体
+func deleteBlockInLedger(pid string, bm *metainfo.BlockMeta) {
+	pu := PU{
+		pid: pid,
+		uid: bm.GetUid(),
+	}
+	if thischalinfo, ok := getChalinfo(pu); ok {
+		thischalinfo.Cid.Delete(bm.ToString())
+		thischalinfo.tmpCid.Delete(bm.ToString())
+	}
 }
 
 func checkLedger(ctx context.Context) {
