@@ -8,6 +8,7 @@ import (
 
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -117,20 +118,24 @@ func InitLogs() (*Logs, error) {
 	bucketNameToID := make(map[string]int32)
 	return &Logs{
 		Sb:             sb,
-		SbModified:     true,
 		BucketByID:     bucketByID,
 		BucketNameToID: bucketNameToID,
 	}, nil
 }
 
-func newSuperBlock() *pb.SuperBlock {
+func newSuperBlock() *SuperBlock {
 	buckets := make(map[int32]string)
-	return &pb.SuperBlock{
-		Buckets:         buckets,
-		MetaBackupCount: defaultMetaBackupCount,
-		NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
-		MagicNumber:     0xfb,
-		Version:         1,
+	bitset := bitset.New(256)
+	return &SuperBlock{
+		SuperBlockInfo: pb.SuperBlockInfo{
+			BucketsSet:      nil,
+			MetaBackupCount: defaultMetaBackupCount,
+			NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
+			MagicNumber:     0xfb,
+			Version:         1},
+		Buckets: buckets,
+		Bitset:  bitset,
+		Dirty:   true,
 	}
 }
 
@@ -208,7 +213,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 			continue
 		}
 	}
-	if lfs.CurrentLog.SbModified || isForce { //将超级块信息保存在本地
+	if lfs.CurrentLog.Sb.Dirty || isForce { //将超级块信息保存在本地
 		err := lfs.flushSuperBlockLocal(lfs.CurrentLog.Sb)
 		if err != nil {
 			return err
@@ -230,12 +235,12 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 		}
 	}
 
-	if lfs.CurrentLog.SbModified || isForce {
+	if lfs.CurrentLog.Sb.Dirty || isForce {
 		err := lfs.flushSuperBlockToProvider(lfs.CurrentLog.Sb)
 		if err != nil {
 			return err
 		}
-		lfs.CurrentLog.SbModified = false
+		lfs.CurrentLog.Sb.Dirty = false
 		fmt.Println("Flush Superblock to provider finish. The uid is ", lfs.UserID)
 	}
 

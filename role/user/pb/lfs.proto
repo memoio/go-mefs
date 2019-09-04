@@ -1,8 +1,8 @@
 syntax = "proto3";
 package user.pb;
 
-message SuperBlock {
-  map<int32, string> Buckets = 1; // User现有的Buckets
+message SuperBlockInfo {
+  repeated uint64 BucketsSet = 1; // User现有的Buckets
   int32 MetaBackupCount = 2; //对于所有的元数据块，副本数
   int32 NextBucketID = 3;
   int32 MagicNumber = 4;
