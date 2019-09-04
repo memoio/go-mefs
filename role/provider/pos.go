@@ -9,11 +9,9 @@ import (
 	"strings"
 	"time"
 
-	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/pos"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
@@ -38,6 +36,7 @@ var posUid string = "8MGxCuiT75bje883b7uFb6eMrJt5cP"
 var curGid int = -10
 var curSid int = -1
 var inGenerate int
+var keeperAddrs []string = []string{}
 
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
 var Mullen = 1 * 1024 * 1024
@@ -62,32 +61,14 @@ func posSerivce() {
 }
 
 func getKeepers() ([]string, error) {
-	config, _ := localNode.Repo.Config()
-	endPoint := config.Eth
-	userAddr, err := ad.GetAddressFromID(pos.PosId)
-	if err != nil {
-		fmt.Println("getKeepers GetAddressFromID() error", err)
-		return nil, err
-	}
-	_, uk, err := contracts.GetUKFromResolver(endPoint, userAddr)
-	if err != nil {
-		fmt.Println("getKeepers GetUKFromResolver() error", err)
-		return nil, err
-	}
-	ukItem, err := contracts.GetUpkeepingInfo(endPoint, userAddr, uk)
-	if err != nil {
-		fmt.Println("getKeepers GetUpkeepingInfo() error", err)
-		return nil, err
-	}
-	out := []string{}
-	for _, addr := range ukItem.KeeperAddrs {
-		pid, err := ad.GetIDFromAddress(addr)
+	if len(keeperAddrs) == 0 {
+		uk, err := GetUpkeeping(pos.PosId)
 		if err != nil {
-			fmt.Println("getKeepers GetIDFromAddress() error", err, "addr:", addr)
+			return keeperAddrs, err
 		}
-		out = append(out, pid)
+		keeperAddrs = uk.KeeperAddrs
 	}
-	return out, nil
+	return keeperAddrs, nil
 }
 
 // getDiskUsage gets the disk usage

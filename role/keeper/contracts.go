@@ -134,25 +134,33 @@ func GetOffer(providerID string) (contracts.OfferItem, error) {
 }
 
 // addProvider 将传入pid加入posuser的upkeeping合约
-func ukAddProvider(uid, pid, sk string) {
+func ukAddProvider(uid, pid, sk string) error {
 	gp, ok := getGroupsInfo(uid)
 	if !ok {
 		fmt.Println("ukAddProvider getGroupsInfo() error")
-		return
+		return ErrNoGroupsInfo
 	}
 	uk, err := GetUpkeeping(gp)
 	if err != nil {
-		fmt.Println("ukAddProvider GetUpkeeping() error", err)
-		return
+		err := SaveUpkeeping(gp, uid)
+		if err != nil {
+			fmt.Println("ukAddProvider GetUpkeeping() error", err)
+			return err
+		}
+		uk, err = GetUpkeeping(gp) //保存之后重试。还是出错就返回
+		if err != nil {
+			fmt.Println("ukAddProvider GetUpkeeping() error", err)
+			return err
+		}
 	}
 	providerAddr, err := ad.GetAddressFromID(pid)
 	if err != nil {
 		fmt.Println("ukAddProvider GetAddressFromID() error", err)
-		return
+		return err
 	}
 	for _, localPid := range uk.ProviderAddrs { //判断该provider是否为新,如果存在，直接返回
 		if strings.Compare(localPid, providerAddr.String()) == 0 {
-			return
+			return nil
 		}
 	}
 
@@ -162,12 +170,13 @@ func ukAddProvider(uid, pid, sk string) {
 	userAddr, err := ad.GetAddressFromID(uid)
 	if err != nil {
 		fmt.Println("ukAddProvider GetAddressFromID() error", err)
-		return
+		return err
 	}
 	err = contracts.AddProvider(endPoint, sk, userAddr, []common.Address{providerAddr})
 	if err != nil {
 		fmt.Println("ukAddProvider AddProvider() error", err)
-		return
+		return err
 	}
 	uk.ProviderAddrs = append(uk.ProviderAddrs, providerAddr.String())
+	return nil
 }
