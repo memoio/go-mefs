@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"github.com/memoio/go-mefs/utils/address"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -28,11 +29,11 @@ please run the daemon:
 `
 
 type IdOutput struct {
-	ID              string
-	PublicKey       string
-	Addresses       []string
-	AgentVersion    string
-	ProtocolVersion string
+	ID           string
+	PeerAddr     string
+	PublicKey    string
+	Addresses    []string
+	AgentVersion string
 }
 
 const (
@@ -48,8 +49,8 @@ If no peer is specified, prints out information for local peers.
 
 'mefs id' supports the format option for output with the following keys:
 <id> : The peers id.
+<peerAddr>: The peers address.
 <aver>: Agent version.
-<pver>: Protocol version.
 <pubkey>: Public key.
 <addrs>: Addresses (newline delimited).
 `,
@@ -110,8 +111,8 @@ If no peer is specified, prints out information for local peers.
 			if found {
 				output := format
 				output = strings.Replace(output, "<id>", out.ID, -1)
+				output = strings.Replace(output, "<peerAddr>", out.PeerAddr, -1)
 				output = strings.Replace(output, "<aver>", out.AgentVersion, -1)
-				output = strings.Replace(output, "<pver>", out.ProtocolVersion, -1)
 				output = strings.Replace(output, "<pubkey>", out.PublicKey, -1)
 				output = strings.Replace(output, "<addrs>", strings.Join(out.Addresses, "\n"), -1)
 				output = strings.Replace(output, "\\n", "\n", -1)
@@ -138,6 +139,11 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 
 	info := new(IdOutput)
 	info.ID = p.Pretty()
+	tmpAddr, err := address.GetAddressFromID(p.Pretty())
+	if err != nil {
+		return nil, err
+	}
+	info.PeerAddr = tmpAddr.String()
 
 	if pk := ps.PubKey(p); pk != nil {
 		pkb, err := ic.MarshalPublicKey(pk)
@@ -151,11 +157,6 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 		info.Addresses = append(info.Addresses, a.String())
 	}
 
-	if v, err := ps.Get(p, "ProtocolVersion"); err == nil {
-		if vs, ok := v.(string); ok {
-			info.ProtocolVersion = vs
-		}
-	}
 	if v, err := ps.Get(p, "AgentVersion"); err == nil {
 		if vs, ok := v.(string); ok {
 			info.AgentVersion = vs
@@ -169,6 +170,11 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 func printSelf(node *core.MefsNode) (interface{}, error) {
 	info := new(IdOutput)
 	info.ID = node.Identity.Pretty()
+	tmpAddr, err := address.GetAddressFromID(node.Identity.Pretty())
+	if err != nil {
+		return nil, err
+	}
+	info.PeerAddr = tmpAddr.String()
 
 	if node.PrivateKey == nil {
 		if err := node.LoadPrivateKey(); err != nil {
@@ -189,7 +195,6 @@ func printSelf(node *core.MefsNode) (interface{}, error) {
 			info.Addresses = append(info.Addresses, s)
 		}
 	}
-	info.ProtocolVersion = identify.LibP2PVersion
 	info.AgentVersion = identify.ClientVersion
 	return info, nil
 }
