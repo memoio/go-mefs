@@ -12,6 +12,7 @@ import (
 	"github.com/memoio/go-mefs/contracts"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -82,11 +83,17 @@ type LfsService struct {
 }
 
 type Logs struct {
-	Sb             *pb.SuperBlock
-	SbMux          sync.Mutex
-	SbModified     bool              //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+	Sb             *SuperBlock
 	BucketNameToID map[string]int32  //通过BucketName找到Bucket信息
 	BucketByID     map[int32]*Bucket //通过BucketID知道到Bucket信息
+}
+
+type SuperBlock struct {
+	pb.SuperBlockInfo
+	Bitset  *bitset.BitSet
+	Buckets map[int32]string //ID向bucketname的映射
+	SbMux   sync.Mutex
+	Dirty   bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
 }
 
 type Bucket struct {

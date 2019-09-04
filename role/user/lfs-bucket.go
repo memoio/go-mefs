@@ -15,24 +15,28 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 	if err != nil {
 		return nil, err
 	}
-	bucketID := lfs.CurrentLog.BucketNameToID[bucketName]
-	if bucket, ok := lfs.CurrentLog.BucketByID[bucketID]; ok || bucket != nil {
+	if lfs.CurrentLog.BucketNameToID == nil {
+		return nil, ErrBucketNotExist
+	}
+
+	if _, ok := lfs.CurrentLog.BucketNameToID[bucketName]; ok {
 		return nil, ErrBucketAlreadyExist
 	}
-	lfs.CurrentLog.SbMux.Lock()
-	defer lfs.CurrentLog.SbMux.Unlock()
+	lfs.CurrentLog.Sb.SbMux.Lock()
+	defer lfs.CurrentLog.Sb.SbMux.Unlock()
 	// 多副本策略
 	if policy == dataformat.MulPolicy {
 		Sum := dataCount + parityCount
 		dataCount = 1
 		parityCount = Sum - 1
 	}
+	bucketID := lfs.CurrentLog.Sb.NextBucketID
 
 	objects := make(map[string]*Object)
 	bucket := &Bucket{
 		BucketInfo: pb.BucketInfo{
 			BucketName:  bucketName,
-			BucketID:    lfs.CurrentLog.Sb.NextBucketID,
+			BucketID:    bucketID,
 			Policy:      int32(policy),
 			DataCount:   int32(dataCount),
 			ParityCount: int32(parityCount),
@@ -50,7 +54,8 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 	//将此Bucket信息添加到LFS中
 	lfs.CurrentLog.Sb.Buckets[bucket.BucketID] = bucket.BucketName
 	lfs.CurrentLog.Sb.NextBucketID++
-	lfs.CurrentLog.SbModified = true
+	lfs.CurrentLog.Sb.Bitset.Set(uint(bucketID))
+	lfs.CurrentLog.Sb.Dirty = true
 
 	lfs.CurrentLog.BucketByID[bucket.BucketID] = bucket
 	lfs.CurrentLog.BucketNameToID[bucket.BucketName] = bucket.BucketID
@@ -101,7 +106,7 @@ func (lfs *LfsService) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	return nil, ErrBucketNotExist
+	return &bucket.BucketInfo, nil
 }
 
 //list all buckets in a lfsservice

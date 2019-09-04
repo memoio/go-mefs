@@ -78,7 +78,7 @@ LFS全局维护一个Log信息，即LFS的全局元数据。
 type Logs struct {
 	node         *core.MefsNode
 	Sb           *pb.SuperBlock
-	SbModified   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+	Dirty   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
 	BucketByName map[string]*pb.BucketInfo           //通过BucketName找到Bucket信息
 	BucketByID   map[int32]*pb.BucketInfo            //通过BucketID知道到Bucket信息
 	Entries      map[int32]map[string]*pb.ObjectInfo //通过BucketID检索Bucket下文件
