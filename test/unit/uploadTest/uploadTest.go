@@ -164,20 +164,27 @@ func transferTo(value *big.Int, addr string) {
 		fmt.Println("rpc.Dial err", err)
 		log.Fatal(err)
 	}
+	fmt.Println("ethclient.Dial success")
+
 	privateKey, err := crypto.HexToECDSA("928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4")
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("crypto.HexToECDSA success")
+
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
 		log.Fatal("error casting public key to ECDSA")
 	}
+	fmt.Println("cast public key to ECDSA success")
+
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("client.PendingNonceAt success")
 	gasLimit := uint64(21000) // in units
 
 	gasPrice := big.NewInt(30000000000) // in wei (30 gwei)
@@ -185,18 +192,22 @@ func transferTo(value *big.Int, addr string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("client.SuggestGasPrice success")
+
 	toAddress := common.HexToAddress(addr[2:])
 	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
-
 	chainID, err := client.NetworkID(context.Background())
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("client.NetworkID error,use the default chainID")
+		chainID := big.NewInt(666)
 	}
 
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("types.SignTx success")
+	
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		log.Fatal(err)

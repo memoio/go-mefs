@@ -21,6 +21,10 @@ role-golint:
   tags:
     - "47.92.5.51"
   allow_failure: true
+  only:
+    - dev
+    - master
+    - testnet
 
 bls12-golint:
   stage: golangci-lint
@@ -31,6 +35,10 @@ bls12-golint:
   tags:
     - "47.92.5.51"
   allow_failure: true
+  only:
+    - dev
+    - master
+    - testnet
 
 contracts-golint:
   stage: golangci-lint
@@ -41,6 +49,10 @@ contracts-golint:
   tags:
     - "47.92.5.51"
   allow_failure: true
+  only:
+    - dev
+    - master
+    - testnet
 
 data_format-golint:
   stage: golangci-lint
@@ -51,6 +63,10 @@ data_format-golint:
   tags:
     - "47.92.5.51"
   allow_failure: true
+  only:
+    - dev
+    - master
+    - testnet
 
 utils-golint:
   stage: golangci-lint
@@ -61,6 +77,10 @@ utils-golint:
   tags:
     - "47.92.5.51"
   allow_failure: true
+  only:
+    - dev
+    - master
+    - testnet
 
 mefs-golint:
   stage: golangci-lint
@@ -71,6 +91,10 @@ mefs-golint:
   tags:
     - "47.92.5.51"
   allow_failure: true
+  only:
+    - dev
+    - master
+    - testnet
 
 compile:
   stage: compile
@@ -80,6 +104,10 @@ compile:
     - make install
   tags:
     - "47.92.5.51"
+  only:
+    - dev
+    - master
+    - testnet
 
 unit_test:
   stage: test
@@ -89,6 +117,10 @@ unit_test:
     - make test
   tags:
     - "47.92.5.51"
+  only:
+    - dev
+    - master
+    - testnet
 
 challenge_test:
   stage: test
