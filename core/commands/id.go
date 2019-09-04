@@ -1,13 +1,11 @@
 package commands
 
 import (
-	"github.com/memoio/go-mefs/utils/address"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/ipfs/go-ipfs-cmds"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
@@ -17,6 +15,7 @@ import (
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	core "github.com/memoio/go-mefs/core"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 const offlineIdErrorMessage = `'mefs id' currently cannot query information on remote
@@ -58,9 +57,7 @@ If no peer is specified, prints out information for local peers.
 	Arguments: []cmds.Argument{
 		cmds.StringArg("peerid", false, false, "Peer.ID of node to look up."),
 	},
-	Options: []cmds.Option{
-		cmds.StringOption(formatOptionName, "f", "Optional output format."),
-	},
+	Options: []cmds.Option{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		n, err := cmdenv.GetNode(env)
 		if err != nil {
@@ -107,25 +104,12 @@ If no peer is specified, prints out information for local peers.
 	},
 	Encoders: cmds.EncoderMap{
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *IdOutput) error {
-			format, found := req.Options[formatOptionName].(string)
-			if found {
-				output := format
-				output = strings.Replace(output, "<id>", out.ID, -1)
-				output = strings.Replace(output, "<peerAddr>", out.PeerAddr, -1)
-				output = strings.Replace(output, "<aver>", out.AgentVersion, -1)
-				output = strings.Replace(output, "<pubkey>", out.PublicKey, -1)
-				output = strings.Replace(output, "<addrs>", strings.Join(out.Addresses, "\n"), -1)
-				output = strings.Replace(output, "\\n", "\n", -1)
-				output = strings.Replace(output, "\\t", "\t", -1)
-				fmt.Fprint(w, output)
-			} else {
-				marshaled, err := json.MarshalIndent(out, "", "\t")
-				if err != nil {
-					return err
-				}
-				marshaled = append(marshaled, byte('\n'))
-				fmt.Fprintln(w, string(marshaled))
+			marshaled, err := json.MarshalIndent(out, "", "\t")
+			if err != nil {
+				return err
 			}
+			marshaled = append(marshaled, byte('\n'))
+			fmt.Fprintln(w, string(marshaled))
 			return nil
 		}),
 	},
