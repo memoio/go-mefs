@@ -104,10 +104,6 @@ compile:
     - make install
   tags:
     - "47.92.5.51"
-  only:
-    - dev
-    - master
-    - testnet
 
 unit_test:
   stage: test
@@ -117,10 +113,6 @@ unit_test:
     - make test
   tags:
     - "47.92.5.51"
-  only:
-    - dev
-    - master
-    - testnet
 
 challenge_test:
   stage: test

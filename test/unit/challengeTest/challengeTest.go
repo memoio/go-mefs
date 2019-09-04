@@ -276,7 +276,7 @@ func transferTo(value *big.Int, addr string) {
 	chainID, err := client.NetworkID(context.Background())
 	if err != nil {
 		fmt.Println("client.NetworkID error,use the default chainID")
-		chainID := big.NewInt(666)
+		chainID = big.NewInt(666)
 	}
 
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
