@@ -71,13 +71,6 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 		return ErrGetSecreteKey
 	}
 	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps)
-	if !isInit {
-		//在这里先尝试获取一次Bls config，如果失败，在启动完Groupservice的时候会再试一次
-		err = gp.loadBLS12Config()
-		if err != nil {
-			log.Println("Load BLS12 Config error:", err)
-		}
-	}
 	err = SetGroupService(gp)
 	if err != nil {
 		fmt.Println("SetGroupService()err")

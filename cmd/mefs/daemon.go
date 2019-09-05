@@ -309,16 +309,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				cfg.Role = metainfo.RoleProvider
 			} else {
 				cfg.Role = metainfo.RoleUser
-				//查询是否部署过upKeeping合约
-				_, _, err = contracts.GetUKFromResolver(endPoint, localAddress)
-				switch err {
-				case nil: //部署过
-					cfg.IsInit = false
-				case contracts.ErrNotDeployedMapper, contracts.ErrNotDeployedUk: //没有部署过
-					cfg.IsInit = true
-				default:
-					return err
-				}
 			}
 		}
 	}
