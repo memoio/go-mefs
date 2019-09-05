@@ -278,6 +278,9 @@ func GetMarketAddr(endPoint string, localAddr, ownerAddr common.Address, addrTyp
 		fmt.Println("getMarketAddressesErr:", err)
 		return marketAddr, err
 	}
+	if len(Addresses) == 0 {
+		return marketAddr, ErrNotDeployedMarket
+	}
 	// 返回最新的offer、query地址
 	marketAddr = Addresses[len(Addresses)-1]
 	return marketAddr, nil
