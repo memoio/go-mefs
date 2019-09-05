@@ -3,7 +3,9 @@ image: limcos/mefs_compile_env:latest
 stages:
   - golangci-lint
   - compile
-  - test
+  - short-test
+  - challenge-test
+  - upload-test
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
@@ -106,7 +108,7 @@ compile:
     - "47.92.5.51"
 
 unit_test:
-  stage: test
+  stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
@@ -114,40 +116,8 @@ unit_test:
   tags:
     - "47.92.5.51"
 
-challenge_test:
-  stage: test
-  when: always
-  script:
-    - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
-    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
-    - chmod 777 challengeTest.sh
-    - ./challengeTest.sh
-  after_script:
-    - cat ~/daemon.stdout
-  tags:
-    - "47.92.5.51"
-  only:
-    - schedules
-
-upload_test:
-  stage: test
-  when: always
-  script:
-    - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
-    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
-    - chmod 777 uploadTest.sh
-    - ./uploadTest.sh
-  after_script:
-    - cat ~/daemon.stdout
-  tags:
-    - "47.92.5.51"
-  only:
-    - schedules
-
 contract_test:
-  stage: test
+  stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
@@ -162,7 +132,7 @@ contract_test:
     - schedules
 
 channel_test:
-  stage: test
+  stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
@@ -177,7 +147,7 @@ channel_test:
     - schedules
 
 js_API_test:
-  stage: test
+  stage: short-test
   when: always
   script:
     - ifconfig
@@ -193,5 +163,37 @@ js_API_test:
   retry:
     max: 1
     when: stuck_or_timeout_failure
+  only:
+    - schedules
+
+challenge_test:
+  stage: challenge-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 challengeTest.sh
+    - ./challengeTest.sh
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
+upload_test:
+  stage: upload-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 uploadTest.sh
+    - ./uploadTest.sh
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
   only:
     - schedules
