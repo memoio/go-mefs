@@ -54,11 +54,11 @@ func PersistBeforeExit() error {
 		}
 		fmt.Println("持久化channel:", channel.ChannelAddr, channel.Value.String())
 	}
-	posKM, err := metainfo.NewKeyMeta(posUid, metainfo.Local)
+	posKM, err := metainfo.NewKeyMeta(PosId, metainfo.Local)
 	if err != nil {
 		return err
 	}
-	posValue := opt.CidPrefix
+	posValue := posCidPrefix
 	fmt.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
 	if err != nil {

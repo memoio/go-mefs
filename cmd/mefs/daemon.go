@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	_ "expvar"
 	"fmt"
@@ -461,7 +460,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		if pos {
 			fmt.Println("Start pos Service")
-			go provider.PosRegular(context.Background())
+			go provider.PosSerivce()
 		}
 	default:
 	}

@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
@@ -25,7 +26,7 @@ const (
 var (
 	ErrUnmatchedPeerID         = errors.New("Peer ID is not match")
 	ErrProviderServiceNotReady = errors.New("Provider service is not ready")
-	ErrGetContractItem           = errors.New("Can't get contract Item")
+	ErrGetContractItem         = errors.New("Can't get contract Item")
 )
 
 type ProviderContracts struct {
@@ -109,4 +110,58 @@ func getNewUserConfig(userID, keeperID string) (*UserBLS12Config, error) {
 		PubKey: userPubKey,
 	}
 	return userConfig, nil
+}
+
+func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
+	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	if err != nil {
+		return nil, err
+	}
+	userconfigkey := kmBls12.ToString()
+	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, keeperID)
+	if err != nil {
+		return nil, err
+	}
+	userconfigProto := &pb.UserBLS12Config{}
+	err = proto.Unmarshal(userconfigbyte, userconfigProto) //反序列化
+	if err != nil {
+		return nil, err
+	}
+	sk := new(mcl.SecretKey)
+
+	c := btcec.S256()
+	seck, _ := btcec.PrivKeyFromBytes(c, PosSkByte)
+	if seck == nil {
+		opt.KeySet = nil
+		return nil, errors.New("get user's secrete key error")
+	}
+	blsk, err := btcec.Decrypt(seck, userconfigProto.PrikeyBls)
+	if err != nil {
+		opt.KeySet = nil
+		return nil, err
+	}
+	err = sk.BlsSK.Deserialize(blsk)
+	if err != nil {
+		opt.KeySet = nil
+		return nil, err
+	}
+
+	x, err := btcec.Decrypt(seck, userconfigProto.X)
+	if err != nil {
+		opt.KeySet = nil
+		return nil, err
+	}
+	err = sk.X.Deserialize(x)
+	if err != nil {
+		opt.KeySet = nil
+		return nil, err
+	}
+
+	sk.XI = make([]mcl.Fr, mcl.N)
+	err = sk.CalculateXi()
+	if err != nil {
+		opt.KeySet = nil
+		return nil, err
+	}
+	return sk, nil
 }

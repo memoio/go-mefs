@@ -158,8 +158,8 @@ func ukAddProvider(uid, pid, sk string) error {
 		fmt.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
-	for _, localPid := range uk.ProviderAddrs { //判断该provider是否为新,如果存在，直接返回
-		if strings.Compare(localPid, providerAddr.String()) == 0 {
+	for _, localPid := range uk.ProviderIDs { //判断该provider是否为新,如果存在，直接返回
+		if strings.Compare(localPid, pid) == 0 {
 			return nil
 		}
 	}
@@ -177,6 +177,7 @@ func ukAddProvider(uid, pid, sk string) error {
 		fmt.Println("ukAddProvider AddProvider() error", err)
 		return err
 	}
-	uk.ProviderAddrs = append(uk.ProviderAddrs, providerAddr.String())
+	//uk.ProviderAddrs = append(uk.ProviderAddrs, providerAddr.String())
+	uk.ProviderIDs = append(uk.ProviderIDs, pid)
 	return nil
 }
