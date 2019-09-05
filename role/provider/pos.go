@@ -325,6 +325,9 @@ func getUserConifg(userID, keeperID string) error {
 		fmt.Println("getNewUserConfig in get userconfig error :", err)
 		return err
 	}
+
+	usersConfigs.Store(userID, tmpUserBls12Config.PubKey)
+
 	opt.KeySet.Pk = tmpUserBls12Config.PubKey
 
 	//获取私钥

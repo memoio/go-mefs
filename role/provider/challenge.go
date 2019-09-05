@@ -21,7 +21,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	if !ok {
 		tmpUserCongfig, err := getNewUserConfig(userID, from)
 		if err != nil {
-			fmt.Println("get new user`s config failed,error :", err)
+			fmt.Println("get new user`s config from:", from, "failed, error :", err)
 			return err
 		}
 		usersConfigs.Store(userID, tmpUserCongfig.PubKey)
