@@ -231,25 +231,25 @@ func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.In
 }
 
 //GetChannelStartDate used to get the startDate of channel-contract
-func GetChannelStartDate(endPoint string, localAddress common.Address, providerAddress common.Address) (string, error) {
-	resolver, err := getResolverFromIndexer(endPoint, localAddress, providerAddress.String())
+func GetChannelStartDate(endPoint string, localAddr, providerAddr, ownerAddr common.Address) (string, error) {
+	resolver, err := getResolverFromIndexer(endPoint, localAddr, providerAddr.String())
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return "", err
 	}
 
-	mapper, err := getMapperInstance(endPoint, localAddress, localAddress, resolver)
+	mapper, err := getMapperInstance(endPoint, localAddr, ownerAddr, resolver)
 	if err != nil {
 		return "", err
 	}
 
-	_, channelContract, err := getChannel(endPoint, mapper, localAddress)
+	_, channelContract, err := getChannel(endPoint, mapper, localAddr)
 	if err != nil {
 		return "", err
 	}
 
 	startDateBigInt, err := channelContract.GetStartDate(&bind.CallOpts{
-		From: localAddress,
+		From: localAddr,
 	})
 	if err != nil {
 		fmt.Println("GetStartDateErr:", err)
