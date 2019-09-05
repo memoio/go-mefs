@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress in mapper
@@ -160,20 +161,28 @@ func GetUpkeepingInfo(endPoint string, localAddress common.Address, uk *upKeepin
 	var keepers []string
 	var providers []string
 	for _, keeper := range keeperAddrs {
-		keepers = append(keepers, keeper.String())
+		kid, err := address.GetIDFromAddress(keeper.String())
+		if err != nil {
+			return item, err
+		}
+		keepers = append(keepers, kid)
 	}
 	for _, provider := range providerAddrs {
-		providers = append(providers, provider.String())
+		pid, err := address.GetIDFromAddress(provider.String())
+		if err != nil {
+			return item, err
+		}
+		providers = append(providers, pid)
 	}
 	item = UpKeepingItem{
-		KeeperAddrs:   keepers,
-		KeeperSla:     int32(len(keeperAddrs)),
-		ProviderAddrs: providers,
-		ProviderSla:   int32(len(providerAddrs)),
-		Duration:      duration.Int64(),
-		Capacity:      capacity.Int64(),
-		Price:         price.Int64(),
-		StartTime:     utils.UnixToTime(time.Int64()).Format("2006-01-02 15:04:05"),
+		KeeperIDs:   keepers,
+		KeeperSla:   int32(len(keeperAddrs)),
+		ProviderIDs: providers,
+		ProviderSla: int32(len(providerAddrs)),
+		Duration:    duration.Int64(),
+		Capacity:    capacity.Int64(),
+		Price:       price.Int64(),
+		StartTime:   utils.UnixToTime(time.Int64()).Format("2006-01-02 15:04:05"),
 	}
 	return item, nil
 }

@@ -94,7 +94,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 			// keeper数量、provider的数量应以合约约定为主
 			gp.keeperSLA = int(item.KeeperSla)
 			gp.providerSLA = int(item.ProviderSla)
-			err = gp.ConnectKeepersAndProviders(ctx, item.KeeperAddrs, item.ProviderAddrs)
+			err = gp.ConnectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
 			if err != nil {
 				return err
 			}
@@ -136,15 +136,10 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 	// 第一次对所有keeper进行连接，第二次对连接失败的keeper进行连接，依次类推
 	for i := 0; i < connectTryCount; i++ {
 		var unsuccess []string
-		for _, keeper := range keepers {
-			kid, err := address.GetIDFromAddress(keeper)
-			if err != nil {
-				fmt.Println("Get kid error, the error is ", err)
-				continue
-			}
+		for _, kid := range keepers {
 			// 连接失败加入unsuccess
 			if !sc.ConnectTo(ctx, localNode, kid) {
-				unsuccess = append(unsuccess, keeper)
+				unsuccess = append(unsuccess, kid)
 				log.Println("Connect to keeper", kid, "failed.")
 				continue
 			}
@@ -168,7 +163,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 			// 检查该keeper是否已添加
 			var repeat int
 			for repeat = 0; repeat < len(gp.localPeersInfo.Keepers); repeat++ {
-				if keeper == gp.localPeersInfo.Keepers[repeat].KeeperID {
+				if kid == gp.localPeersInfo.Keepers[repeat].KeeperID {
 					break
 				}
 			}
@@ -190,12 +185,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 						return err
 					}
 				}
-				for _, provider := range providers {
-					pid, err := address.GetIDFromAddress(provider)
-					if err != nil {
-						fmt.Println("Get pid error, the error is ", err)
-						continue
-					}
+				for _, pid := range providers {
 					if sc.ConnectTo(ctx, localNode, pid) {
 						fmt.Println("Connect to provider-", pid, "success.")
 					} else {

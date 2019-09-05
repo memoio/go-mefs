@@ -79,11 +79,12 @@ func (cs *ContractService) SaveChannel() error {
 	if err != nil {
 		return err
 	}
-	for _, provider := range uk.ProviderAddrs {
-		if _, ok := cs.channelBook[provider]; ok {
+	for _, proId := range uk.ProviderIDs {
+		if _, ok := cs.channelBook[proId]; ok {
 			continue
 		}
-		proAddr, err := address.GetAddressFromID(provider)
+
+		proAddr, err := address.GetAddressFromID(proId)
 		if err != nil {
 			return err
 		}
@@ -101,11 +102,11 @@ func (cs *ContractService) SaveChannel() error {
 		valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
-			fmt.Println("Can't get channel value in local,err :", err, ", so try to get from ", provider)
-			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), provider)
+			fmt.Println("Can't get channel value in local,err :", err, ", so try to get from ", proId)
+			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), proId)
 			if err != nil {
 				// provider上也没找到，value设为0
-				fmt.Println("Can't get channel price from ", provider, ",err :", err, ", so set channel price to 0.")
+				fmt.Println("Can't get channel price from ", proId, ",err :", err, ", so set channel price to 0.")
 				value = big.NewInt(0)
 			} else {
 				//provider上找到了
@@ -131,11 +132,11 @@ func (cs *ContractService) SaveChannel() error {
 		channel := contracts.ChannelItem{
 			UserID:      cs.UserID,
 			ChannelAddr: chanAddr.String(),
-			ProID:       provider,
+			ProID:       proId,
 			Value:       value,
 			StartTime:   time,
 		}
-		cs.channelBook[provider] = channel
+		cs.channelBook[proId] = channel
 	}
 	return nil
 }
@@ -176,27 +177,29 @@ func (cs *ContractService) SaveOffer() error {
 	if err != nil {
 		return err
 	}
-	for _, provider := range uk.ProviderAddrs {
-		if _, ok := cs.offerBook[provider]; ok {
+	for _, proId := range uk.ProviderIDs {
+		if _, ok := cs.offerBook[proId]; ok {
 			continue
 		}
-		proAddr, err := address.GetAddressFromID(provider)
+
+		proAddr, err := address.GetAddressFromID(proId)
 		if err != nil {
 			return err
 		}
+
 		offerAddr, err := contracts.GetMarketAddr(config.Eth, userAddr, proAddr, contracts.Offer)
 		if err != nil {
-			fmt.Println("get", provider, "'s offer address err ")
+			fmt.Println("get", proAddr.String(), "'s offer address err ")
 			return err
 		}
 		offerItem, err := contracts.GetOfferInfo(config.Eth, userAddr, offerAddr)
 		if err != nil {
-			fmt.Println("get", provider, "'s offer params err ")
+			fmt.Println("get", proAddr.String(), "'s offer params err ")
 			return err
 		}
-		offerItem.ProviderID = provider
+		offerItem.ProviderID = proId
 		offerItem.OfferAddr = offerAddr.String()
-		cs.offerBook[provider] = offerItem
+		cs.offerBook[proId] = offerItem
 	}
 	return nil
 }

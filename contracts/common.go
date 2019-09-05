@@ -43,8 +43,8 @@ var (
 type UpKeepingItem struct {
 	UserID        string // 部署upkeeping的userid
 	UpKeepingAddr string // 合约地址
-	KeeperAddrs   []string
-	ProviderAddrs []string
+	KeeperIDs     []string
+	ProviderIDs   []string
 	KeeperSla     int32
 	ProviderSla   int32
 	Duration      int64
