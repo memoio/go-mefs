@@ -66,6 +66,11 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	fmt.Println(gp.Userid, "balance", balance)
 	// 说明该user没钱，该user为testuser;否则为有金额的实际用户
 	if balance.Cmp(big.NewInt(0)) <= 0 {
+		// 判断是否为初始化启动
+		if isInit {
+			err := gp.findKeeperAndProviderInit(ctx)
+			return err
+		}
 		// 尝试以inited方式启动
 		err = gp.findKeeperAndProviderNotInit(ctx)
 		if err != nil {
