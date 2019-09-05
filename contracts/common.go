@@ -107,11 +107,11 @@ func QueryBalance(endPoint string, account string) (balance *big.Int, err error)
 	return balance, nil
 }
 
-//DeployResolver provider deploys resolver to save mapper
-func DeployResolver(endPoint string, hexKey string, localAddress common.Address, indexer *indexer.Indexer) error {
+//DeployResolverForChannel provider deploys resolver to save mapper
+func DeployResolverForChannel(endPoint string, hexKey string, localAddress common.Address, indexer *indexer.Indexer) (common.Address, error) {
 	fmt.Println("begin deploy resolver...")
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
+	sk, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(sk)
 	client := GetClient(endPoint)
 
 	//查看是否已经部署过
@@ -120,29 +120,30 @@ func DeployResolver(endPoint string, hexKey string, localAddress common.Address,
 	}, localAddress.String())
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
-		return err
+		return resolverAddrGetted, err
 	}
-	if resolverAddrGetted.String() != InvalidAddr { //说明部署过
+	if resolverAddrGetted.String() != "" && resolverAddrGetted.String() != InvalidAddr { //说明部署过
 		log.Println("you have deployed resolver already")
-		return nil
+		return resolverAddrGetted, nil
 	}
 
 	//provider部署resolver
-	auth = bind.NewKeyedTransactor(key)
+	auth = bind.NewKeyedTransactor(sk)
 	resolverAddr, _, _, err := resolver.DeployResolver(auth, client)
 	if err != nil {
 		fmt.Println("deployResolverErr:", err)
-		return err
+		return resolverAddr, err
 	}
 	log.Println("resolverAddr:", resolverAddr.String())
 
-	//将resolver地址放进indexer中,关键字key为provider的地址
+	//将resolver地址放进indexer中,关键字key可以理解为resolverAddress的索引
+	//resolver-for-channel的key为providerAddr.string()
 	fmt.Print("wait for resolverAddr added into indexer...")
-	auth = bind.NewKeyedTransactor(key)
+	auth = bind.NewKeyedTransactor(sk)
 	_, err = indexer.Add(auth, localAddress.String(), resolverAddr)
 	if err != nil {
 		fmt.Println("\naddResolverErr:", err)
-		return err
+		return resolverAddr, err
 	}
 
 	//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
@@ -152,7 +153,7 @@ func DeployResolver(endPoint string, hexKey string, localAddress common.Address,
 		}, localAddress.String())
 		if err != nil {
 			fmt.Println("\ngetContractsErr:", err)
-			return err
+			return resolverAddr, err
 		}
 		if resolverAddrGetted == resolverAddr { //放进去了
 			fmt.Println("done!")
@@ -162,7 +163,7 @@ func DeployResolver(endPoint string, hexKey string, localAddress common.Address,
 	}
 
 	fmt.Println("resolver have been successfully deployed!")
-	return nil
+	return resolverAddr, nil
 }
 
 func getResolverFromIndexer(endPoint string, localAddress common.Address, key string) (*resolver.Resolver, error) {
@@ -195,13 +196,13 @@ func getResolverFromIndexer(endPoint string, localAddress common.Address, key st
 }
 
 // deployMapper 部署Mapper合约，若Mapper已经部署过，则返回已部署好的Mapper
-func deployMapper(endPoint string, userAddress common.Address, resolver *resolver.Resolver, auth *bind.TransactOpts, client *ethclient.Client) (*mapper.Mapper, error) {
+func deployMapper(endPoint string, localAddress common.Address, resolver *resolver.Resolver, auth *bind.TransactOpts, client *ethclient.Client) (*mapper.Mapper, error) {
 	//试图从resolver中取出mapper地址：mapperAddr
 	var mapperAddr common.Address
 	var mapperInstance *mapper.Mapper
 	mapperAddr, err := resolver.Get(&bind.CallOpts{
-		From: userAddress,
-	}, userAddress)
+		From: localAddress,
+	}, localAddress)
 	if err != nil {
 		fmt.Println("getMapperErr:", err)
 		return mapperInstance, err
@@ -224,8 +225,8 @@ func deployMapper(endPoint string, userAddress common.Address, resolver *resolve
 		}
 		for { //验证是否放进resolver
 			mapperGetted, err := resolver.Get(&bind.CallOpts{
-				From: userAddress,
-			}, userAddress)
+				From: localAddress,
+			}, localAddress)
 			if err != nil {
 				fmt.Println("getMapperErr:", err)
 				return mapperInstance, err

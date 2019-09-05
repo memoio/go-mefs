@@ -3,9 +3,7 @@ package provider
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
@@ -59,49 +57,25 @@ func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duratio
 		return err
 	}
 
-	//检查是否已经部署过resolver
-	_, resAddr, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, localAddress.String())
-	if err != nil {
-		fmt.Println("Geterr:", err)
-		return err
-	}
-	//如果部署过resolver，那么也部署过offer，目前可以先只用部署一次offer，后面可以加一个选项来选择是否要再部署新的offer
-	if resAddr.String() != "" && resAddr.String() != contracts.InvalidAddr { //部署过
-		fmt.Println("you have deployed resolver and offer, resolverAddr is: ", resAddr.String())
-
-		if reDeployOffer { //用户想要重新部署offer合约
-			//部署offer
-			fmt.Println("provider wants to redeploy offer-contract")
-			err = contracts.DeployOffer(endPoint, localAddress, hexPK, capacity, duration, price)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
 	//获得用户的账户余额
 	balance, _ := contracts.QueryBalance(endPoint, localAddress.Hex())
 	fmt.Println("balance:", balance)
-
-	//判断余额是否能够部署resolver以及offer
-	deployPrice := 931369000000000
-	leastMoney := big.NewInt(int64(deployPrice))
-	if balance.Cmp(leastMoney) < 0 { //余额不足
-		return errBalance
-	}
-
-	//部署resolver
-	err = contracts.DeployResolver(endPoint, hexPK, localAddress, indexer)
+	//先部署resolver-for-channel
+	//如果部署过resolver-for-channel，那接下来就可以直接检查是否部署过offer合约，没有的话就部署
+	//DeployResolver()函数内部会进行判断是否部署过
+	_, err = contracts.DeployResolverForChannel(endPoint, hexPK, localAddress, indexer)
 	if err != nil {
 		return err
 	}
 
-	//部署offer
-	err = contracts.DeployOffer(endPoint, localAddress, hexPK, capacity, duration, price)
+	//获得用户的账户余额
+	balance, _ = contracts.QueryBalance(endPoint, localAddress.Hex())
+	fmt.Println("balance:", balance)
+	//再开始部署offer合约
+	if reDeployOffer { //用户想要重新部署offer合约
+		fmt.Println("provider wants to redeploy offer-contract")
+	}
+	err = contracts.DeployOffer(endPoint, localAddress, hexPK, capacity, duration, price, reDeployOffer)
 	if err != nil {
 		return err
 	}

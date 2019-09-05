@@ -450,7 +450,7 @@ func testChannelTimeout(localAddr common.Address, hexKey string, ethEndPoint str
 		fmt.Println("newIndexerErr:", err)
 		return err
 	}
-	err = contracts.DeployResolver(ethEndPoint, hexKey, localAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(ethEndPoint, hexKey, localAddr, indexer)
 	if err != nil {
 		fmt.Println("deployResolverErr:", err)
 		return err
@@ -516,7 +516,7 @@ func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint strin
 		fmt.Println("newIndexerErr:", err)
 		return err
 	}
-	err = contracts.DeployResolver(ethEndPoint, hexKey, localAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(ethEndPoint, hexKey, localAddr, indexer)
 	if err != nil {
 		fmt.Println("deployResolverErr:", err)
 		return err
