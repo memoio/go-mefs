@@ -511,13 +511,10 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 		BucketByID := make(map[int32]*Bucket)
 		BucketNameToID := make(map[string]int32)
 
-		buckets := make(map[int32]string)
-
 		fmt.Println("Lfs SuperBlock is loaded.")
 		return &Logs{
 			Sb: &SuperBlock{
 				SuperBlockInfo: superBlock,
-				Buckets:        buckets,
 				Dirty:          false,
 				Bitset:         bitset.From(superBlock.BucketsSet),
 			},
