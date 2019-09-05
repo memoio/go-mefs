@@ -17,6 +17,7 @@ import (
 
 	logging "github.com/ipfs/go-log"
 	routing "github.com/libp2p/go-libp2p-routing"
+	b58 "github.com/mr-tron/base58/base58"
 )
 
 var log = logging.Logger("blockservice")
@@ -130,7 +131,7 @@ func (s *blockService) GetBlock(ctx context.Context, c cid.Cid) (blocks.Block, e
 
 func (s *blockService) GetBlockFrom(ctx context.Context, pid string, ncid string, tim time.Duration, sig []byte) (blocks.Block, error) {
 	if s.rt != nil {
-		km, err := metainfo.NewKeyMeta(ncid, metainfo.GetBlock, string(sig))
+		km, err := metainfo.NewKeyMeta(ncid, metainfo.GetBlock, b58.Encode(sig))
 		if err != nil {
 			return nil, err
 		}

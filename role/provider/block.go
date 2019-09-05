@@ -17,6 +17,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	b58 "github.com/mr-tron/base58/base58"
 )
 
 func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
@@ -100,7 +101,12 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 		return "", errors.New("Key is too short")
 	}
 
-	res, userID, key, value, err := verify([]byte(splitedNcid[2]))
+	sigByte, err := b58.Decode(splitedNcid[2])
+	if err != nil {
+		return "", errors.New("Signature format is wrong")
+	}
+
+	res, userID, key, value, err := verify(sigByte)
 	if err != nil {
 		fmt.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 	} else if res { //验证通过
