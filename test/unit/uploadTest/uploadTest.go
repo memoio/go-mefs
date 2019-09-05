@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
@@ -26,12 +27,14 @@ const dataCount = 3
 const parityCount = 2
 
 func main() {
-	if err := UploadTest(); err != nil {
+	count := flag.Int("count", 200, "count of file we want to upload")
+	err := UploadTest(*count)
+	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func UploadTest() error {
+func UploadTest(count int) error {
 	sh := shell.NewShell("localhost:5001")
 	testuser, err := sh.CreateUser()
 	if err != nil {
@@ -127,6 +130,10 @@ func UploadTest() error {
 		fmt.Println("  Upload file",fileNum,"success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
 		fmt.Println(ob.String() + "address: " + addr)
 		fileNum++
+		if fileNum == count {
+			fmt.Println("upload test success")
+			return nil
+		}
 		errNum = 0
 	}
 }
