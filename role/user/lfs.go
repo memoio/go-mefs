@@ -124,7 +124,6 @@ func InitLogs() (*Logs, error) {
 }
 
 func newSuperBlock() *SuperBlock {
-	buckets := make(map[int32]string)
 	bitset := bitset.New(256)
 	return &SuperBlock{
 		SuperBlockInfo: pb.SuperBlockInfo{
@@ -133,9 +132,8 @@ func newSuperBlock() *SuperBlock {
 			NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
 			MagicNumber:     0xfb,
 			Version:         1},
-		Buckets: buckets,
-		Bitset:  bitset,
-		Dirty:   true,
+		Bitset: bitset,
+		Dirty:  true,
 	}
 }
 

@@ -25,11 +25,16 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 	lfs.CurrentLog.Sb.SbMux.Lock()
 	defer lfs.CurrentLog.Sb.SbMux.Unlock()
 	// 多副本策略
-	if policy == dataformat.MulPolicy {
+	switch policy {
+	case dataformat.MulPolicy:
 		Sum := dataCount + parityCount
 		dataCount = 1
 		parityCount = Sum - 1
+	case dataformat.RsPolicy:
+	default:
+		return nil, dataformat.ErrWrongPolicy
 	}
+
 	bucketID := lfs.CurrentLog.Sb.NextBucketID
 
 	objects := make(map[string]*Object)
@@ -52,7 +57,6 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 		Objects: objects,
 	}
 	//将此Bucket信息添加到LFS中
-	lfs.CurrentLog.Sb.Buckets[bucket.BucketID] = bucket.BucketName
 	lfs.CurrentLog.Sb.NextBucketID++
 	lfs.CurrentLog.Sb.Bitset.Set(uint(bucketID))
 	lfs.CurrentLog.Sb.Dirty = true

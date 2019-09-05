@@ -90,10 +90,9 @@ type Logs struct {
 
 type SuperBlock struct {
 	pb.SuperBlockInfo
-	Bitset  *bitset.BitSet
-	Buckets map[int32]string //ID向bucketname的映射
-	SbMux   sync.Mutex
-	Dirty   bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+	Bitset *bitset.BitSet
+	SbMux  sync.Mutex
+	Dirty  bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
 }
 
 type Bucket struct {
