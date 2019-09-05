@@ -153,7 +153,8 @@ func CloseChannel(endPoint string, hexKey string, localAddress common.Address, o
 
 //getChannel()当在ChannelTimeOut()中被调用，则localAddress为userAddr；
 // 当在CloseChannel()中被调用，则localAddress是providerAddr
-func getChannel(endPoint string, mapper *mapper.Mapper, localAddress common.Address) (channelAddr common.Address, channelContract *channel.Channel, err error) {
+func getChannel(endPoint string, mapper *mapper.Mapper, localAddress common.Address) (common.Address, *channel.Channel, error) {
+	var channelAddr common.Address
 	channels, err := mapper.Get(&bind.CallOpts{
 		From: localAddress,
 	})
@@ -163,11 +164,12 @@ func getChannel(endPoint string, mapper *mapper.Mapper, localAddress common.Addr
 	}
 	if len(channels) == 0 {
 		fmt.Println("getChannelErr:", ErrNotDeployedChannel)
+		return channelAddr, nil, ErrNotDeployedChannel
 	}
 
 	//返回最新的channel地址
 	channelAddr = channels[len(channels)-1]
-	channelContract, err = channel.NewChannel(channelAddr, GetClient(endPoint))
+	channelContract, err := channel.NewChannel(channelAddr, GetClient(endPoint))
 	if err != nil {
 		fmt.Println("getChannelsErr:", err)
 		return channelAddr, nil, err

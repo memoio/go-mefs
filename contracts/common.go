@@ -37,6 +37,7 @@ var (
 	ErrNotDeployedChannel     = errors.New("the user has not deployed channel-contract with you")
 	ErrContractNotPutToMapper = errors.New("the upKeeping-contract has not been added to mapper within a specified period of time")
 	ErrMarketType             = errors.New("The market type is error, please input correct market type")
+	ErrNotDeployedMarket      = errors.New("has not deployed query or offer")
 )
 
 type UpKeepingItem struct {
