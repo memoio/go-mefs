@@ -206,7 +206,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	var offset, electedOffset int
 	thischalinfo.Cid.Range(func(k, v interface{}) bool { //记录每个块的挑战结果
 		var flag int
-		if len(blocks) != 0 {	//存在挑战失败的块
+		if len(blocks) != 0 { //存在挑战失败的块
 			for _, block := range blocks {
 				if strings.Compare(k.(string), block) != 0 {
 					flag++
@@ -249,12 +249,12 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		fmt.Println("mcl.VerifyProof error!", err)
 		return
 	}
-	if res {	//验证proof通过后,循环记录每一个块的挑战信息（用于修复），和此次对provider的挑战信息
+	if res { //验证proof通过后,循环记录每一个块的挑战信息（用于修复），和此次对provider的挑战信息
 		//fmt.Println("verify success cid :", h.Indices)
 		//更新thischalinfo.Cid的信息
 		for _, tmpindex := range h.Indices {
 			blockID, _, _ := utils.SplitIndex(tmpindex)
-			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok {	//获取当前blockid的offset,若内存中有则直接用，没有就在硬盘中查
+			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok { //获取当前blockid的offset,若内存中有则直接用，没有就在硬盘中查
 				offset = thiscidinfo.(*cidInfo).offset
 			} else {
 				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
@@ -297,7 +297,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 			fmt.Println("metainfo.NewKeyMeta()err")
 			return
 		}
-		metavalue := strings.Join([]string{strconv.Itoa(int(length)), "1", proof, strconv.Itoa(int(thisSum)), strconv.Itoa(int(thisH))}, metainfo.DELIMITER)
+		metavalue := strings.Join([]string{strconv.Itoa(int(length)), "1", strconv.Itoa(int(thisSum)), strconv.Itoa(int(thisH)), proof}, metainfo.DELIMITER)
 		metaSyncTo(kmChal, metavalue)
 		thischalinfo.Time.Store(challengetime, newchalresult)
 		addCredit(pid)

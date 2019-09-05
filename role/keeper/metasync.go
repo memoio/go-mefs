@@ -122,7 +122,7 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		return metainfo.ErrIllegalKey
 	}
 	splitedMetaValue := strings.Split(metaValue, metainfo.DELIMITER)
-	if len(splitedMetaValue) < 5 {
+	if len(splitedMetaValue) < 7 {
 		return metainfo.ErrIllegalValue
 	}
 	timerec := utils.StringToUnix(options[3])   //转换收到的时间信息格式
@@ -135,14 +135,15 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	if res == "0" {
 		chalres = false
 	}
-	thisSum, err := strconv.Atoi(splitedMetaValue[3])
+	thisSum, err := strconv.Atoi(splitedMetaValue[2])
 	if err != nil {
 		return err
 	}
-	thisH, err := strconv.Atoi(splitedMetaValue[4])
+	thisH, err := strconv.Atoi(splitedMetaValue[3])
 	if err != nil {
 		return err
 	}
+	proofStr := strings.Join(splitedMetaValue[4:], metainfo.DELIMITER)
 	thischalresult := &chalresult{ //构建挑战结果
 		kid:            options[2],
 		pid:            options[1],
@@ -151,7 +152,7 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		sum:            uint32(thisSum),
 		h:              thisH,
 		res:            chalres,
-		proof:          splitedMetaValue[2],
+		proof:          proofStr,
 		length:         uint32(l),
 	}
 
