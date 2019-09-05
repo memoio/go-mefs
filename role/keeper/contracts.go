@@ -2,9 +2,12 @@ package keeper
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils/address"
+	ad "github.com/memoio/go-mefs/utils/address"
 )
 
 func SaveUpkeeping(gp *GroupsInfo, userID string) error {
@@ -128,4 +131,53 @@ func GetOffer(providerID string) (contracts.OfferItem, error) {
 	}
 	offerItem = value.(contracts.OfferItem)
 	return offerItem, nil
+}
+
+// addProvider 将传入pid加入posuser的upkeeping合约
+func ukAddProvider(uid, pid, sk string) error {
+	gp, ok := getGroupsInfo(uid)
+	if !ok {
+		fmt.Println("ukAddProvider getGroupsInfo() error")
+		return ErrNoGroupsInfo
+	}
+	uk, err := GetUpkeeping(gp)
+	if err != nil {
+		err := SaveUpkeeping(gp, uid)
+		if err != nil {
+			fmt.Println("ukAddProvider GetUpkeeping() error", err)
+			return err
+		}
+		uk, err = GetUpkeeping(gp) //保存之后重试。还是出错就返回
+		if err != nil {
+			fmt.Println("ukAddProvider GetUpkeeping() error", err)
+			return err
+		}
+	}
+	providerAddr, err := ad.GetAddressFromID(pid)
+	if err != nil {
+		fmt.Println("ukAddProvider GetAddressFromID() error", err)
+		return err
+	}
+	for _, localPid := range uk.ProviderIDs { //判断该provider是否为新,如果存在，直接返回
+		if strings.Compare(localPid, pid) == 0 {
+			return nil
+		}
+	}
+
+	//若为新provider 做添加操作
+	config, _ := localNode.Repo.Config()
+	endPoint := config.Eth
+	userAddr, err := ad.GetAddressFromID(uid)
+	if err != nil {
+		fmt.Println("ukAddProvider GetAddressFromID() error", err)
+		return err
+	}
+	err = contracts.AddProvider(endPoint, sk, userAddr, []common.Address{providerAddr})
+	if err != nil {
+		fmt.Println("ukAddProvider AddProvider() error", err)
+		return err
+	}
+	//uk.ProviderAddrs = append(uk.ProviderAddrs, providerAddr.String())
+	uk.ProviderIDs = append(uk.ProviderIDs, pid)
+	return nil
 }

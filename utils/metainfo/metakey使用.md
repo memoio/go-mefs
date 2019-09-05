@@ -47,6 +47,9 @@
   + User申请新的provider
     + keytype：`NewKPReq`
     + key:`uid/"UserNewKP"/count` value:`pid1pid2...`(无分隔符，当前拥有的provider 的id)
+  + provider冷启动相关操作
+    + 添加pos块 keytype：`"PosAdd"`  key:`pid/"PosAdd"`  value:`blockid1/blockid2/blockid3.........`
+    + 删除pos块 keytype:`PosDelete`  key:`pid/"PosDelete"` value:`blockid1/blockid2/blockid3.........`
   + 其他保存在本地的KV
     + keytype: `"local"`
     + block位置信息 key:`blockID/"local"/"block"` value:`pid/offset`
