@@ -71,7 +71,6 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 			err := gp.findKeeperAndProviderInit(ctx)
 			return err
 		}
-
 		// 尝试以inited方式启动
 		err = gp.findKeeperAndProviderNotInit(ctx)
 		if err != nil {
