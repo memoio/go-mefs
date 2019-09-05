@@ -7,8 +7,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts/indexer"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -151,7 +149,7 @@ func GetQueryInfo(endPoint string, localAddress common.Address, queryAddress com
 }
 
 //DeployOffer provider use it to deploy offer-contract
-func DeployOffer(endPoint string, indexer *indexer.Indexer, providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64, reDeployOffer bool) error {
+func DeployOffer(endPoint string, providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64, reDeployOffer bool) error {
 	fmt.Println("begin to deploy offer-contract...")
 
 	//获得resolver实例
