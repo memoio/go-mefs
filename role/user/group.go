@@ -191,7 +191,10 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 					} else {
 						fmt.Println("Connect to provider-", pid, "failed.")
 					}
-					gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
+					if utils.CheckDup(gp.localPeersInfo.Providers, pid) {
+						gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
+					}
+
 				}
 				// 构造key告诉keeper和provider自己已经启动
 				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
@@ -476,11 +479,11 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	}
 
 	//选择provider
+	gp.tempProviders = disorderArray(gp.tempProviders)
 	for i := 0; i < len(gp.tempProviders); {
 		if i >= gp.providerSLA {
 			break
 		}
-		gp.tempProviders = disorderArray(gp.tempProviders)
 		pidStr := gp.tempProviders[i]
 		pidB58, _ := peer.IDB58Decode(pidStr)
 		//判断是否链接，如果连不上，则从备选中删除，看下一个
