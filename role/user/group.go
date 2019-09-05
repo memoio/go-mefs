@@ -92,8 +92,8 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 				return err
 			}
 			// keeper数量、provider的数量应以合约约定为主
-			gp.keeperSLA = int(item.KeeperSla)
-			gp.providerSLA = int(item.ProviderSla)
+			gp.keeperSLA = int(item.KeeperSLA)
+			gp.providerSLA = int(item.ProviderSLA)
 			err = gp.ConnectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
 			if err != nil {
 				return err

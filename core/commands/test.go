@@ -15,7 +15,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
-
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
@@ -472,7 +471,7 @@ func testChannelTimeout(localAddr common.Address, hexKey string, ethEndPoint str
 	}
 	fmt.Println("channel合约的balance:", balance)
 
-	_, err = contracts.GetChannelStartDate(ethEndPoint, localAddr, localAddr)
+	_, err = contracts.GetChannelStartDate(ethEndPoint, localAddr, localAddr, localAddr)
 	if err != nil {
 		fmt.Println("GetChannelStartDateErr:", err)
 		return err

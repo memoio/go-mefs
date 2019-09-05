@@ -45,8 +45,8 @@ type UpKeepingItem struct {
 	UpKeepingAddr string // 合约地址
 	KeeperIDs     []string
 	ProviderIDs   []string
-	KeeperSla     int32
-	ProviderSla   int32
+	KeeperSLA     int32
+	ProviderSLA   int32
 	Duration      int64
 	Capacity      int64
 	Price         int64  // 部署的价格

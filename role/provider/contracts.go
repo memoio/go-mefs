@@ -116,7 +116,7 @@ func SaveChannel(userID string) error {
 		}
 	}
 	fmt.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
-	time, err := contracts.GetChannelStartDate(config.Eth, proAddr, proAddr)
+	time, err := contracts.GetChannelStartDate(config.Eth, proAddr, proAddr, userAddr)
 	if err != nil {
 		return err
 	}

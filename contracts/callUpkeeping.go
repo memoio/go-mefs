@@ -176,9 +176,9 @@ func GetUpkeepingInfo(endPoint string, localAddress common.Address, uk *upKeepin
 	}
 	item = UpKeepingItem{
 		KeeperIDs:   keepers,
-		KeeperSla:   int32(len(keeperAddrs)),
+		KeeperSLA:   int32(len(keeperAddrs)),
 		ProviderIDs: providers,
-		ProviderSla: int32(len(providerAddrs)),
+		ProviderSLA: int32(len(providerAddrs)),
 		Duration:    duration.Int64(),
 		Capacity:    capacity.Int64(),
 		Price:       price.Int64(),
