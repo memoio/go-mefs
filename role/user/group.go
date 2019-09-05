@@ -137,20 +137,25 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 	for i := 0; i < connectTryCount; i++ {
 		var unsuccess []string
 		for _, keeper := range keepers {
+			kid, err := address.GetIDFromAddress(keeper)
+			if err != nil {
+				fmt.Println("Get kid error, the error is ", err)
+				continue
+			}
 			// 连接失败加入unsuccess
-			if !sc.ConnectTo(ctx, localNode, keeper) {
+			if !sc.ConnectTo(ctx, localNode, kid) {
 				unsuccess = append(unsuccess, keeper)
-				log.Println("Connect to keeper", keeper, "failed.")
+				log.Println("Connect to keeper", kid, "failed.")
 				continue
 			}
 			tempKeeper := &KeeperInfo{
-				KeeperID: keeper,
+				KeeperID: kid,
 			}
 			kmKid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.Local, metainfo.SyncTypeKid)
 			if err != nil {
 				return err
 			}
-			res, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), keeper)
+			res, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmKid.ToString(), kid)
 			if err == nil && res != nil {
 				resStr := string(res)
 				splitRes := strings.Split(resStr, metainfo.DELIMITER)
@@ -186,12 +191,17 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 					}
 				}
 				for _, provider := range providers {
-					if sc.ConnectTo(ctx, localNode, provider) {
-						fmt.Println("Connect to provider-", provider, "success.")
-					} else {
-						fmt.Println("Connect to provider-", provider, "failed.")
+					pid, err := address.GetIDFromAddress(provider)
+					if err != nil {
+						fmt.Println("Get pid error, the error is ", err)
+						continue
 					}
-					gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, provider) //将Provider加入内存缓冲
+					if sc.ConnectTo(ctx, localNode, pid) {
+						fmt.Println("Connect to provider-", pid, "success.")
+					} else {
+						fmt.Println("Connect to provider-", pid, "failed.")
+					}
+					gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
 				}
 				// 构造key告诉keeper和provider自己已经启动
 				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
