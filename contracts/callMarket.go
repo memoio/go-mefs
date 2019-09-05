@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts/indexer"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -149,30 +151,45 @@ func GetQueryInfo(endPoint string, localAddress common.Address, queryAddress com
 }
 
 //DeployOffer provider use it to deploy offer-contract
-func DeployOffer(endPoint string, providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64) error {
+func DeployOffer(endPoint string, indexer *indexer.Indexer, providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64, reDeployOffer bool) error {
 	fmt.Println("begin to deploy offer-contract...")
-	//获得resolver
-	resolver, err := getResolverFromIndexer(endPoint, providerAddress, "offer")
+
+	//获得resolver实例
+	resolverInstance, err := getResolverFromIndexer(endPoint, providerAddress, "offer")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return err
 	}
 
-	//获得mapper
-	key, err := crypto.HexToECDSA(hexKey)
+	//部署mapper，如果部署过就直接返回
+	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		fmt.Println("HexToECDSAErr:", err)
 		return err
 	}
-	auth := bind.NewKeyedTransactor(key)
+	auth := bind.NewKeyedTransactor(sk)
 	client := GetClient(endPoint)
-	mapper, err := deployMapper(endPoint, providerAddress, resolver, auth, client)
+	mapper, err := deployMapper(endPoint, providerAddress, resolverInstance, auth, client)
 	if err != nil {
+		fmt.Println("deployMapperErr:", err)
 		return err
 	}
 
-	// 部署offer
-	auth = bind.NewKeyedTransactor(key)
+	if !reDeployOffer { //用户不想重新部署offer，那我们首先应该检查以前是否部署过，如果部署过，就直接返回，否则就部署
+		offerAddressesGetted, err := mapper.Get(&bind.CallOpts{
+			From: providerAddress,
+		})
+		if err != nil {
+			fmt.Println("getOfferAddressesErr:", err)
+			return err
+		}
+		if len(offerAddressesGetted) != 0 && offerAddressesGetted[0].String() != InvalidAddr { //代表用户之前就部署过offer
+			fmt.Println("you have deployed offer already")
+			return nil
+		}
+	}
+	//部署offer
+	auth = bind.NewKeyedTransactor(sk)
 	offerAddr, _, _, err := market.DeployOffer(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price)) //提供存储容量 存储时段 存储单价
 	if err != nil {
 		fmt.Println("deployOfferErr:", err)
@@ -181,7 +198,7 @@ func DeployOffer(endPoint string, providerAddress common.Address, hexKey string,
 	log.Println("offerAddr:", offerAddr.String())
 
 	//offerAddress放进mapper,多尝试几次，以免出现未知错误
-	auth = bind.NewKeyedTransactor(key)
+	auth = bind.NewKeyedTransactor(sk)
 	for addToMapperCount := 0; addToMapperCount < 2; addToMapperCount++ {
 		time.Sleep(10 * time.Second)
 		_, err = mapper.Add(auth, offerAddr)
