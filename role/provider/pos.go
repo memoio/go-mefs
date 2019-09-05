@@ -67,7 +67,11 @@ func PosSerivce() {
 	fmt.Println("tmpKeeper :", tmpKeeperIDs[0])
 
 	//填充opt.KeySet
-	getUserConifg(tmpKeeperIDs[0], PosId)
+	for _, tmpKeeper := range tmpKeeperIDs {
+		if err := getUserConifg(PosId, tmpKeeper); err == nil {
+			break
+		}
+	}
 
 	//从磁盘读取存储的Cidprefix
 	posKM, err := metainfo.NewKeyMeta(PosId, metainfo.Local)
@@ -312,13 +316,14 @@ func deletePosBlocks(decreseSpace uint64) {
 	}
 }
 
-func getUserConifg(userID, keeperID string) {
+func getUserConifg(userID, keeperID string) error {
 	// 需要用私钥decode出bls的私钥，用user中的方法
 	//获取公钥
 	opt.KeySet = new(mcl.KeySet)
 	tmpUserBls12Config, err := getNewUserConfig(userID, keeperID)
 	if err != nil {
 		fmt.Println("getNewUserConfig in get userconfig error :", err)
+		return err
 	}
 	opt.KeySet.Pk = tmpUserBls12Config.PubKey
 
@@ -326,8 +331,10 @@ func getUserConifg(userID, keeperID string) {
 	opt.KeySet.Sk, err = getUserPrivateKey(userID, keeperID)
 	if err != nil {
 		fmt.Println("getUserPrivateKey in get userconfig error ", err)
+		return err
 	}
 	fmt.Println("Pk :", opt.KeySet.Pk, "\nSk :", opt.KeySet.Sk)
+	return nil
 }
 
 func fillRandom(p []byte) {
