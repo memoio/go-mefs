@@ -45,7 +45,9 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 		go handleDeleteBlock(km, from)
 	case metainfo.GetBlock:
 		res, err := handleGetBlock(km, from)
-		if err == nil {
+		if err != nil {
+			fmt.Println("getBlcokError: ", err)
+		} else {
 			return res, nil
 		}
 	case metainfo.PutBlock:
