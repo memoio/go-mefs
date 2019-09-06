@@ -48,7 +48,6 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *SuperBlock) error {
 		return err
 	}
 
-	//length := SbBuffer.Len()
 	data := SbBuffer.Bytes()
 	if len(data) == 0 {
 		return nil
@@ -83,13 +82,9 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *SuperBlock) error {
 
 func (lfs *LfsService) flushSuperBlockToProvider(sb *SuperBlock) error {
 	sb.BucketsSet = sb.Bitset.Bytes()
-	providers, err := GetGroupService(lfs.UserID).GetProviders(int(sb.MetaBackupCount))
-	if err != nil {
-		return err
-	}
 	SbBuffer := bytes.NewBuffer(nil)
 	SbDelimitedWriter := ggio.NewDelimitedWriter(SbBuffer)
-	err = SbDelimitedWriter.WriteMsg(&sb.SuperBlockInfo)
+	err := SbDelimitedWriter.WriteMsg(&sb.SuperBlockInfo)
 	if err != nil {
 		fmt.Println("SbDelimitedWriter.WriteMsg(sb) failed ", err)
 		return err
@@ -111,14 +106,21 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *SuperBlock) error {
 	}
 	ncidPrefix := bm.ToString(3)
 	dataEncoded, offset, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, sb.MetaBackupCount-1, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+	if err != nil {
+		return err
+	}
+	providers, err := GetGroupService(lfs.UserID).GetProviders(int(sb.MetaBackupCount))
+	if err != nil {
+		return err
+	}
 	for j := 0; j < len(providers); j++ { //
 		bm.SetBid(strconv.Itoa(j))
 		ncid := bm.ToString()
-		if err != nil {
-			return err
-		}
 
-		km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
+		km, err := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
+		if err != nil {
+			continue
+		}
 		updateKey := km.ToString()
 		bcid := cid.NewCidV2([]byte(updateKey))
 		b, err := blocks.NewBlockWithCid(dataEncoded[j], bcid)
@@ -479,7 +481,7 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 			}
 			b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //向指定provider查询超级块
 			if err != nil {                                                                                        //*错误处理
-				log.Printf("Get metablock %s from %s failed.\n", ncid, provider)
+				log.Printf("Get metablock %s from %s failed: %s.\n", ncid, provider, err)
 				continue
 			}
 			if b != nil { //获取到有效数据块，跳出
