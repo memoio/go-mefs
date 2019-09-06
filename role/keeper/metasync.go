@@ -8,10 +8,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/memoio/go-mefs/contracts"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	"github.com/memoio/go-mefs/utils/metainfo"
-
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var (
@@ -231,11 +232,21 @@ func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
 			thechalinfo.Cid.Store(blockID, newcidinfo)
 		}
 	} else {
+		isTestUser := false
+		addr, err := address.GetAddressFromID(newpu.uid)
+		if err == nil {
+			_, _, err = contracts.GetUKFromResolver(addr)
+			if err != nil {
+				isTestUser = true
+			}
+		}
+
 		var newCid, newTime sync.Map
 		newCid.Store(blockID, newcidinfo)
 		newchalinfo := &chalinfo{
-			Time: newTime,
-			Cid:  newCid,
+			Time:     newTime,
+			Cid:      newCid,
+			testuser: isTestUser,
 		}
 		LedgerInfo.Store(newpu, newchalinfo)
 	}

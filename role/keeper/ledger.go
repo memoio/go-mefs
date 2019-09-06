@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
@@ -29,6 +31,7 @@ type chalinfo struct {
 	tmpCid      sync.Map
 	inChallenge int
 	maxlength   uint32
+	testuser    bool // 记录是否是test用户，用于不发起挑战
 }
 
 type cidInfo struct {
@@ -72,9 +75,20 @@ func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) erro
 	var Cid sync.Map
 	var Time sync.Map
 	Cid.Store(blockid, newcidinfo)
+
+	isTestUser := false
+	addr, err := address.GetAddressFromID(pu.uid)
+	if err == nil {
+		_, _, err = contracts.GetUKFromResolver(addr)
+		if err != nil {
+			isTestUser = true
+		}
+	}
+
 	newchalinfo := &chalinfo{
-		Cid:  Cid,
-		Time: Time,
+		Cid:      Cid,
+		Time:     Time,
+		testuser: isTestUser,
 	}
 	LedgerInfo.Store(pu, newchalinfo)
 	return nil

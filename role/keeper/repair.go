@@ -10,8 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -129,6 +131,15 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 			}
 		} else {
 			fmt.Println("!ok blockID :", blockID, "\npid :", pid, "\nuid :", uid)
+			isTestUser := false
+			addr, err := address.GetAddressFromID(pu.uid)
+			if err == nil {
+				_, _, err = contracts.GetUKFromResolver(addr)
+				if err != nil {
+					isTestUser = true
+				}
+			}
+
 			newcidinfo := &cidInfo{
 				repair: 0,
 				offset: offset,
@@ -137,8 +148,9 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 			var newCid, newTime sync.Map
 			newCid.Store(blockID, newcidinfo)
 			newchalinfo := &chalinfo{
-				Time: newTime,
-				Cid:  newCid,
+				Time:     newTime,
+				Cid:      newCid,
+				testuser: isTestUser,
 			}
 			LedgerInfo.Store(pu, newchalinfo)
 		}
@@ -161,11 +173,21 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 				thischalinfo.Cid.Store(blockID, newcidinfo)
 			}
 		} else {
+			isTestUser := false
+			addr, err := address.GetAddressFromID(pu1.uid)
+			if err == nil {
+				_, _, err = contracts.GetUKFromResolver(addr)
+				if err != nil {
+					isTestUser = true
+				}
+			}
+
 			var newCid, newTime sync.Map
 			newCid.Store(blockID, newcidinfo)
 			newchalinfo := &chalinfo{
-				Time: newTime,
-				Cid:  newCid,
+				Time:     newTime,
+				Cid:      newCid,
+				testuser: isTestUser,
 			}
 			LedgerInfo.Store(pu1, newchalinfo)
 		}

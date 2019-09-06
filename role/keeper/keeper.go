@@ -593,10 +593,21 @@ func loadAllUser() error {
 				}
 				cidMap.Store(blockid, newcidinfo)
 			}
+
+			isTestUser := false
+			addr, err := address.GetAddressFromID(newpu.uid)
+			if err == nil {
+				_, _, err = contracts.GetUKFromResolver(addr)
+				if err != nil {
+					isTestUser = true
+				}
+			}
+
 			newchalinfo := &chalinfo{
 				Cid:       cidMap,
 				Time:      timeMap,
 				maxlength: thischalinfoinProto.Maxlength,
+				testuser:  isTestUser,
 			}
 			LedgerInfo.Store(newpu, newchalinfo)
 		}

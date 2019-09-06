@@ -10,12 +10,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
@@ -73,18 +71,9 @@ func challengeRegular(ctx context.Context) { //定期挑战
 func ChallengeProviderBLS12() {
 	LedgerInfo.Range(func(k, v interface{}) bool { //对PU对进行循环
 		pu := k.(PU)
-		isTestUser := false
-		//没有部署合约的不进行挑战修复
-		addr, err := address.GetAddressFromID(pu.uid)
-		if err != nil {
-			isTestUser = true
-		}
-		_, _, err = contracts.GetUKFromResolver(addr)
-		if err != nil {
-			isTestUser = true
-		}
-
 		thischalinfo := v.(*chalinfo)
+
+		isTestUser := thischalinfo.testuser
 		challengetime := utils.GetUnixNow()
 		var ret []string
 		var sum, maxlength uint32
