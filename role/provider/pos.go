@@ -255,7 +255,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
 		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosAdd)
 		for _, keeper := range keeperIDs {
-			sendMetaMessage(km, metaValue, keeper)
+			sendMetaRequest(km, metaValue, keeper)
 		}
 
 		// 本地更新
@@ -305,7 +305,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		}
 		metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
 		for _, keeper := range keeperIDs {
-			sendMetaMessage(km, metavalue, keeper)
+			sendMetaRequest(km, metavalue, keeper)
 		}
 		//更新Gid,Sid
 		curSid = (curSid + 1023) % 1024
