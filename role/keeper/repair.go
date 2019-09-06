@@ -18,6 +18,7 @@ import (
 var repch chan string
 
 const (
+	// RepairFailed ...
 	RepairFailed = "Repair Failed"
 )
 
@@ -41,7 +42,7 @@ func checkrepairlist(ctx context.Context) {
 	}()
 }
 
-//Repair works in 3 steps 1.search a new provider,we do it in func SearchNewProvider
+//RepairBlock works in 3 steps 1.search a new provider,we do it in func SearchNewProvider
 //2.put chunk to this provider 3.change metainfo and sync
 func RepairBlock(userID string, blockID string) {
 	var cpids, ugid []string

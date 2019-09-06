@@ -26,7 +26,7 @@
     + keytype:`"sync"`，第一个操作数表示是哪一类数据
     + block位置信息 key:`blockID/"sync"/"block"` value:`pid/offset`
     + 挑战结果信息: key:`uid/"sync"/"chalres"/pid/kid/time` value: `length/result/proof/sum/h`
-    + 挑战汇总信息(支付): key:`uid/"sync"/"chalpay"/pid/begin_time/end_time` value:`spacetime/signature/proof`
+    + 挑战汇总信息(支付): key:`uid/"sync"/"chalpay"/pid/beginTime/endTime` value:`spacetime/signature/proof`
     + tendermint信息：key:`uid/"sync"/"tendermintinfo"` value:`id/ip/pubkey/p2pport/rpcport`
   + tendermint重新启动
     + keytype:`"trestart"`
@@ -56,7 +56,7 @@
     + config信息(目前特指bls12) key:`PeerID/"local"/"config"/"bls12"` value:具体数据
     + 角色信息 key:`PeerID/"local"/"roleinfo"` value:`user`/`keeper`/`provider`
     + legerinfo信息 key:`PeerID/"local"/legerinfo` value:具体数据
-    + 最近一次支付的信息 key:`uid/"local"/"lastpay"/pid` value:`begin_time/end_time/spacetime/signature/proof`
+    + 最近一次支付的信息 key:`uid/"local"/"lastpay"/pid` value:`beginTime/endTime/spacetime/signature/proof`
     + 与角色相连的其他节点信息 
       + user key:`PeerID/"local"/"uids"` value:`uid1uid2uid3....`
       + keeper key:`PeerID/"local"/"kids"` value:`kid1kid2kid3....`

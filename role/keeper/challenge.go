@@ -23,15 +23,15 @@ import (
 //chalresult 挑战结果在内存中的结构
 //作为chalinfo.Time的value 记录单次挑战的各项信息
 type chalresult struct {
-	kid            string //挑战发起者
-	pid            string //挑战对象
-	uid            string //挑战的数据所属对象
-	challenge_time int64  //挑战发起时间 使用unix时间戳
-	sum            uint32 //挑战总空间
-	length         uint32 //挑战成功空间
-	h              int    //挑战的随机数
-	res            bool   //挑战是否成功
-	proof          string //挑战结果的证据
+	kid           string //挑战发起者
+	pid           string //挑战对象
+	uid           string //挑战的数据所属对象
+	challengeTime int64  //挑战发起时间 使用unix时间戳
+	sum           uint32 //挑战总空间
+	length        uint32 //挑战成功空间
+	h             int    //挑战的随机数
+	res           bool   //挑战是否成功
+	proof         string //挑战结果的证据
 	//allproof       accproof  // 每个挑战结果的证据保存，当前先忽略
 }
 
@@ -109,8 +109,8 @@ func ChallengeProviderBLS12() {
 			return true
 		}
 		thischalresult := &chalresult{ //对provider发起挑战之前，先构造好本次挑战信息的结构体
-			challenge_time: challengetime,
-			sum:            sum,
+			challengeTime: challengetime,
+			sum:           sum,
 		}
 		thischalinfo.Time.Store(challengetime, thischalresult)
 		if len(ret) != 0 {
@@ -279,15 +279,15 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		thisSum := thischalresult.(*chalresult).sum
 		thisH := thischalresult.(*chalresult).h
 		newchalresult := &chalresult{
-			kid:            localNode.Identity.Pretty(),
-			pid:            pid,
-			uid:            uid,
-			challenge_time: challengetime,
-			sum:            thisSum,
-			h:              thisH,
-			res:            true,
-			proof:          proof,
-			length:         length,
+			kid:           localNode.Identity.Pretty(),
+			pid:           pid,
+			uid:           uid,
+			challengeTime: challengetime,
+			sum:           thisSum,
+			h:             thisH,
+			res:           true,
+			proof:         proof,
+			length:        length,
 		}
 		//挑战信息验证通过后，同步给组内的其他keeper
 		kmChal, err := metainfo.NewKeyMeta(uid, metainfo.Sync, metainfo.SyncTypeChalRes, pid, localNode.Identity.Pretty(), chaltime)

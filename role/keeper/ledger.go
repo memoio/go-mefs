@@ -115,7 +115,7 @@ func checkLedger(ctx context.Context) {
 						//fmt.Println("avaltime :", value.(*cidInfo).availtime)
 						if EXPIRETIME < (utils.GetUnixNow()-value.(*cidInfo).availtime) && value.(*cidInfo).repair < 3 {
 							fmt.Println("need repair cid :", key.(string))
-							value.(*cidInfo).repair += 1
+							value.(*cidInfo).repair++
 							repch <- key.(string)
 						}
 						return true

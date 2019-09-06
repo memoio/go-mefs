@@ -697,9 +697,14 @@ func checkLocalPeers() {
 		if err != nil {
 			continue
 		}
-		sc.ConnectTo(context.Background(), localNode, keeper)
+
 		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 			tmpKeepers = append(tmpKeepers, keeper)
+		} else {
+			sc.ConnectTo(context.Background(), localNode, keeper)
+			if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
+				tmpKeepers = append(tmpKeepers, keeper)
+			}
 		}
 	}
 	localPeerInfo.Keepers = tmpKeepers
@@ -710,9 +715,14 @@ func checkLocalPeers() {
 		if err != nil {
 			continue
 		}
-		sc.ConnectTo(context.Background(), localNode, provider)
+
 		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 			tmpProviders = append(tmpProviders, provider)
+		} else {
+			sc.ConnectTo(context.Background(), localNode, provider)
+			if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
+				tmpProviders = append(tmpProviders, provider)
+			}
 		}
 	}
 	localPeerInfo.Providers = tmpProviders
@@ -749,7 +759,7 @@ func checkConnectedPeer() error {
 			}
 		}
 
-		if exist == true {
+		if exist {
 			return nil
 		}
 

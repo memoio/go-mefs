@@ -85,7 +85,7 @@ func getTarget(mainID, syncType string) ([]string, error) {
 }
 
 //该函数用于将master发来的支付信息，构造两份信息，一份为最近一次支付结果保存在本地，一份为支付信息，保存在内存中和本地
-//(groupid/"sync"/"chalpay"/pid/begin_time/end_time, spacetime/signature/proof)
+//(groupid/"sync"/"chalpay"/pid/beginTime/endTime, spacetime/signature/proof)
 func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 	groupid := km.GetMid()
 	options := km.GetOptions()
@@ -148,7 +148,7 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		kid:            options[2],
 		pid:            options[1],
 		uid:            groupid,
-		challenge_time: timerec,
+		challengeTime: timerec,
 		sum:            uint32(thisSum),
 		h:              thisH,
 		res:            chalres,

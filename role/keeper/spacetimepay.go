@@ -24,13 +24,13 @@ var PayInfo sync.Map
 //chalpay 一次支付结果在内存中的记录
 //作为PayInfo结构体的
 type chalpay struct {
-	pid        string   //挑战对象
-	uid        string   //挑战的数据所属对象
-	begin_time int64    // 上次支付结算的结束时间，当前的起始时间
-	end_time   int64    // 这次支付结算的结束时间
-	spacetime  *big.Int // 此次结算的时空值，根据过去一段时间的结果计算
-	signature  string   // 对spacetime值的签名
-	proof      string   // 挑战结果，预留
+	pid       string   //挑战对象
+	uid       string   //挑战的数据所属对象
+	beginTime int64    // 上次支付结算的结束时间，当前的起始时间
+	endTime   int64    // 这次支付结算的结束时间
+	spacetime *big.Int // 此次结算的时空值，根据过去一段时间的结果计算
+	signature string   // 对spacetime值的签名
+	proof     string   // 挑战结果，预留
 }
 
 func spaceTimePayRegular(ctx context.Context) {
@@ -96,7 +96,7 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 		fmt.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
 		defer fmt.Println("=====spacetimepay=====")
 		fmt.Printf("groupid:%s:\npid:%s\n", groupid, pidString)
-		scGroupid, _ := ad.GetAddressFromID(groupid)                        //获得userAddress
+		scGroupid, _ := ad.GetAddressFromID(groupid)              //获得userAddress
 		ukaddr, uk, err := contracts.GetUKFromResolver(scGroupid) //查询合约
 		if err != nil {
 			fmt.Println("contracts.GetUKFromResolver() err:", err)
@@ -121,9 +121,9 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 			fmt.Println("GetHexPrivKeyFromKS() failed:", err)
 			return
 		}
-		fmt.Printf("amount:%d\nbegin_time:%s\nlast_time:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
+		fmt.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err = contracts.SpaceTimePay(uk,  scGroupid, pAddr, hexPk, amount) //进行支付
+		err = contracts.SpaceTimePay(uk, scGroupid, pAddr, hexPk, amount) //进行支付
 		if err != nil {
 			fmt.Println("contracts.SpaceTimePay() failed:", err)
 			return
@@ -224,7 +224,7 @@ func fetchChalresult(uidString string, pidString string, timestart int64, timeen
 
 //saveLastPay 支付完成或者同步操作时，记录信息,返回支付信息的keymeta结构体和metavalue
 func saveLastPay(groupidString, pidString, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
-	//最近一次支付信息，保存在本地 `uid/"local"/"lastpay"/pid`,`begin_time/end_time/spacetime/signature/proof`
+	//最近一次支付信息，保存在本地 `uid/"local"/"lastpay"/pid`,`beginTime/endTime/spacetime/signature/proof`
 	kmLast, err := metainfo.NewKeyMeta(groupidString, metainfo.Local, metainfo.SyncTypeLastPay, pidString)
 	if err != nil {
 		fmt.Println("doSpaceTimePay()NewKeyMeta()err", err)
@@ -236,7 +236,7 @@ func saveLastPay(groupidString, pidString, signature, proof string, beginTime, e
 		fmt.Println("CmdPutTo()error:", err)
 		return nil, "", err
 	}
-	//支付信息，保存在内存和本地`uid/"sync"/"chalpay"/pid/begin_time/end_time` `spacetime/signature/proof`
+	//支付信息，保存在内存和本地`uid/"sync"/"chalpay"/pid/beginTime/endTime` `spacetime/signature/proof`
 	km, err := metainfo.NewKeyMeta(groupidString, metainfo.Local, metainfo.SyncTypeChalPay, pidString, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 	if err != nil {
 		fmt.Println("doSpaceTimePay()NewKeyMeta()err", err)
@@ -254,13 +254,13 @@ func saveLastPay(groupidString, pidString, signature, proof string, beginTime, e
 		uid: groupidString,
 	}
 	thisChalPay := &chalpay{
-		begin_time: beginTime,
-		end_time:   endTime,
-		pid:        pidString,
-		proof:      "proof",
-		signature:  "signature",
-		spacetime:  spaceTime,
-		uid:        groupidString,
+		beginTime: beginTime,
+		endTime:   endTime,
+		pid:       pidString,
+		proof:     "proof",
+		signature: "signature",
+		spacetime: spaceTime,
+		uid:       groupidString,
 	}
 	PayInfo.Store(thisPU, thisChalPay)
 	return km, metaValue, nil
@@ -291,15 +291,15 @@ func checkLastPayTime(groupidString string, pidString string) int64 {
 			fmt.Println("checkLastPayTime() parseLastPayKV() error!", err)
 			return failtime
 		}
-		return thisChalPay.end_time
+		return thisChalPay.endTime
 	}
 
 	thisChalPay := thisPayOfProvider.(*chalpay)
-	return thisChalPay.end_time
+	return thisChalPay.endTime
 }
 
 //parseLastPayKV 传入lastPay的KV，解析成 PU和*chalpay结构体
-//`uid/"local"/"lastpay"/pid` ,`begin_time/end_time/spacetime/signature/proof`
+//`uid/"local"/"lastpay"/pid` ,`beginTime/endTime/spacetime/signature/proof`
 func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (PU, *chalpay, error) {
 	splitedValue := strings.Split(value, metainfo.DELIMITER)
 	if len(splitedValue) < 5 {
@@ -319,20 +319,20 @@ func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (PU, *chalpay, erro
 	if !ok {
 		fmt.Println("SetString()err!value:", splitedValue[2])
 	}
-	beginTime := utils.StringToUnix(splitedValue[0])
-	endTime := utils.StringToUnix(splitedValue[1])
-	if beginTime == 0 || endTime == 0 {
+	begintime := utils.StringToUnix(splitedValue[0])
+	endtime := utils.StringToUnix(splitedValue[1])
+	if begintime == 0 || endtime == 0 {
 		fmt.Println("key:", keyMeta.ToString(), "\nvalue:", value)
 		return PU{}, nil, metainfo.ErrIllegalValue
 	}
 	thischalPay := &chalpay{
-		pid:        pidString,
-		uid:        uidString,
-		begin_time: beginTime,
-		end_time:   endTime,
-		spacetime:  st,
-		signature:  splitedValue[3],
-		proof:      splitedValue[4],
+		pid:       pidString,
+		uid:       uidString,
+		beginTime: begintime,
+		endTime:   endtime,
+		spacetime: st,
+		signature: splitedValue[3],
+		proof:     splitedValue[4],
 	}
 	return thisPU, thischalPay, nil
 }
