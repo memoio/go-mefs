@@ -18,6 +18,9 @@ import (
 	"github.com/memoio/go-mefs/utils"
 )
 
+// config中的ETH，在daemon中赋值
+var EndPoint string
+
 const (
 	//IndexerHex indexerAddress, it is well known
 	IndexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
@@ -91,9 +94,9 @@ func GetClient(endPoint string) *ethclient.Client {
 }
 
 //QueryBalance query the balance of account
-func QueryBalance(endPoint string, account string) (balance *big.Int, err error) {
+func QueryBalance(account string) (balance *big.Int, err error) {
 	var result string
-	client, err := rpc.Dial(endPoint)
+	client, err := rpc.Dial(EndPoint)
 	if err != nil {
 		fmt.Println("rpc.dial err:", err)
 		return balance, err
@@ -108,11 +111,11 @@ func QueryBalance(endPoint string, account string) (balance *big.Int, err error)
 }
 
 //DeployResolverForChannel provider deploys resolver to save mapper
-func DeployResolverForChannel(endPoint string, hexKey string, localAddress common.Address, indexer *indexer.Indexer) (common.Address, error) {
+func DeployResolverForChannel(hexKey string, localAddress common.Address, indexer *indexer.Indexer) (common.Address, error) {
 	fmt.Println("begin deploy resolver...")
 	sk, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(sk)
-	client := GetClient(endPoint)
+	client := GetClient(EndPoint)
 
 	//查看是否已经部署过
 	_, resolverAddrGetted, err := indexer.Get(&bind.CallOpts{
@@ -166,10 +169,10 @@ func DeployResolverForChannel(endPoint string, hexKey string, localAddress commo
 	return resolverAddr, nil
 }
 
-func getResolverFromIndexer(endPoint string, localAddress common.Address, key string) (*resolver.Resolver, error) {
+func getResolverFromIndexer(localAddress common.Address, key string) (*resolver.Resolver, error) {
 	var resolverInstance *resolver.Resolver
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexerInstance, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexerInstance, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return resolverInstance, err
@@ -187,7 +190,7 @@ func getResolverFromIndexer(endPoint string, localAddress common.Address, key st
 		return resolverInstance, ErrNotDeployedResolver
 	}
 
-	resolverInstance, err = resolver.NewResolver(resolverAddr, GetClient(endPoint))
+	resolverInstance, err = resolver.NewResolver(resolverAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println(err)
 		return resolverInstance, err
@@ -196,7 +199,7 @@ func getResolverFromIndexer(endPoint string, localAddress common.Address, key st
 }
 
 // deployMapper 部署Mapper合约，若Mapper已经部署过，则返回已部署好的Mapper
-func deployMapper(endPoint string, localAddress common.Address, resolver *resolver.Resolver, auth *bind.TransactOpts, client *ethclient.Client) (*mapper.Mapper, error) {
+func deployMapper(localAddress common.Address, resolver *resolver.Resolver, auth *bind.TransactOpts, client *ethclient.Client) (*mapper.Mapper, error) {
 	//试图从resolver中取出mapper地址：mapperAddr
 	var mapperAddr common.Address
 	var mapperInstance *mapper.Mapper
@@ -237,7 +240,7 @@ func deployMapper(endPoint string, localAddress common.Address, resolver *resolv
 			time.Sleep(8 * time.Second)
 		}
 	} else { //部署过mapper，直接根据mapperAddr获得mapper
-		mapperInstance, err = mapper.NewMapper(mapperAddr, GetClient(endPoint))
+		mapperInstance, err = mapper.NewMapper(mapperAddr, GetClient(EndPoint))
 		if err != nil {
 			fmt.Println("newMapperErr:", err)
 			return mapperInstance, err
@@ -249,7 +252,7 @@ func deployMapper(endPoint string, localAddress common.Address, resolver *resolv
 // getMapperInstance 返回已经部署的Mapper，若Mapper没部署则返回err
 // 特别地，当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
 // 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
-func getMapperInstance(endPoint string, localAddress common.Address, ownerAddress common.Address, resolver *resolver.Resolver) (*mapper.Mapper, error) {
+func getMapperInstance(localAddress common.Address, ownerAddress common.Address, resolver *resolver.Resolver) (*mapper.Mapper, error) {
 	mapperAddr, err := resolver.Get(&bind.CallOpts{
 		From: localAddress,
 	}, ownerAddress)
@@ -261,7 +264,7 @@ func getMapperInstance(endPoint string, localAddress common.Address, ownerAddres
 		fmt.Println(ErrNotDeployedMapper)
 		return nil, ErrNotDeployedMapper
 	}
-	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(endPoint))
+	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newMapperErr:", err)
 		return nil, err

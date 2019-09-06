@@ -12,9 +12,9 @@ import (
 	"github.com/memoio/go-mefs/contracts/role"
 )
 
-func getKeeperContractFromIndexer(endPoint string, localAddress common.Address) (keeperContract *role.Keeper, err error) {
+func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return keeperContract, err
@@ -28,7 +28,7 @@ func getKeeperContractFromIndexer(endPoint string, localAddress common.Address) 
 		return keeperContract, err
 	}
 
-	keeperContract, err = role.NewKeeper(keeperContractAddr, GetClient(endPoint))
+	keeperContract, err = role.NewKeeper(keeperContractAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newKeeperErr:", err)
 		return keeperContract, err
@@ -37,8 +37,8 @@ func getKeeperContractFromIndexer(endPoint string, localAddress common.Address) 
 }
 
 //IsKeeper judge if an account is keeper
-func IsKeeper(endPoint string, localAddress common.Address) (bool, error) {
-	keeperContract, err := getKeeperContractFromIndexer(endPoint, localAddress)
+func IsKeeper(localAddress common.Address) (bool, error) {
+	keeperContract, err := getKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		fmt.Println("keeperContracterr:", err)
 		return false, err
@@ -53,9 +53,9 @@ func IsKeeper(endPoint string, localAddress common.Address) (bool, error) {
 	return isKeeper, nil
 }
 
-func getProviderContractFromIndexer(endPoint string, localAddress common.Address) (providerContract *role.Provider, err error) {
+func getProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return providerContract, err
@@ -69,7 +69,7 @@ func getProviderContractFromIndexer(endPoint string, localAddress common.Address
 		return providerContract, err
 	}
 
-	providerContract, err = role.NewProvider(providerContractAddr, GetClient(endPoint))
+	providerContract, err = role.NewProvider(providerContractAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println(err)
 		return providerContract, err
@@ -78,8 +78,8 @@ func getProviderContractFromIndexer(endPoint string, localAddress common.Address
 }
 
 //IsProvider judge if an account is provider
-func IsProvider(endPoint string, localaddress common.Address) (bool, error) {
-	providerContract, err := getProviderContractFromIndexer(endPoint, localaddress)
+func IsProvider(localaddress common.Address) (bool, error) {
+	providerContract, err := getProviderContractFromIndexer(localaddress)
 	if err != nil {
 		fmt.Println("providerContracterr:", err)
 		return false, err
@@ -95,10 +95,10 @@ func IsProvider(endPoint string, localaddress common.Address) (bool, error) {
 }
 
 //KeeperContract deploy a keeper contract
-func KeeperContract(endPoint string, hexKey string) (err error) {
+func KeeperContract(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
-	client := GetClient(endPoint)
+	client := GetClient(EndPoint)
 
 	//暂时将质押金额设为0
 	deposit := big.NewInt(0)
@@ -110,7 +110,7 @@ func KeeperContract(endPoint string, hexKey string) (err error) {
 	log.Println("keeperContractAddr:", keeperContractAddr.String())
 
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err
@@ -121,8 +121,8 @@ func KeeperContract(endPoint string, hexKey string) (err error) {
 }
 
 //SetKeeper set "localAddress" keeper in contract if isKeeper is true
-func SetKeeper(endPoint string, localAddress common.Address, hexKey string, isKeeper bool) (err error) {
-	keeper, err := getKeeperContractFromIndexer(endPoint, localAddress)
+func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err error) {
+	keeper, err := getKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		fmt.Println("keeperContracterr:", err)
 		return err
@@ -139,10 +139,10 @@ func SetKeeper(endPoint string, localAddress common.Address, hexKey string, isKe
 }
 
 //ProviderContract deploy a keeper contract
-func ProviderContract(endPoint string, hexKey string) (err error) {
+func ProviderContract(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
-	client := GetClient(endPoint)
+	client := GetClient(EndPoint)
 
 	//暂时将存储容量、质押金额设为0
 	size := big.NewInt(0)
@@ -155,7 +155,7 @@ func ProviderContract(endPoint string, hexKey string) (err error) {
 	log.Println("providerContractAddr:", providerContractAddr.String())
 
 	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(endPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err
@@ -166,8 +166,8 @@ func ProviderContract(endPoint string, hexKey string) (err error) {
 }
 
 //SetProvider set "localAddress" provider in contract if isProvider is true
-func SetProvider(endPoint string, localAddress common.Address, hexKey string, isProvider bool) (err error) {
-	provider, err := getProviderContractFromIndexer(endPoint, localAddress)
+func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (err error) {
+	provider, err := getProviderContractFromIndexer(localAddress)
 	if err != nil {
 		return err
 	}
