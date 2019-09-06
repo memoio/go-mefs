@@ -345,6 +345,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 						fmt.Printf("Keeper %s not response, waiting...", keeperInfo.KeeperID)
 					}
 				}
+			case OnDeploy:
 			default:
 				return nil
 			}
