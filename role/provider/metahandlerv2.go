@@ -51,7 +51,7 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 			return res, nil
 		}
 	case metainfo.PutBlock:
-		handlePutBlock(km, metaValue, from)
+		go handlePutBlock(km, metaValue, from)
 	default: //没有匹配的信息，报错
 		return "", metainfo.ErrWrongType
 	}
