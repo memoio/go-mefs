@@ -31,12 +31,12 @@ const (
 
 var curGid int = -1024
 var curSid int = -1
-var PosId string
-var PosAddr string
+var posID string
+var posAddr string
 var posCidPrefix string
 var inGenerate int
 var keeperIDs []string = []string{}
-var PosSkByte []byte
+var posSkByte []byte
 
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
 var Mullen = 1 * 1024 * 1024
@@ -51,29 +51,29 @@ var opt = &df.DataEncoder{
 func PosSerivce() {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
-	PosId = pos.GetPosId()
-	PosAddr = pos.GetPosAddr()
-	PosSkByte = pos.GetPosSkByte()
+	posID = pos.GetPosId()
+	posAddr = pos.GetPosAddr()
+	posSkByte = pos.GetPosSkByte()
 
-	err := SaveUpkeeping(PosId)
+	err := SaveUpkeeping(posID)
 	if err != nil {
 		fmt.Println("Save upkeeping in posService error :", err)
 	}
 	var tmpKeeperIDs []string
-	if value, ok := ProContracts.upKeepingBook.Load(PosId); ok {
+	if value, ok := ProContracts.upKeepingBook.Load(posID); ok {
 		tmpKeeperIDs = value.(contracts.UpKeepingItem).KeeperIDs
 	}
 	fmt.Println("tmpKeeper :", tmpKeeperIDs[0])
 
 	//填充opt.KeySet
 	for _, tmpKeeper := range tmpKeeperIDs {
-		if err := getUserConifg(PosId, tmpKeeper); err == nil {
+		if err := getUserConifg(posID, tmpKeeper); err == nil {
 			break
 		}
 	}
 
 	//从磁盘读取存储的Cidprefix
-	posKM, err := metainfo.NewKeyMeta(PosId, metainfo.Local)
+	posKM, err := metainfo.NewKeyMeta(posID, metainfo.Local)
 	if err != nil {
 		fmt.Println("NewKeyMeta posKM error :", err)
 	} else {
@@ -106,7 +106,7 @@ func PosSerivce() {
 
 func getKeepers() ([]string, error) {
 	if len(keeperIDs) == 0 {
-		uk, err := GetUpkeeping(PosId)
+		uk, err := GetUpkeeping(posID)
 		if err != nil {
 			return keeperIDs, err
 		}
@@ -193,7 +193,7 @@ func UploadMulpolicy(data []byte) ([][]byte, int, error) {
 	opt.Policy = df.MulPolicy
 	// 构建加密秘钥
 	buckid := localNode.Identity.Pretty() + strconv.Itoa(curGid)
-	tmpkey := []byte(string(PosSkByte) + buckid)
+	tmpkey := []byte(string(posSkByte) + buckid)
 	skey := sha256.Sum256(tmpkey)
 	// 加密、Encode
 	data, err := aes.AesEncrypt(data, skey[:])
@@ -227,7 +227,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		if curSid == 0 {
 			curGid += 1024
 		}
-		posCidPrefix = PosId + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		data, _, err := UploadMulpolicy(tmpData)
 		if err != nil {
 			fmt.Println("UploadMulpolicy in generate Pos Blocks error :", err)
@@ -310,7 +310,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		if curSid == 1023 {
 			curGid -= 1024
 		}
-		posCidPrefix = PosId + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		fmt.Println("after delete ,Gid :", curGid, "\n sid :", curSid, "\ncid prefix :", posCidPrefix)
 	}
 }

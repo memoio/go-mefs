@@ -130,7 +130,7 @@ func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
 	sk := new(mcl.SecretKey)
 
 	c := btcec.S256()
-	seck, _ := btcec.PrivKeyFromBytes(c, PosSkByte)
+	seck, _ := btcec.PrivKeyFromBytes(c, posSkByte)
 	if seck == nil {
 		opt.KeySet = nil
 		return nil, errors.New("get user's secrete key error")
