@@ -452,7 +452,11 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 	fmt.Println("Begin to load superblock : ", lfs.UserID)
 	var b blocks.Block
 	var err error
-	var sig []byte
+	sig, err := BuildSignMessage()
+	if err != nil {
+		return nil, err
+	}
+
 	bm, err := metainfo.NewBlockMeta(lfs.UserID, "0", "0", "0")
 	if err != nil {
 		return nil, err
@@ -531,7 +535,11 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 //----------------------------Load BucketInfo-----------------------------------
 //lfs启动进行元数据的加载，对Log中的字段进行初始化 填充除superblock、Entries字段之外的字段
 func (lfs *LfsService) loadBucketInfo() error {
-	var sig []byte
+	sig, err := BuildSignMessage()
+	if err != nil {
+		return err
+	}
+
 	state, err := GetUserServiceState(lfs.UserID)
 	if err != nil {
 		return err
@@ -613,7 +621,10 @@ func (lfs *LfsService) loadBucketInfo() error {
 //------------------------------Load Objectinfo---------------------------------------
 //填充Entries字段，传入参数为bucket,记录传入bucket的数据信息
 func (lfs *LfsService) loadObjectsInfo(bucket *Bucket) error {
-	var sig []byte
+	sig, err := BuildSignMessage()
+	if err != nil {
+		return err
+	}
 	state, err := GetUserServiceState(lfs.UserID)
 	if err != nil {
 		return err

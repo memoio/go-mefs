@@ -3,12 +3,17 @@ package user
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+
 	fr "github.com/memoio/go-mefs/repo/fsrepo"
+	pb "github.com/memoio/go-mefs/role/user/pb"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
@@ -68,4 +73,18 @@ func buildSignParams(userID string, providerID string, privateKey []byte) (commo
 	hex.Encode(enc, pkByte)
 
 	return userAddress, providerAddress, string(enc), nil
+}
+
+func BuildSignMessage() ([]byte, error) {
+	money := big.NewInt(0)
+	moneyByte := money.Bytes()
+	message := &pb.SignForChannel{
+		Money: moneyByte,
+	}
+	mes, err := proto.Marshal(message)
+	if err != nil {
+		log.Println("protoMarshal failed err:", err)
+		return nil, err
+	}
+	return mes, nil
 }

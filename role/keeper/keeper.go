@@ -726,14 +726,7 @@ func checkConnectedPeer() error {
 
 	fmt.Println("checkConnectedPeer")
 	localID := localNode.Identity.Pretty() //本地id
-	kmKid, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeKid)
-	if err != nil {
-		return err
-	}
-	kmPid, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypePid)
-	if err != nil {
-		return err
-	}
+
 	connPeers := localNode.PeerHost.Network().Peers() //the list of peers we are connected to
 
 	exist := false
@@ -758,6 +751,15 @@ func checkConnectedPeer() error {
 
 		if exist == true {
 			return nil
+		}
+
+		kmKid, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeKid)
+		if err != nil {
+			return err
+		}
+		kmPid, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypePid)
+		if err != nil {
+			return err
 		}
 
 		fmt.Println("try to get roleinfo from: ", id)
