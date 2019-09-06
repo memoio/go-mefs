@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"strconv"
@@ -378,7 +377,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				}
 				err = localNode.Blocks.PutBlockTo(b, providers[i])
 				if err != nil {
-					fmt.Println("Put Block", ncid, "to", providers[i], "failed:", err)
+					log.Println("Put Block", ncid, "to", providers[i], "failed:", err)
 					err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, providers[i], offset)
 					if err != nil {
 						return err
@@ -411,7 +410,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				ncid := bm.ToString()
 				provider, _, err := GetGroupService(ul.LfsService.UserID).GetBlockProviders(ncid)
 				if err != nil || provider == ul.LfsService.UserID {
-					fmt.Println("Append Block to", provider, "failed:", err)
+					log.Println("Append Block to", provider, "failed:", err)
 					if _, err := peer.IDB58Decode(provider); provider != "" && err == nil {
 						err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
 						if err != nil {
@@ -435,7 +434,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				}
 				err = localNode.Blocks.PutBlockTo(b, provider)
 				if err != nil {
-					fmt.Println("Append Block", ncid, "to", provider, "failed:", err)
+					log.Println("Append Block", ncid, "to", provider, "failed:", err)
 					err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
 					if err != nil {
 						return err

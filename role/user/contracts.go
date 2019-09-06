@@ -2,7 +2,7 @@ package user
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -94,11 +94,11 @@ func (cs *ContractService) SaveChannel() error {
 		valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
-			fmt.Println("Can't get channel value in local,err :", err, ", so try to get from ", proId)
+			log.Println("Can't get channel value in local,err :", err, ", so try to get from ", proId)
 			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), proId)
 			if err != nil {
 				// provider上也没找到，value设为0
-				fmt.Println("Can't get channel price from ", proId, ",err :", err, ", so set channel price to 0.")
+				log.Println("Can't get channel price from ", proId, ",err :", err, ", so set channel price to 0.")
 				value = big.NewInt(0)
 			} else {
 				//provider上找到了
@@ -116,7 +116,7 @@ func (cs *ContractService) SaveChannel() error {
 				return errors.New("bigInt.SetString err")
 			}
 		}
-		fmt.Println("保存在内存中的channel地址和value为:", chanAddr.String(), value.String())
+		log.Println("保存在内存中的channel地址和value为:", chanAddr.String(), value.String())
 		time, err := contracts.GetChannelStartDate(userAddr, proAddr, userAddr)
 		if err != nil {
 			return err
@@ -173,12 +173,12 @@ func (cs *ContractService) SaveOffer() error {
 
 		offerAddr, err := contracts.GetMarketAddr(userAddr, proAddr, contracts.Offer)
 		if err != nil {
-			fmt.Println("get", proAddr.String(), "'s offer address err ")
+			log.Println("get", proAddr.String(), "'s offer address err ")
 			return err
 		}
 		offerItem, err := contracts.GetOfferInfo(userAddr, offerAddr)
 		if err != nil {
-			fmt.Println("get", proAddr.String(), "'s offer params err ")
+			log.Println("get", proAddr.String(), "'s offer params err ")
 			return err
 		}
 		offerItem.ProviderID = proId
@@ -206,7 +206,7 @@ func (cs *ContractService) GetOfferItem(proid string) (contracts.OfferItem, erro
 
 func (cs *ContractService) GetUpkeepingItem() (contracts.UpKeepingItem, error) {
 	if cs.upKeepingItem.UpKeepingAddr == "" || cs.upKeepingItem.UserID == "" {
-		fmt.Println("UpKeepingItem hasn't set")
+		log.Println("UpKeepingItem hasn't set")
 		return cs.upKeepingItem, ErrGetContractItem
 	}
 	return cs.upKeepingItem, nil
@@ -214,7 +214,7 @@ func (cs *ContractService) GetUpkeepingItem() (contracts.UpKeepingItem, error) {
 
 func (cs *ContractService) GetQueryItem() (contracts.QueryItem, error) {
 	if cs.queryItem.QueryAddr == "" || cs.queryItem.UserID == "" {
-		fmt.Println("QueryItem hasn't set")
+		log.Println("QueryItem hasn't set")
 		return cs.queryItem, ErrGetContractItem
 	}
 	return cs.queryItem, nil

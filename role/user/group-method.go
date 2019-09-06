@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -211,14 +210,14 @@ func (gp *GroupService) PutDataMetaToKeepers(blockID string, provider string, of
 	}
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockMetaInfo, metainfo.SyncTypeBlock)
 	if err != nil {
-		fmt.Println("construct put blockMeta KV error :", err)
+		log.Println("construct put blockMeta KV error :", err)
 		return err
 	}
 	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
 	for _, keeper := range gp.localPeersInfo.Keepers {
 		_, err = sendMetaRequest(kmBlock, metaValue, keeper.KeeperID)
 		if err != nil {
-			fmt.Println("send metaMessage to ", keeper.KeeperID, " error :", err)
+			log.Println("send metaMessage to ", keeper.KeeperID, " error :", err)
 		}
 	}
 	return nil
@@ -246,7 +245,7 @@ func (gp *GroupService) DeleteBlocksFromProvider(blockID string, updateMeta bool
 
 	km, err := metainfo.NewKeyMeta(blockID, metainfo.DeleteBlock)
 	if err != nil {
-		fmt.Println("construct delete block KV error :", err)
+		log.Println("construct delete block KV error :", err)
 		return err
 	}
 	pid, err := peer.IDB58Decode(provider)

@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"log"
 
@@ -13,7 +12,7 @@ import (
 )
 
 func (gp *GroupService) userBLS12ConfigInit(password string) ([]byte, error) {
-	fmt.Printf("Generating BLS12 Sk and Pk for %s: \n", gp.Userid)
+	log.Printf("Generating BLS12 Sk and Pk for %s: \n", gp.Userid)
 	var err error
 	gp.KeySet, err = mcl.GenKeySet()
 	if err != nil {
@@ -72,12 +71,12 @@ func (gp *GroupService) userBLS12ConfigInit(password string) ([]byte, error) {
 		gp.KeySet = nil
 		return nil, err
 	}
-	fmt.Println(gp.Userid, "'s BlS12 SK is", gp.KeySet.Sk.BlsSK.Serialize(), "\nPk is", gp.KeySet.Pk.BlsPK.Serialize())
+	log.Println(gp.Userid, "'s BlS12 SK and PK init success")
 	return userBLS12Config, nil
 }
 
 func (gp *GroupService) loadBLS12Config() error {
-	fmt.Printf("Loading BLS12 Sk and Pk for %s: \n", gp.Userid)
+	log.Printf("Loading BLS12 Sk and Pk for %s: \n", gp.Userid)
 	var userBLS12config []byte
 	var err error
 	kmBls, err := metainfo.NewKeyMeta(gp.Userid, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
@@ -90,7 +89,7 @@ func (gp *GroupService) loadBLS12Config() error {
 		if err = gp.parseBLS12ConfigMeta(userBLS12config); err != nil {
 			log.Println("Parse bls Config from local failed.", err)
 		} else {
-			fmt.Println(gp.Userid, " BlS12 SK and Pk is loaded")
+			log.Println(gp.Userid, " BlS12 SK and Pk is loaded")
 			return nil
 		}
 	}
@@ -110,7 +109,7 @@ func (gp *GroupService) loadBLS12Config() error {
 		return err
 	}
 
-	fmt.Println(gp.Userid, " BlS12 SK and Pk is loaded")
+	log.Println(gp.Userid, " BlS12 SK and Pk is loaded")
 	return nil
 }
 
@@ -178,7 +177,7 @@ func (gp *GroupService) parseBLS12ConfigMeta(userBLS12config []byte) error {
 		var temp mcl.G1
 		err = temp.Deserialize(u)
 		if err != nil {
-			fmt.Println("temp.Deserialize(u) failed :", err)
+			log.Println("temp.Deserialize(u) failed :", err)
 		}
 		pk.U[i] = temp
 	}
@@ -190,7 +189,7 @@ func (gp *GroupService) parseBLS12ConfigMeta(userBLS12config []byte) error {
 		var temp mcl.G2
 		err = temp.Deserialize(w)
 		if err != nil {
-			fmt.Println("temp.Deserialize(u) failed :", err)
+			log.Println("temp.Deserialize(u) failed :", err)
 		}
 		pk.W[i] = temp
 	}

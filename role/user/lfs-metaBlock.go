@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"strconv"
@@ -39,12 +38,12 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *SuperBlock) error {
 	SbDelimitedWriter := ggio.NewDelimitedWriter(SbBuffer)
 	err := SbDelimitedWriter.WriteMsg(&sb.SuperBlockInfo)
 	if err != nil {
-		fmt.Println("SbDelimitedWriter.WriteMsg(sb) failed ", err)
+		log.Println("SbDelimitedWriter.WriteMsg(sb) failed ", err)
 		return err
 	}
 	err = SbDelimitedWriter.Close()
 	if err != nil {
-		fmt.Println("SbDelimitedWriter.Close() failed ", err)
+		log.Println("SbDelimitedWriter.Close() failed ", err)
 		return err
 	}
 
@@ -86,12 +85,12 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *SuperBlock) error {
 	SbDelimitedWriter := ggio.NewDelimitedWriter(SbBuffer)
 	err := SbDelimitedWriter.WriteMsg(&sb.SuperBlockInfo)
 	if err != nil {
-		fmt.Println("SbDelimitedWriter.WriteMsg(sb) failed ", err)
+		log.Println("SbDelimitedWriter.WriteMsg(sb) failed ", err)
 		return err
 	}
 	err = SbDelimitedWriter.Close()
 	if err != nil {
-		fmt.Println("SbDelimitedWriter.Close() failed ", err)
+		log.Println("SbDelimitedWriter.Close() failed ", err)
 		return err
 	}
 
@@ -449,7 +448,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucket *Bucket) error {
 //lfs启动时加载超级块操作，返回结构体currentLog,主要填充其中的superblock字段
 //先从本地查找超级快信息，若没找到，就找自己的provider获取
 func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
-	fmt.Println("Begin to load superblock : ", lfs.UserID)
+	log.Println("Begin to load superblock : ", lfs.UserID)
 	var b blocks.Block
 	var err error
 	sig, err := BuildSignMessage()
@@ -490,9 +489,9 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 			}
 			if b != nil { //获取到有效数据块，跳出
 				if ok := dataformat.VerifyBlock(b.RawData(), ncid, GetGroupService(lfs.UserID).GetKeyset().Pk); !ok {
-					fmt.Println("Verify Block failed.", ncid, "from:", provider)
+					log.Println("Verify Block failed.", ncid, "from:", provider)
 				} else {
-					fmt.Println("load superblock in block", ncid, "from Provider", provider)
+					log.Println("load superblock in block", ncid, "from Provider", provider)
 					break
 				}
 			}
@@ -502,7 +501,7 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 	if b != nil {
 		data, err := dataformat.GetDataFromRawData(b.RawData()) //Tag暂时没用
 		if err != nil {                                         //*错误处理
-			fmt.Println("GetDataFromRawData err!", err)
+			log.Println("GetDataFromRawData err!", err)
 			return nil, err
 		}
 		superBlock := pb.SuperBlockInfo{}
@@ -511,13 +510,13 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 		err = SbDelimitedReader.ReadMsg(&superBlock)
 		if err == io.EOF {
 		} else if err != nil {
-			fmt.Println("Cannot load Lfs superblock.", err)
+			log.Println("Cannot load Lfs superblock.", err)
 			return nil, err
 		}
 		BucketByID := make(map[int32]*Bucket)
 		BucketNameToID := make(map[string]int32)
 
-		fmt.Println("Lfs SuperBlock is loaded.")
+		log.Println("Lfs SuperBlock is loaded.")
 		return &Logs{
 			Sb: &SuperBlock{
 				SuperBlockInfo: superBlock,
@@ -528,7 +527,7 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 			BucketNameToID: BucketNameToID,
 		}, nil
 	}
-	fmt.Println("Cannot load Lfs superblock. Get metablock failed")
+	log.Println("Cannot load Lfs superblock. Get metablock failed")
 	return nil, ErrCannotLoadSuperBlock
 }
 
@@ -581,7 +580,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 				b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //获取数据块
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, GetGroupService(lfs.UserID).GetKeyset().Pk); !ok {
-						fmt.Println("Verify Block failed.", ncid, "from:", provider)
+						log.Println("Verify Block failed.", ncid, "from:", provider)
 					} else {
 						break
 					}
@@ -595,7 +594,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 		if b != nil {
 			data, err := dataformat.GetDataFromRawData(b.RawData()) //Tag暂时没用
 			if err != nil {                                         //*错误处理
-				fmt.Println("GetDataFromRawData err!", err)
+				log.Println("GetDataFromRawData err!", err)
 				return err
 			}
 			bucket := pb.BucketInfo{}
@@ -612,7 +611,7 @@ func (lfs *LfsService) loadBucketInfo() error {
 				Dirty:      false,
 			}
 			lfs.CurrentLog.BucketNameToID[bucket.BucketName] = bucket.BucketID
-			fmt.Println("Bucket-ID:", bucket.BucketID, "Name-", bucket.BucketName, "is loaded")
+			log.Println("Bucket-ID:", bucket.BucketID, "Name-", bucket.BucketName, "is loaded")
 		}
 	}
 	return nil
@@ -668,7 +667,7 @@ func (lfs *LfsService) loadObjectsInfo(bucket *Bucket) error {
 				b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig)
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, GetGroupService(lfs.UserID).GetKeyset().Pk); !ok {
-						fmt.Println("Verify Block failed.", ncid, "from:", provider)
+						log.Println("Verify Block failed.", ncid, "from:", provider)
 					} else {
 						break
 					}

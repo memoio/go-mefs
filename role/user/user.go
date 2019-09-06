@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"os"
 	"path"
@@ -73,37 +74,37 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps)
 	err = SetGroupService(gp)
 	if err != nil {
-		fmt.Println("SetGroupService()err")
+		log.Println("SetGroupService()err")
 		return err
 	}
 	// user联网
 	err = gp.StartGroupService(ctx, pwd, isInit)
 	if err != nil {
-		fmt.Println("StartGroupService(()err")
+		log.Println("StartGroupService(()err")
 		return err
 	}
 
 	cs := ConstructContractService(us.UserID)
 	err = SetContractService(us.UserID, cs)
 	if err != nil {
-		fmt.Println("SetContractService()err")
+		log.Println("SetContractService()err")
 		return err
 	}
 	err = cs.SaveContracts()
 	if err != nil {
-		fmt.Println("SaveContracts err:", err)
+		log.Println("SaveContracts err:", err)
 	}
 
 	lfs := ConstructLfsService(us.UserID, userkey.PrivateKey)
 
 	err = SetLfsService(lfs)
 	if err != nil {
-		fmt.Println("SetLfsService()err")
+		log.Println("SetLfsService()err")
 		return err
 	}
 	err = lfs.StartLfsService(ctx)
 	if err != nil {
-		fmt.Println("StartLfsService()err")
+		log.Println("StartLfsService()err")
 		return err
 	}
 
@@ -326,9 +327,9 @@ func PersistBeforeExit() error {
 			}
 			err = UserService.LfsService.Fsync(false)
 			if err != nil {
-				fmt.Printf("Sorry, something wrong in persisting for %s: %v\n", UserID, err)
+				log.Printf("Sorry, something wrong in persisting for %s: %v\n", UserID, err)
 			} else {
-				fmt.Printf("User %s Persist completed\n", UserID)
+				log.Printf("User %s Persist completed\n", UserID)
 			}
 			UserService.CancelFunc() //释放资源
 		}
@@ -339,8 +340,8 @@ func PersistBeforeExit() error {
 //输出本节点的信息
 func ShowInfo(userID string) map[string]string {
 	outmap := map[string]string{}
-	fmt.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
-	defer fmt.Println("================================")
+	log.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
+	defer log.Println("================================")
 	gp := GetGroupService(userID)
 	lfs := GetLfsService(userID)
 	if lfs == nil {

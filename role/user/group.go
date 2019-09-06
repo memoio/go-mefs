@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/big"
 	"strconv"
@@ -62,7 +61,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		}
 
 	}
-	fmt.Println(gp.Userid, "balance", balance)
+	log.Println(gp.Userid, "balance", balance)
 	// 说明该user没钱，该user为testuser;否则为有金额的实际用户
 	if balance.Cmp(big.NewInt(0)) <= 0 {
 		// 判断是否为初始化启动
@@ -73,7 +72,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		// 尝试以inited方式启动
 		err = gp.findKeeperAndProviderNotInit(ctx)
 		if err != nil {
-			fmt.Println("Can't connect the user's keepers, so we think the user hasn't inited, begin to init user...", gp.Userid)
+			log.Println("Can't connect the user's keepers, so we think the user hasn't inited, begin to init user...", gp.Userid)
 			err = gp.findKeeperAndProviderInit(ctx)
 			if err != nil {
 				return err
@@ -84,7 +83,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		_, uk, err := contracts.GetUKFromResolver(uaddr)
 		switch err {
 		case nil: //部署过
-			fmt.Println("begin to find keepers and providers to start user : ", gp.Userid)
+			log.Println("begin to find keepers and providers to start user : ", gp.Userid)
 			item, err := contracts.GetUpkeepingInfo(uaddr, uk)
 			if err != nil {
 				return err
@@ -97,7 +96,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 				return err
 			}
 		case contracts.ErrNotDeployedMapper, contracts.ErrNotDeployedUk: //没有部署过
-			fmt.Println("begin to init user : ", gp.Userid)
+			log.Println("begin to init user : ", gp.Userid)
 			err := gp.findKeeperAndProviderInit(ctx)
 			if err != nil {
 				return err
@@ -110,7 +109,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 }
 
 func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
-	fmt.Println("Begin to connect user's keepers and providers:", gp.Userid)
+	log.Println("Begin to connect user's keepers and providers:", gp.Userid)
 	waitTime := 0 //进行网络连接
 	for {
 		if waitTime > 60 { //连不上网？
@@ -169,9 +168,9 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 				gp.localPeersInfo.Keepers = append(gp.localPeersInfo.Keepers, tempKeeper)
 			}
 			if tempKeeper.IsBFT {
-				fmt.Println("Connect to keeper", tempKeeper.KeeperID, "use bft mode")
+				log.Println("Connect to keeper", tempKeeper.KeeperID, "use bft mode")
 			} else {
-				fmt.Println("Connect to keeper", tempKeeper.KeeperID, "use simple mode")
+				log.Println("Connect to keeper", tempKeeper.KeeperID, "use simple mode")
 			}
 
 			// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
@@ -185,9 +184,9 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 				}
 				for _, pid := range providers {
 					if sc.ConnectTo(ctx, localNode, pid) {
-						fmt.Println("Connect to provider-", pid, "success.")
+						log.Println("Connect to provider-", pid, "success.")
 					} else {
-						fmt.Println("Connect to provider-", pid, "failed.")
+						log.Println("Connect to provider-", pid, "failed.")
 					}
 					if utils.CheckDup(gp.localPeersInfo.Providers, pid) {
 						gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
@@ -197,22 +196,22 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 				// 构造key告诉keeper和provider自己已经启动
 				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
 				if err != nil {
-					fmt.Println("Construct Deployed key error", err)
+					log.Println("Construct Deployed key error", err)
 					return err
 				}
 				for _, keeper := range gp.localPeersInfo.Keepers {
 					_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
 					if err != nil {
-						fmt.Println("Send keeper", keeper.KeeperID, " err:", err)
+						log.Println("Send keeper", keeper.KeeperID, " err:", err)
 					}
 				}
 				for _, provider := range gp.localPeersInfo.Providers {
 					_, err = sendMetaRequest(kmPid, gp.Userid, provider)
 					if err != nil {
-						fmt.Println("Send provider", provider, " err:", err)
+						log.Println("Send provider", provider, " err:", err)
 					}
 				}
-				fmt.Println(gp.Userid + ":Group Service is ready")
+				log.Println(gp.Userid + ":Group Service is ready")
 				err = SetUserState(gp.Userid, GroupStarted)
 				if err != nil {
 					return err
@@ -244,11 +243,11 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 	var queryAddr common.Address
 	if !config.Test {
 		balance, _ := contracts.QueryBalance(addr.Hex()) //获得用户的账户余额
-		fmt.Println("balance:", balance)
+		log.Println("balance:", balance)
 		//判断账户余额能否部署query合约
 		deployPrice := big.NewInt(int64(740621000000000))
 		if balance.Cmp(deployPrice) < 0 { //余额不足
-			fmt.Println(ErrBalance)
+			log.Println(ErrBalance)
 			return ErrBalance
 		}
 
@@ -262,10 +261,10 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			return err
 		}
 	} else {
-		fmt.Println("测试环境，将不部署query合约")
+		log.Println("测试环境，将不部署query合约")
 	}
 
-	fmt.Println("Begin to find Keepers for init...", "\nthe uid is: "+gp.Userid+"\nthe addr is: "+addr.String())
+	log.Println("Begin to find Keepers for init...", "\nthe uid is: "+gp.Userid+"\nthe addr is: "+addr.String())
 
 	waitTime := 0 //进行网络连接
 	for {
@@ -295,14 +294,14 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 	}
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBls.ToString(), string(userBLS12config), "local") //先在本地保存一份
 	if err != nil {
-		fmt.Println("CmdPutTo()err")
+		log.Println("CmdPutTo()err")
 		return err
 	}
 
 	//构造init信息并发送 此时，初始化阶段为collecting
 	kmInit, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserInitReq, strconv.Itoa(gp.keeperSLA), strconv.Itoa(gp.providerSLA), queryAddr.String())
 	if err != nil {
-		fmt.Println("findKeeperAndProviderInit()NewKeyMeta()error!")
+		log.Println("findKeeperAndProviderInit()NewKeyMeta()error!")
 		return err
 	}
 	go broadcastMetaMessage(kmInit, "")
@@ -334,15 +333,15 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 					}
 					gp.userInitNotif(kmInit, kmBls.ToString(), string(userBLS12config))
 				} else {
-					fmt.Printf("Timeout, No enough Keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(gp.tempKeepers), len(gp.tempProviders), gp.keeperSLA, gp.providerSLA)
+					log.Printf("Timeout, No enough Keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(gp.tempKeepers), len(gp.tempProviders), gp.keeperSLA, gp.providerSLA)
 					go broadcastMetaMessage(kmInit, "")
 				}
 			case CollectCompleted:
 				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
-				fmt.Printf("Timeout, waiting keeper response\n")
+				log.Printf("Timeout, waiting keeper response\n")
 				for _, keeperInfo := range gp.localPeersInfo.Keepers {
 					if !keeperInfo.Connected {
-						fmt.Printf("Keeper %s not response, waiting...", keeperInfo.KeeperID)
+						log.Printf("Keeper %s not response, waiting...", keeperInfo.KeeperID)
 					}
 				}
 			case OnDeploy:
@@ -390,10 +389,10 @@ func (gp *GroupService) userInitNotif(km *metainfo.KeyMeta, userBLS12configkey, 
 		if err == ErrNoEnoughKeeper { //有keeper没有连接上，重新设置初始化状态为collecting
 			err := SetUserState(gp.Userid, Collecting)
 			if err != nil {
-				fmt.Println("userInitNotif()SetUserState()err:", err)
+				log.Println("userInitNotif()SetUserState()err:", err)
 			}
 		}
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
@@ -413,10 +412,10 @@ func (gp *GroupService) userInitNotif(km *metainfo.KeyMeta, userBLS12configkey, 
 	var wg sync.WaitGroup
 	notif := func(wg *sync.WaitGroup, keeper string) {
 		defer wg.Done()
-		fmt.Println("Notify keeper:", keeper)
+		log.Println("Notify keeper:", keeper)
 		_, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
 		if err != nil {
-			fmt.Println("gp.localNode.Routing.MetaNewUserNotif failed :", err)
+			log.Println("gp.localNode.Routing.MetaNewUserNotif failed :", err)
 		}
 	}
 	//TODO:Keeper有没有错误的逻辑需要考虑，如果有一部分回复completed，一部分回复error怎么办
@@ -430,10 +429,10 @@ func (gp *GroupService) userInitNotif(km *metainfo.KeyMeta, userBLS12configkey, 
 	for _, keeper := range gp.localPeersInfo.Keepers {
 		err := localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userBLS12configkey, userBLS12configstring, keeper.KeeperID)
 		if err != nil {
-			fmt.Println("gp.localNode.Routing.CmdPut failed :", err)
+			log.Println("gp.localNode.Routing.CmdPut failed :", err)
 		}
 	}
-	fmt.Println("Waiting for keepers' response")
+	log.Println("Waiting for keepers' response")
 }
 
 //chooseKeepersAndProviders 启动流程，收集到足够KP信息，从备选中 选出本节点的keeper和provider，选择keeper的时候，检查连接性
@@ -445,7 +444,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	if userState != CollectCompleted {
 		return ErrWrongInitState
 	}
-	fmt.Println("Has enough Keeper and Providers, choosing...")
+	log.Println("Has enough Keeper and Providers, choosing...")
 	gp.localPeersInfo.Keepers = make([]*KeeperInfo, 0, gp.keeperSLA)
 	gp.localPeersInfo.Providers = make([]string, 0, gp.providerSLA)
 	//选择keeper
@@ -490,7 +489,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 		gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pidStr)
 	}
 
-	fmt.Println("Choose completed, Providers:", gp.localPeersInfo.Providers)
+	log.Println("Choose completed, Providers:", gp.localPeersInfo.Providers)
 
 	return nil
 }
@@ -507,7 +506,7 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 				keeperInfo.IsBFT = true
 			}
 			keeperInfo.Connected = true
-			fmt.Printf("Receive %s's response, waiting for other keepers\n", keeper)
+			log.Printf("Receive %s's response, waiting for other keepers\n", keeper)
 		}
 		if keeperInfo.Connected {
 			ConnectedCount++
@@ -515,46 +514,46 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 	}
 	//与所有keeper都连接成功了
 	if ConnectedCount == len(gp.localPeersInfo.Keepers) {
-		fmt.Println("Receive all keepers' response")
+		log.Println("Receive all keepers' response")
 		err := localNode.Repo.SetConfigKey("IsInit", false) //初始化过后，设置IsInit
 		if err != nil {
-			fmt.Println("gp.localNode.Repo.SetConfigKey failed :", err)
+			log.Println("gp.localNode.Repo.SetConfigKey failed :", err)
 		}
 
 		// 状态改为部署合约中
 		err = SetUserState(gp.Userid, OnDeploy)
 		if err != nil {
-			fmt.Println("SetUserState failed :", err)
+			log.Println("SetUserState failed :", err)
 			return err
 		}
 
 		//部署合约
 		err = gp.deployUpKeepingAndChannel()
 		if err != nil {
-			fmt.Println("gp.deployUpKeepingAndChannel failed :", err)
+			log.Println("gp.deployUpKeepingAndChannel failed :", err)
 		}
 		// 构造key告诉keeper和provider自己已经部署好合约
 		kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
 		if err != nil {
-			fmt.Println("Construct Deployed key error", err)
+			log.Println("Construct Deployed key error", err)
 			return err
 		}
 		for _, keeper := range gp.localPeersInfo.Keepers {
 			_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
 			if err != nil {
-				fmt.Println("Send keeper", keeper.KeeperID, " err:", err)
+				log.Println("Send keeper", keeper.KeeperID, " err:", err)
 			}
 		}
 		for _, provider := range gp.localPeersInfo.Providers {
 			_, err = sendMetaRequest(kmPid, gp.Userid, provider)
 			if err != nil {
-				fmt.Println("Send provider", provider, " err:", err)
+				log.Println("Send provider", provider, " err:", err)
 			}
 		}
-		fmt.Println(gp.Userid + ":Group Service is ready")
+		log.Println(gp.Userid + ":Group Service is ready")
 		err = SetUserState(gp.Userid, GroupStarted)
 		if err != nil {
-			fmt.Println("SetUserState failed :", err)
+			log.Println("SetUserState failed :", err)
 			return err
 		}
 	}
@@ -564,13 +563,13 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 func (gp *GroupService) deployUpKeepingAndChannel() error {
 	hexPK, localAddress, keepers, providers, err := buildUKParams(gp.Userid, gp.password, gp.localPeersInfo)
 	if err != nil {
-		fmt.Println("getParams:", err)
+		log.Println("getParams:", err)
 		return err
 	}
 
 	config, err := localNode.Repo.Config()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return err
 	}
 	balance, err := contracts.QueryBalance(localAddress.Hex()) //获得用户的账户余额
@@ -579,7 +578,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 			balance = big.NewInt(0)
 		}
 	}
-	fmt.Println("balance:", balance)
+	log.Println("balance:", balance)
 
 	d := gp.storeDays
 	s := gp.storeSize
@@ -596,7 +595,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	var leastMoney = new(big.Int)
 	leastMoney = leastMoney.Add(moneyAccount, deployPrice)
 	if balance.Cmp(leastMoney) < 0 { //余额不足
-		fmt.Println(ErrBalance)
+		log.Println(ErrBalance)
 		return ErrBalance
 	}
 
@@ -622,7 +621,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	for _, providerAddr := range providers {
 		channelAddr, err := contracts.DeployChannelContract(hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
 		if err == contracts.ErrNotDeployedResolver {
-			fmt.Println("the provider" + providerAddr.String() + "has not deployed resolver")
+			log.Println("the provider" + providerAddr.String() + "has not deployed resolver")
 			continue
 		} else if err != nil {
 			return err
@@ -636,7 +635,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return err
 		}
 		//存到provider上
@@ -646,20 +645,20 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		}
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return err
 		}
 	}
-	fmt.Println("user has deployed all channel-contract successfully!")
+	log.Println("user has deployed all channel-contract successfully!")
 
 	return nil
 }
 
 func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error {
-	fmt.Println("Begin to find Keeper for start user service:", gp.Userid)
+	log.Println("Begin to find Keeper for start user service:", gp.Userid)
 	km, err := metainfo.NewKeyMeta(gp.Userid, metainfo.Local, metainfo.SyncTypeKid)
 	if err != nil {
-		fmt.Println("findKeeperAndProviderNotInit()NewKeyMeta()error:", err)
+		log.Println("findKeeperAndProviderNotInit()NewKeyMeta()error:", err)
 		return err
 	}
 
@@ -729,9 +728,9 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 								gp.localPeersInfo.Keepers = append(gp.localPeersInfo.Keepers, tempKeeper)
 							}
 							if tempKeeper.IsBFT {
-								fmt.Println("Connect to keeper", tempKeeper.KeeperID, "use bft mode")
+								log.Println("Connect to keeper", tempKeeper.KeeperID, "use bft mode")
 							} else {
-								fmt.Println("Connect to keeper", tempKeeper.KeeperID, "use simple mode")
+								log.Println("Connect to keeper", tempKeeper.KeeperID, "use simple mode")
 							}
 						} else {
 							log.Println("Connect to keeper", kid, "failed.")
@@ -757,16 +756,16 @@ func (gp *GroupService) findKeeperAndProviderNotInit(ctx context.Context) error 
 								for i := 0; i < len(providers)/utils.IDLength; i++ {
 									pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
 									if sc.ConnectTo(ctx, localNode, pid) {
-										fmt.Println("Connect to provider-", pid, "success.")
+										log.Println("Connect to provider-", pid, "success.")
 									} else {
-										fmt.Println("Connect to provider-", pid, "failed.")
+										log.Println("Connect to provider-", pid, "failed.")
 									}
 									gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid)
 								}
-								fmt.Println(gp.Userid + ":Group Service is ready")
+								log.Println(gp.Userid + ":Group Service is ready")
 								err = SetUserState(gp.Userid, GroupStarted)
 								if err != nil {
-									fmt.Println("SetUserState failed :", err)
+									log.Println("SetUserState failed :", err)
 								}
 							}
 							return nil

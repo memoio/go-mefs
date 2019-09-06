@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -24,7 +23,7 @@ func ConstructLfsService(userID string, privKey []byte) *LfsService {
 func (lfs *LfsService) StartLfsService(ctx context.Context) error {
 	err := lfs.startLfs(ctx)
 	if err != nil {
-		fmt.Println("Lfs start err : ", err)
+		log.Println("Lfs start err : ", err)
 		return err
 	}
 	go lfs.PersistMetaBlock(ctx)
@@ -51,7 +50,7 @@ func (lfs *LfsService) startLfs(ctx context.Context) error {
 				select {
 				case <-tick:
 					if tickCount >= 60 { //超过十分钟还没有Keeper，出故障了
-						fmt.Println("Cannot start lfs service-", ErrNoKeepers)
+						log.Println("Cannot start lfs service-", ErrNoKeepers)
 						return ErrNoKeepers
 					}
 
@@ -70,16 +69,16 @@ func (lfs *LfsService) startLfs(ctx context.Context) error {
 		}
 		lfs.CurrentLog, err = lfs.loadSuperBlock() //找到keeper再加载一次超级块
 		if err != nil || lfs.CurrentLog == nil {
-			fmt.Println("load superblock fail, so begin to init Lfs :", lfs.UserID)
+			log.Println("load superblock fail, so begin to init Lfs :", lfs.UserID)
 			lfs.CurrentLog, err = initLfs() //初始化
 			if err != nil {
 				log.Println(ErrCannotStartLfsService)
 				return ErrCannotStartLfsService
 			}
-			fmt.Println(lfs.UserID + " : Lfs Service is ready")
+			log.Println(lfs.UserID + " : Lfs Service is ready")
 			err = SetUserState(lfs.UserID, BothStarted)
 			if err != nil {
-				fmt.Println("SetUserState failed")
+				log.Println("SetUserState failed")
 			}
 			return nil
 		}
@@ -94,12 +93,12 @@ func (lfs *LfsService) startLfs(ctx context.Context) error {
 			log.Println(ErrCannotStartLfsService, err)
 			return err
 		}
-		fmt.Println("Objects in bucket-", Bucket.BucketName, "is loaded")
+		log.Println("Objects in bucket-", Bucket.BucketName, "is loaded")
 	}
-	fmt.Println(lfs.UserID + " : Lfs Service is ready")
+	log.Println(lfs.UserID + " : Lfs Service is ready")
 	err = SetUserState(lfs.UserID, BothStarted)
 	if err != nil {
-		fmt.Println("SetUserState failed")
+		log.Println("SetUserState failed")
 	}
 	return nil
 }
@@ -196,18 +195,18 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 	for _, provider := range providers {
 		channel, err := cs.GetChannelItem(provider)
 		if err != nil {
-			fmt.Println("GetChannelItem err:", provider, err)
+			log.Println("GetChannelItem err:", provider, err)
 			continue
 		}
 		// 保存本地形式：K-provider，V-channel此时的value
 		km, err := metainfo.NewKeyMeta(channel.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
 		if err != nil {
-			fmt.Println("NewKeyMeta err:", provider, err)
+			log.Println("NewKeyMeta err:", provider, err)
 			continue
 		}
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), channel.Value.String(), "local")
 		if err != nil {
-			fmt.Println("CmdPutTo error", provider, err)
+			log.Println("CmdPutTo error", provider, err)
 			continue
 		}
 	}
@@ -216,7 +215,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Flush Superblock to local finish. The uid is ", lfs.UserID)
+		log.Println("Flush Superblock to local finish. The uid is ", lfs.UserID)
 	}
 
 	for _, bucket := range lfs.CurrentLog.BucketByID { //bucket信息和object信息保存在本地
@@ -229,7 +228,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Flush %s BucketInfo and Objects Info to local finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
+			log.Printf("Flush %s BucketInfo and Objects Info to local finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
 		}
 	}
 
@@ -239,7 +238,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 			return err
 		}
 		lfs.CurrentLog.Sb.Dirty = false
-		fmt.Println("Flush Superblock to provider finish. The uid is ", lfs.UserID)
+		log.Println("Flush Superblock to provider finish. The uid is ", lfs.UserID)
 	}
 
 	for _, bucket := range lfs.CurrentLog.BucketByID {
@@ -253,7 +252,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 				return err
 			}
 			bucket.Dirty = false
-			fmt.Printf("Flush %s BucketInfo and Objects Info to provider finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
+			log.Printf("Flush %s BucketInfo and Objects Info to provider finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
 		}
 	}
 

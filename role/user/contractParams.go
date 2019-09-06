@@ -2,7 +2,6 @@ package user
 
 import (
 	"encoding/hex"
-	"fmt"
 	"log"
 	"math/big"
 
@@ -57,13 +56,13 @@ func buildSignParams(userID string, providerID string, privateKey []byte) (commo
 	var userAddress, providerAddress common.Address
 	providerAddress, err := ad.GetAddressFromID(providerID)
 	if err != nil {
-		fmt.Println("GetProAddrErr", err)
+		log.Println("GetProAddrErr", err)
 		return userAddress, providerAddress, "", err
 	}
 
 	userAddress, err = ad.GetAddressFromID(userID)
 	if err != nil {
-		fmt.Println("GetLocalAddrErr", err)
+		log.Println("GetLocalAddrErr", err)
 		return userAddress, providerAddress, "", err
 	}
 
