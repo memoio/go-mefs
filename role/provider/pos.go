@@ -35,7 +35,7 @@ var posID string
 var posAddr string
 var posCidPrefix string
 var inGenerate int
-var keeperIDs []string = []string{}
+var keeperIDs []string
 var posSkByte []byte
 
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
@@ -55,32 +55,39 @@ func PosSerivce() {
 	posAddr = pos.GetPosAddr()
 	posSkByte = pos.GetPosSkByte()
 
-	err := SaveUpkeeping(posID)
-	if err != nil {
-		fmt.Println("Save upkeeping in posService error :", err)
+	retryCount := 0
+	for {
+		if retryCount > 10 {
+			fmt.Println("Save upkeeping in posService error, exit from pos mode.")
+			return
+		}
+		err := SaveUpkeeping(posID)
+		if err == nil {
+			break
+		}
+		retryCount++
 	}
-	var tmpKeeperIDs []string
+
 	if value, ok := ProContracts.upKeepingBook.Load(posID); ok {
-		tmpKeeperIDs = value.(contracts.UpKeepingItem).KeeperIDs
+		keeperIDs = value.(contracts.UpKeepingItem).KeeperIDs
 	}
-	fmt.Println("tmpKeeper :", tmpKeeperIDs[0])
 
 	//填充opt.KeySet
-	for _, tmpKeeper := range tmpKeeperIDs {
+	for _, tmpKeeper := range keeperIDs {
 		if err := getUserConifg(posID, tmpKeeper); err == nil {
 			break
 		}
 	}
 
 	//从磁盘读取存储的Cidprefix
-	posKM, err := metainfo.NewKeyMeta(posID, metainfo.Local)
+	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
 	if err != nil {
 		fmt.Println("NewKeyMeta posKM error :", err)
 	} else {
 		fmt.Println("posKm :", posKM.ToString())
 		posValue, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(posKM.ToString(), "local")
 		if err != nil {
-			fmt.Println("CmdGetFrom(posKM, 'local') error :", err)
+			fmt.Println("Get posKM from local error :", err)
 		} else {
 			fmt.Println("posvalue :", string(posValue))
 			posCidPrefix = string(posValue)
@@ -104,17 +111,6 @@ func PosSerivce() {
 	posRegular(context.Background())
 }
 
-func getKeepers() ([]string, error) {
-	if len(keeperIDs) == 0 {
-		uk, err := GetUpkeeping(posID)
-		if err != nil {
-			return keeperIDs, err
-		}
-		keeperIDs = uk.KeeperIDs
-	}
-	return keeperIDs, nil
-}
-
 // getDiskUsage gets the disk usage
 func getDiskUsage() (uint64, error) {
 	dataStore := localNode.Repo.Datastore()
@@ -126,7 +122,7 @@ func getDiskUsage() (uint64, error) {
 	return DataSpace, nil
 }
 
-// getDiskUsage gets the disk total space which is set in config
+// getDiskTotal gets the disk total space which is set in config
 func getDiskTotal() (float64, error) {
 	cfg, err := localNode.Repo.Config()
 	if err != nil {
@@ -160,9 +156,9 @@ func posRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if inGenerate == 0 {
+				// 如果超过了90%，则删除10%容量的posBlocks；如果低于80%，则生成到80%
 				go doGenerateOrDelete()
 			}
-			// 如果超过了90%，则删除10%容量的posBlocks；如果低于80%，则生成到80%
 		}
 	}
 }
@@ -181,10 +177,12 @@ func doGenerateOrDelete() {
 	if err != nil {
 		return
 	}
-	fmt.Println("totalSpace :", totalSpace, "\n(usedSpace)/totalSpace", float64(usedSpace)/totalSpace)
-	if float64(usedSpace)/totalSpace <= LowWater {
+	fmt.Println("totalSpace :", totalSpace)
+	ratio := float64(usedSpace) / totalSpace
+	fmt.Println("(usedSpace)/totalSpace is ", ratio)
+	if ratio <= LowWater {
 		generatePosBlocks(uint64(totalSpace / 10))
-	} else if float64(usedSpace)/totalSpace >= HighWater {
+	} else if ratio >= HighWater {
 		deletePosBlocks(uint64(usedSpace / 10))
 	}
 }
@@ -234,10 +232,6 @@ func generatePosBlocks(increaseSpace uint64) {
 			continue
 		}
 
-		keepers, err := getKeepers()
-		if err != nil {
-			fmt.Println("generatePosBlocks getKeepers()err:", err)
-		}
 		blockList := []string{}
 
 		//做成块，放到本地
@@ -256,24 +250,32 @@ func generatePosBlocks(increaseSpace uint64) {
 			}
 			blockList = append(blockList, blockID)
 		}
-		//向keeper发送元数据
+
+		// 向keeper发送元数据
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
 		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosAdd)
-		for _, keeper := range keepers {
+		for _, keeper := range keeperIDs {
 			sendMetaMessage(km, metaValue, keeper)
 		}
 
+		// 本地更新
+		posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+		if err != nil {
+			continue
+		}
+		posValue := posCidPrefix
+		fmt.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+		if err != nil {
+			fmt.Println("CmdPutTo posKM error :", err)
+			continue
+		}
 	}
 }
 
 func deletePosBlocks(decreseSpace uint64) {
 	// delete last blocks
 	var totalDecresed uint64
-
-	keepers, err := getKeepers()
-	if err != nil {
-		fmt.Println("generatePosBlocks getKeepers()err:", err)
-	}
 
 	for {
 		if totalDecresed >= decreseSpace {
@@ -302,7 +304,7 @@ func deletePosBlocks(decreseSpace uint64) {
 			return
 		}
 		metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
-		for _, keeper := range keepers {
+		for _, keeper := range keeperIDs {
 			sendMetaMessage(km, metavalue, keeper)
 		}
 		//更新Gid,Sid

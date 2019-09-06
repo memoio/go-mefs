@@ -49,6 +49,7 @@ const (
 	GetPeerAddr
 	PosAdd
 	PosDelete
+	PosMeta
 	Test MetaKeyType = 99
 )
 

@@ -54,7 +54,7 @@ func PersistBeforeExit() error {
 		}
 		fmt.Println("持久化channel:", channel.ChannelAddr, channel.Value.String())
 	}
-	posKM, err := metainfo.NewKeyMeta(posID, metainfo.Local)
+	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
 	if err != nil {
 		return err
 	}
