@@ -30,10 +30,7 @@ func ConnectTo(ctx context.Context, node *core.MefsNode, to string) bool {
 	connectTryCount := 3
 	for i := 0; i <= connectTryCount; i++ {
 		if retry { // retry three times
-			res := getAddrAndConnect(ctx, node, to)
-			if res {
-				return true
-			}
+			ctx = context.WithValue(ctx, "ExternIP", true)
 		}
 
 		pi, err := node.Routing.FindPeer(ctx, id)
@@ -51,6 +48,13 @@ func ConnectTo(ctx context.Context, node *core.MefsNode, to string) bool {
 			return true
 		}
 		retry = true
+	}
+
+	for i := 0; i <= connectTryCount; i++ {
+		res := getAddrAndConnect(ctx, node, to)
+		if res {
+			return true
+		}
 	}
 	return false
 }

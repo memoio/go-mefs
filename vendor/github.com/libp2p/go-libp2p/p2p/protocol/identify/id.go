@@ -341,6 +341,10 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	// that picks random source ports, this can cause DHT nodes to collect
 	// many undialable addresses for other peers.
 
+	if HasConsistentTransport(c.RemoteMultiaddr(), lmaddrs) {
+		lmaddrs = append(lmaddrs, c.RemoteMultiaddr())
+	}
+
 	// Extend the TTLs on the known (probably) good addresses.
 	// Taking the lock ensures that we don't concurrently process a disconnect.
 	ids.addrMu.Lock()
