@@ -388,12 +388,7 @@ func ShowInfo(userID string) map[string]string {
 		outmap["error"] = "GetAddressFromID() err:" + err.Error()
 		return outmap
 	}
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		outmap["error"] = "Config() err:" + err.Error()
-		return outmap
-	}
-	amountLocal, err := contracts.QueryBalance(cfg.Eth, addrLocal.Hex())
+	amountLocal, err := contracts.QueryBalance(addrLocal.Hex())
 	if err != nil {
 		outmap["error"] = "QueryBalance() err:" + err.Error()
 	}
@@ -412,7 +407,7 @@ func ShowInfo(userID string) map[string]string {
 		return outmap
 	}
 	outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr
-	amountUpkeeping, err := contracts.QueryBalance(cfg.Eth, upkeeping.UpKeepingAddr)
+	amountUpkeeping, err := contracts.QueryBalance(upkeeping.UpKeepingAddr)
 	if err != nil {
 		outmap["error"] = "QueryBalance()err:" + err.Error()
 		return outmap

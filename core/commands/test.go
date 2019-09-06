@@ -323,12 +323,7 @@ var channelTimeoutCmd = &cmds.Command{
 			fmt.Println("getHexPKErr", err)
 			return err
 		}
-		config, err := n.Repo.Config()
-		if err != nil {
-			return err
-		}
-		ethEndPoint := config.Eth
-		err = testChannelTimeout(localAddress, hexKey, ethEndPoint)
+		err = testChannelTimeout(localAddress, hexKey)
 		if err != nil {
 			fmt.Println("channelTimeout failed")
 			return err
@@ -419,13 +414,7 @@ var showBalanceCmd = &cmds.Command{
 				return err
 			}
 		}
-		config, err := node.Repo.Config()
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		endpoint := config.Eth
-		balances, err := contracts.QueryBalance(endpoint, addressid)
+		balances, err := contracts.QueryBalance(addressid)
 		if err != nil {
 			return err
 		}
@@ -434,9 +423,9 @@ var showBalanceCmd = &cmds.Command{
 }
 
 //TestChannelTimeout test channelTimeout()
-func testChannelTimeout(localAddr common.Address, hexKey string, ethEndPoint string) (err error) {
+func testChannelTimeout(localAddr common.Address, hexKey string) (err error) {
 	fmt.Println("==========开始测试channelTimeout=========")
-	balance, err := contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看账户余额
+	balance, err := contracts.QueryBalance(localAddr.String()) //查看账户余额
 	if err != nil {
 		fmt.Println("contracts.QueryBalanceErr:", err)
 		return err
@@ -445,47 +434,47 @@ func testChannelTimeout(localAddr common.Address, hexKey string, ethEndPoint str
 
 	//部署channel合约，测试中这个账户与自己部署channel合约
 	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(ethEndPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
 		return err
 	}
-	_, err = contracts.DeployResolverForChannel(ethEndPoint, hexKey, localAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(hexKey, localAddr, indexer)
 	if err != nil {
 		fmt.Println("deployResolverErr:", err)
 		return err
 	}
 	timeout := big.NewInt(60)
 	moneyToChannel := big.NewInt(1000000)
-	channelAddr, err := contracts.DeployChannelContract(ethEndPoint, hexKey, localAddr, localAddr, timeout, moneyToChannel)
+	channelAddr, err := contracts.DeployChannelContract(hexKey, localAddr, localAddr, timeout, moneyToChannel)
 	if err != nil {
 		fmt.Println("deployChannelErr:", err)
 		return err
 	}
 
 	time.Sleep(120 * time.Second)
-	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看部署的channel合约的账户余额
+	balance, err = contracts.QueryBalance(channelAddr.String()) //查看部署的channel合约的账户余额
 	if err != nil {
 		fmt.Println("contracts.QueryBalanceErr:", err)
 		return err
 	}
 	fmt.Println("channel合约的balance:", balance)
 
-	_, err = contracts.GetChannelStartDate(ethEndPoint, localAddr, localAddr, localAddr)
+	_, err = contracts.GetChannelStartDate(localAddr, localAddr, localAddr)
 	if err != nil {
 		fmt.Println("GetChannelStartDateErr:", err)
 		return err
 	}
 
 	//触发channelTimeout()
-	err = contracts.ChannelTimeout(ethEndPoint, hexKey, localAddr, localAddr)
+	err = contracts.ChannelTimeout(hexKey, localAddr, localAddr)
 	if err != nil {
 		fmt.Println("channelTimeoutErr:", err)
 		return err
 	}
 
 	time.Sleep(120 * time.Second)
-	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看触发channelTimeout后的合约余额
+	balance, err = contracts.QueryBalance(channelAddr.String()) //查看触发channelTimeout后的合约余额
 	if err != nil {
 		fmt.Println("contracts.QueryBalanceErr:", err)
 		return err
@@ -502,7 +491,7 @@ func testChannelTimeout(localAddr common.Address, hexKey string, ethEndPoint str
 //看合约代码，应该是会转过去的，所以closeChannel应该是测通的，当然还需要能连上服务器上节点时再进行本地测试
 func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint string) (err error) {
 	fmt.Println("==========开始测试closeChannel=========")
-	balance, err := contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看账户余额
+	balance, err := contracts.QueryBalance(localAddr.String()) //查看账户余额
 	if err != nil {
 		fmt.Println("QueryBalanceErr", err)
 		return err
@@ -516,14 +505,14 @@ func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint strin
 		fmt.Println("newIndexerErr:", err)
 		return err
 	}
-	_, err = contracts.DeployResolverForChannel(ethEndPoint, hexKey, localAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(hexKey, localAddr, indexer)
 	if err != nil {
 		fmt.Println("deployResolverErr:", err)
 		return err
 	}
 	timeout := big.NewInt(120)
 	moneyToChannel := big.NewInt(1000000)
-	channelAddr, err := contracts.DeployChannelContract(ethEndPoint, hexKey, localAddr, localAddr, timeout, moneyToChannel)
+	channelAddr, err := contracts.DeployChannelContract(hexKey, localAddr, localAddr, timeout, moneyToChannel)
 	if err != nil {
 		fmt.Println("deployChannelErr:", err)
 		return err
@@ -554,13 +543,13 @@ func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint strin
 	}
 
 	time.Sleep(60 * time.Second)
-	balance, err = contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看部署channel合约后的账户余额
+	balance, err = contracts.QueryBalance(localAddr.String()) //查看部署channel合约后的账户余额
 	if err != nil {
 		fmt.Println("QueryBalanceErr:", err)
 		return err
 	}
 	fmt.Println("部署后balance:", balance)
-	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看channel合约的账户余额
+	balance, err = contracts.QueryBalance(channelAddr.String()) //查看channel合约的账户余额
 	if err != nil {
 		fmt.Println("QueryBalanceErr:", err)
 		return err
@@ -571,16 +560,16 @@ func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint strin
 	fmt.Println("channel合约的balance:", balance)
 
 	//触发CloseChannel()
-	err = contracts.CloseChannel(ethEndPoint, hexKey, localAddr, localAddr, sig, value)
+	err = contracts.CloseChannel(hexKey, localAddr, localAddr, sig, value)
 	if err != nil {
 		fmt.Println("CloseChannelErr:", err)
 		return err
 	}
 
 	time.Sleep(120 * time.Second)
-	balance, err = contracts.QueryBalance(ethEndPoint, localAddr.String()) //查看触发Closechannel合约后的账户余额
+	balance, err = contracts.QueryBalance(localAddr.String()) //查看触发Closechannel合约后的账户余额
 	fmt.Println("触发后balance:", balance)
-	balance, err = contracts.QueryBalance(ethEndPoint, channelAddr.String()) //查看channel合约的账户余额
+	balance, err = contracts.QueryBalance(channelAddr.String()) //查看channel合约的账户余额
 	fmt.Println("channel合约的balance:", balance)
 	if balance.Cmp(big.NewInt(0)) != 0 {
 		return errors.New("close channel failed")

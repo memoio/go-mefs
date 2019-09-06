@@ -48,15 +48,11 @@ func (cs *ContractService) SaveUpkeeping() error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
+	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
 		return err
 	}
-	ukAddr, uk, err := contracts.GetUKFromResolver(config.Eth, userAddr)
-	if err != nil {
-		return err
-	}
-	item, err := contracts.GetUpkeepingInfo(config.Eth, userAddr, uk)
+	item, err := contracts.GetUpkeepingInfo(userAddr, uk)
 	if err != nil {
 		return err
 	}
@@ -75,10 +71,6 @@ func (cs *ContractService) SaveChannel() error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
 	for _, proId := range uk.ProviderIDs {
 		if _, ok := cs.channelBook[proId]; ok {
 			continue
@@ -88,7 +80,7 @@ func (cs *ContractService) SaveChannel() error {
 		if err != nil {
 			return err
 		}
-		chanAddr, err := contracts.GetChannelAddr(config.Eth, userAddr, proAddr, userAddr)
+		chanAddr, err := contracts.GetChannelAddr(userAddr, proAddr, userAddr)
 		if err != nil {
 			return err
 		}
@@ -125,7 +117,7 @@ func (cs *ContractService) SaveChannel() error {
 			}
 		}
 		fmt.Println("保存在内存中的channel地址和value为:", chanAddr.String(), value.String())
-		time, err := contracts.GetChannelStartDate(config.Eth, userAddr, proAddr, userAddr)
+		time, err := contracts.GetChannelStartDate(userAddr, proAddr, userAddr)
 		if err != nil {
 			return err
 		}
@@ -146,15 +138,11 @@ func (cs *ContractService) SaveQuery() error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
+	queryAddr, err := contracts.GetMarketAddr(userAddr, userAddr, contracts.Query)
 	if err != nil {
 		return err
 	}
-	queryAddr, err := contracts.GetMarketAddr(config.Eth, userAddr, userAddr, contracts.Query)
-	if err != nil {
-		return err
-	}
-	item, err := contracts.GetQueryInfo(config.Eth, userAddr, queryAddr)
+	item, err := contracts.GetQueryInfo(userAddr, queryAddr)
 	if err != nil {
 		return err
 	}
@@ -173,10 +161,6 @@ func (cs *ContractService) SaveOffer() error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
 	for _, proId := range uk.ProviderIDs {
 		if _, ok := cs.offerBook[proId]; ok {
 			continue
@@ -187,12 +171,12 @@ func (cs *ContractService) SaveOffer() error {
 			return err
 		}
 
-		offerAddr, err := contracts.GetMarketAddr(config.Eth, userAddr, proAddr, contracts.Offer)
+		offerAddr, err := contracts.GetMarketAddr(userAddr, proAddr, contracts.Offer)
 		if err != nil {
 			fmt.Println("get", proAddr.String(), "'s offer address err ")
 			return err
 		}
-		offerItem, err := contracts.GetOfferInfo(config.Eth, userAddr, offerAddr)
+		offerItem, err := contracts.GetOfferInfo(userAddr, offerAddr)
 		if err != nil {
 			fmt.Println("get", proAddr.String(), "'s offer params err ")
 			return err

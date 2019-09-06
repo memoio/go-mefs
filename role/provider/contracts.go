@@ -45,11 +45,7 @@ func SaveUpkeeping(userID string) error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	ukAddr, uk, err := contracts.GetUKFromResolver(config.Eth, userAddr)
+	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
 		return err
 	}
@@ -57,7 +53,7 @@ func SaveUpkeeping(userID string) error {
 	if err != nil {
 		return err
 	}
-	item, err := contracts.GetUpkeepingInfo(config.Eth, proAddr, uk)
+	item, err := contracts.GetUpkeepingInfo(proAddr, uk)
 	if err != nil {
 		return err
 	}
@@ -83,16 +79,12 @@ func SaveChannel(userID string) error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
 	proID := localNode.Identity.Pretty()
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return err
 	}
-	channelAddr, err := contracts.GetChannelAddr(config.Eth, proAddr, proAddr, userAddr)
+	channelAddr, err := contracts.GetChannelAddr(proAddr, proAddr, userAddr)
 	if err != nil {
 		return err
 	}
@@ -116,7 +108,7 @@ func SaveChannel(userID string) error {
 		}
 	}
 	fmt.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
-	time, err := contracts.GetChannelStartDate(config.Eth, proAddr, proAddr, userAddr)
+	time, err := contracts.GetChannelStartDate(proAddr, proAddr, userAddr)
 	if err != nil {
 		return err
 	}
@@ -160,21 +152,16 @@ func SaveQuery(userID string) error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	endPoint := config.Eth //获取endPoint
 	proID := localNode.Identity.Pretty()
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return err
 	}
-	queryAddr, err := contracts.GetMarketAddr(endPoint, proAddr, userAddr, contracts.Query)
+	queryAddr, err := contracts.GetMarketAddr(proAddr, userAddr, contracts.Query)
 	if err != nil {
 		return err
 	}
-	queryItem, err := contracts.GetQueryInfo(endPoint, proAddr, queryAddr)
+	queryItem, err := contracts.GetQueryInfo(proAddr, queryAddr)
 	if err != nil {
 		return err
 	}
@@ -196,21 +183,16 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 }
 
 func SaveOffer() error {
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	endPoint := config.Eth //获取endPoint
 	proID := localNode.Identity.Pretty()
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return err
 	}
-	offerAddr, err := contracts.GetMarketAddr(endPoint, proAddr, proAddr, contracts.Offer)
+	offerAddr, err := contracts.GetMarketAddr(proAddr, proAddr, contracts.Offer)
 	if err != nil {
 		return err
 	}
-	offerItem, err := contracts.GetOfferInfo(endPoint, proAddr, offerAddr)
+	offerItem, err := contracts.GetOfferInfo(proAddr, offerAddr)
 	if err != nil {
 		return err
 	}

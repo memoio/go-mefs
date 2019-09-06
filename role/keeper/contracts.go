@@ -19,12 +19,7 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	endPoint := config.Eth
-	ukAddr, uk, err := contracts.GetUKFromResolver(endPoint, userAddr)
+	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
 		fmt.Println("get ", userID, "'s ukAddr err:", err)
 		return err
@@ -35,7 +30,7 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	if err != nil {
 		return err
 	}
-	item, err := contracts.GetUpkeepingInfo(endPoint, keeperAddr, uk)
+	item, err := contracts.GetUpkeepingInfo(keeperAddr, uk)
 	if err != nil {
 		return err
 	}
@@ -58,21 +53,16 @@ func SaveQuery(userID string) error {
 	if err != nil {
 		return err
 	}
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	endPoint := config.Eth
 	keeperID := localNode.Identity.Pretty()
 	keeperAddr, err := address.GetAddressFromID(keeperID)
 	if err != nil {
 		return err
 	}
-	queryAddr, err := contracts.GetMarketAddr(endPoint, keeperAddr, userAddr, contracts.Query)
+	queryAddr, err := contracts.GetMarketAddr(keeperAddr, userAddr, contracts.Query)
 	if err != nil {
 		return err
 	}
-	queryItem, err := contracts.GetQueryInfo(endPoint, keeperAddr, queryAddr)
+	queryItem, err := contracts.GetQueryInfo(keeperAddr, queryAddr)
 	if err != nil {
 		return err
 	}
@@ -94,11 +84,6 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 }
 
 func SaveOffer(providerID string) error {
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return err
-	}
-	endPoint := config.Eth //获取endPoint
 	proAddr, err := address.GetAddressFromID(providerID)
 	if err != nil {
 		return err
@@ -108,11 +93,11 @@ func SaveOffer(providerID string) error {
 	if err != nil {
 		return err
 	}
-	offerAddr, err := contracts.GetMarketAddr(endPoint, keeperAddr, proAddr, contracts.Offer)
+	offerAddr, err := contracts.GetMarketAddr(keeperAddr, proAddr, contracts.Offer)
 	if err != nil {
 		return err
 	}
-	offerItem, err := contracts.GetOfferInfo(endPoint, keeperAddr, offerAddr)
+	offerItem, err := contracts.GetOfferInfo(keeperAddr, offerAddr)
 	if err != nil {
 		return err
 	}
@@ -164,15 +149,12 @@ func ukAddProvider(uid, pid, sk string) error {
 		}
 	}
 
-	//若为新provider 做添加操作
-	config, _ := localNode.Repo.Config()
-	endPoint := config.Eth
 	userAddr, err := ad.GetAddressFromID(uid)
 	if err != nil {
 		fmt.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
-	err = contracts.AddProvider(endPoint, sk, userAddr, []common.Address{providerAddr})
+	err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
 	if err != nil {
 		fmt.Println("ukAddProvider AddProvider() error", err)
 		return err

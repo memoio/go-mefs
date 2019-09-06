@@ -85,15 +85,13 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		}
 	}
 
-	endPoint := getEndPoint()
-
 	hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //获得本节点私钥
 	if err != nil {
 		fmt.Println("获取私钥错误:", err)
 		return err
 	}
 
-	ukaddr, uk, err := deployUKTest(endPoint, hexPk, localAddr, listKeeperAddr, listProviderAddr) //部署一个合约，并且获得其实例
+	ukaddr, uk, err := deployUKTest(hexPk, localAddr, listKeeperAddr, listProviderAddr) //部署一个合约，并且获得其实例
 	if err != nil {
 		fmt.Println("deployUKTest()err:", err)
 		return err
@@ -109,7 +107,7 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 	fmt.Println("本地节点金额变化：", amountCost)
 	mapKeeperAddr[localAddr] = amountLocal
 
-	err = contracts.SpaceTimePay(uk, endPoint, localAddr, listProviderAddr[0], hexPk, amount)
+	err = contracts.SpaceTimePay(uk, localAddr, listProviderAddr[0], hexPk, amount)
 	if err != nil {
 		fmt.Println("时空支付错误:", err)
 		return err
@@ -142,7 +140,7 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 
 //本节点部署一个测试用的uk合约
 //传入参数为endPoint,私钥，合约中的user地址、keeper地址列表、provider地址列表，返回测试用用的合约实例，没有放入mapper，测试结束后，该实例丢失
-func deployUKTest(endPoint, hexKey string, userAddr common.Address, listKeeperAddr, listProviderAddr []common.Address) (common.Address, *upKeeping.UpKeeping, error) {
+func deployUKTest(hexKey string, userAddr common.Address, listKeeperAddr, listProviderAddr []common.Address) (common.Address, *upKeeping.UpKeeping, error) {
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		fmt.Println("HexToECDSAErr:", err)
@@ -150,7 +148,7 @@ func deployUKTest(endPoint, hexKey string, userAddr common.Address, listKeeperAd
 	}
 	auth := bind.NewKeyedTransactor(key)
 	auth.Value = big.NewInt(2457600)
-	client := contracts.GetClient(endPoint)
+	client := contracts.GetClient(contracts.EndPoint)
 	ukaddr, _, uk, err := upKeeping.DeployUpKeeping(auth, client, userAddr, listKeeperAddr, listProviderAddr, big.NewInt(10), big.NewInt(1024), big.NewInt(1111))
 	if err != nil {
 		return common.Address{}, nil, err
@@ -160,13 +158,8 @@ func deployUKTest(endPoint, hexKey string, userAddr common.Address, listKeeperAd
 
 //输入一个节点的地址 查它的余额
 func queryBalanceTest(addr common.Address) *big.Int {
-	queryBalanceRes, _ := contracts.QueryBalance(getEndPoint(), addr.Hex())
+	queryBalanceRes, _ := contracts.QueryBalance(addr.Hex())
 	return queryBalanceRes
-}
-
-func getEndPoint() string {
-	config, _ := localNode.Repo.Config()
-	return config.Eth
 }
 
 func DeployKeeperContractTest() {
@@ -190,14 +183,14 @@ func DeployKeeperContractTest() {
 	localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty()) //将id转化成智能合约中的address格式
 	fmt.Println("本节点地址localAddr：", localAddr.String())
 
-	queryBalanceRes, err := contracts.QueryBalance(endPoint, localAddr.Hex())
+	queryBalanceRes, err := contracts.QueryBalance(localAddr.Hex())
 	if err != nil {
 		fmt.Println("查询余额错误：", err)
 		return
 	}
 	fmt.Println("查询余额信息：", queryBalanceRes)
 
-	err = contracts.KeeperContract(endPoint, hexPk)
+	err = contracts.KeeperContract(hexPk)
 	if err != nil {
 		fmt.Println("keeper合约部署错误:", err)
 		return
@@ -220,14 +213,14 @@ func SetKeeperTest(address string, node *core.MefsNode, isKeeper bool) error {
 	hexPk := "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4" //此私钥部署过keeper合约
 	fmt.Println("账户地址address：", address)
 
-	queryBalanceRes, err := contracts.QueryBalance(endPoint, address)
+	queryBalanceRes, err := contracts.QueryBalance(address)
 	if err != nil {
 		fmt.Println("查询余额错误：", err)
 		return err
 	}
 	fmt.Println("查询余额信息：", queryBalanceRes)
 
-	err = contracts.SetKeeper(endPoint, common.HexToAddress(address), hexPk, isKeeper)
+	err = contracts.SetKeeper(common.HexToAddress(address), hexPk, isKeeper)
 	if err != nil {
 		fmt.Println("setKeeper错误:", err)
 		return err
@@ -265,14 +258,14 @@ func DeployProviderContractTest() {
 	localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty()) //将id转化成智能合约中的address格式
 	fmt.Println("本节点地址localAddr：", localAddr.String())
 
-	queryBalanceRes, err := contracts.QueryBalance(endPoint, localAddr.Hex())
+	queryBalanceRes, err := contracts.QueryBalance(localAddr.Hex())
 	if err != nil {
 		fmt.Println("查询余额错误：", err)
 		return
 	}
 	fmt.Println("查询余额信息：", queryBalanceRes)
 
-	err = contracts.ProviderContract(endPoint, hexPk)
+	err = contracts.ProviderContract(hexPk)
 	if err != nil {
 		fmt.Println("provider合约部署错误:", err)
 		return
@@ -296,14 +289,14 @@ func SetProviderTest(address string, node *core.MefsNode, isProvider bool) error
 
 	fmt.Println("账户地址address：", address)
 
-	queryBalanceRes, err := contracts.QueryBalance(endPoint, address)
+	queryBalanceRes, err := contracts.QueryBalance(address)
 	if err != nil {
 		fmt.Println("查询余额错误：", err)
 		return err
 	}
 	fmt.Println("查询余额信息：", queryBalanceRes)
 
-	err = contracts.SetProvider(endPoint, common.HexToAddress(address), hexPk, isProvider)
+	err = contracts.SetProvider(common.HexToAddress(address), hexPk, isProvider)
 	if err != nil {
 		fmt.Println("setProvider错误:", err)
 		return err

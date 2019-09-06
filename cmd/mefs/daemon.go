@@ -244,6 +244,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
+	contracts.EndPoint = cfg.Eth
+
 	routingOption := cfg.Routing.Type
 	if routingOption == "" {
 		routingOption = routingOptionDHTKwd
@@ -286,13 +288,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	if !cfg.Test {
 		//从合约中获取账户角色
-		endPoint := cfg.Eth
 		localAddress, err := address.GetAddressFromID(nid)
 		if err != nil {
 			log.Error("error from get address from id: ", err)
 			return err
 		}
-		isKeeper, err := contracts.IsKeeper(endPoint, localAddress)
+		isKeeper, err := contracts.IsKeeper(localAddress)
 		if err != nil {
 			log.Error("error from IsKeeper: ", err)
 			return err
@@ -300,7 +301,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 		} else {
-			isProvider, err := contracts.IsProvider(endPoint, localAddress)
+			isProvider, err := contracts.IsProvider(localAddress)
 			if err != nil {
 				log.Error("error from IsProvider: ", err)
 				return err

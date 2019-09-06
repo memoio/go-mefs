@@ -53,8 +53,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	if err != nil {
 		return err
 	}
-	endpoint := config.Eth
-	balance, err := contracts.QueryBalance(endpoint, uaddr.Hex())
+	balance, err := contracts.QueryBalance(uaddr.Hex())
 	if err != nil {
 		if config.Test {
 			balance = big.NewInt(0)
@@ -82,11 +81,11 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		}
 	} else {
 		// getUK
-		_, uk, err := contracts.GetUKFromResolver(endpoint, uaddr)
+		_, uk, err := contracts.GetUKFromResolver(uaddr)
 		switch err {
 		case nil: //部署过
 			fmt.Println("begin to find keepers and providers to start user : ", gp.Userid)
-			item, err := contracts.GetUpkeepingInfo(endpoint, uaddr, uk)
+			item, err := contracts.GetUpkeepingInfo(uaddr, uk)
 			if err != nil {
 				return err
 			}
@@ -244,8 +243,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 
 	var queryAddr common.Address
 	if !config.Test {
-		endPoint := config.Eth
-		balance, _ := contracts.QueryBalance(endPoint, addr.Hex()) //获得用户的账户余额
+		balance, _ := contracts.QueryBalance(addr.Hex()) //获得用户的账户余额
 		fmt.Println("balance:", balance)
 		//判断账户余额能否部署query合约
 		deployPrice := big.NewInt(int64(740621000000000))
@@ -255,15 +253,11 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 		}
 
 		sk := crypto.ToECDSAUnsafe(gp.PrivateKey)
-		err = contracts.DeployQuery(endPoint, addr, sk, gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA)
+		err = contracts.DeployQuery(addr, sk, gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA)
 		if err != nil {
 			return err
 		}
-		config, err := localNode.Repo.Config()
-		if err != nil {
-			return err
-		}
-		queryAddr, err = contracts.GetMarketAddr(config.Eth, addr, addr, contracts.Query) //获取query合约地址
+		queryAddr, err = contracts.GetMarketAddr(addr, addr, contracts.Query) //获取query合约地址
 		if err != nil {
 			return err
 		}
@@ -570,8 +564,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		fmt.Println(err)
 		return err
 	}
-	endpoint := config.Eth                                               //通过config的Eth字段获得起rpc客户端的端点
-	balance, err := contracts.QueryBalance(endpoint, localAddress.Hex()) //获得用户的账户余额
+	balance, err := contracts.QueryBalance(localAddress.Hex()) //获得用户的账户余额
 	if err != nil {
 		if config.Test {
 			balance = big.NewInt(0)
@@ -598,17 +591,17 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 		return ErrBalance
 	}
 
-	err = contracts.DeployUpkeeping(endpoint, hexPK, localAddress, keepers, providers, d, s, price, moneyAccount)
+	err = contracts.DeployUpkeeping(hexPK, localAddress, keepers, providers, d, s, price, moneyAccount)
 	if err != nil {
 		return err
 	}
 
 	//部署好upKeeping合约后，将user部署的query合约的completed参数设为true
-	queryAddr, err := contracts.GetMarketAddr(endpoint, localAddress, localAddress, contracts.Query)
+	queryAddr, err := contracts.GetMarketAddr(localAddress, localAddress, contracts.Query)
 	if err != nil {
 		return err
 	}
-	err = contracts.SetQueryCompleted(endpoint, hexPK, localAddress, queryAddr)
+	err = contracts.SetQueryCompleted(hexPK, localAddress, queryAddr)
 	if err != nil {
 		return err
 	}
@@ -618,7 +611,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	var moneyToChannel = new(big.Int)
 	moneyToChannel = moneyToChannel.Mul(big.NewInt(s), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
 	for _, providerAddr := range providers {
-		channelAddr, err := contracts.DeployChannelContract(endpoint, hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
+		channelAddr, err := contracts.DeployChannelContract(hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
 		if err == contracts.ErrNotDeployedResolver {
 			fmt.Println("the provider" + providerAddr.String() + "has not deployed resolver")
 			continue

@@ -79,9 +79,7 @@ func ChallengeProviderBLS12() {
 		if err != nil {
 			isTestUser = true
 		}
-		config, _ := localNode.Repo.Config()
-		endPoint := config.Eth //获取endPoint
-		_, _, err = contracts.GetUKFromResolver(endPoint, addr)
+		_, _, err = contracts.GetUKFromResolver(addr)
 		if err != nil {
 			isTestUser = true
 		}

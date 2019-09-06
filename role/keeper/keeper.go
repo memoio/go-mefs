@@ -404,12 +404,7 @@ func cleanTestUsers() {
 		if err != nil {
 			return true
 		}
-		config, err := localNode.Repo.Config()
-		if err != nil {
-			return true
-		}
-		endPoint := config.Eth //获取endPoint
-		_, _, err = contracts.GetUKFromResolver(endPoint, addr)
+		_, _, err = contracts.GetUKFromResolver(addr)
 		//部署过合约的不清理
 		if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
 			return true

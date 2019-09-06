@@ -15,15 +15,15 @@ import (
 )
 
 //DeployChannelContract deploy channel-contract, timeOut's unit is second
-func DeployChannelContract(endPoint string, hexKey string, localAddress common.Address, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int) (common.Address, error) {
+func DeployChannelContract(hexKey string, localAddress common.Address, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int) (common.Address, error) {
 	fmt.Println("begin deploy channel-contract with", providerAddress.String(), "...")
 	var channelAddr common.Address
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
-	client := GetClient(endPoint)
+	client := GetClient(EndPoint)
 
 	//根据key(provider的地址)从indexer中获得对应的resolver
-	resolver, err := getResolverFromIndexer(endPoint, localAddress, providerAddress.String())
+	resolver, err := getResolverFromIndexer(localAddress, providerAddress.String())
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return channelAddr, err
@@ -31,7 +31,7 @@ func DeployChannelContract(endPoint string, hexKey string, localAddress common.A
 
 	//从上面的resolver中，获得本user的mapper，如果没有，则部署mapper
 	auth = bind.NewKeyedTransactor(key)
-	mapper, err := deployMapper(endPoint, localAddress, resolver, auth, client)
+	mapper, err := deployMapper(localAddress, resolver, auth, client)
 	if err != nil {
 		return channelAddr, err
 	}
@@ -84,21 +84,21 @@ func DeployChannelContract(endPoint string, hexKey string, localAddress common.A
 }
 
 //ChannelTimeout called by user to discontinue the channel-contract
-func ChannelTimeout(endPoint string, hexKey string, localAddress common.Address, providerAddress common.Address) (err error) {
+func ChannelTimeout(hexKey string, localAddress common.Address, providerAddress common.Address) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 
-	resolver, err := getResolverFromIndexer(endPoint, localAddress, providerAddress.String())
+	resolver, err := getResolverFromIndexer(localAddress, providerAddress.String())
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return err
 	}
 
-	mapper, err := getMapperInstance(endPoint, localAddress, localAddress, resolver)
+	mapper, err := getMapperInstance(localAddress, localAddress, resolver)
 	if err != nil {
 		return err
 	}
 
-	_, channelContract, err := getChannel(endPoint, mapper, localAddress)
+	_, channelContract, err := getChannel(mapper, localAddress)
 	if err != nil {
 		return err
 	}
@@ -115,18 +115,18 @@ func ChannelTimeout(endPoint string, hexKey string, localAddress common.Address,
 }
 
 //CloseChannel called by provider to stop the channel-contract,the ownerAddress implements the deployer
-func CloseChannel(endPoint string, hexKey string, localAddress common.Address, ownerAddress common.Address, sig []byte, value *big.Int) (err error) {
+func CloseChannel(hexKey string, localAddress common.Address, ownerAddress common.Address, sig []byte, value *big.Int) (err error) {
 	//获得channel合约地址
-	resolver, err := getResolverFromIndexer(endPoint, localAddress, localAddress.String())
+	resolver, err := getResolverFromIndexer(localAddress, localAddress.String())
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return err
 	}
-	mapper, err := getMapperInstance(endPoint, localAddress, ownerAddress, resolver)
+	mapper, err := getMapperInstance(localAddress, ownerAddress, resolver)
 	if err != nil {
 		return err
 	}
-	channelAddr, channelContract, err := getChannel(endPoint, mapper, localAddress)
+	channelAddr, channelContract, err := getChannel(mapper, localAddress)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func CloseChannel(endPoint string, hexKey string, localAddress common.Address, o
 
 //getChannel()当在ChannelTimeOut()中被调用，则localAddress为userAddr；
 // 当在CloseChannel()中被调用，则localAddress是providerAddr
-func getChannel(endPoint string, mapper *mapper.Mapper, localAddress common.Address) (common.Address, *channel.Channel, error) {
+func getChannel(mapper *mapper.Mapper, localAddress common.Address) (common.Address, *channel.Channel, error) {
 	var channelAddr common.Address
 	channels, err := mapper.Get(&bind.CallOpts{
 		From: localAddress,
@@ -169,7 +169,7 @@ func getChannel(endPoint string, mapper *mapper.Mapper, localAddress common.Addr
 
 	//返回最新的channel地址
 	channelAddr = channels[len(channels)-1]
-	channelContract, err := channel.NewChannel(channelAddr, GetClient(endPoint))
+	channelContract, err := channel.NewChannel(channelAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("getChannelsErr:", err)
 		return channelAddr, nil, err
@@ -178,19 +178,19 @@ func getChannel(endPoint string, mapper *mapper.Mapper, localAddress common.Addr
 }
 
 //GetChannelAddr get the channel contract's address
-func GetChannelAddr(endPoint string, localAddr, providerAddr, ownerAddr common.Address) (common.Address, error) {
+func GetChannelAddr(localAddr, providerAddr, ownerAddr common.Address) (common.Address, error) {
 	var ChannelAddr common.Address
-	resolver, err := getResolverFromIndexer(endPoint, localAddr, providerAddr.String())
+	resolver, err := getResolverFromIndexer(localAddr, providerAddr.String())
 	if err != nil {
 		return ChannelAddr, err
 	}
 
-	mapper, err := getMapperInstance(endPoint, localAddr, ownerAddr, resolver)
+	mapper, err := getMapperInstance(localAddr, ownerAddr, resolver)
 	if err != nil {
 		return ChannelAddr, err
 	}
 
-	channelAddr, _, err := getChannel(endPoint, mapper, localAddr)
+	channelAddr, _, err := getChannel(mapper, localAddr)
 	if err != nil {
 		return ChannelAddr, err
 	}
@@ -231,19 +231,19 @@ func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.In
 }
 
 //GetChannelStartDate used to get the startDate of channel-contract
-func GetChannelStartDate(endPoint string, localAddr, providerAddr, ownerAddr common.Address) (string, error) {
-	resolver, err := getResolverFromIndexer(endPoint, localAddr, providerAddr.String())
+func GetChannelStartDate(localAddr, providerAddr, ownerAddr common.Address) (string, error) {
+	resolver, err := getResolverFromIndexer(localAddr, providerAddr.String())
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return "", err
 	}
 
-	mapper, err := getMapperInstance(endPoint, localAddr, ownerAddr, resolver)
+	mapper, err := getMapperInstance(localAddr, ownerAddr, resolver)
 	if err != nil {
 		return "", err
 	}
 
-	_, channelContract, err := getChannel(endPoint, mapper, localAddr)
+	_, channelContract, err := getChannel(mapper, localAddr)
 	if err != nil {
 		return "", err
 	}

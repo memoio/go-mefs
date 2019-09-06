@@ -195,12 +195,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	}
 
 	//判断签名是否正确
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		return false, "", "", nil, err
-	}
-	endPoint := config.Eth
-	channelAddr, err := contracts.GetChannelAddr(endPoint, providerAddr, providerAddr, userAddr)
+	channelAddr, err := contracts.GetChannelAddr(providerAddr, providerAddr, userAddr)
 	if err != nil {
 		return false, "", "", nil, err
 	}

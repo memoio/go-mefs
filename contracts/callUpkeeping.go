@@ -15,10 +15,10 @@ import (
 )
 
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress in mapper
-func DeployUpkeeping(endPoint string, hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
+func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
 	fmt.Println("begin deploy upKeeping...")
 	//获得resolver
-	resolver, err := getResolverFromIndexer(endPoint, userAddress, "memoriae")
+	resolver, err := getResolverFromIndexer(userAddress, "memoriae")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return err
@@ -29,10 +29,10 @@ func DeployUpkeeping(endPoint string, hexKey string, userAddress common.Address,
 		return err
 	}
 	auth := bind.NewKeyedTransactor(key)
-	client := GetClient(endPoint)
+	client := GetClient(EndPoint)
 
 	//获得mapper
-	mapper, err := deployMapper(endPoint, userAddress, resolver, auth, client)
+	mapper, err := deployMapper(userAddress, resolver, auth, client)
 	if err != nil {
 		return err
 	}
@@ -89,16 +89,16 @@ func DeployUpkeeping(endPoint string, hexKey string, userAddress common.Address,
 }
 
 //GetUKFromResolver get upKeeping-contract from the mapper, and get the mapper from the resolver
-func GetUKFromResolver(endPoint string, ownerAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
+func GetUKFromResolver(ownerAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
 	//获得resolver
-	resolver, err := getResolverFromIndexer(endPoint, ownerAddress, "memoriae")
+	resolver, err := getResolverFromIndexer(ownerAddress, "memoriae")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return InvalidAddr, uk, err
 	}
 
 	//获得mapper
-	mapper, err := getMapperInstance(endPoint, ownerAddress, ownerAddress, resolver)
+	mapper, err := getMapperInstance(ownerAddress, ownerAddress, resolver)
 	if err != nil {
 		fmt.Println("getMapperInstance err:", err)
 		return InvalidAddr, uk, err
@@ -119,7 +119,7 @@ func GetUKFromResolver(endPoint string, ownerAddress common.Address) (ukaddr str
 
 	//获得uk，暂时默认第一个是所需的uk合约地址
 	//TODO：优化从mapper中找出uk合约的方法
-	uk, err = upKeeping.NewUpKeeping(contracts[0], GetClient(endPoint))
+	uk, err = upKeeping.NewUpKeeping(contracts[0], GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newUkErr:", err)
 		return InvalidAddr, uk, err
@@ -129,7 +129,7 @@ func GetUKFromResolver(endPoint string, ownerAddress common.Address) (ukaddr str
 }
 
 //SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
-func SpaceTimePay(uk *upKeeping.UpKeeping, endPoint string, userAddress common.Address, providerAddr common.Address, hexKey string, money *big.Int) error {
+func SpaceTimePay(uk *upKeeping.UpKeeping, userAddress common.Address, providerAddr common.Address, hexKey string, money *big.Int) error {
 	//构建auth,用keeper的私钥
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
@@ -148,7 +148,7 @@ func SpaceTimePay(uk *upKeeping.UpKeeping, endPoint string, userAddress common.A
 }
 
 // GetUpkeepingInfo get Upkeeping-contract's params
-func GetUpkeepingInfo(endPoint string, localAddress common.Address, uk *upKeeping.UpKeeping) (
+func GetUpkeepingInfo(localAddress common.Address, uk *upKeeping.UpKeeping) (
 	UpKeepingItem, error) {
 	var item UpKeepingItem
 	_, keeperAddrs, providerAddrs, duration, capacity, price, time, err := uk.GetOrder(&bind.CallOpts{
@@ -188,8 +188,8 @@ func GetUpkeepingInfo(endPoint string, localAddress common.Address, uk *upKeepin
 }
 
 //AddProvider add a provider to upKeeping
-func AddProvider(endPoint string, hexKey string, userAddress common.Address, providerAddress []common.Address) error {
-	_, uk, err := GetUKFromResolver(endPoint, userAddress)
+func AddProvider(hexKey string, userAddress common.Address, providerAddress []common.Address) error {
+	_, uk, err := GetUKFromResolver(userAddress)
 	if err != nil {
 		return err
 	}

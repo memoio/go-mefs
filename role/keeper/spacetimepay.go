@@ -96,15 +96,13 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 		fmt.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
 		defer fmt.Println("=====spacetimepay=====")
 		fmt.Printf("groupid:%s:\npid:%s\n", groupid, pidString)
-		config, _ := localNode.Repo.Config()
-		endPoint := config.Eth                                              //获取endPoint
 		scGroupid, _ := ad.GetAddressFromID(groupid)                        //获得userAddress
-		ukaddr, uk, err := contracts.GetUKFromResolver(endPoint, scGroupid) //查询合约
+		ukaddr, uk, err := contracts.GetUKFromResolver(scGroupid) //查询合约
 		if err != nil {
 			fmt.Println("contracts.GetUKFromResolver() err:", err)
 			return
 		}
-		ukBalance, err := contracts.QueryBalance(endPoint, ukaddr) //查询合约价格
+		ukBalance, err := contracts.QueryBalance(ukaddr) //查询合约价格
 		if err != nil {
 			fmt.Println("contracts.QueryBalance() err:", err)
 			return
@@ -125,7 +123,7 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 		}
 		fmt.Printf("amount:%d\nbegin_time:%s\nlast_time:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err = contracts.SpaceTimePay(uk, endPoint, scGroupid, pAddr, hexPk, amount) //进行支付
+		err = contracts.SpaceTimePay(uk,  scGroupid, pAddr, hexPk, amount) //进行支付
 		if err != nil {
 			fmt.Println("contracts.SpaceTimePay() failed:", err)
 			return

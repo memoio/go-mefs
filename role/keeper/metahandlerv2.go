@@ -102,12 +102,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 	} else {
 		fmt.Println("部署过query合约，从合约中查询需求")
 		localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty())
-		config, err := localNode.Repo.Config()
-		if err != nil {
-			fmt.Println("get config err:", err)
-			return
-		}
-		item, err := contracts.GetQueryInfo(config.Eth, localAddr, common.HexToAddress(queryAddr))
+		item, err := contracts.GetQueryInfo(localAddr, common.HexToAddress(queryAddr))
 		if item.Completed || err != nil {
 			fmt.Println("complete:", item.Completed, "error:", err)
 			return
