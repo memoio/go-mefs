@@ -74,8 +74,9 @@ func buildSignParams(userID string, providerID string, privateKey []byte) (commo
 	return userAddress, providerAddress, string(enc), nil
 }
 
+// BuildSignMessage builds sign message for test or repair
 func BuildSignMessage() ([]byte, error) {
-	money := big.NewInt(0)
+	money := big.NewInt(123)
 	moneyByte := money.Bytes()
 	message := &pb.SignForChannel{
 		Money: moneyByte,
