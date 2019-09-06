@@ -29,6 +29,11 @@ func metaSyncTo(keyMeta *metainfo.KeyMeta, metaValue string, targets ...string) 
 		return
 	}
 
+	// sync block meta seems to too heavily
+	if options[0] == metainfo.SyncTypeBlock {
+		return
+	}
+
 	if len(targets) == 0 { //获取同步对象
 		targets, err = getTarget(mainID, options[0])
 		if err != nil {
@@ -145,15 +150,15 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	}
 	proofStr := strings.Join(splitedMetaValue[4:], metainfo.DELIMITER)
 	thischalresult := &chalresult{ //构建挑战结果
-		kid:            options[2],
-		pid:            options[1],
-		uid:            groupid,
+		kid:           options[2],
+		pid:           options[1],
+		uid:           groupid,
 		challengeTime: timerec,
-		sum:            uint32(thisSum),
-		h:              thisH,
-		res:            chalres,
-		proof:          proofStr,
-		length:         uint32(l),
+		sum:           uint32(thisSum),
+		h:             thisH,
+		res:           chalres,
+		proof:         proofStr,
+		length:        uint32(l),
 	}
 
 	pu := PU{
