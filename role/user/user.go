@@ -24,12 +24,13 @@ const (
 	Starting UserState = iota
 	Collecting
 	CollectCompleted
+	OnDeploy
 	GroupStarted
 	BothStarted
 )
 
 var StateList = []string{
-	"starting", "Collecting", "CollectComplited", "GroupStarted", "BothStarted",
+	"Starting", "Collecting", "CollectComplited", "OnDeploy", "GroupStarted", "BothStarted",
 }
 
 type UsersInfo struct {

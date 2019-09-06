@@ -525,6 +525,14 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 		if err != nil {
 			fmt.Println("gp.localNode.Repo.SetConfigKey failed :", err)
 		}
+
+		// 状态改为部署合约中
+		err = SetUserState(gp.Userid, OnDeploy)
+		if err != nil {
+			fmt.Println("SetUserState failed :", err)
+			return err
+		}
+
 		//部署合约
 		err = gp.deployUpKeepingAndChannel()
 		if err != nil {
