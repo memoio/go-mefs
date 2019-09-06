@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/memoio/go-mefs/utils/pos"
-
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
@@ -21,6 +19,7 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 const (
@@ -52,9 +51,9 @@ var opt = &df.DataEncoder{
 func PosSerivce() {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
-	PosId = pos.GetPosId(pos.PosSkStr)
-	PosAddr = pos.GetPosAddr(pos.PosSkStr)
-	PosSkByte = pos.GetPosSkByte(pos.PosSkStr)
+	PosId = pos.GetPosId()
+	PosAddr = pos.GetPosAddr()
+	PosSkByte = pos.GetPosSkByte()
 
 	err := SaveUpkeeping(PosId)
 	if err != nil {

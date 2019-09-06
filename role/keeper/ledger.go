@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/memoio/go-mefs/utils/metainfo"
-
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 //LedgerInfo 存放挑战信息的内存结构体
@@ -105,6 +105,11 @@ func checkLedger(ctx context.Context) {
 		case <-ticker.C:
 			go func() {
 				LedgerInfo.Range(func(k, v interface{}) bool {
+					pu := k.(PU)
+					if pu.uid == pos.GetPosId() {
+						return true
+					}
+
 					thischalinfo := v.(*chalinfo)
 					thischalinfo.Cid.Range(func(key, value interface{}) bool {
 						//fmt.Println("avaltime :", value.(*cidInfo).availtime)
