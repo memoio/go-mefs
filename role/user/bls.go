@@ -90,7 +90,7 @@ func (gp *GroupService) loadBLS12Config() error {
 		if err = gp.parseBLS12ConfigMeta(userBLS12config); err != nil {
 			log.Println("Parse bls Config from local failed.", err)
 		} else {
-			fmt.Println(gp.Userid, " BlS12 SK is", gp.KeySet.Sk.BlsSK.Serialize(), "\nPk is", gp.KeySet.Pk.BlsPK.Serialize())
+			fmt.Println(gp.Userid, " BlS12 SK and Pk is loaded")
 			return nil
 		}
 	}
@@ -110,7 +110,7 @@ func (gp *GroupService) loadBLS12Config() error {
 		return err
 	}
 
-	fmt.Println(gp.Userid, " BlS12 SK is", gp.KeySet.Sk.BlsSK.Serialize(), "\nPk is", gp.KeySet.Pk.BlsPK.Serialize())
+	fmt.Println(gp.Userid, " BlS12 SK and Pk is loaded")
 	return nil
 }
 

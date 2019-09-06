@@ -466,7 +466,7 @@ func (lfs *LfsService) loadSuperBlock() (*Logs, error) {
 		if err != nil && err != bs.ErrNotFound {
 			return nil, err
 		}
-		log.Printf("Cannot Get SuperBlock in block %s from local datastore. Maybe block is lost or broken.\n", ncidlocal)
+		log.Printf("Cannot Get SuperBlock in block %s from local datastore. Try to get it from remote servers.\n", ncidlocal)
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
 			bm.SetBid(strconv.Itoa(j))
 			ncid := bm.ToString()

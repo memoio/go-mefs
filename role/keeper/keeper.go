@@ -736,8 +736,30 @@ func checkConnectedPeer() error {
 	}
 	connPeers := localNode.PeerHost.Network().Peers() //the list of peers we are connected to
 
+	exist := false
+
 	for _, ID := range connPeers {
 		id := ID.Pretty() //连接结点id的base58编码
+
+		//看本地已有此节点记录
+		for _, kid := range localPeerInfo.Keepers {
+			if id == kid {
+				exist = true
+				break
+			}
+		}
+
+		for _, pid := range localPeerInfo.Providers {
+			if id == pid {
+				exist = true
+				break
+			}
+		}
+
+		if exist == true {
+			return nil
+		}
+
 		fmt.Println("try to get roleinfo from: ", id)
 		kmRole, err := metainfo.NewKeyMeta(id, metainfo.Local, metainfo.SyncTypeRole)
 		if err != nil {
@@ -745,34 +767,18 @@ func checkConnectedPeer() error {
 		}
 		val, _ := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmRole.ToString(), id) //全网查该节点的角色
 		if string(val) == metainfo.RoleKeeper {
-			var i int
-			for i = 0; i < len(localPeerInfo.Keepers); i++ { //看本地已有此节点记录
-				if id == localPeerInfo.Keepers[i] {
-					break
-				}
-			}
-			if i == len(localPeerInfo.Keepers) {
-				log.Println("Connect to connected keeper: ", id)
-				localPeerInfo.Keepers = append(localPeerInfo.Keepers, id)
-				err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmKid.ToString(), id, "local") //把当前连接的所有keepers信息存到本地的leveldb中
-				if err != nil {
-					return err
-				}
+			log.Println("Connect to connected keeper: ", id)
+			localPeerInfo.Keepers = append(localPeerInfo.Keepers, id)
+			err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmKid.ToString(), id, "local") //把当前连接的所有keepers信息存到本地的leveldb中
+			if err != nil {
+				return err
 			}
 		} else if string(val) == metainfo.RoleProvider {
-			var i int
-			for i = 0; i < len(localPeerInfo.Providers); i++ {
-				if id == localPeerInfo.Providers[i] {
-					break
-				}
-			}
-			if i == len(localPeerInfo.Providers) {
-				log.Println("Connect to connected provider: ", id)
-				localPeerInfo.Providers = append(localPeerInfo.Providers, id)
-				err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), id, "local") //把当前连接的所有providers信息存到本地的leveldb中
-				if err != nil {
-					return err
-				}
+			log.Println("Connect to connected provider: ", id)
+			localPeerInfo.Providers = append(localPeerInfo.Providers, id)
+			err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), id, "local") //把当前连接的所有providers信息存到本地的leveldb中
+			if err != nil {
+				return err
 			}
 		}
 	}
