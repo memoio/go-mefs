@@ -79,6 +79,7 @@ var KeyTypeMap = map[MetaKeyType]int{
 	GetPeerAddr:           0,
 	PosAdd:                2,
 	PosDelete:             2,
+	PosMeta:               0,
 	Test:                  0,
 }
 

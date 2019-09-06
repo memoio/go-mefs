@@ -337,7 +337,6 @@ func getUserConifg(userID, keeperID string) error {
 		fmt.Println("getUserPrivateKey in get userconfig error ", err)
 		return err
 	}
-	fmt.Println("Pk :", opt.KeySet.Pk, "\nSk :", opt.KeySet.Sk)
 	return nil
 }
 
