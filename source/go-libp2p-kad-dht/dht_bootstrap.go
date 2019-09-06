@@ -105,7 +105,7 @@ func newRandomPeerId() peer.ID {
 
 // Traverse the DHT toward the given ID.
 func (dht *IpfsDHT) walk(ctx context.Context, target peer.ID) (peer.AddrInfo, error) {
-	// TODO: Extract the query action (traversal logic?) inside FindPeer,
+	// TODO: Extract the query action (traversal logic?) inside ,
 	// don't actually call through the FindPeer machinery, which can return
 	// things out of the peer store etc.
 	return dht.FindPeer(ctx, target)

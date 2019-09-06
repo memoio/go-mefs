@@ -20,7 +20,9 @@ import (
 	"github.com/ipfs/go-ipfs-cmds/http"
 	u "github.com/ipfs/go-ipfs-util"
 	logging "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/transport"
 	loggables "github.com/libp2p/go-libp2p-loggables"
+	"github.com/libp2p/go-libp2p-swarm"
 	oldcmds "github.com/memoio/go-mefs/commands"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core"
@@ -33,6 +35,10 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
+
+func init() {
+	swarm.DialTimeoutLocal = transport.DialTimeout
+}
 
 // log is the command logger
 var log = logging.Logger("cmd/mefs")
