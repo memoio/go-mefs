@@ -118,15 +118,12 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			return "", errors.New("Block is not found")
 		}
 		if key != "" {
-			item, ok := ProContracts.channelBook.Load(userID)
-			if !ok {
+			channelItem, err := GetChannel(userID)
+			if err != nil {
 				return "", errors.New("Find channelItem in channelBook error")
 			}
-			channelItem, ok := item.(contracts.ChannelItem)
-			if !ok {
-				return "", errors.New("Transfer item to channelItem error")
-			}
-			log.Println("下载成功，更改内存中channel.value并持久化:", value.String())
+
+			log.Println("Downlaod success，change channel.value and persist: ", value.String())
 			channelItem.Value = value
 			ProContracts.channelBook.Store(userID, channelItem)
 			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value.String(), "local")

@@ -127,8 +127,13 @@ func GetChannel(userID string) (contracts.ChannelItem, error) {
 	var channelItem contracts.ChannelItem
 	value, ok := ProContracts.channelBook.Load(userID)
 	if !ok {
-		log.Println("Not find ", userID, "'s channelItem in channelBook")
-		return channelItem, ErrGetContractItem
+		SaveChannel(userID)
+
+		value, ok = ProContracts.channelBook.Load(userID)
+		if !ok {
+			log.Println("Not find ", userID, "'s channelItem in channelBook")
+			return channelItem, ErrGetContractItem
+		}
 	}
 	channelItem = value.(contracts.ChannelItem)
 	return channelItem, nil
