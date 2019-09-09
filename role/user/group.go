@@ -318,13 +318,13 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			if timeOutCount >= 40 {
 				return ErrTimeOut
 			}
-			timeOutCount++
 			userState, err := GetUserServiceState(gp.Userid)
 			if err != nil {
 				return err
 			}
 			switch userState {
 			case Collecting:
+				timeOutCount++
 				if len(gp.tempKeepers) >= gp.keeperSLA && len(gp.tempProviders) >= gp.providerSLA {
 					//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
 					err := SetUserState(gp.Userid, CollectCompleted)
@@ -337,6 +337,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 					go broadcastMetaMessage(kmInit, "")
 				}
 			case CollectCompleted:
+				timeOutCount++
 				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
 				log.Printf("Timeout, waiting keeper response\n")
 				for _, keeperInfo := range gp.localPeersInfo.Keepers {
