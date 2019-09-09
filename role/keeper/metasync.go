@@ -155,11 +155,11 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		pid:           options[1],
 		uid:           groupid,
 		challengeTime: timerec,
-		sum:           uint32(thisSum),
+		sum:           int64(thisSum),
 		h:             thisH,
 		res:           chalres,
 		proof:         proofStr,
-		length:        uint32(l),
+		length:        int64(l),
 	}
 
 	pu := PU{

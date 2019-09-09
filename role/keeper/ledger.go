@@ -29,8 +29,10 @@ type chalinfo struct {
 	Time        sync.Map //某provider下user数据在某时刻发起挑战的结果，key为挑战发起时间的时间戳，格式为int64,value为chalresult
 	Cid         sync.Map
 	tmpCid      sync.Map
+	chalCid     []string //当前挑战的块
+	chalOffset  []int    //当前挑战的块
 	inChallenge int
-	maxlength   uint32
+	maxlength   int64
 	testuser    bool // 记录是否是test用户，用于不发起挑战
 }
 

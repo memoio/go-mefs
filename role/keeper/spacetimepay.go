@@ -189,10 +189,10 @@ func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
 //从内存中取相应的挑战结果数据，并且进行排序
 //传入user和provider的id号，返回两个数组，存放挑战结果中的时间和长度
 //按照时间顺序排序
-func fetchChalresult(uidString string, pidString string, timestart int64, timeend int64) ([]int64, []uint32) {
-	var timeList []int64   //存放挑战时间序列
-	var lenghList []uint32 //存放与挑战时间同序的数据长度序列
-	var tsl timesortlist   //用来对挑战时间排序
+func fetchChalresult(uidString string, pidString string, timestart int64, timeend int64) ([]int64, []int64) {
+	var timeList []int64  //存放挑战时间序列
+	var lenghList []int64 //存放与挑战时间同序的数据长度序列
+	var tsl timesortlist  //用来对挑战时间排序
 	//取provider-user的挑战信息
 	thisPU := PU{
 		pid: pidString,
