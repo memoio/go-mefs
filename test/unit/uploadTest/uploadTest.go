@@ -55,7 +55,7 @@ func UploadTest(count int) error {
 		if balance.Cmp(big.NewInt(10000000000)) > 0 {
 			break
 		}
-		fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+		fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success\n")
 		time.Sleep(10 * time.Second)
 	}
 	err = sh.StartUser(addr)
@@ -88,22 +88,26 @@ func UploadTest(count int) error {
 		fmt.Println(addr, "started, begin to upload")
 		break
 	}
-	//upload file
-	bucketName := "Bucket0"
-	bucketNum := 0
+	bucketName := "Bucket1"
+	bucketNum := 1
 	errNum := 0
 	fileNum := 0
+	fileUploadSuccessNum := 0
+
+	var bucketOfFile []int
+	//upload file
 	for {
 		r := rand.Int63n(randomDataSize)
 		data := make([]byte, r)
 		fillRandom(data)
 		buf := bytes.NewBuffer(data)
-		objectName := addr + "_" + strconv.Itoa(int(r))
-		fmt.Println("  Begin to upload file",fileNum,"，Filename is", objectName, "Size is", ToStorageSize(r), "addr", addr)
-		beginTime := time.Now().Unix()
+		objectName := addr + "_" + strconv.Itoa(fileNum)
+		fmt.Println("\n  Begin to upload file",fileNum,"，Filename is", objectName, "Size is", ToStorageSize(r), "addr", addr)
+		uploadBeginTime := time.Now().Unix()
 		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
-			log.Println(addr, "Upload failed in file ",fileNum,",", err)
+			bucketOfFile = append(bucketOfFile, 0)
+			fmt.Println(addr, "Upload failed in file ",fileNum,",", err)
 			if errNum == 0 {
 				bucketNum++
 				var opts []func(*shell.RequestBuilder) error
@@ -121,21 +125,44 @@ func UploadTest(count int) error {
 				errNum = 1
 				fileNum++
 			} else {
-				return err
+				fmt.Println("\n连续两次更换bucket后依然上传失败，可能是网络故障，停止上传\n")
+				fmt.Println("upload ",fileNum," files,",fileUploadSuccessNum," files uploaded success.fileUploadSuccess rate is",fileUploadSuccessNum/fileNum)
+				break
 			}
 		}
+		bucketOfFile = append(bucketOfFile, bucketNum)
 		storagekb := float64(r) / 1024.0
-		endTime := time.Now().Unix()
-		speed := storagekb / float64(endTime-beginTime)
+		uploadEndTime := time.Now().Unix()
+		speed := fmt.Sprintf("%.2f", storagekb / float64(uploadEndTime-uploadBeginTime))
 		fmt.Println("  Upload file",fileNum,"success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
 		fmt.Println(ob.String() + "address: " + addr)
 		fileNum++
+		fileUploadSuccessNum++
 		if fileNum == count {
 			fmt.Println("upload test success")
-			return nil
+			fmt.Println("upload ",fileNum," files,",fileUploadSuccessNum," files success.fileUploadSuccess rate is",fileUploadSuccessNum/count)
+			break
 		}
 		errNum = 0
 	}
+	//download file
+	fileDownloadSuccessNum := 0
+	for i, num := range bucketOfFile {
+        if num == 0 {//上传失败
+			continue
+		}
+		objectName := addr + "_" + strconv.Itoa(i)
+		bucketName := "Bucket"+string(num)
+		_, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
+		if err != nil {
+			fmt.Println(addr, "download failed in file ",i,",", err)
+		}
+		fmt.Println(addr, "download file ",i,"success")
+		fileDownloadSuccessNum++
+    }
+	fmt.Println("download test success")
+	fmt.Println("download ",fileUploadSuccessNum," files,",fileDownloadSuccessNum," files success.fileDownloadSuccess rate is",fileDownloadSuccessNum/fileUploadSuccessNum)
+	return nil
 }
 
 func ToStorageSize(r int64) string {
