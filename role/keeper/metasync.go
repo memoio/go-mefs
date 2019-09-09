@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -38,7 +38,7 @@ func metaSyncTo(keyMeta *metainfo.KeyMeta, metaValue string, targets ...string) 
 	if len(targets) == 0 { //获取同步对象
 		targets, err = getTarget(mainID, options[0])
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 	}
@@ -48,7 +48,7 @@ func metaSyncTo(keyMeta *metainfo.KeyMeta, metaValue string, targets ...string) 
 	for _, p := range targets {
 		_, err := sendMetaRequest(keyMeta, metaValue, p)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 	}
@@ -107,7 +107,7 @@ func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 	endTime := utils.StringToUnix(options[3])
 	st, ok := big.NewInt(0).SetString(splitedMetaValue[0], 0)
 	if !ok {
-		fmt.Println("SetString()err!value:", splitedMetaValue[0])
+		log.Println("SetString()err!value: ", splitedMetaValue[0])
 		return metainfo.ErrIllegalValue
 	}
 
@@ -214,7 +214,7 @@ func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
 		thischalinfo.Cid.Range(func(key, value interface{}) bool {
 			if strings.Compare(key.(string), blockID) == 0 {
 				thischalinfo.Cid.Delete(blockID)
-				fmt.Println("delete old meta data")
+				log.Println("delete old meta data")
 			}
 			return true
 		})

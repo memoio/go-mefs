@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"fmt"
+	"log"
 	"strings"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -16,35 +16,35 @@ func handlePosAdd(km *metainfo.KeyMeta, metaValue, from string) {
 	// add provider to upkeeping if it is not in upkeeping
 	err := ukAddProvider(pos.GetPosId(), from, pos.PosSkStr)
 	if err != nil {
-		fmt.Println("handlePosAdd err:", err)
+		log.Println("handlePosAdd err:", err)
 	}
 	if from != km.GetMid() {
-		fmt.Println("handlePosAdd error! from!=km.mid")
+		log.Println("handlePosAdd error! from!=km.mid")
 	}
 	blocks := strings.Split(metaValue, metainfo.DELIMITER)
 	for _, blockID := range blocks {
 		//保存在本地
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		pidAndOffset := from + metainfo.DELIMITER + "255"
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBlock.ToString(), pidAndOffset, "local")
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 
 		//保存到内存
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		err = doAddBlocktoLedger(from, bm.GetUid(), blockID, 255)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 	}
@@ -54,24 +54,24 @@ func handlePosAdd(km *metainfo.KeyMeta, metaValue, from string) {
 func handlePosDelete(km *metainfo.KeyMeta, metaValue, from string) {
 	deleteBlocks := strings.Split(metaValue, metainfo.DELIMITER)
 	if from != km.GetMid() {
-		fmt.Println("handlePosDelete error! from!=km.mid")
+		log.Println("handlePosDelete error! from and km.mid are: ", from, km.GetMid())
 	}
 	for _, blockID := range deleteBlocks {
 		//先删除本地信息
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		err = localNode.Routing.(*dht.IpfsDHT).DeleteLocal(kmBlock.ToString())
 		if err != nil && err != ds.ErrNotFound {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		//再删除内存中信息
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		deleteBlockInLedger(from, bm)

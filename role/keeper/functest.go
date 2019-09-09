@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 	"time"
 
@@ -28,8 +28,8 @@ var testStartTime int64 //用全局变量，保证每次测试的对象不变
 
 //测试时空值正确性的函数，每隔一段时间，上传数据，计算之前的时空值，返回实际计算的值，与理论值对比
 func ResultSummaryTest() string {
-	fmt.Println("===================ResultSummaryTest============================")
-	defer fmt.Println("===================ResultSummaryTest============================")
+	log.Println("===================ResultSummaryTest============================")
+	defer log.Println("===================ResultSummaryTest============================")
 	if testGid == "" {
 		PInfo.Range(func(groupid, groupsinfo interface{}) bool {
 			thisgroupid := groupid.(string)
@@ -40,7 +40,7 @@ func ResultSummaryTest() string {
 	if testPid == "" {
 		thisGroupsInfo, ok := getGroupsInfo(testGid)
 		if !ok {
-			fmt.Println("getGroupsInfo(testGid) error")
+			log.Println("getGroupsInfo(testGid) error")
 			return "0"
 		}
 		testPid = thisGroupsInfo.Providers[0]
@@ -51,13 +51,13 @@ func ResultSummaryTest() string {
 
 	testEndTime := utils.GetUnixNow()
 	actual, _ := resultSummary(testGid, testPid, testStartTime, testEndTime)
-	fmt.Println("actual:", actual)
+	log.Println("actual:", actual)
 	return actual.String()
 }
 
 func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
-	fmt.Println(">>>>>>>>>>>>>>>>>>>>>SmartContractTest>>>>>>>>>>>>>>>>>>>>>")
-	defer fmt.Println("===================SmartContractTestEnd============================")
+	log.Println(">>>>>>>>>>>>>>>>>>>>>SmartContractTest>>>>>>>>>>>>>>>>>>>>>")
+	defer log.Println("===================SmartContractTestEnd============================")
 
 	localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty()) //将id转化成智能合约中的address格式
 	mapKeeperAddr := make(map[common.Address]*big.Int)
@@ -87,50 +87,50 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 
 	hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //获得本节点私钥
 	if err != nil {
-		fmt.Println("获取私钥错误:", err)
+		log.Println("获取私钥错误:", err)
 		return err
 	}
 
 	ukaddr, uk, err := deployUKTest(hexPk, localAddr, listKeeperAddr, listProviderAddr) //部署一个合约，并且获得其实例
 	if err != nil {
-		fmt.Println("deployUKTest()err:", err)
+		log.Println("deployUKTest()err:", err)
 		return err
 	}
-	fmt.Println("合约部署成功,合约地址:", ukaddr.Hex())
-	fmt.Println("等待2分钟 查询合约金额和部署合约开销")
+	log.Println("合约部署成功,合约地址:", ukaddr.Hex())
+	log.Println("等待2分钟 查询合约金额和部署合约开销")
 	time.Sleep(120 * time.Second)
 	amountUk := queryBalanceTest(ukaddr)
-	fmt.Println("合约金额：", amountUk)
+	log.Println("合约金额：", amountUk)
 	amountLocal := queryBalanceTest(localAddr)
 	amountCost := big.NewInt(0)
 	amountCost.Sub(amountLocal, mapKeeperAddr[localAddr])
-	fmt.Println("本地节点金额变化：", amountCost)
+	log.Println("本地节点金额变化：", amountCost)
 	mapKeeperAddr[localAddr] = amountLocal
 
 	err = contracts.SpaceTimePay(uk, localAddr, listProviderAddr[0], hexPk, amount)
 	if err != nil {
-		fmt.Println("时空支付错误:", err)
+		log.Println("时空支付错误:", err)
 		return err
 	}
-	fmt.Println("时空支付成功,等待2分钟，进行金额变化计算")
+	log.Println("时空支付成功,等待2分钟，进行金额变化计算")
 	time.Sleep(120 * time.Second)
-	fmt.Println("---------keeper金额变化----------")
+	log.Println("---------keeper金额变化----------")
 	for kAddr, amount := range mapKeeperAddr {
 		amountNow := queryBalanceTest(kAddr)
 		amountCost := big.NewInt(0)
 		amountCost.Sub(amountNow, amount)
 		if kAddr == localAddr {
-			fmt.Println(kAddr.String(), "(本节点):", amountCost)
+			log.Println(kAddr.String(), "(本节点):", amountCost)
 		} else {
-			fmt.Println(kAddr.String(), ":", amountCost)
+			log.Println(kAddr.String(), ":", amountCost)
 		}
 	}
-	fmt.Println("---------provider金额变化----------")
+	log.Println("---------provider金额变化----------")
 	for pAddr, amount := range mapProviderAddr {
 		amountNow := queryBalanceTest(pAddr)
 		amountCost := big.NewInt(0)
 		amountCost.Sub(amountNow, amount)
-		fmt.Println(pAddr.String(), ":", amountCost)
+		log.Println(pAddr.String(), ":", amountCost)
 		if listProviderAddr[0] == pAddr && amountCost.Sign() <= 0 {
 			return errors.New("被支付的provider金额变化为0")
 		}
@@ -143,7 +143,7 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 func deployUKTest(hexKey string, userAddr common.Address, listKeeperAddr, listProviderAddr []common.Address) (common.Address, *upKeeping.UpKeeping, error) {
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return common.Address{}, nil, err
 	}
 	auth := bind.NewKeyedTransactor(key)
@@ -163,163 +163,163 @@ func queryBalanceTest(addr common.Address) *big.Int {
 }
 
 func DeployKeeperContractTest() {
-	fmt.Println("===================DeployKeeperContractTestBegin========================")
-	defer fmt.Println("===================DeployKeeperContractTestEnd=======================")
+	log.Println("===================DeployKeeperContractTestBegin========================")
+	defer log.Println("===================DeployKeeperContractTestEnd=======================")
 	config, err := localNode.Repo.Config()
 	if err != nil {
-		fmt.Println("获取config错误:", err)
+		log.Println("获取config错误:", err)
 		return
 	}
 	endPoint := config.Eth
-	fmt.Println("endPoint:", endPoint)
+	log.Println("endPoint:", endPoint)
 
 	hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //获得本节点私钥
 	if err != nil {
-		fmt.Println("获取私钥错误:", err)
+		log.Println("获取私钥错误:", err)
 		return
 	}
-	fmt.Println("私钥hexPk:", hexPk)
+	log.Println("私钥hexPk:", hexPk)
 
 	localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty()) //将id转化成智能合约中的address格式
-	fmt.Println("本节点地址localAddr：", localAddr.String())
+	log.Println("本节点地址localAddr：", localAddr.String())
 
 	queryBalanceRes, err := contracts.QueryBalance(localAddr.Hex())
 	if err != nil {
-		fmt.Println("查询余额错误：", err)
+		log.Println("查询余额错误：", err)
 		return
 	}
-	fmt.Println("查询余额信息：", queryBalanceRes)
+	log.Println("查询余额信息：", queryBalanceRes)
 
 	err = contracts.KeeperContract(hexPk)
 	if err != nil {
-		fmt.Println("keeper合约部署错误:", err)
+		log.Println("keeper合约部署错误:", err)
 		return
 	}
-	fmt.Println("keeper部署合约成功")
+	log.Println("keeper部署合约成功")
 }
 
 //SetKeeperTest set an account as keeper
 func SetKeeperTest(address string, node *core.MefsNode, isKeeper bool) error {
-	fmt.Println("===================SetKeeperTestBegin========================")
-	defer fmt.Println("===================SetKeeperTestEnd=======================")
+	log.Println("===================SetKeeperTestBegin========================")
+	defer log.Println("===================SetKeeperTestEnd=======================")
 	config, err := node.Repo.Config()
 	if err != nil {
-		fmt.Println("获得config错误：", err)
+		log.Println("获得config错误：", err)
 		return err
 	}
 	endPoint := config.Eth
-	fmt.Println("endPoint:", endPoint)
+	log.Println("endPoint:", endPoint)
 
 	hexPk := "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4" //此私钥部署过keeper合约
-	fmt.Println("账户地址address：", address)
+	log.Println("账户地址address：", address)
 
 	queryBalanceRes, err := contracts.QueryBalance(address)
 	if err != nil {
-		fmt.Println("查询余额错误：", err)
+		log.Println("查询余额错误：", err)
 		return err
 	}
-	fmt.Println("查询余额信息：", queryBalanceRes)
+	log.Println("查询余额信息：", queryBalanceRes)
 
 	err = contracts.SetKeeper(common.HexToAddress(address), hexPk, isKeeper)
 	if err != nil {
-		fmt.Println("setKeeper错误:", err)
+		log.Println("setKeeper错误:", err)
 		return err
 	}
-	fmt.Println("setKeeper成功")
-	// fmt.Println("===开始测试IsKeeper===")
+	log.Println("setKeeper成功")
+	// log.Println("===开始测试IsKeeper===")
 	// time.Sleep(2 * time.Minute) //使上面的setKeeper交易执行
 	// isKeeper, err := contracts.IsKeeper(endPoint, common.HexToAddress(address))
 	// if err != nil {
-	// 	fmt.Println("IsKeeper错误：", err)
+	// 	log.Println("IsKeeper错误：", err)
 	// 	return err
 	// }
 	// if !isKeeper {
-	// 	fmt.Println("===IsKeeper测试失败===")
+	// 	log.Println("===IsKeeper测试失败===")
 	// 	return err
 	// }
-	// fmt.Println("===IsKeeper测试成功===")
+	// log.Println("===IsKeeper测试成功===")
 	return nil
 }
 
 func DeployProviderContractTest() {
-	fmt.Println("===================DeployProviderContractTestBegin========================")
-	defer fmt.Println("===================DeployProviderContractTestEnd=======================")
+	log.Println("===================DeployProviderContractTestBegin========================")
+	defer log.Println("===================DeployProviderContractTestEnd=======================")
 	config, _ := localNode.Repo.Config()
 	endPoint := config.Eth
-	fmt.Println("endPoint:", endPoint)
+	log.Println("endPoint:", endPoint)
 
 	hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //获得本节点私钥
 	if err != nil {
-		fmt.Println("获取私钥错误:", err)
+		log.Println("获取私钥错误:", err)
 		return
 	}
-	fmt.Println("私钥hexPk:", hexPk)
+	log.Println("私钥hexPk:", hexPk)
 
 	localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty()) //将id转化成智能合约中的address格式
-	fmt.Println("本节点地址localAddr：", localAddr.String())
+	log.Println("本节点地址localAddr：", localAddr.String())
 
 	queryBalanceRes, err := contracts.QueryBalance(localAddr.Hex())
 	if err != nil {
-		fmt.Println("查询余额错误：", err)
+		log.Println("查询余额错误：", err)
 		return
 	}
-	fmt.Println("查询余额信息：", queryBalanceRes)
+	log.Println("查询余额信息：", queryBalanceRes)
 
 	err = contracts.ProviderContract(hexPk)
 	if err != nil {
-		fmt.Println("provider合约部署错误:", err)
+		log.Println("provider合约部署错误:", err)
 		return
 	}
-	fmt.Println("provider部署合约成功")
+	log.Println("provider部署合约成功")
 }
 
 //SetProviderTest set an account as provider
 func SetProviderTest(address string, node *core.MefsNode, isProvider bool) error {
-	fmt.Println("===================SetProviderTestBegin========================")
-	defer fmt.Println("===================SetProviderTestEnd=======================")
+	log.Println("===================SetProviderTestBegin========================")
+	defer log.Println("===================SetProviderTestEnd=======================")
 	config, err := node.Repo.Config()
 	if err != nil {
-		fmt.Println("获得config错误：", err)
+		log.Println("获得config错误：", err)
 		return err
 	}
 	endPoint := config.Eth
-	fmt.Println("endPoint:", endPoint)
+	log.Println("endPoint:", endPoint)
 
 	hexPk := "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
 
-	fmt.Println("账户地址address：", address)
+	log.Println("账户地址address：", address)
 
 	queryBalanceRes, err := contracts.QueryBalance(address)
 	if err != nil {
-		fmt.Println("查询余额错误：", err)
+		log.Println("查询余额错误：", err)
 		return err
 	}
-	fmt.Println("查询余额信息：", queryBalanceRes)
+	log.Println("查询余额信息：", queryBalanceRes)
 
 	err = contracts.SetProvider(common.HexToAddress(address), hexPk, isProvider)
 	if err != nil {
-		fmt.Println("setProvider错误:", err)
+		log.Println("setProvider错误:", err)
 		return err
 	}
-	fmt.Println("setProvider成功")
-	// fmt.Println("===开始测试IsProvider===")
+	log.Println("setProvider成功")
+	// log.Println("===开始测试IsProvider===")
 	// isProvider, err := contracts.IsProvider(endPoint, common.HexToAddress(address))
 	// if err != nil {
-	// 	fmt.Println("IsProvider错误：", err)
+	// 	log.Println("IsProvider错误：", err)
 	// 	return err
 	// }
 	// if !isProvider {
-	// 	fmt.Println("===IsProvider测试失败===")
+	// 	log.Println("===IsProvider测试失败===")
 	// 	return err
 	// }
-	// fmt.Println("===IsProvider测试成功===")
+	// log.Println("===IsProvider测试成功===")
 	return nil
 }
 
 //testSaveChalPay 测试支付信息的保存和读取操作
 func SaveChalPayTest() error {
-	fmt.Println(">>>>>>>>>>>>>>>>>>>>>SaveChalPayTest>>>>>>>>>>>>>>>>>>>>>")
-	defer fmt.Println("===================SaveChalPayTestEnd============================")
+	log.Println(">>>>>>>>>>>>>>>>>>>>>SaveChalPayTest>>>>>>>>>>>>>>>>>>>>>")
+	defer log.Println("===================SaveChalPayTestEnd============================")
 	groupid := "testGroupid"
 	pid := "testPid"
 	signature := "signature"
@@ -327,25 +327,25 @@ func SaveChalPayTest() error {
 	beginTime := int64(512)
 	endTime := int64(1024)
 	spaceTime := big.NewInt(2048)
-	fmt.Println("没有信息，直接获取数据")
+	log.Println("没有信息，直接获取数据")
 	thisTime := checkLastPayTime(groupid, pid)
 	if thisTime != int64(0) {
-		fmt.Println("获取空数据出错")
+		log.Println("获取空数据出错")
 		return ErrTestFail
 	}
-	fmt.Println("ok!\n保存测试数据")
+	log.Println("ok!\n保存测试数据")
 	_, _, err := saveLastPay(groupid, pid, signature, proof, beginTime, endTime, spaceTime)
 	if err != nil {
-		fmt.Println("saveLastPay()error:", err)
+		log.Println("saveLastPay()error:", err)
 		return ErrTestFail
 	}
-	fmt.Println("ok!\n再次获取数据")
+	log.Println("ok!\n再次获取数据")
 	thisTime = checkLastPayTime(groupid, pid)
 	if thisTime != endTime {
-		fmt.Println("获取空数据出错")
+		log.Println("获取空数据出错")
 		return ErrTestFail
 	}
-	fmt.Print("测试成功")
+	log.Print("测试成功")
 	return nil
 }
 
@@ -353,12 +353,12 @@ func SaveChalPayTest() error {
 func FreeTest() {
 	err := localNode.Routing.(*dht.IpfsDHT).CmdPutTo("testkey", "testvalue", "local")
 	if err != nil {
-		fmt.Println("error!!:", err)
+		log.Println("error!!:", err)
 	}
 	value, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom("testkey", "local")
 	if err != nil {
-		fmt.Println("error!!:", err)
+		log.Println("error!!:", err)
 	} else {
-		fmt.Println(string(value))
+		log.Println(string(value))
 	}
 }

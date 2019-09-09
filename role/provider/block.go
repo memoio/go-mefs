@@ -2,7 +2,7 @@ package provider
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -27,12 +27,12 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 	if len(splitedNcid) < 5 {
 		Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
 		if err != nil {
-			fmt.Printf("Error create block %s: %s", bcid.String(), err)
+			log.Printf("Error create block %s: %s", bcid.String(), err)
 			return err
 		}
 		err = localNode.Blockstore.Put(Nblk)
 		if err != nil {
-			fmt.Printf("Error writing block to datastore: %s", err)
+			log.Printf("Error writing block to datastore: %s", err)
 			return err
 		}
 		return nil
@@ -43,53 +43,53 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 	switch typ {
 	case "append":
 		if has, err := localNode.Blockstore.Has(bcid); !has || err != nil {
-			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
+			log.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
 		beginOffset, err := strconv.Atoi(splitedNcid[3])
 		if err != nil {
-			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
+			log.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
 		endOffset, err := strconv.Atoi(splitedNcid[4])
 		if err != nil {
-			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
+			log.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
 		err = localNode.Blockstore.Append(bcid, []byte(value), beginOffset, endOffset)
 		if err != nil {
-			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
+			log.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
 	case "update":
 		_, err := strconv.Atoi(splitedNcid[3])
 		if err != nil {
-			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
+			log.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
 		_, err = strconv.Atoi(splitedNcid[4])
 		if err != nil {
-			fmt.Printf("Error append field to block %s: %s", bcid.String(), err)
+			log.Printf("Error append field to block %s: %s", bcid.String(), err)
 			return err
 		}
 		if has, _ := localNode.Blockstore.Has(bcid); true == has {
 			err := localNode.Blockstore.DeleteBlock(bcid)
 			if err != nil {
-				fmt.Printf("Error delete block %s: %s", bcid.String(), err)
+				log.Printf("Error delete block %s: %s", bcid.String(), err)
 			}
 		}
 		Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
 		if err != nil {
-			fmt.Printf("Error create block %s: %s", bcid.String(), err)
+			log.Printf("Error create block %s: %s", bcid.String(), err)
 			return err
 		}
 		err = localNode.Blockstore.Put(Nblk)
 		if err != nil {
-			fmt.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
+			log.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
 			return err
 		}
 	default:
-		fmt.Printf("Wrong type in put block")
+		log.Printf("Wrong type in put block")
 	}
 	return nil
 }
@@ -108,7 +108,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 
 	res, userID, key, value, err := verify(sigByte)
 	if err != nil {
-		fmt.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
+		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 	} else if res { //验证通过
 		// 内存channel的value变化
 		// 然后持久化
@@ -126,18 +126,18 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			if !ok {
 				return "", errors.New("Transfer item to channelItem error")
 			}
-			fmt.Println("下载成功，更改内存中channel.value并持久化:", value.String())
+			log.Println("下载成功，更改内存中channel.value并持久化:", value.String())
 			channelItem.Value = value
 			ProContracts.channelBook.Store(userID, channelItem)
 			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value.String(), "local")
 			if err != nil {
-				fmt.Println("cmdPutErr:", err)
+				log.Println("cmdPutErr:", err)
 				return string(b.RawData()), err
 			}
 		}
 		return string(b.RawData()), nil
 	} else { //验证不通过
-		fmt.Printf("verify is false %s", splitedNcid[0])
+		log.Printf("verify is false %s", splitedNcid[0])
 	}
 
 	return "", nil
@@ -148,7 +148,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	signForChannel := &pb.SignForChannel{}
 	err := proto.Unmarshal(mes, signForChannel)
 	if err != nil {
-		fmt.Println("proto.Unmarshal when provider verify err:", err)
+		log.Println("proto.Unmarshal when provider verify err:", err)
 		return false, "", "", nil, err
 	}
 
@@ -158,7 +158,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	userAddr := common.HexToAddress(signForChannel.GetUserAddress())
 	providerAddr := common.HexToAddress(signForChannel.GetProviderAddress())
 	sig := signForChannel.GetSig() //传过来的签名信息如果是空，就表明是测试环境，直接返回true
-	fmt.Println("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
+	log.Println("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
 	if sig == nil {
 		return true, "", "", nil, nil
 	}
@@ -175,12 +175,12 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	}
 	item, ok := ProContracts.channelBook.Load(userID)
 	if !ok {
-		fmt.Println("Not find ", userID, "'s channelItem in channelBook.")
+		log.Println("Not find ", userID, "'s channelItem in channelBook.")
 		return false, "", "", nil, errors.New("Find channelItem in channelBook error")
 	}
 	channelItem, ok := item.(contracts.ChannelItem)
 	if !ok {
-		fmt.Println("Can't transfer item to channelItem.")
+		log.Println("Can't transfer item to channelItem.")
 		return false, "", "", nil, errors.New("Transfer item to channelItem error")
 	}
 	//在Value的基础上再加上此次下载需要支付的money，就是此次验证签名的value
@@ -188,9 +188,9 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	// 默认100 + Value
 	value := big.NewInt(0)
 	value = value.Add(channelItem.Value, big.NewInt(addValue))
-	fmt.Println("==========测试最终value=======:", value.String())
 
 	if money.Cmp(value) != 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
+		log.Println("value is different from money,  value is: ", value.String())
 		return false, "", "", nil, nil
 	}
 

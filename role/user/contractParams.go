@@ -56,13 +56,13 @@ func buildSignParams(userID string, providerID string, privateKey []byte) (commo
 	var userAddress, providerAddress common.Address
 	providerAddress, err := ad.GetAddressFromID(providerID)
 	if err != nil {
-		log.Println("GetProAddrErr", err)
+		log.Println("GetProAddr err: ", err)
 		return userAddress, providerAddress, "", err
 	}
 
 	userAddress, err = ad.GetAddressFromID(userID)
 	if err != nil {
-		log.Println("GetLocalAddrErr", err)
+		log.Println("GetLocalAddr err: ", err)
 		return userAddress, providerAddress, "", err
 	}
 
@@ -83,7 +83,7 @@ func BuildSignMessage() ([]byte, error) {
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		log.Println("protoMarshal failed err:", err)
+		log.Println("protoMarshal failed err: ", err)
 		return nil, err
 	}
 	return mes, nil

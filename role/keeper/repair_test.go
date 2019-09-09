@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"bytes"
-	"fmt"
+	"log"
 	"math/rand"
 	"testing"
 
@@ -13,7 +13,7 @@ import (
 func TestRepair(t *testing.T) {
 	err := mcl.Init(mcl.BLS12_381)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	keySet, _ := mcl.GenKeySet()
 	//providerID := "17nCkDaiLjr2guQG1aYxkdXZsUg"
@@ -53,7 +53,7 @@ func TestRepair(t *testing.T) {
 	blocks[5] = nil
 	newstripe, _ := dataformat.RecoverStripe(blocks)
 	if bytes.Equal(newstripe[1], blocks[1]) {
-		fmt.Println("no1 equal")
+		log.Println("no1 equal")
 	}
 }
 
@@ -72,5 +72,5 @@ func fillRandom(p []byte) {
 // 	UID, _ := peer.IDB58Decode(uid)
 // 	groupid := "0"
 // 	s := SearchNewProvider(UID, groupid)
-// 	fmt.Println("s :", s)
+// 	log.Println("s :", s)
 // }

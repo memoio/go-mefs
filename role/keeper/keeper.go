@@ -3,7 +3,6 @@ package keeper
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -97,12 +96,12 @@ var localNode *core.MefsNode
 func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 	thisGroupinfo, ok := PInfo.Load(groupid)
 	if !ok {
-		fmt.Println("getGroupsInfo err,groupid:", groupid)
+		log.Println("getGroupsInfo err,groupid:", groupid)
 		return nil, false
 	}
 	out, ok := thisGroupinfo.(*GroupsInfo) //做类型断言的检查，接口的类型转换出错说明数据有问题，报错
 	if !ok {
-		fmt.Println("thisGroupinfo.(*GroupsInfo) err！", thisGroupinfo)
+		log.Println("thisGroupinfo.(*GroupsInfo) err！", thisGroupinfo)
 		return nil, false
 	}
 	return out, true
@@ -112,12 +111,12 @@ func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 //关于LocalKeeper属性，指向本组中本地节点的结构，同一个keeper在不同组中的角色可能不同，避免多次同步请求的重复查找
 func getLocalKeeperInGroup(groupid string) (*KeeperInGroup, error) {
 	if !IsKeeperServiceRunning() {
-		fmt.Println("keeper service not running")
+		log.Println("keeper service not running")
 		return nil, ErrKeeperServiceNotReady
 	}
 	thisGroupInfo, ok := getGroupsInfo(groupid)
 	if !ok {
-		fmt.Println("getGroupsInfo err! groupid:", groupid)
+		log.Println("getGroupsInfo err! groupid:", groupid)
 		return nil, ErrNoGroupsInfo
 	}
 	if thisGroupInfo.LocalKeeper == nil {
@@ -138,14 +137,14 @@ func getLocalKeeperInGroup(groupid string) (*KeeperInGroup, error) {
 func localKeeperIsMaster(groupid string) bool {
 	localKeeper, err := getLocalKeeperInGroup(groupid)
 	if err != nil {
-		fmt.Println("getLocalKeeperInGroup err.", err)
+		log.Println("getLocalKeeperInGroup err.", err)
 		return false
 	}
 	var kidList []string
 	if localKeeper.MasterType == UnKnow { //本地节点状态未定,先确定状态
 		thisGroupsInfo, ok := getGroupsInfo(groupid)
 		if !ok {
-			fmt.Println("localkeeperIsMaster err!There is no information in Pinfo,groupid:", groupid)
+			log.Println("localkeeperIsMaster err!There is no information in Pinfo,groupid:", groupid)
 			return false
 		}
 		for _, keeper := range thisGroupsInfo.Keepers {
@@ -191,10 +190,10 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 		localPeerInfo = nil
 		return err
 	}
-	fmt.Println("Keeper Service is ready")
+	log.Println("Keeper Service is ready")
 	err = SearchAllKeepersAndProviders(ctx) //连接节点
 	if err != nil {
-		fmt.Println("SearchAllKeepersAndProviders()err:", err)
+		log.Println("SearchAllKeepersAndProviders err:", err)
 		localNode = nil
 		localPeerInfo = nil
 		return err
@@ -202,7 +201,7 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 	//tendermint启动相关
 	localPeerInfo.enableTendermint = enableTendermint
 	if !localPeerInfo.enableTendermint {
-		fmt.Println("本节点不使用Tendermint")
+		log.Println("Use simple mode")
 	}
 
 	go persistLocalPeerInfoRegular(ctx)
@@ -213,12 +212,11 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 	go spaceTimePayRegular(ctx)
 	go checkStorage(ctx)
 	go checkPeers(ctx)
-	fmt.Println("StartKeeperService() complete!")
 	return nil
 }
 
 func persistLocalPeerInfoRegular(ctx context.Context) {
-	fmt.Println("persistLocalPeerInfoRegular() start!")
+	log.Println("persistLocalPeerInfoRegular start!")
 	ticker := time.NewTicker(PERSISTTIME)
 	defer ticker.Stop()
 	for {
@@ -286,7 +284,7 @@ func PersistlocalPeerInfo() error { //每次退出前将现有的本地PeerInfo�
 	}
 	creditByte, err := proto.Marshal(creditProto)
 	if err != nil {
-		fmt.Println("Credit marshal failed")
+		log.Println("Credit marshal failed, err: ", err)
 	}
 
 	PInfo.Range(func(uid, groupsinfo interface{}) bool { //循环PInfo整理连接的user信息
@@ -297,7 +295,7 @@ func PersistlocalPeerInfo() error { //每次退出前将现有的本地PeerInfo�
 			}
 			return true
 		}
-		fmt.Println("uid.(string) false!uid:", uid)
+		log.Println("uid.(string) false!uid:", uid)
 		return false
 	})
 
@@ -314,7 +312,7 @@ func PersistlocalPeerInfo() error { //每次退出前将现有的本地PeerInfo�
 		}
 		puByte, err := proto.Marshal(puProto) //*格式修改
 		if err != nil {
-			fmt.Println("proto.Marshal error:", err)
+			log.Println("proto.Marshal error:", err)
 		}
 		thischalinfo.Cid.Range(func(k, v interface{}) bool {
 			tmpCidin := &pb.Cidin{
@@ -336,7 +334,7 @@ func PersistlocalPeerInfo() error { //每次退出前将现有的本地PeerInfo�
 		}
 		ledgerByte, err = proto.Marshal(ledgerin) //*格式修改
 		if err != nil {
-			fmt.Println("proto.Marshal error:", err)
+			log.Println("proto.Marshal error:", err)
 		}
 		return true
 	})
@@ -373,7 +371,7 @@ func PersistlocalPeerInfo() error { //每次退出前将现有的本地PeerInfo�
 
 //此函数仅在内测阶段需要，会在每天 1~5点期间，将测试User的信息删掉
 func cleanTestUsersRegular(ctx context.Context) {
-	fmt.Println("cleanTestUsersRegular() start!")
+	log.Println("clean Test Users Regular start!")
 	ticker := time.NewTicker(2 * time.Hour)
 	defer ticker.Stop()
 	for {
@@ -386,7 +384,7 @@ func cleanTestUsersRegular(ctx context.Context) {
 			t2 := t1.Add(4 * time.Hour)
 			//在一点和五点之间，清理testUsers
 			if tNow.After(t1) && tNow.Before(t2) {
-				fmt.Println("Begin to clean testUser")
+				log.Println("Begin to clean test users")
 				go func() {
 					cleanTestUsers()
 				}()
@@ -409,16 +407,16 @@ func cleanTestUsers() {
 		if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
 			return true
 		}
-		fmt.Println(pu.uid, "is a test User, clean its data")
+		log.Println(pu.uid, "is a test User, clean its data")
 		testUsers[pu] = struct{}{}
 		thischalinfo := v.(*chalinfo)
 		thischalinfo.Cid.Range(func(key, value interface{}) bool { //对该PU对中provider保存的块循环
 			blockID := key.(string)
-			fmt.Println("Delete testUser block-", blockID)
+			log.Println("Delete testUser block-", blockID)
 			//先通知Provider删除块
 			km, err := metainfo.NewKeyMeta(blockID, metainfo.DeleteBlock)
 			if err != nil {
-				fmt.Println("construct delete block KV error :", err)
+				log.Println("construct delete block KV error :", err)
 				return false
 			}
 			_, err = sendMetaRequest(km, "", pu.pid)
@@ -431,14 +429,14 @@ func cleanTestUsers() {
 					}
 				}
 				if err != nil {
-					fmt.Println("Delete testUser block failed-", blockID, "error:", err)
+					log.Println("Delete testUser block failed-", blockID, "error:", err)
 				}
 			}
 
 			//再在本地删除记录
 			kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
 			if err != nil {
-				fmt.Println("NewKeyMeta()error!", err, "blockID:", blockID)
+				log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
 			}
 			err = localNode.Routing.(*dht.IpfsDHT).DeleteLocal(kmBlock.ToString())
 			if err != nil {
@@ -476,7 +474,7 @@ func loadAllUser() error {
 	if !IsKeeperServiceRunning() {
 		return ErrKeeperServiceNotReady
 	}
-	fmt.Println("loadAllUser")
+	log.Println("Load All User's Information")
 	localID := localNode.Identity.Pretty() //本地id
 
 	kmUid, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeUID)
@@ -499,7 +497,7 @@ func loadAllUser() error {
 		if remain := len(users) % utils.IDLength; remain != 0 {
 			users = users[:len(users)-remain]
 		}
-		fmt.Println("Load-User", string(users))
+		log.Println("Load-User", string(users))
 		for i := 0; i < len(users)/utils.IDLength; i++ { //对user进行循环，逐个恢复user信息
 			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
 			var userPeersInfo GroupsInfo
@@ -543,24 +541,24 @@ func loadAllUser() error {
 			// 保存Upkeeping信息
 			err = SaveUpkeeping(&userPeersInfo, userID)
 			if err != nil {
-				fmt.Println("Save ", userID, "'s Upkeeping error in loadAllUser", err)
+				log.Println("Save ", userID, "'s Upkeeping error in loadAllUser", err)
 			} else {
-				fmt.Println("Save ", userID, "'s Upkeeping success in loadAllUser")
+				log.Println("Save ", userID, "'s Upkeeping success in loadAllUser")
 			}
 			// 保存Query信息
 			err = SaveQuery(userID)
 			if err != nil {
-				fmt.Println("Save ", userID, "'s Query error in loadAllUser", err)
+				log.Println("Save ", userID, "'s Query error in loadAllUser", err)
 			} else {
-				fmt.Println("Save ", userID, "'s Query success in loadAllUser")
+				log.Println("Save ", userID, "'s Query success in loadAllUser")
 			}
 			// 保存Offer信息
 			for _, provider := range userPeersInfo.Providers {
 				err = SaveOffer(provider)
 				if err != nil {
-					fmt.Println("Save ", provider, "'s Offer error in loadAllUser", err)
+					log.Println("Save ", provider, "'s Offer error in loadAllUser", err)
 				} else {
-					fmt.Println("Save ", provider, "'s Offer success in loadAllUser")
+					log.Println("Save ", provider, "'s Offer success in loadAllUser")
 				}
 			}
 		}
@@ -634,7 +632,6 @@ func SearchAllKeepersAndProviders(ctx context.Context) error {
 	loadKnownKeepersAndProviders(ctx) //先加载持久化的keeper和Provider看看，有助于快速恢复
 	//go newConnPeerRole(PeerIDch, ctx) //此协程不断处理新连接的节点
 	err := checkConnectedPeer() //查看当前连接的节点的角色
-	fmt.Println("checkConnectedPeer()complete")
 	if err != nil {
 		return err
 	}
@@ -745,7 +742,6 @@ func checkConnectedPeer() error {
 	}
 	checkLocalPeers()
 
-	fmt.Println("checkConnectedPeer")
 	localID := localNode.Identity.Pretty() //本地id
 
 	connPeers := localNode.PeerHost.Network().Peers() //the list of peers we are connected to
@@ -783,7 +779,7 @@ func checkConnectedPeer() error {
 			return err
 		}
 
-		fmt.Println("try to get roleinfo from: ", id)
+		log.Println("try to get roleinfo from: ", id)
 		kmRole, err := metainfo.NewKeyMeta(id, metainfo.Local, metainfo.SyncTypeRole)
 		if err != nil {
 			return err
@@ -856,9 +852,9 @@ func newConnPeerRole(peerIDch chan string, ctx context.Context) error { //处理
 					log.Println("Connect to new connect provider: ", id)
 					err := SaveOffer(id)
 					if err != nil {
-						fmt.Println("Save ", id, "'s Offer err in newConnPeerRole", err)
+						log.Println("Save ", id, "'s Offer err in newConnPeerRole", err)
 					} else {
-						fmt.Println("Save ", id, "'s Offer success in newConnPeerRole")
+						log.Println("Save ", id, "'s Offer success in newConnPeerRole")
 					}
 					localPeerInfo.Providers = append(localPeerInfo.Providers, id)
 					err = localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), id, "local")
@@ -878,7 +874,7 @@ func IsKeeperServiceRunning() bool {
 }
 
 func checkStorage(ctx context.Context) {
-	fmt.Println("CheckStorage() start!")
+	log.Println("Check Storage start!")
 	ticker := time.NewTicker(STORAGESYNCTIME)
 	defer ticker.Stop()
 	for {
@@ -890,7 +886,7 @@ func checkStorage(ctx context.Context) {
 				for _, pid := range localPeerInfo.Providers {
 					km, err := metainfo.NewKeyMeta(pid, metainfo.StorageSync)
 					if err != nil {
-						fmt.Println("construct Storage sync KV error :", err)
+						log.Println("construct Storage sync KV error :", err)
 						return
 					}
 					_, err = sendMetaRequest(km, "", pid)
@@ -904,7 +900,7 @@ func checkStorage(ctx context.Context) {
 }
 
 func checkPeers(ctx context.Context) {
-	fmt.Println("CheckConnectedPeer() start!")
+	log.Println("Check Connected Peer start!")
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
 	checkConnectedPeer()

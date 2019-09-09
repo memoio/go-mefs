@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"math/big"
 	"sort"
 	"strings"
@@ -34,7 +34,7 @@ type chalpay struct {
 }
 
 func spaceTimePayRegular(ctx context.Context) {
-	fmt.Println("spaceTimePayRegular() start!")
+	log.Println("spaceTimePay start!")
 	ticker := time.NewTicker(SPACETIMEPAYTIME)
 	defer ticker.Stop()
 	for {
@@ -58,18 +58,18 @@ func spaceTimePay() {
 	PInfo.Range(func(groupid, groupsInfo interface{}) bool { //循环user
 		thisGroupid, ok := groupid.(string)
 		if !ok {
-			fmt.Println("spaceTimePay()", ErrPInfoTypeAssert)
+			log.Println("spaceTimePay()", ErrPInfoTypeAssert)
 			return true
 		}
 		thisGroupsInfo, ok := groupsInfo.(*GroupsInfo)
 		if !ok {
-			fmt.Println("spaceTimePay()", ErrPInfoTypeAssert)
+			log.Println("spaceTimePay()", ErrPInfoTypeAssert)
 			return true
 		}
 		for _, pidString := range thisGroupsInfo.Providers { //循环当前user的provider
 			uk, err := GetUpkeeping(thisGroupsInfo)
 			if err != nil {
-				fmt.Println("getUpkeeping err:", err)
+				log.Println("getUpkeeping err: ", err)
 				continue
 			}
 			materials = append(materials, &payMaterial{
@@ -93,21 +93,21 @@ func spaceTimePay() {
 //先根据本地保存的挑战信息 汇总一段时间内的挑战结果，然后将挑战结果发给同组的其他keeper（同步），收到其他keeper的确认信息后，进行支付操作
 func doSpaceTimePay(groupid string, pidString string, price int64) {
 	if localKeeperIsMaster(groupid) { //只有master节点进行支付过程
-		fmt.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
-		defer fmt.Println("=====spacetimepay=====")
-		fmt.Printf("groupid:%s:\npid:%s\n", groupid, pidString)
+		log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
+		defer log.Println("=====spacetimepay=====")
+		log.Printf("groupid:%s:\npid:%s\n", groupid, pidString)
 		scGroupid, _ := ad.GetAddressFromID(groupid)              //获得userAddress
 		ukaddr, uk, err := contracts.GetUKFromResolver(scGroupid) //查询合约
 		if err != nil {
-			fmt.Println("contracts.GetUKFromResolver() err:", err)
+			log.Println("contracts.GetUKFromResolver() err: ", err)
 			return
 		}
 		ukBalance, err := contracts.QueryBalance(ukaddr) //查询合约价格
 		if err != nil {
-			fmt.Println("contracts.QueryBalance() err:", err)
+			log.Println("contracts.QueryBalance() err: ", err)
 			return
 		}
-		fmt.Printf("ukaddr:%s\nukbalance:%s\n", ukaddr, ukBalance.String())
+		log.Printf("ukaddr:%s\nukbalance:%s\n", ukaddr, ukBalance.String())
 
 		startTime := checkLastPayTime(groupid, pidString)
 		spaceTime, lastTime := resultSummary(groupid, pidString, startTime, utils.GetUnixNow()) //根据时间段获取时空值
@@ -118,25 +118,25 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 		pAddr, _ := ad.GetAddressFromID(pidString)                                   //providerAddress
 		hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //得到本节点的私钥
 		if err != nil {
-			fmt.Println("GetHexPrivKeyFromKS() failed:", err)
+			log.Println("GetHexPrivKeyFromKS() failed: ", err)
 			return
 		}
-		fmt.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
+		log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
 		err = contracts.SpaceTimePay(uk, scGroupid, pAddr, hexPk, amount) //进行支付
 		if err != nil {
-			fmt.Println("contracts.SpaceTimePay() failed:", err)
+			log.Println("contracts.SpaceTimePay() failed: ", err)
 			return
 		}
 
 		km, metaValue, err := saveLastPay(groupid, pidString, "signature", "proof", startTime, lastTime, spaceTime)
 		if err != nil {
-			fmt.Println("saveLastPay() failed:", err)
+			log.Println("saveLastPay() failed: ", err)
 			return
 		}
 		km.SetKeyType(metainfo.Sync)
 		metaSyncTo(km, metaValue) //此次支付结果同步到其他的节点
-		fmt.Println("spaceTimePay complete!")
+		log.Println("spaceTimePay complete!")
 	}
 }
 
@@ -145,13 +145,13 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 	amount := big.NewInt(0)
 	if spacetime.Sign() <= 0 || price <= 0 {
-		fmt.Println("error! spaceTime:", spacetime.String(), "price:", price)
+		log.Println("error! spaceTime:", spacetime.String(), "price:", price)
 		return amount
 	}
 	amount.Mul(spacetime, big.NewInt(price))
 	amount.Quo(amount, big.NewInt(1024*1024*60*60*24)) //注意这里先用时空值×单位，计算出来更加准确
 	if amount.Sign() <= 0 {
-		fmt.Println("error! spaceTime:", spacetime, "amount:", amount, "price:", price)
+		log.Println("error! spaceTime:", spacetime, "amount:", amount, "price:", price)
 		return amount
 	}
 	return amount
@@ -163,7 +163,7 @@ func resultSummary(uid string, pid string, timeStart int64, timeEnd int64) (*big
 	timeList, lenghList := fetchChalresult(uid, pid, timeStart, timeEnd) //取数据
 	spacetime := big.NewInt(0)
 	if len(timeList) <= 1 || len(lenghList) <= 1 {
-		fmt.Println("no enough  challenge data")
+		log.Println("no enough challenge data")
 		return big.NewInt(0), 0
 	}
 	timepre := timeList[0]
@@ -176,7 +176,7 @@ func resultSummary(uid string, pid string, timeStart int64, timeEnd int64) (*big
 		lengthpre = length
 	}
 	if spacetime.Sign() < 0 {
-		fmt.Println("error spacetime<0!\ntimeList:", timeList, "\nlenghlist:", lenghList)
+		log.Println("error spacetime<0!\ntimeList:", timeList, "\nlenghlist:", lenghList)
 	}
 	return spacetime, timepre
 }
@@ -200,7 +200,7 @@ func fetchChalresult(uidString string, pidString string, timestart int64, timeen
 	}
 	thischalinfo, ok := getChalinfo(thisPU)
 	if !ok {
-		fmt.Println("fetchChalresult(),getchalinfo error!")
+		log.Println("fetchChalresult(),getchalinfo error!")
 		return timeList, lenghList
 	}
 	thischalinfo.Time.Range(func(key, value interface{}) bool {
@@ -213,7 +213,7 @@ func fetchChalresult(uidString string, pidString string, timestart int64, timeen
 	for _, key := range tsl {
 		chalres, ok := thischalinfo.Time.Load(key)
 		if !ok {
-			fmt.Println("获取挑战数据失败 time:", utils.UnixToTime(key))
+			log.Println("fetch challenge results err, time:", utils.UnixToTime(key))
 		}
 		timeList = append(timeList, key)
 		lengthtemp := chalres.(*chalresult).length
@@ -227,25 +227,25 @@ func saveLastPay(groupidString, pidString, signature, proof string, beginTime, e
 	//最近一次支付信息，保存在本地 `uid/"local"/"lastpay"/pid`,`beginTime/endTime/spacetime/signature/proof`
 	kmLast, err := metainfo.NewKeyMeta(groupidString, metainfo.Local, metainfo.SyncTypeLastPay, pidString)
 	if err != nil {
-		fmt.Println("doSpaceTimePay()NewKeyMeta()err", err)
+		log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
 		return nil, "", err
 	}
 	valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmLast.ToString(), valueLast, "local")
 	if err != nil {
-		fmt.Println("CmdPutTo()error:", err)
+		log.Println("CmdPutTo()error: ", err)
 		return nil, "", err
 	}
 	//支付信息，保存在内存和本地`uid/"sync"/"chalpay"/pid/beginTime/endTime` `spacetime/signature/proof`
 	km, err := metainfo.NewKeyMeta(groupidString, metainfo.Local, metainfo.SyncTypeChalPay, pidString, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 	if err != nil {
-		fmt.Println("doSpaceTimePay()NewKeyMeta()err", err)
+		log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
 		return nil, "", err
 	}
 	metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local") //持久化保存支付信息
 	if err != nil {
-		fmt.Println("CmdPutTo()error:", err)
+		log.Println("CmdPutTo()error: ", err)
 		return nil, "", err
 	}
 	//将此次支付作为最近一次支付，保存在内存中
@@ -277,18 +277,18 @@ func checkLastPayTime(groupidString string, pidString string) int64 {
 	if !ok {                                      //没有找到 在本地查找
 		kmLast, err := metainfo.NewKeyMeta(groupidString, metainfo.Local, metainfo.SyncTypeLastPay, pidString)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return failtime
 		}
 		valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmLast.ToString(), "local") //在levelDB中查找最近一次支付信息
 		if err != nil {                                                                           //硬盘中也没找到，说明没存。返回failtime
-			fmt.Println("no lastTime data,return Unix(0)")
+			log.Println("no lastTime data, return Unix(0)")
 			return failtime
 		}
 		valueString := string(valueByte)
 		_, thisChalPay, err := parseLastPayKV(kmLast, valueString)
 		if err != nil { //解析出错，一般不会发生
-			fmt.Println("checkLastPayTime() parseLastPayKV() error!", err)
+			log.Println("checkLastPayTime() parseLastPayKV() err: ", err)
 			return failtime
 		}
 		return thisChalPay.endTime
@@ -317,12 +317,12 @@ func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (PU, *chalpay, erro
 	}
 	st, ok := big.NewInt(0).SetString(splitedValue[2], 0)
 	if !ok {
-		fmt.Println("SetString()err!value:", splitedValue[2])
+		log.Println("SetString()err!value: ", splitedValue[2])
 	}
 	begintime := utils.StringToUnix(splitedValue[0])
 	endtime := utils.StringToUnix(splitedValue[1])
 	if begintime == 0 || endtime == 0 {
-		fmt.Println("key:", keyMeta.ToString(), "\nvalue:", value)
+		log.Println("key:", keyMeta.ToString(), "\nvalue:", value)
 		return PU{}, nil, metainfo.ErrIllegalValue
 	}
 	thischalPay := &chalpay{

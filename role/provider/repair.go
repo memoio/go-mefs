@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +30,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	if !ok {
 		tmpUserCongfig, err := getNewUserConfig(userID, keeper)
 		if err != nil {
-			fmt.Println("get new user`s config failed,error :", err)
+			log.Println("get new user`s config failed,error :", err)
 			return err
 		}
 		usersConfigs.Store(userID, tmpUserCongfig.PubKey)
@@ -50,12 +50,12 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 					if right {
 						blkMeta, err := metainfo.GetBlockMeta(splitcpid[0])
 						if err != nil {
-							fmt.Println("get block meta error :", err)
+							log.Println("get block meta error :", err)
 							return err
 						}
 						i, err := strconv.Atoi(blkMeta.GetBid())
 						if err != nil {
-							fmt.Println("strconv.Atoi error :", err)
+							log.Println("strconv.Atoi error :", err)
 							return err
 						}
 						if i >= len(stripe) {
@@ -66,21 +66,21 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 						stripe[i] = make([]byte, len(blk.RawData()))
 						stripe[i] = blk.RawData()
 					} else {
-						fmt.Println("block rawdata verify failed, error :", err)
+						log.Println("block rawdata verify failed, error :", err)
 						return err
 					}
 				} else {
-					fmt.Println("GetBlock error :", err)
+					log.Println("GetBlock error :", err)
 				}
 			} else {
 				cidMeta, err := metainfo.GetBlockMeta(blockID)
 				if err != nil {
-					fmt.Println("get block meta error :", err)
+					log.Println("get block meta error :", err)
 					return err
 				}
 				nbid, err = strconv.Atoi(cidMeta.GetBid())
 				if err != nil {
-					fmt.Println("strconv.Atoi error :", err)
+					log.Println("strconv.Atoi error :", err)
 					return err
 				}
 				//ret = cid|pid|offset
@@ -100,9 +100,9 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	}
 	newstripe, err := rs.Repair(stripe)
 	if err != nil {
-		fmt.Println("修复失败 ：", blockID, "\nrepair error :", err)
+		log.Println("repair ", blockID, " failed, error: ", err)
 		retMetaValue := RepairFailed + metainfo.DELIMITER + ret
-		fmt.Println("repair response metavalue :", retMetaValue)
+		log.Println("repair response metavalue :", retMetaValue)
 		_, err = sendMetaRequest(retKm, retMetaValue, keeper)
 		if err != nil {
 			return err
@@ -113,7 +113,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 				temcid := cid.NewCidV2([]byte(tmpCid))
 				err = localNode.Blocks.DeleteBlock(temcid)
 				if err != nil && err != bs.ErrNotFound {
-					fmt.Println("delete error :", err)
+					log.Println("delete error :", err)
 					return err
 				}
 			}
@@ -123,7 +123,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	ncid := cid.NewCidV2([]byte(blockID))
 	newblk, err := blocks.NewBlockWithCid(newstripe[nbid], ncid)
 	if err != nil {
-		fmt.Println("New block failed, error :", err)
+		log.Println("New block failed, error :", err)
 		return err
 	}
 	//删除修复时get到的block；
@@ -132,7 +132,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 			temcid := cid.NewCidV2([]byte(tmpCid))
 			err = localNode.Blocks.DeleteBlock(temcid)
 			if err != nil && err != bs.ErrNotFound {
-				fmt.Println("delete error :", err)
+				log.Println("delete error :", err)
 				return err
 			}
 		}
@@ -140,15 +140,15 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	//把修复好的block放到本地；
 	err = localNode.Blocks.PutBlock(newblk)
 	if err != nil {
-		fmt.Println("add block failed, error :", err)
+		log.Println("add block failed, error :", err)
 		return err
 	}
 	retMetaValue := RepairSuccess + metainfo.DELIMITER + ret
-	fmt.Println("repair response metavalue :", retMetaValue)
-	fmt.Println("修复成功 ：", blockID)
+	log.Println("repair response metavalue :", retMetaValue)
+	log.Println("repair success：", blockID)
 	_, err = sendMetaRequest(retKm, retMetaValue, keeper)
 	if err != nil {
-		fmt.Println("repair response err :", err)
+		log.Println("repair response err :", err)
 		return err
 	}
 	return nil

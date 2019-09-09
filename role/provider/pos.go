@@ -3,7 +3,8 @@ package provider
 import (
 	"context"
 	"crypto/sha256"
-	"fmt"
+	"errors"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -58,7 +59,7 @@ func PosSerivce() {
 	retryCount := 0
 	for {
 		if retryCount > 10 {
-			fmt.Println("Save upkeeping in posService error, exit from pos mode.")
+			log.Println("Save upkeeping in posService error, exit from pos mode.")
 			return
 		}
 		err := SaveUpkeeping(posID)
@@ -82,26 +83,26 @@ func PosSerivce() {
 	//从磁盘读取存储的Cidprefix
 	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
 	if err != nil {
-		fmt.Println("NewKeyMeta posKM error :", err)
+		log.Println("NewKeyMeta posKM error :", err)
 	} else {
-		fmt.Println("posKm :", posKM.ToString())
+		log.Println("posKm :", posKM.ToString())
 		posValue, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(posKM.ToString(), "local")
 		if err != nil {
-			fmt.Println("Get posKM from local error :", err)
+			log.Println("Get posKM from local error :", err)
 		} else {
-			fmt.Println("posvalue :", string(posValue))
+			log.Println("posvalue :", string(posValue))
 			posCidPrefix = string(posValue)
 			cidInfo, err := metainfo.GetBlockMeta(string(posValue) + "_0")
 			if err != nil {
-				fmt.Println("get block meta in posRegular error :", err)
+				log.Println("get block meta in posRegular error :", err)
 			} else {
 				curGid, err = strconv.Atoi(cidInfo.GetGid()[utils.IDLength:])
 				if err != nil {
-					fmt.Println("strconv.Atoi Gid in posReguar error :", err)
+					log.Println("strconv.Atoi Gid in posReguar error :", err)
 				}
 				curSid, err = strconv.Atoi(cidInfo.GetSid())
 				if err != nil {
-					fmt.Println("strconv.Atoi Sid in posReguar error :", err)
+					log.Println("strconv.Atoi Sid in posReguar error :", err)
 				}
 			}
 		}
@@ -116,7 +117,7 @@ func getDiskUsage() (uint64, error) {
 	dataStore := localNode.Repo.Datastore()
 	DataSpace, err := ds.DiskUsage(dataStore)
 	if err != nil {
-		fmt.Println("get disk usage failed :", err)
+		log.Println("get disk usage failed :", err)
 		return 0, err
 	}
 	return DataSpace, nil
@@ -126,15 +127,20 @@ func getDiskUsage() (uint64, error) {
 func getDiskTotal() (float64, error) {
 	cfg, err := localNode.Repo.Config()
 	if err != nil {
-		fmt.Println("getDiskTotal error :", err)
+		log.Println("getDiskTotal error :", err)
 		return 0, err
 	}
 	maxSpaceStr := strings.Replace(cfg.Datastore.StorageMax, "GB", "", 1)
 	maxSpaceInGB, err := strconv.ParseFloat(maxSpaceStr, 64)
 	if err != nil {
-		fmt.Println("PraseUint maxSpaceStr to maxspace error :", err)
+		log.Println("PraseUint maxSpaceStr to maxspace error :", err)
 		return 0, err
 	}
+
+	if maxSpaceInGB == 0 {
+		return 0, errors.New("max space is zero")
+	}
+
 	maxSpaceInByte := maxSpaceInGB * 1024 * 1024 * 1024
 	return maxSpaceInByte, nil
 }
@@ -146,7 +152,7 @@ func getFreeSpace() {
 
 // posRegular checks posBlocks and decide to add/delete
 func posRegular(ctx context.Context) {
-	fmt.Println("posRegular() start!")
+	log.Println("posRegular() start!")
 
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -172,14 +178,12 @@ func doGenerateOrDelete() {
 	if err != nil {
 		return
 	}
-	fmt.Println("usedSpace :", usedSpace)
 	totalSpace, err := getDiskTotal()
 	if err != nil {
 		return
 	}
-	fmt.Println("totalSpace :", totalSpace)
 	ratio := float64(usedSpace) / totalSpace
-	fmt.Println("(usedSpace)/totalSpace is ", ratio)
+	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",(usedSpace)/totalSpace is: ", ratio)
 	if ratio <= LowWater {
 		generatePosBlocks(uint64(totalSpace / 10))
 	} else if ratio >= HighWater {
@@ -228,7 +232,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		data, _, err := UploadMulpolicy(tmpData)
 		if err != nil {
-			fmt.Println("UploadMulpolicy in generate Pos Blocks error :", err)
+			log.Println("UploadMulpolicy in generate Pos Blocks error :", err)
 			continue
 		}
 
@@ -240,13 +244,13 @@ func generatePosBlocks(increaseSpace uint64) {
 			ncid := cid.NewCidV2([]byte(blockID))
 			newblk, err := blocks.NewBlockWithCid(dataBlock, ncid)
 			if err != nil {
-				fmt.Println("New block failed, error :", err)
+				log.Println("New block failed, error :", err)
 				continue
 			}
-			fmt.Println("New block success :", newblk.Cid())
+			log.Println("New block success :", newblk.Cid())
 			err = localNode.Blocks.PutBlock(newblk)
 			if err != nil {
-				fmt.Println("add block failed, error :", err)
+				log.Println("add block failed, error :", err)
 			}
 			blockList = append(blockList, blockID)
 		}
@@ -264,10 +268,10 @@ func generatePosBlocks(increaseSpace uint64) {
 			continue
 		}
 		posValue := posCidPrefix
-		fmt.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
+		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
 		if err != nil {
-			fmt.Println("CmdPutTo posKM error :", err)
+			log.Println("CmdPutTo posKM error :", err)
 			continue
 		}
 	}
@@ -288,10 +292,10 @@ func deletePosBlocks(decreseSpace uint64) {
 			ncid := cid.NewCidV2([]byte(blockID))
 			err := localNode.Blockstore.DeleteBlock(ncid)
 			if err != nil {
-				fmt.Println("delete block in func deletePosBlocks() error :", err, " blockID :", blockID)
+				log.Println("delete block in func deletePosBlocks() error :", err, " blockID :", blockID)
 				return
 			}
-			fmt.Println("delete block :", blockID, "success")
+			log.Println("delete block : ", blockID, " success")
 			totalDecresed += uint64(5 * Mullen)
 
 			deleteBlocks = append(deleteBlocks, blockID)
@@ -300,7 +304,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		//发送元数据到keeper
 		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosDelete)
 		if err != nil {
-			fmt.Println("construct put blockMeta KV error :", err)
+			log.Println("construct put blockMeta KV error :", err)
 			return
 		}
 		metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
@@ -313,7 +317,7 @@ func deletePosBlocks(decreseSpace uint64) {
 			curGid -= 1024
 		}
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		fmt.Println("after delete ,Gid :", curGid, "\n sid :", curSid, "\ncid prefix :", posCidPrefix)
+		log.Println("after delete ,Gid :", curGid, "\n sid :", curSid, "\ncid prefix :", posCidPrefix)
 	}
 }
 
@@ -323,7 +327,7 @@ func getUserConifg(userID, keeperID string) error {
 	opt.KeySet = new(mcl.KeySet)
 	tmpUserBls12Config, err := getNewUserConfig(userID, keeperID)
 	if err != nil {
-		fmt.Println("getNewUserConfig in get userconfig error :", err)
+		log.Println("getNewUserConfig in get userconfig error :", err)
 		return err
 	}
 
@@ -334,7 +338,7 @@ func getUserConifg(userID, keeperID string) error {
 	//获取私钥
 	opt.KeySet.Sk, err = getUserPrivateKey(userID, keeperID)
 	if err != nil {
-		fmt.Println("getUserPrivateKey in get userconfig error ", err)
+		log.Println("getUserPrivateKey in get userconfig error ", err)
 		return err
 	}
 	return nil

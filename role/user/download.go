@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
-	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -316,7 +315,7 @@ func (ds *downloadStripe) Run(ctx context.Context, stripeID, offsetStart, remain
 	skey := sha256.Sum256(tmpkey)
 	cfg, err := localNode.Repo.Config()
 	if err != nil {
-		log.Println("get config from Download failed.")
+		log.Println("get config from Download failed, err: ", err)
 		ds.writeFunc(nil, ds.jobID, err)
 		return
 	}
@@ -374,7 +373,7 @@ func (ds *downloadStripe) Run(ctx context.Context, stripeID, offsetStart, remain
 					ds.writeFunc(nil, ds.jobID, err)
 					return
 				}
-				fmt.Println("下载成功，更改内存中channel.value", channel.ChannelAddr, money.String())
+				log.Println("下载成功，更改内存中channel.value", channel.ChannelAddr, money.String())
 				channel.Value = money
 				cs.channelBook[provider] = channel
 			}

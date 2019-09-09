@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -52,7 +51,7 @@ func getChalresult(thisPU PU, time int64) (*chalresult, bool) {
 
 // 挑战过程的起始函数 定时对本节点连接的provider发起挑战
 func challengeRegular(ctx context.Context) { //定期挑战
-	fmt.Println("ChallengeRegular() start!")
+	log.Println("ChallengeRegular() start!")
 	ticker := time.NewTicker(CHALTIME)
 	defer ticker.Stop()
 	for {
@@ -125,7 +124,7 @@ func doChallengeBLS12(pu PU, blocks []string, chaltime int64) error {
 		}
 		hByte, err := proto.Marshal(hProto)
 		if err != nil {
-			log.Println("marshal h failed")
+			log.Println("marshal h failed, err: ", err)
 			return err
 		}
 
@@ -161,14 +160,14 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		if index != "" {
 			block, _, err := utils.SplitIndex(index)
 			if err != nil {
-				fmt.Println(err)
+				log.Println("SplitIndex err:", err)
 				return
 			}
 			blocks = append(blocks, block)
 		}
 	}
 	if len(blocks) != 0 {
-		fmt.Println("Fault or NotFound blocks :", blocks)
+		log.Println("Fault or NotFound blocks :", blocks)
 		reduceCredit(pid)
 	}
 	pu := PU{
@@ -178,13 +177,12 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	challengetime := utils.StringToUnix(chaltime)
 	thischalinfo, ok := getChalinfo(pu)
 	if !ok {
-		fmt.Println("getChalinfo error!pu:", pu)
+		log.Println("getChalinfo error!pu: ", pu)
 		return
 	}
 	thischalresult, ok := thischalinfo.Time.Load(challengetime) //获取之前建立好的挑战信息结构
 	if !ok {
-		fmt.Println("thischalinfo.Time.Load error!challengetime:", challengetime)
-		fmt.Println("PU:", pu)
+		log.Println("thischalinfo.Time.Load error!challengetime:", challengetime)
 		return
 	}
 	h.C = thischalresult.(*chalresult).h
@@ -228,16 +226,16 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	}
 	pubs, err := getUserBLS12Config(uid)
 	if err != nil {
-		fmt.Println("getUserBLS12Config error! uid:", uid)
+		log.Println("getUserBLS12Config error! uid:", uid)
 		return
 	}
 	res, err := mcl.VerifyProof(pubs.PubKey, h, proof)
 	if err != nil {
-		fmt.Println("mcl.VerifyProof error!", err)
+		log.Println("mcl.VerifyProof err: ", err)
 		return
 	}
 	if res { //验证proof通过后,循环记录每一个块的挑战信息（用于修复），和此次对provider的挑战信息
-		//fmt.Println("verify success cid :", h.Indices)
+		//log.Println("verify success cid :", h.Indices)
 		//更新thischalinfo.Cid的信息
 		for _, tmpindex := range h.Indices {
 			blockID, _, _ := utils.SplitIndex(tmpindex)
@@ -246,7 +244,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 			} else {
 				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
 				if err != nil {
-					fmt.Println(err)
+					log.Println("NewKeyMeta err:", err)
 					return
 				}
 				pidoff, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmBlock.ToString(), "")
@@ -281,7 +279,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		//挑战信息验证通过后，同步给组内的其他keeper
 		kmChal, err := metainfo.NewKeyMeta(uid, metainfo.Sync, metainfo.SyncTypeChalRes, pid, localNode.Identity.Pretty(), chaltime)
 		if err != nil {
-			fmt.Println("metainfo.NewKeyMeta()err")
+			log.Println("metainfo.NewKeyMeta err: ", err)
 			return
 		}
 		metavalue := strings.Join([]string{strconv.Itoa(int(length)), "1", strconv.Itoa(int(thisSum)), strconv.Itoa(int(thisH)), proof}, metainfo.DELIMITER)
@@ -289,7 +287,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		thischalinfo.Time.Store(challengetime, newchalresult)
 		addCredit(pid)
 	} else {
-		fmt.Println("verify failed cid :", h.Indices)
+		log.Println("verify failed cid: ", h.Indices)
 		reduceCredit(pid)
 	}
 

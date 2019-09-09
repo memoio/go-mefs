@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"fmt"
+	"log"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,7 +21,7 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	}
 	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
-		fmt.Println("get ", userID, "'s ukAddr err:", err)
+		log.Println("get ", userID, "'s ukAddr err:", err)
 		return err
 	}
 	// get upkkeeping params
@@ -42,7 +42,7 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 
 func GetUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
 	if gp.upkeeping.UserID == "" || gp.upkeeping.UpKeepingAddr == "" {
-		fmt.Println("OfferItem hasn't set")
+		log.Println("OfferItem hasn't set")
 		return gp.upkeeping, ErrGetContractItem
 	}
 	return gp.upkeeping, nil
@@ -76,7 +76,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := localPeerInfo.queryBook.Load(userID)
 	if !ok {
-		fmt.Println("Not find ", userID, "'s queryItem in querybook")
+		log.Println("Not find ", userID, "'s queryItem in querybook")
 		return queryItem, ErrGetContractItem
 	}
 	queryItem = value.(contracts.QueryItem)
@@ -111,7 +111,7 @@ func GetOffer(providerID string) (contracts.OfferItem, error) {
 	var offerItem contracts.OfferItem
 	value, ok := localPeerInfo.offerBook.Load(providerID)
 	if !ok {
-		fmt.Println("Not find ", providerID, "'s offerItem in offerBook")
+		log.Println("Not find ", providerID, "'s offerItem in offerBook")
 		return offerItem, ErrGetContractItem
 	}
 	offerItem = value.(contracts.OfferItem)
@@ -122,25 +122,25 @@ func GetOffer(providerID string) (contracts.OfferItem, error) {
 func ukAddProvider(uid, pid, sk string) error {
 	gp, ok := getGroupsInfo(uid)
 	if !ok {
-		fmt.Println("ukAddProvider getGroupsInfo() error")
+		log.Println("ukAddProvider getGroupsInfo() error")
 		return ErrNoGroupsInfo
 	}
 	uk, err := GetUpkeeping(gp)
 	if err != nil {
 		err := SaveUpkeeping(gp, uid)
 		if err != nil {
-			fmt.Println("ukAddProvider GetUpkeeping() error", err)
+			log.Println("ukAddProvider GetUpkeeping() error", err)
 			return err
 		}
 		uk, err = GetUpkeeping(gp) //保存之后重试。还是出错就返回
 		if err != nil {
-			fmt.Println("ukAddProvider GetUpkeeping() error", err)
+			log.Println("ukAddProvider GetUpkeeping() error", err)
 			return err
 		}
 	}
 	providerAddr, err := ad.GetAddressFromID(pid)
 	if err != nil {
-		fmt.Println("ukAddProvider GetAddressFromID() error", err)
+		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 	for _, localPid := range uk.ProviderIDs { //判断该provider是否为新,如果存在，直接返回
@@ -151,12 +151,12 @@ func ukAddProvider(uid, pid, sk string) error {
 
 	userAddr, err := ad.GetAddressFromID(uid)
 	if err != nil {
-		fmt.Println("ukAddProvider GetAddressFromID() error", err)
+		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 	err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
 	if err != nil {
-		fmt.Println("ukAddProvider AddProvider() error", err)
+		log.Println("ukAddProvider AddProvider() error", err)
 		return err
 	}
 	//uk.ProviderAddrs = append(uk.ProviderAddrs, providerAddr.String())

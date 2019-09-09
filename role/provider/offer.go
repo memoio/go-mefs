@@ -2,7 +2,7 @@ package provider
 
 import (
 	"errors"
-	"fmt"
+	"log"
 
 	"github.com/ethereum/go-ethereum/common"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -21,14 +21,14 @@ func getParamsForDeployContract(node *core.MefsNode) (hexPK string, localAddress
 	id := peer.IDB58Encode(node.Identity)
 	localAddress, err = ad.GetAddressFromID(id)
 	if err != nil {
-		fmt.Println("getLocalAddrErr", err)
+		log.Println("getLocalAddr err: ", err)
 		return "", localAddress, err
 	}
 
 	//得到部署resolver的provider的私钥
 	hexPK, err = fr.GetHexPrivKeyFromKS(node.Identity, node.Password)
 	if err != nil {
-		fmt.Println("getHexPKErr", err)
+		log.Println("getHexPK err: ", err)
 		return "", localAddress, err
 	}
 
@@ -46,13 +46,13 @@ func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duratio
 	indexerAddr := common.HexToAddress(contracts.IndexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
+		log.Println("newIndexer err: ", err)
 		return err
 	}
 
 	//获得用户的账户余额
 	balance, _ := contracts.QueryBalance(localAddress.Hex())
-	fmt.Println("balance:", balance)
+	log.Println("balance is: ", balance)
 	//先部署resolver-for-channel
 	//如果部署过resolver-for-channel，那接下来就可以直接检查是否部署过offer合约，没有的话就部署
 	//DeployResolver()函数内部会进行判断是否部署过
@@ -63,10 +63,10 @@ func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duratio
 
 	//获得用户的账户余额
 	balance, _ = contracts.QueryBalance(localAddress.Hex())
-	fmt.Println("balance:", balance)
+	log.Println("after deploying resolver for channel, balance is: ", balance)
 	//再开始部署offer合约
 	if reDeployOffer { //用户想要重新部署offer合约
-		fmt.Println("provider wants to redeploy offer-contract")
+		log.Println("provider wants to redeploy offer-contract")
 	}
 	err = contracts.DeployOffer(localAddress, hexPK, capacity, duration, price, reDeployOffer)
 	if err != nil {

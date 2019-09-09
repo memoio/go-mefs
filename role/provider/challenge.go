@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"log"
 	"strconv"
 
@@ -21,7 +20,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	if !ok {
 		tmpUserCongfig, err := getNewUserConfig(userID, from)
 		if err != nil {
-			fmt.Println("get new user`s config from:", from, "failed, error :", err)
+			log.Println("get new user`s config from:", from, "failed, error :", err)
 			return err
 		}
 		usersConfigs.Store(userID, tmpUserCongfig.PubKey)
@@ -35,7 +34,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	hByte, _ := b58.Decode(metaValue)
 	err := proto.Unmarshal(hByte, hProto)
 	if err != nil {
-		fmt.Println("unmarshal h failed")
+		log.Println("unmarshal h failed, err: ", err)
 	}
 
 	var chal mcl.Challenge
@@ -68,7 +67,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 			} else {
 				isTrue := mcl.VerifyTag(tmpdata, tmptag, electedIndex, pubKey)
 				if !isTrue {
-					fmt.Println("verify tag failed")
+					log.Println("verify tag failed")
 					//验证失败，则在本地删除此块
 					err := localNode.Blocks.DeleteBlock(blockID)
 					if err != nil {
@@ -87,17 +86,17 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 
 	proof, err := mcl.GenProof(pubKey, chal, data, tag)
 	if err != nil {
-		fmt.Println("GenProof err-", err)
+		log.Println("GenProof err: ", err)
 		return err
 	}
 	// 在发送之前检查生成的proof
 	boo, err := mcl.VerifyProof(pubKey, chal, proof)
 	if err != nil {
-		fmt.Println("verify proof failed, err is: ", err)
+		log.Println("verify proof failed, err is: ", err)
 		return err
 	}
 	if !boo {
-		fmt.Println("proof is false")
+		log.Println("proof is false")
 		return mcl.ErrProofVerifyInProvider
 	}
 	retKm, err := metainfo.NewKeyMeta(uid, metainfo.Proof, b58.Encode([]byte(FaultBlock)), ops[0])
@@ -108,7 +107,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
 	_, err = sendMetaRequest(retKm, retMetaValue, from)
 	if err != nil {
-		fmt.Println("send proof err :", err)
+		log.Println("send proof err: ", err)
 	}
 	return nil
 }

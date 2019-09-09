@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
@@ -25,16 +24,15 @@ const (
 )
 
 func checkrepairlist(ctx context.Context) {
-	fmt.Println("Checkrepairlist() start!")
+	log.Println("Check Repairlist start!")
 	repch = make(chan string, 1024)
 	go func() {
 		for {
 			select {
 			case cid := <-repch:
 				uid := cid[:utils.IDLength]
-				fmt.Println("get need repair cid :", cid)
 				if localKeeperIsMaster(uid) {
-					fmt.Println("repairing cid :", cid)
+					log.Println("repairing cid: ", cid)
 					RepairBlock(uid, cid)
 				}
 			case <-ctx.Done():
@@ -51,7 +49,7 @@ func RepairBlock(userID string, blockID string) {
 	var offset int
 	blkinfo, err := metainfo.GetBlockMeta(blockID)
 	if err != nil {
-		fmt.Println("Get Block Meta error :", blockID, err)
+		log.Println("Get Block Meta error :", blockID, err)
 		return
 	}
 
@@ -63,7 +61,7 @@ func RepairBlock(userID string, blockID string) {
 				cid := key.(string)
 				blockMeta, err := metainfo.GetBlockMeta(cid)
 				if err != nil {
-					fmt.Println("GetBlockMeta error :", err)
+					log.Println("GetBlockMeta error :", err)
 					return false
 				}
 				if blkinfo.GetGid() == blockMeta.GetGid() && blkinfo.GetSid() == blockMeta.GetSid() && blkinfo.GetBid() != blockMeta.GetBid() {
@@ -84,7 +82,7 @@ func RepairBlock(userID string, blockID string) {
 		log.Println("Repair failed, no provider")
 		return
 	}
-	fmt.Println("response provider :", response)
+	log.Println("Repair provider: ", response)
 	var rpids string
 	for _, cpid := range cpids {
 		rpids += cpid
@@ -92,14 +90,14 @@ func RepairBlock(userID string, blockID string) {
 	}
 	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair)
 	if err != nil {
-		fmt.Println("construct repair KV error :", err)
+		log.Println("construct repair KV error: ", err)
 		return
 	}
 	metaValue := rpids
-	fmt.Println("cpids :", cpids, "\nrpids :", rpids)
+	log.Println("cpids: ", cpids, "\nrpids: ", rpids)
 	_, err = sendMetaRequest(km, metaValue, response)
 	if err != nil {
-		fmt.Println("err :", err)
+		log.Println("err: ", err)
 	}
 }
 
@@ -107,13 +105,13 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 	blockID := km.GetMid()
 	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
 	if len(splitedValue) != 4 {
-		fmt.Println(metainfo.ErrIllegalValue, metaValue)
+		log.Println("handleRepairResponse err: ", metainfo.ErrIllegalValue, metaValue)
 		return
 	}
 	pid := splitedValue[2]
 	offset, err := strconv.Atoi(splitedValue[3])
 	if err != nil {
-		fmt.Println("strconv.Atoi offset error :", err)
+		log.Println("strconv.Atoi offset error: ", err)
 		return
 	}
 	uid := blockID[:utils.IDLength]
@@ -122,7 +120,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 		uid: uid,
 	}
 	if strings.Compare(splitedValue[0], RepairFailed) == 0 {
-		fmt.Println("修复失败 cid :", blockID)
+		log.Println("repair failed, cid is: ", blockID)
 		thischalinfo, ok := getChalinfo(pu)
 		if ok {
 			if thiscidinfo, ok := thischalinfo.Cid.Load(blockID); ok {
@@ -130,7 +128,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 				thiscidinfo.(*cidInfo).repair = 0
 			}
 		} else {
-			fmt.Println("!ok blockID :", blockID, "\npid :", pid, "\nuid :", uid)
+			log.Println("!ok blockID :", blockID, "\npid :", pid, "\nuid :", uid)
 			isTestUser := false
 			addr, err := address.GetAddressFromID(pu.uid)
 			if err == nil {
@@ -159,7 +157,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 			pid: provider,
 			uid: uid,
 		}
-		fmt.Println("修复成功 cid :", blockID)
+		log.Println("repair success, cid is: ", blockID)
 		newcidinfo := &cidInfo{
 			repair:    0,
 			availtime: utils.GetUnixNow(),
@@ -203,7 +201,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 		var flag int
 		thisGroupsInfo, ok := getGroupsInfo(uid)
 		if !ok {
-			fmt.Println(ErrNoGroupsInfo)
+			log.Println(ErrNoGroupsInfo)
 			return
 		}
 		for _, Pid := range thisGroupsInfo.Providers {
@@ -221,20 +219,20 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 
 		kmPid, err := metainfo.NewKeyMeta(uid, metainfo.Sync, metainfo.SyncTypePid)
 		if err != nil {
-			fmt.Println("construct SyncPidsK error :", err)
+			log.Println("construct SyncPidsK error :", err)
 			return
 		}
 		metaSyncTo(kmPid, NewPids)
 		kmPid.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmPid.ToString(), NewPids, "local")
 		if err != nil {
-			fmt.Println("construct SyncPidsK error :", err)
+			log.Println("construct SyncPidsK error :", err)
 			return
 		}
 		//更新block的meta信息
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Sync, metainfo.SyncTypeBlock)
 		if err != nil {
-			fmt.Println("construct Syncblock KV error :", err)
+			log.Println("construct Syncblock KV error :", err)
 			return
 		}
 		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
@@ -242,7 +240,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 		kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBlock.ToString(), metaValue, "local")
 		if err != nil {
-			fmt.Println("construct SyncPidsK error :", err)
+			log.Println("construct SyncPidsK error :", err)
 			return
 		}
 	}

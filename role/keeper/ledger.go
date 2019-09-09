@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -108,7 +108,7 @@ func deleteBlockInLedger(pid string, bm *metainfo.BlockMeta) {
 }
 
 func checkLedger(ctx context.Context) {
-	fmt.Println("CheckLedger() start!")
+	log.Println("Check Ledger Start!")
 	time.Sleep(2 * CHALTIME)
 	ticker := time.NewTicker(CHECKTIME)
 	defer ticker.Stop()
@@ -126,9 +126,9 @@ func checkLedger(ctx context.Context) {
 
 					thischalinfo := v.(*chalinfo)
 					thischalinfo.Cid.Range(func(key, value interface{}) bool {
-						//fmt.Println("avaltime :", value.(*cidInfo).availtime)
+						//log.Println("avaltime :", value.(*cidInfo).availtime)
 						if EXPIRETIME < (utils.GetUnixNow()-value.(*cidInfo).availtime) && value.(*cidInfo).repair < 3 {
-							fmt.Println("need repair cid :", key.(string))
+							log.Println("Need repair cid: ", key.(string))
 							value.(*cidInfo).repair++
 							repch <- key.(string)
 						}

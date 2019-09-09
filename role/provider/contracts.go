@@ -2,7 +2,7 @@ package provider
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -12,30 +12,30 @@ import (
 )
 
 func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) error {
-	fmt.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
+	log.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
 	err := SaveUpkeeping(km.GetMid())
 	if err != nil {
-		fmt.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
+		log.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
 	} else {
-		fmt.Println("Save ", km.GetMid(), "'s Upkeeping success")
+		log.Println("Save ", km.GetMid(), "'s Upkeeping success")
 	}
 	err = SaveChannel(km.GetMid())
 	if err != nil {
-		fmt.Println("Save ", km.GetMid(), "'s Channel err", err)
+		log.Println("Save ", km.GetMid(), "'s Channel err", err)
 	} else {
-		fmt.Println("Save ", km.GetMid(), "'s Channel success")
+		log.Println("Save ", km.GetMid(), "'s Channel success")
 	}
 	err = SaveQuery(km.GetMid())
 	if err != nil {
-		fmt.Println("Save ", km.GetMid(), "'s Query err", err)
+		log.Println("Save ", km.GetMid(), "'s Query err", err)
 	} else {
-		fmt.Println("Save ", km.GetMid(), "'s Query success")
+		log.Println("Save ", km.GetMid(), "'s Query success")
 	}
 	err = SaveOffer()
 	if err != nil {
-		fmt.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
+		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
 	} else {
-		fmt.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
+		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
 	}
 	return nil
 }
@@ -67,7 +67,7 @@ func GetUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 	var upkeepingItem contracts.UpKeepingItem
 	value, ok := ProContracts.upKeepingBook.Load(userID)
 	if !ok {
-		fmt.Println("Not find ", userID, "'s upkeepingItem in upKeepingBook")
+		log.Println("Not find ", userID, "'s upkeepingItem in upKeepingBook")
 		return upkeepingItem, ErrGetContractItem
 	}
 	upkeepingItem = value.(contracts.UpKeepingItem)
@@ -97,17 +97,17 @@ func SaveChannel(userID string) error {
 	valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), "local")
 	if err != nil {
 		// 本地没查到，value设为0
-		fmt.Println("Can't get channel value in local,err :", err, ", so  set channel value to 0")
+		log.Println("Can't get channel value in local,err :", err, ", so  set channel value to 0")
 		value = big.NewInt(0)
 	} else {
-		fmt.Println("Get channel value in local:", string(valueByte))
+		log.Println("Get channel value in local:", string(valueByte))
 		var ok bool
 		value, ok = new(big.Int).SetString(string(valueByte), 10)
 		if !ok {
 			return errors.New("bigint setString error")
 		}
 	}
-	fmt.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
+	log.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
 	time, err := contracts.GetChannelStartDate(proAddr, proAddr, userAddr)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func GetChannel(userID string) (contracts.ChannelItem, error) {
 	var channelItem contracts.ChannelItem
 	value, ok := ProContracts.channelBook.Load(userID)
 	if !ok {
-		fmt.Println("Not find ", userID, "'s channelItem in channelBook")
+		log.Println("Not find ", userID, "'s channelItem in channelBook")
 		return channelItem, ErrGetContractItem
 	}
 	channelItem = value.(contracts.ChannelItem)
@@ -175,7 +175,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := ProContracts.queryBook.Load(userID)
 	if !ok {
-		fmt.Println("Not find ", userID, "'s queryItem in queryBook")
+		log.Println("Not find ", userID, "'s queryItem in queryBook")
 		return queryItem, ErrGetContractItem
 	}
 	queryItem = value.(contracts.QueryItem)
@@ -204,7 +204,7 @@ func SaveOffer() error {
 
 func GetOffer() (contracts.OfferItem, error) {
 	if ProContracts.offer.OfferAddr == "" || ProContracts.offer.ProviderID == "" {
-		fmt.Println("OfferItem hasn't set")
+		log.Println("OfferItem hasn't set")
 		return ProContracts.offer, ErrGetContractItem
 	}
 	return ProContracts.offer, nil
