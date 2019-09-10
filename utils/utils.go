@@ -32,7 +32,7 @@ const (
 	//BlockSize 暂定一个块中纯data的大小，1k
 	BlockSize = 1024 * 1024
 
-	MAXOFFSET = 255 // 一个Stripe最多有256个field，最大offset为255
+	SegementCount = 256
 )
 
 //false 意味着有，true表示无重复

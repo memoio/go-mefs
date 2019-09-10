@@ -251,8 +251,8 @@ func VerifyBlockLength(blockData []byte, beginoffset, tagFlag, segmentSize, data
 	if len(noPreRawdata)%int(fieldSize) != 0 { //fields有问题
 		return false, ErrDataBroken
 	}
-	if dif+beginoffset*int(pre.SegmentSize)*dataCount > (utils.MAXOFFSET+1)*int(pre.SegmentSize)*dataCount {
-		if len(noPreRawdata)/int(fieldSize) < utils.MAXOFFSET+1 {
+	if dif+beginoffset*int(pre.SegmentSize)*dataCount > (utils.SegementCount)*int(pre.SegmentSize)*dataCount {
+		if len(noPreRawdata)/int(fieldSize) < utils.SegementCount {
 			return false, ErrDataBroken
 		}
 	} else {

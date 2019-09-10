@@ -289,9 +289,9 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 	// true为纠删
 	switch encoder.Policy {
 	case dataformat.RsPolicy:
-		readByte = SegementCount * ul.segmentSize * dataCount //每一次读取的数据，尽量读一个整的
+		readByte = utils.SegementCount * ul.segmentSize * dataCount //每一次读取的数据，尽量读一个整的
 	case dataformat.MulPolicy:
-		readByte = SegementCount * ul.segmentSize //每一次读取的数据，尽量读一个整的，多副本只读一个
+		readByte = utils.SegementCount * ul.segmentSize //每一次读取的数据，尽量读一个整的，多副本只读一个
 	default:
 		return ErrPolicy
 	}
@@ -451,7 +451,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				return ErrNoEnoughProvider
 			}
 		}
-		if offset >= int(SegementCount-1) { //如果写满了一个stripe
+		if offset >= int(utils.SegementCount-1) { //如果写满了一个stripe
 			ul.LfsService.CurrentLog.BucketByID[ul.BucketID].CurStripe++
 			ul.LfsService.CurrentLog.BucketByID[ul.BucketID].NextOffset = 0
 		} else {

@@ -25,8 +25,7 @@ const (
 	DefaultDuration int64 = 10      //单位：天
 	DefaultPrice    int64 = 1000000 //单位：wei
 
-	DefaultPassword       = "123456"
-	SegementCount   int32 = 256
+	DefaultPassword = "123456"
 
 	//LFS
 	maxObjectNameLen = 4096 //设定文件名和路径可占用的最长字节数

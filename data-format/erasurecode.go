@@ -7,7 +7,6 @@ import (
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
-	"github.com/memoio/go-mefs/utils"
 )
 
 // 将传入的n个数据块编码成n+m个数据冗余块组的形式，并返回该数据冗余块组
@@ -71,59 +70,57 @@ func RecoverData(datas [][]byte, dataCount, parityCount int, index ...int) ([][]
 }
 
 // 将传入的Rawdata数据块编码成含前缀的规范化块组Stripe，并返回该Stripe及结束时的offset
-func EncodeDataToPreStripe(data []byte, ncidPrefix string, DataCount, ParityCount, tagflag int, SegmentSize uint64, keyset *mcl.KeySet) ([][]byte, int, error) {
-	if (utils.MAXOFFSET+1)*SegmentSize*uint64(DataCount) < uint64(len(data)) {
-		return nil, 0, ErrDataToolong
-	}
+func EncodeDataToPreStripe(data []byte, ncidPrefix string, dataCount, parityCount, tagflag int, segmentSize uint64, keyset *mcl.KeySet) ([][]byte, int, error) {
 	if len(data) == 0 {
 		return nil, 0, ErrDataTooShort
 	}
-	tagNum := 1 + (ParityCount-1)/DataCount + 1
-	enc, err := reedsolomon.New(DataCount, ParityCount)
+	tagNum := 1 + (parityCount-1)/dataCount + 1
+	enc, err := reedsolomon.New(dataCount, parityCount)
 	if err != nil {
 		return nil, 0, err
 	}
-	encP, err := reedsolomon.New(DataCount+ParityCount, (DataCount+ParityCount)*(tagNum-1))
+	encP, err := reedsolomon.New(dataCount+parityCount, (dataCount+parityCount)*(tagNum-1))
 	if err != nil {
 		return nil, 0, err
 	}
 	// 生成块组Stripe
 	var stripe [][]byte
-	realOffset := (len(data) - 1) / (int(SegmentSize) * DataCount)
+	realOffset := (len(data) - 1) / (int(segmentSize) * dataCount)
 	tagSize, ok := DefaultLengths[uint64(tagflag)]
 	if !ok {
 		return nil, 0, ErrWrongTagFlag
 	}
-	prefix, err := PrefixEncode(RsPolicy, uint64(DataCount), uint64(ParityCount), uint64(tagflag), SegmentSize, tagSize)
+	prefix, err := PrefixEncode(RsPolicy, uint64(dataCount), uint64(parityCount), uint64(tagflag), segmentSize, tagSize)
 	if err != nil {
 		return nil, 0, err
 	}
-	stripe = createStripeHavePrefix(SegmentSize, tagSize, prefix, DataCount, ParityCount, realOffset+1)
+	stripe = createStripeHavePrefix(segmentSize, tagSize, prefix, dataCount, parityCount, realOffset+1)
 
 	// 生成临时块组保存data切分后的segment
-	tmpdata := creatGroup(DataCount+ParityCount, SegmentSize)
+	tmpdata := creatGroup(dataCount+parityCount, segmentSize)
 	// 生成taggroup装一组的tag+tagP
-	taggroup := creatGroup((DataCount+ParityCount)*tagNum, tagSize)
-	for i := 0; i <= utils.MAXOFFSET && data != nil; i++ {
+	taggroup := creatGroup((dataCount+parityCount)*tagNum, tagSize)
+
+	for i := 0; i <= realOffset && data != nil; i++ {
 		clearGroup(tmpdata)
 		clearGroup(taggroup)
-		for j := 0; j < DataCount; j++ {
+		for j := 0; j < dataCount; j++ {
 			// 填充数据
-			if SegmentSize > uint64(len(data)) {
+			if segmentSize > uint64(len(data)) {
 				copy(tmpdata[j], data)
 				data = nil
 				break
 			}
-			copy(tmpdata[j], data[:SegmentSize])
-			data = data[SegmentSize:]
+			copy(tmpdata[j], data[:segmentSize])
+			data = data[segmentSize:]
 		}
 		err = enc.Encode(tmpdata)
 		if err != nil {
 			return nil, 0, err
 		}
-		for j := 0; j < DataCount+ParityCount; j++ {
+		for j := 0; j < dataCount+parityCount; j++ {
 			// 生成tag并装进taggroup，index为peerid_bucketid_stripeid_blockid_offsetid
-			tag, err := GenTagForSegment(tmpdata[j], []byte(ncidPrefix+"_"+strconv.Itoa(j)+"_"+strconv.Itoa(i)), uint64(tagflag), SegmentSize, keyset)
+			tag, err := GenTagForSegment(tmpdata[j], []byte(ncidPrefix+"_"+strconv.Itoa(j)+"_"+strconv.Itoa(i)), uint64(tagflag), segmentSize, keyset)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -142,9 +139,6 @@ func EncodeDataToPreStripe(data []byte, ncidPrefix string, DataCount, ParityCoun
 
 // 将传入的Rawdata数据块编码成不含前缀的块组Stripe，并返回该Stripe。便于发送给provider进行append操作
 func EncodeDataToNoPreStripe(data []byte, ncidPrefix string, dataCount, parityCount, tagflag, beginOffset int, segmentSize uint64, keyset *mcl.KeySet) ([][]byte, int, error) {
-	if (utils.MAXOFFSET-beginOffset+1)*int(segmentSize)*dataCount < len(data) {
-		return nil, 0, ErrDataToolong
-	}
 	if len(data) == 0 {
 		return nil, 0, ErrDataTooShort
 	}
@@ -169,7 +163,9 @@ func EncodeDataToNoPreStripe(data []byte, ncidPrefix string, dataCount, parityCo
 	tmpdata := creatGroup(dataCount+parityCount, segmentSize)
 	// 生成taggroup装一组的tag+tagP
 	taggroup := creatGroup((dataCount+parityCount)*tagNum, tagSize)
-	for i := beginOffset; i <= utils.MAXOFFSET && data != nil; i++ {
+
+	maxOffset := realOffset + beginOffset
+	for i := beginOffset; i <= maxOffset && data != nil; i++ {
 		clearGroup(tmpdata)
 		clearGroup(taggroup)
 		for j := 0; j < dataCount; j++ {
