@@ -495,9 +495,9 @@ func loadAllUser() error {
 		if remain := len(users) % utils.IDLength; remain != 0 {
 			users = users[:len(users)-remain]
 		}
-		log.Println("Load-User", string(users))
 		for i := 0; i < len(users)/utils.IDLength; i++ { //对user进行循环，逐个恢复user信息
 			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
+			log.Println("Load user", userID, "'s infomations")
 			var userPeersInfo GroupsInfo
 			PInfo.Store(userID, &userPeersInfo)
 			kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
@@ -539,24 +539,18 @@ func loadAllUser() error {
 			// 保存Upkeeping信息
 			err = SaveUpkeeping(&userPeersInfo, userID)
 			if err != nil {
-				log.Println("Save ", userID, "'s Upkeeping error in loadAllUser", err)
-			} else {
-				log.Println("Save ", userID, "'s Upkeeping success in loadAllUser")
+				log.Println("Save ", userID, "'s Upkeeping error: ", err)
 			}
 			// 保存Query信息
 			err = SaveQuery(userID)
 			if err != nil {
-				log.Println("Save ", userID, "'s Query error in loadAllUser", err)
-			} else {
-				log.Println("Save ", userID, "'s Query success in loadAllUser")
+				log.Println("Save ", userID, "'s Query error: ", err)
 			}
 			// 保存Offer信息
 			for _, provider := range userPeersInfo.Providers {
 				err = SaveOffer(provider)
 				if err != nil {
-					log.Println("Save ", provider, "'s Offer error in loadAllUser", err)
-				} else {
-					log.Println("Save ", provider, "'s Offer success in loadAllUser")
+					log.Println("Save ", provider, "'s Offer error: ", err)
 				}
 			}
 		}
