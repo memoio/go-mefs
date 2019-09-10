@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/memoio/go-mefs/contracts"
+	df "github.com/memoio/go-mefs/data-format"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -92,7 +93,7 @@ func getTarget(mainID, syncType string) ([]string, error) {
 
 //该函数用于将master发来的支付信息，构造两份信息，一份为最近一次支付结果保存在本地，一份为支付信息，保存在内存中和本地
 //(groupid/"sync"/"chalpay"/pid/beginTime/endTime, spacetime/signature/proof)
-func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
+func handleSyncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 	groupid := km.GetMid()
 	options := km.GetOptions()
 	if len(options) < 4 {
@@ -121,7 +122,7 @@ func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 
 // syncProof 收到单次挑战信息同步的操作，保存在内存和硬盘中
 // uid/"sync"/"chalres"/pid/kid/time,length/result/proof/sum/h
-func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
+func handleSyncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	groupid := km.GetMid()
 	options := km.GetOptions()
 	if len(options) < 4 {
@@ -168,7 +169,7 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	}
 	thischalinfo, ok := getChalinfo(pu)
 	if !ok {
-		return errors.New("getchalinfo error")
+		return ErrNoChalInfo
 	}
 	thischalinfo.Time.Store(timerec, thischalresult) //放到LedgerInfo里
 	return nil
@@ -176,7 +177,7 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 
 //syncBlock 收到数据块信息的同步操作
 // blockID/"sync"/"block",pid/length
-func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
+func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 	km.SetKeyType(metainfo.Local)
 	splitedMetaValue := strings.Split(metaValue, metainfo.DELIMITER)
 	if len(splitedMetaValue) < 2 {
@@ -209,27 +210,28 @@ func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
 		pid: pid,
 		uid: uid,
 	}
-	LedgerInfo.Range(func(k, v interface{}) bool {
-		thischalinfo := v.(*chalinfo)
-		thischalinfo.Cid.Range(func(key, value interface{}) bool {
-			if strings.Compare(key.(string), blockID) == 0 {
-				thischalinfo.Cid.Delete(blockID)
-				log.Println("delete old meta data")
-			}
-			return true
-		})
-		return true
-	})
+
 	newcidinfo := &cidInfo{
 		availtime: utils.GetUnixNow(),
 		repair:    0,
 		offset:    offset,
 	}
+
+	oldOffset := 0
 	if thechalinfo, ok := getChalinfo(newpu); ok {
 		if thechalinfo.inChallenge == 1 {
 			thechalinfo.tmpCid.Store(blockID, newcidinfo)
 		} else if thechalinfo.inChallenge == 0 {
-			thechalinfo.Cid.Store(blockID, newcidinfo)
+			act, loaded := thechalinfo.Cid.LoadOrStore(blockID, newcidinfo)
+			if loaded {
+				oldOffset = act.(*cidInfo).offset
+				if oldOffset < offset {
+					act.(*cidInfo).offset = offset
+				}
+			} else {
+				oldOffset = 0
+			}
+			thechalinfo.maxlength += int64(offset-oldOffset) * df.DefaultSegmentSize
 		}
 	} else {
 		isTestUser := false
@@ -244,9 +246,10 @@ func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
 		var newCid, newTime sync.Map
 		newCid.Store(blockID, newcidinfo)
 		newchalinfo := &chalinfo{
-			Time:     newTime,
-			Cid:      newCid,
-			testuser: isTestUser,
+			Time:      newTime,
+			Cid:       newCid,
+			testuser:  isTestUser,
+			maxlength: int64(offset * df.DefaultSegmentSize),
 		}
 		LedgerInfo.Store(newpu, newchalinfo)
 	}

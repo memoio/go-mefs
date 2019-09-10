@@ -256,11 +256,11 @@ func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
 	var err error
 	switch syncType { //TODO:检查参数是否完整
 	case metainfo.SyncTypeBlock:
-		err = syncBlock(km, metaValue)
+		err = handleSyncBlock(km, metaValue)
 	case metainfo.SyncTypeChalPay:
-		err = syncChalPay(km, metaValue)
+		err = handleSyncChalPay(km, metaValue)
 	case metainfo.SyncTypeChalRes:
-		err = syncChalres(km, metaValue)
+		err = handleSyncChalres(km, metaValue)
 	case metainfo.SyncTypeUID, metainfo.SyncTypePid, metainfo.SyncTypeKid:
 		err = syncKUPIDs(km, metaValue)
 	default:

@@ -16,6 +16,7 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
+	df "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
@@ -581,6 +582,7 @@ func loadAllUser() error {
 				pid: puinProto.Provider,
 				uid: puinProto.User,
 			}
+			var length int64
 			var cidMap, timeMap sync.Map
 			for blockid, thiscidinfoinProto := range thischalinfoinProto.Cidin {
 				newcidinfo := &cidInfo{
@@ -589,6 +591,7 @@ func loadAllUser() error {
 					availtime: utils.StringToUnix(thiscidinfoinProto.Avaltime),
 					offset:    int(thiscidinfoinProto.Offset),
 				}
+				length += int64(thiscidinfoinProto.Offset * df.DefaultSegmentSize)
 				cidMap.Store(blockid, newcidinfo)
 			}
 
@@ -601,10 +604,14 @@ func loadAllUser() error {
 				}
 			}
 
+			if thischalinfoinProto.Maxlength != length {
+				log.Println("pid: ", newpu.pid, " length and stored length is: ", length, thischalinfoinProto.Maxlength)
+			}
+
 			newchalinfo := &chalinfo{
 				Cid:       cidMap,
 				Time:      timeMap,
-				maxlength: thischalinfoinProto.Maxlength,
+				maxlength: length,
 				testuser:  isTestUser,
 			}
 			LedgerInfo.Store(newpu, newchalinfo)

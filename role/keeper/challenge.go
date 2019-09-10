@@ -352,13 +352,16 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	oldOffset := 0
 	thischalinfo.tmpCid.Range(func(k, v interface{}) bool {
 		act, loaded := thischalinfo.Cid.LoadOrStore(k, v)
-		if loaded && act.(*cidInfo).offset < v.(*cidInfo).offset {
+		if loaded {
 			oldOffset = act.(*cidInfo).offset
-			act.(*cidInfo).offset = v.(*cidInfo).offset
-			thischalinfo.tmpCid.Delete(k)
-			return true
+			if oldOffset < v.(*cidInfo).offset {
+				act.(*cidInfo).offset = v.(*cidInfo).offset
+			}
+		} else {
+			oldOffset = 0
 		}
-		thischalinfo.maxlength += int64((act.(*cidInfo).offset - oldOffset) * df.DefaultSegmentSize)
+
+		thischalinfo.maxlength += int64(act.(*cidInfo).offset-oldOffset) * df.DefaultSegmentSize
 		thischalinfo.tmpCid.Delete(k)
 		return true
 	})

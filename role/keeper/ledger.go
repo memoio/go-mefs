@@ -11,6 +11,8 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
+
+	df "github.com/memoio/go-mefs/data-format"
 )
 
 //LedgerInfo 存放挑战信息的内存结构体
@@ -69,6 +71,7 @@ func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) erro
 			thischalinfo.tmpCid.Store(blockid, newcidinfo)
 		} else if thischalinfo.inChallenge == 0 {
 			thischalinfo.Cid.Store(blockid, newcidinfo)
+			thischalinfo.maxlength += int64(offset * df.DefaultSegmentSize)
 		}
 		return nil
 	}
