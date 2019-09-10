@@ -73,7 +73,7 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 
-	usersConfigs.Store(userID, mkey)
+	usersConfigs.Store(userID, mkey.Pk)
 
 	return mkey.Pk, nil
 }

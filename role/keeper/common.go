@@ -69,7 +69,7 @@ func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 
-	usersConfigs.Store(userID, mkey)
+	usersConfigs.Store(userID, mkey.Pk)
 
 	return mkey.Pk, nil
 }
