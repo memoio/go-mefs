@@ -75,7 +75,6 @@ func ChallengeProviderBLS12() {
 		isTestUser := thischalinfo.testuser
 		challengetime := utils.GetUnixNow()
 		var ret []string
-		var retOffset []int
 		var sum int64
 		if !isTestUser {
 			thischalinfo.inChallenge = 1
@@ -92,7 +91,6 @@ func ChallengeProviderBLS12() {
 			}
 			str := key.(string) + "_" + strconv.Itoa(cInfo.offset)
 			ret = append(ret, str)
-			retOffset = append(retOffset, cInfo.offset)
 			sum += int64(cInfo.offset + 1)
 			if chalnum > 100 {
 				return false
@@ -115,7 +113,6 @@ func ChallengeProviderBLS12() {
 			sum:           sum * df.DefaultSegmentSize,
 		}
 		thischalinfo.chalCid = ret
-		thischalinfo.chalOffset = retOffset
 		thischalinfo.Time.Store(challengetime, thischalresult)
 
 		go doChallengeBLS12(pu, ret, challengetime) //对该provider关于该user发起一次挑战
@@ -215,14 +212,20 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	var slength int64
 	var electedOffset int
 
-	for i, chcid := range thischalinfo.chalCid {
-		var flag int
-		if len(fblocks) != 0 { //存在挑战失败的块
+	if len(fblocks) != 0 {
+		for _, index := range thischalinfo.chalCid {
+			chcid, off, err := utils.SplitIndex(index)
+			if err != nil {
+				log.Println("SplitIndex err:", err)
+				continue
+			}
+
+			var flag int
+			//存在挑战失败的块
 			for _, block := range fblocks {
 				if strings.Compare(chcid, block) != 0 {
 					flag++
 					if flag == len(fblocks) {
-						off := thischalinfo.chalOffset[i]
 						if off > 0 {
 							electedOffset = h.C % off
 						} else if off == 0 {
@@ -236,8 +239,14 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 					}
 				}
 			}
-		} else {
-			off := thischalinfo.chalOffset[i]
+		}
+	} else {
+		for _, index := range thischalinfo.chalCid {
+			chcid, off, err := utils.SplitIndex(index)
+			if err != nil {
+				log.Println("SplitIndex err:", err)
+				continue
+			}
 			if off > 0 {
 				electedOffset = h.C % off
 			} else if off == 0 {

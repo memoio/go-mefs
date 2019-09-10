@@ -47,6 +47,10 @@ func CheckDup(strs []string, s string) bool {
 
 func SplitIndex(index string) (string, int, error) {
 	splitedIndex := strings.Split(index, "_")
+	if len(splitedIndex) < 5 {
+		return "", 0, errors.New("String is too short")
+	}
+
 	blockID := splitedIndex[0] + "_" + splitedIndex[1] + "_" + splitedIndex[2] + "_" + splitedIndex[3]
 	offset, err := strconv.Atoi(splitedIndex[4])
 	if err != nil {

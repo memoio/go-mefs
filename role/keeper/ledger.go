@@ -30,7 +30,6 @@ type chalinfo struct {
 	Cid         sync.Map
 	tmpCid      sync.Map
 	chalCid     []string //当前挑战的块
-	chalOffset  []int    //当前挑战的块
 	inChallenge int
 	maxlength   int64
 	testuser    bool // 记录是否是test用户，用于不发起挑战
