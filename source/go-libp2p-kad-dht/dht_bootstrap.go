@@ -53,7 +53,7 @@ var DefaultBootstrapConfig = BootstrapConfig{
 	// For now, this is set to 5 minutes, which is a medium period. We are
 	// We are currently more interested in ensuring we have a properly formed
 	// DHT than making sure our dht minimizes traffic.
-	Period: time.Duration(5 * time.Minute),
+	Period: time.Duration(1 * time.Minute),
 
 	Timeout: time.Duration(10 * time.Second),
 }
