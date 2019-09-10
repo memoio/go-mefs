@@ -69,7 +69,7 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 	}
 	userkey, err := fsrepo.GetPrivateKeyFromKeystore(us.UserID, keypath, pwd)
 	if err != nil {
-		return ErrGetSecreteKey
+		return err
 	}
 	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps)
 	err = SetGroupService(gp)

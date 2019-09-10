@@ -109,7 +109,6 @@ type Object struct {
 var (
 	ErrPolicy                    = errors.New("the policy is error")
 	ErrBalance                   = errors.New("your account's balance is insufficient, we will not deploy contract")
-	ErrGetSecreteKey             = errors.New("get user's secrete key error")
 	ErrKeySetIsNil               = errors.New("user's Keyset is nil")
 	ErrUserNotExist              = errors.New("user not exist")
 	ErrUserBookIsNil             = errors.New("the User book is nil")

@@ -287,7 +287,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 		return err
 	}
 
-	userBLS12config, err := gp.userBLS12ConfigInit(gp.password) //初始化配置
+	userBLS12config, err := gp.userBLS12ConfigInit() //初始化配置
 	if err != nil {
 		log.Println("Cannot init BLS Config-", err)
 		return err

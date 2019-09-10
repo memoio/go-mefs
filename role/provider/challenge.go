@@ -16,19 +16,17 @@ import (
 func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	ops := km.GetOptions()
 	userID := km.GetMid()
-	pubKeyInterface, ok := usersConfigs.Load(userID)
+	pubKeyI, ok := usersConfigs.Load(userID)
 	if !ok {
-		tmpUserCongfig, err := getNewUserConfig(userID, from)
+		pubKeyI, err := getNewUserConfig(userID, from)
 		if err != nil {
 			log.Println("get new user`s config from:", from, "failed, error :", err)
 			return err
 		}
-		usersConfigs.Store(userID, tmpUserCongfig.PubKey)
-		pubKeyInterface = tmpUserCongfig.PubKey
+		usersConfigs.LoadOrStore(userID, pubKeyI)
 	}
-	pubKey := pubKeyInterface.(*mcl.PublicKey)
 
-	usersConfigs.LoadOrStore(userID, pubKey)
+	pubKey := pubKeyI.(*mcl.PublicKey)
 
 	hProto := &pb.Chalnum{}
 	hByte, _ := b58.Decode(metaValue)

@@ -339,15 +339,15 @@ func getUserConifg(userID, keeperID string) error {
 	// 需要用私钥decode出bls的私钥，用user中的方法
 	//获取公钥
 	opt.KeySet = new(mcl.KeySet)
-	tmpUserBls12Config, err := getNewUserConfig(userID, keeperID)
+	pubKey, err := getNewUserConfig(userID, keeperID)
 	if err != nil {
 		log.Println("getNewUserConfig in get userconfig error :", err)
 		return err
 	}
 
-	usersConfigs.Store(userID, tmpUserBls12Config.PubKey)
+	usersConfigs.Store(userID, pubKey)
 
-	opt.KeySet.Pk = tmpUserBls12Config.PubKey
+	opt.KeySet.Pk = pubKey
 
 	//获取私钥
 	opt.KeySet.Sk, err = getUserPrivateKey(userID, keeperID)

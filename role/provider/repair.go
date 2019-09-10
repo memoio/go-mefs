@@ -28,14 +28,16 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	userID := blockID[:utils.IDLength]
 	tmpPubKey, ok := usersConfigs.Load(userID)
 	if !ok {
-		tmpUserCongfig, err := getNewUserConfig(userID, keeper)
+		tmpPubKey, err := getNewUserConfig(userID, keeper)
 		if err != nil {
 			log.Println("get new user`s config failed,error :", err)
 			return err
 		}
-		usersConfigs.Store(userID, tmpUserCongfig.PubKey)
-		tmpPubKey = tmpUserCongfig.PubKey
+		usersConfigs.Store(userID, tmpPubKey)
 	}
+
+	pubKey := tmpPubKey.(*mcl.PublicKey)
+
 	cpids := strings.Split(rpids, metainfo.DELIMITER)
 	stripe := make([][]byte, len(cpids)-1)
 	for _, cpid := range cpids {
@@ -46,7 +48,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 				pid := splitcpid[1]
 				blk, err := localNode.Blocks.GetBlockFrom(localNode.Context(), pid, splitcpid[0], time.Minute, sig)
 				if blk != nil && err == nil {
-					right := rs.VerifyBlock(blk.RawData(), splitcpid[0], tmpPubKey.(*mcl.PublicKey))
+					right := rs.VerifyBlock(blk.RawData(), splitcpid[0], pubKey)
 					if right {
 						blkMeta, err := metainfo.GetBlockMeta(splitcpid[0])
 						if err != nil {

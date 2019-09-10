@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/role"
 	pb "github.com/memoio/go-mefs/role/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
@@ -264,12 +265,12 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	if len(h.Indices) == 0 {
 		return
 	}
-	pubs, err := getUserBLS12Config(uid)
+	pubKey, err := getUserBLS12Config(uid)
 	if err != nil {
 		log.Println("getUserBLS12Config error! uid:", uid)
 		return
 	}
-	res, err := mcl.VerifyProof(pubs.PubKey, h, proof)
+	res, err := mcl.VerifyProof(pubKey, h, proof)
 	if err != nil {
 		log.Println("mcl.VerifyProof err: ", err)
 		return
@@ -370,53 +371,17 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 }
 
 //获得用于证明的user的公用参数
-func getUserBLS12Config(userID string) (*UserBLS12Config, error) {
-	userPubKey := new(mcl.PublicKey)
-	userConfig := &UserBLS12Config{}
-
+func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
 	userconfigbyte, err := getUserBLS12ConfigByte(userID)
 	if err != nil {
-		return userConfig, err
+		return nil, err
 	}
 
-	userconfigProto := &pb.UserBLS12Config{}
-	err = proto.Unmarshal(userconfigbyte, userconfigProto) //反序列化
+	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
 	if err != nil {
-		return userConfig, err
+		return nil, err
 	}
-	err = userPubKey.BlsPK.Deserialize(userconfigProto.PubkeyBls)
-	if err != nil {
-		return userConfig, err
-	}
-	err = userPubKey.G.Deserialize(userconfigProto.PubkeyG)
-	if err != nil {
-		return userConfig, err
-	}
-	userPubKey.U = make([]mcl.G1, mcl.N)
-	for i, u := range userconfigProto.PubkeyU {
-		if i >= mcl.N {
-			break
-		}
-		err = userPubKey.U[i].Deserialize(u)
-		if err != nil {
-			return userConfig, err
-		}
-	}
-	userPubKey.W = make([]mcl.G2, mcl.N)
-	for i, w := range userconfigProto.PubkeyW {
-		if i >= mcl.N {
-			break
-		}
-		err = userPubKey.W[i].Deserialize(w)
-		if err != nil {
-			return userConfig, err
-		}
-	}
-
-	userConfig = &UserBLS12Config{
-		PubKey: userPubKey,
-	}
-	return userConfig, nil
+	return mkey.Pk, nil
 }
 
 func getUserBLS12ConfigByte(userID string) ([]byte, error) {

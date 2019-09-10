@@ -13,7 +13,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-peer"
-	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	df "github.com/memoio/go-mefs/data-format"
@@ -84,10 +83,6 @@ type storageInfo struct {
 }
 
 var localPeerInfo *PeerInfo
-
-type UserBLS12Config struct {
-	PubKey *mcl.PublicKey
-}
 
 var localNode *core.MefsNode
 
