@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/bls12"
 	rs "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/role/user"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
@@ -26,17 +25,12 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	}
 	blockID := km.GetMid()
 	userID := blockID[:utils.IDLength]
-	tmpPubKey, ok := usersConfigs.Load(userID)
-	if !ok {
-		tmpPubKey, err := getNewUserConfig(userID, keeper)
-		if err != nil {
-			log.Println("get new user`s config failed,error :", err)
-			return err
-		}
-		usersConfigs.Store(userID, tmpPubKey)
-	}
 
-	pubKey := tmpPubKey.(*mcl.PublicKey)
+	pubKey, err := getNewUserConfig(userID, keeper)
+	if err != nil {
+		log.Println("get new user`s config failed,error :", err)
+		return err
+	}
 
 	cpids := strings.Split(rpids, metainfo.DELIMITER)
 	stripe := make([][]byte, len(cpids)-1)

@@ -86,6 +86,8 @@ var localPeerInfo *PeerInfo
 
 var localNode *core.MefsNode
 
+var usersConfigs sync.Map
+
 //===========================PInfo数据结构操作============================
 
 //getGroupsInfo 从Pinfo中取GropupSinfo 返回时已经类型转换，在代码上显得更简洁一点. 若没取到，返回nil，在调用时需要进行 !ok的判断

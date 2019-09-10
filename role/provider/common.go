@@ -53,6 +53,11 @@ func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error)
 }
 
 func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
+	pubKeyI, ok := usersConfigs.Load(userID)
+	if ok {
+		return pubKeyI.(*mcl.PublicKey), nil
+	}
+
 	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
 	if err != nil {
 		return nil, err
@@ -67,6 +72,8 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	usersConfigs.Store(userID, mkey)
 
 	return mkey.Pk, nil
 }

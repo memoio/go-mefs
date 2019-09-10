@@ -10,9 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
-	"github.com/memoio/go-mefs/role"
 	pb "github.com/memoio/go-mefs/role/pb"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -368,34 +366,4 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	})
 
 	return
-}
-
-//获得用于证明的user的公用参数
-func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
-	userconfigbyte, err := getUserBLS12ConfigByte(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
-	if err != nil {
-		return nil, err
-	}
-	return mkey.Pk, nil
-}
-
-func getUserBLS12ConfigByte(userID string) ([]byte, error) {
-	if !IsKeeperServiceRunning() {
-		return nil, ErrKeeperServiceNotReady
-	}
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
-	if err != nil {
-		return nil, err
-	}
-	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, "local")
-	if err != nil {
-		return nil, err
-	}
-	return userconfigbyte, nil
 }

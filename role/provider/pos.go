@@ -345,8 +345,6 @@ func getUserConifg(userID, keeperID string) error {
 		return err
 	}
 
-	usersConfigs.Store(userID, pubKey)
-
 	opt.KeySet.Pk = pubKey
 
 	//获取私钥
