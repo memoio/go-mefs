@@ -77,10 +77,18 @@ func PosSerivce() {
 	}
 
 	//填充opt.KeySet
+	getConfig := false
+
 	for _, tmpKeeper := range keeperIDs {
 		if err := getUserConifg(posID, tmpKeeper); err == nil {
+			getConfig = true
 			break
 		}
+	}
+
+	if !getConfig {
+		log.Println("Cannot get userconfig, start pos fails")
+		return
 	}
 
 	//从磁盘读取存储的Cidprefix
