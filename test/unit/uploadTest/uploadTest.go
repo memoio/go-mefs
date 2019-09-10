@@ -55,7 +55,7 @@ func UploadTest(count int) error {
 		if balance.Cmp(big.NewInt(10000000000)) > 0 {
 			break
 		}
-		fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success\n")
+		fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 		time.Sleep(10 * time.Second)
 	}
 	err = sh.StartUser(addr)
@@ -125,7 +125,7 @@ func UploadTest(count int) error {
 				errNum = 1
 				fileNum++
 			} else {
-				fmt.Println("\n连续两次更换bucket后依然上传失败，可能是网络故障，停止上传\n")
+				fmt.Println("\n连续两次更换bucket后依然上传失败，可能是网络故障，停止上传")
 				fmt.Println("upload ",fileNum," files,",fileUploadSuccessNum," files uploaded success.fileUploadSuccess rate is",fileUploadSuccessNum/fileNum)
 				break
 			}
