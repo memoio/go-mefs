@@ -50,7 +50,7 @@ func getChalresult(thisPU PU, time int64) (*chalresult, bool) {
 
 // 挑战过程的起始函数 定时对本节点连接的provider发起挑战
 func challengeRegular(ctx context.Context) { //定期挑战
-	log.Println("ChallengeRegular() start!")
+	log.Println("Challenge start!")
 	ticker := time.NewTicker(CHALTIME)
 	defer ticker.Stop()
 	for {

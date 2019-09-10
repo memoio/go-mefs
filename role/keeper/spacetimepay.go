@@ -34,7 +34,7 @@ type chalpay struct {
 }
 
 func spaceTimePayRegular(ctx context.Context) {
-	log.Println("spaceTimePay start!")
+	log.Println("SpaceTime Pay start!")
 	ticker := time.NewTicker(SPACETIMEPAYTIME)
 	defer ticker.Stop()
 	for {

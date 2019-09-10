@@ -112,7 +112,7 @@ func deleteBlockInLedger(pid string, bm *metainfo.BlockMeta) {
 }
 
 func checkLedger(ctx context.Context) {
-	log.Println("Check Ledger Start!")
+	log.Println("Check Ledger start!")
 	time.Sleep(2 * CHALTIME)
 	ticker := time.NewTicker(CHECKTIME)
 	defer ticker.Stop()
