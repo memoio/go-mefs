@@ -40,7 +40,7 @@ var keeperIDs []string
 var posSkByte []byte
 
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
-var Mullen = 100 * 1024 * 1024
+var Mullen = 1 * 1024 * 1024
 var opt = &df.DataEncoder{
 	DataCount:   1,
 	ParityCount: 4,
