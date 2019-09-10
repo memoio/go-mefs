@@ -40,7 +40,11 @@ var keeperIDs []string
 var posSkByte []byte
 
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
-var Mullen = 1 * 1024 * 1024
+const (
+	mullen = 100 * 1024 * 1024
+	offset = 25599
+)
+
 var opt = &df.DataEncoder{
 	DataCount:   1,
 	ParityCount: 4,
@@ -218,7 +222,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		if totalIncreased >= increaseSpace {
 			break
 		}
-		tmpData := make([]byte, Mullen)
+		tmpData := make([]byte, mullen)
 		totalIncreased += uint64(5 * len(tmpData))
 		rand.Seed(time.Now().UnixNano())
 		fillRandom(tmpData)
@@ -251,7 +255,10 @@ func generatePosBlocks(increaseSpace uint64) {
 			if err != nil {
 				log.Println("add block failed, error :", err)
 			}
-			blockList = append(blockList, blockID)
+
+			boff := blockID + "_" + strconv.Itoa(offset)
+
+			blockList = append(blockList, boff)
 		}
 
 		// 向keeper发送元数据
@@ -295,7 +302,7 @@ func deletePosBlocks(decreseSpace uint64) {
 				return
 			}
 			log.Println("delete block : ", blockID, " success")
-			totalDecresed += uint64(5 * Mullen)
+			totalDecresed += uint64(5 * mullen)
 
 			deleteBlocks = append(deleteBlocks, blockID)
 		}
