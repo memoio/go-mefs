@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	PosSkStr = "7b686dff4326fadf098ae156d57d6c917715a44fdb1655cc7472cd78915e2e03"
+	PosSkStr = "724c1e75ba94dd0305cf532cd6db95df0721c33dcdc323502eba067409e4842b"
 )
 
 func GetPosSkByte() []byte {

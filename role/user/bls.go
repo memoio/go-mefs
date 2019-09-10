@@ -83,33 +83,51 @@ func (gp *GroupService) loadBLS12Config() error {
 	if err != nil {
 		return err
 	}
-	UserBLS12ConfigKey := kmBls.ToString()
-	userBLS12config, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(UserBLS12ConfigKey, "local")
-	if err == nil { //先从本地找，如果有就解析一下
-		if err = gp.parseBLS12ConfigMeta(userBLS12config); err != nil {
-			log.Println("Parse bls Config from local failed.", err)
-		} else {
-			log.Println(gp.Userid, " BlS12 SK and Pk is loaded")
-			return nil
+
+	found := false
+
+	userBLS12ConfigKey := kmBls.ToString()
+	userBLS12config, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userBLS12ConfigKey, "local")
+	if err == nil && len(userBLS12config) > 0 { //先从本地找，如果有就解析一下
+		err = gp.parseBLS12ConfigMeta(userBLS12config)
+		if err == nil {
+			found = true
 		}
 	}
-	if gp.localPeersInfo.Keepers != nil { //然后去找Keeper要
+
+	//本地没有，然后去找Keeper要
+	if !found && len(gp.localPeersInfo.Keepers) > 0 {
 		for _, keeper := range gp.localPeersInfo.Keepers {
-			userBLS12config, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(UserBLS12ConfigKey, keeper.KeeperID)
-			if err == nil && userBLS12config != nil {
+			userBLS12config, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userBLS12ConfigKey, keeper.KeeperID)
+			if err == nil && len(userBLS12config) > 0 {
 				err = gp.parseBLS12ConfigMeta(userBLS12config)
-				if err != nil {
+				if err == nil {
+					found = true
 					break
 				}
 			}
 		}
 	}
-	//此处表示最后一个Keeper返回的还是error，或者干脆没有Keeper
-	if err != nil {
-		return err
+
+	// get localconfig
+	if found && len(userBLS12config) > 0 {
+		// store local
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userBLS12ConfigKey, string(userBLS12config), "local")
+		if err != nil {
+			log.Println("put blsconfig to lcoal failed: ", err)
+		}
+
+		if len(gp.localPeersInfo.Keepers) > 0 {
+			for _, keeper := range gp.localPeersInfo.Keepers {
+				err := localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userBLS12ConfigKey, string(userBLS12config), keeper.KeeperID)
+				if err != nil {
+					log.Println("put blsconfig to keeper", keeper.KeeperID, " failed: ", err)
+				}
+			}
+		}
 	}
 
-	log.Println(gp.Userid, " BlS12 SK and Pk is loaded")
+	log.Println("BlS12 SK and Pk is loaded for ", gp.Userid)
 	return nil
 }
 
