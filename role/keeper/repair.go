@@ -25,7 +25,7 @@ const (
 )
 
 func checkrepairlist(ctx context.Context) {
-	log.Println("Check Repairlist start!")
+	log.Println("Check repairlist start!")
 	repch = make(chan string, 1024)
 	go func() {
 		for {

@@ -214,7 +214,7 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 }
 
 func persistLocalPeerInfoRegular(ctx context.Context) {
-	log.Println("persistLocalPeerInfoRegular start!")
+	log.Println("Persist LocalPeerInfo start!")
 	ticker := time.NewTicker(PERSISTTIME)
 	defer ticker.Stop()
 	for {
@@ -369,7 +369,7 @@ func PersistlocalPeerInfo() error { //每次退出前将现有的本地PeerInfo�
 
 //此函数仅在内测阶段需要，会在每天 1~5点期间，将测试User的信息删掉
 func cleanTestUsersRegular(ctx context.Context) {
-	log.Println("clean Test Users Regular start!")
+	log.Println("Clean Test Users start!")
 	ticker := time.NewTicker(2 * time.Hour)
 	defer ticker.Stop()
 	for {
@@ -872,7 +872,7 @@ func IsKeeperServiceRunning() bool {
 }
 
 func checkStorage(ctx context.Context) {
-	log.Println("Check Storage start!")
+	log.Println("Check storage start!")
 	ticker := time.NewTicker(STORAGESYNCTIME)
 	defer ticker.Stop()
 	for {
@@ -898,7 +898,7 @@ func checkStorage(ctx context.Context) {
 }
 
 func checkPeers(ctx context.Context) {
-	log.Println("Check Connected Peer start!")
+	log.Println("Check connected peer start!")
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
 	checkConnectedPeer()

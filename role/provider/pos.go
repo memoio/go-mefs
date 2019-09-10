@@ -163,7 +163,7 @@ func getFreeSpace() {
 
 // posRegular checks posBlocks and decide to add/delete
 func posRegular(ctx context.Context) {
-	log.Println("posRegular() start!")
+	log.Println("Pos start!")
 
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()

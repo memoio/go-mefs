@@ -73,11 +73,19 @@ func ChallengeProviderBLS12() {
 
 		isTestUser := thischalinfo.testuser
 		challengetime := utils.GetUnixNow()
+		if !isTestUser {
+			// 处理上一次为完成的挑战，这一次挑战当作失败
+			if thischalinfo.inChallenge == 1 {
+				go cleanLastChallenge(pu, thischalinfo, challengetime)
+				return true
+			} else {
+				thischalinfo.inChallenge = 1
+			}
+		}
+
 		var ret []string
 		var sum int64
-		if !isTestUser {
-			thischalinfo.inChallenge = 1
-		}
+
 		// at most 100
 		chalnum := 0
 		thischalinfo.Cid.Range(func(key, value interface{}) bool { //对该PU对中provider保存的块循环
@@ -119,9 +127,56 @@ func ChallengeProviderBLS12() {
 	})
 }
 
+func cleanLastChallenge(pu PU, thischalinfo *chalinfo, chaltime int64) {
+	thischalinfo.inChallenge = 0
+	oldOffset := 0
+	thischalinfo.tmpCid.Range(func(k, v interface{}) bool {
+		act, loaded := thischalinfo.Cid.LoadOrStore(k, v)
+		if loaded {
+			oldOffset = act.(*cidInfo).offset
+			if oldOffset < v.(*cidInfo).offset {
+				act.(*cidInfo).offset = v.(*cidInfo).offset
+			}
+		} else {
+			oldOffset = 0
+		}
+
+		thischalinfo.maxlength += int64(act.(*cidInfo).offset-oldOffset) * df.DefaultSegmentSize
+		thischalinfo.tmpCid.Delete(k)
+		return true
+	})
+}
+
 //doChallengeBLS12 对某个PU对 进行一次挑战，传入时间和挑战的块信息
 func doChallengeBLS12(pu PU, blocks []string, chaltime int64) {
 	chal := mcl.GenChallenge(blocks)
+
+	fail := false
+
+	// clean tmpcid before return
+	defer func() {
+		if fail {
+			if thischalinfo, ok := getChalinfo(pu); ok {
+				thischalinfo.inChallenge = 0
+				oldOffset := 0
+				thischalinfo.tmpCid.Range(func(k, v interface{}) bool {
+					act, loaded := thischalinfo.Cid.LoadOrStore(k, v)
+					if loaded {
+						oldOffset = act.(*cidInfo).offset
+						if oldOffset < v.(*cidInfo).offset {
+							act.(*cidInfo).offset = v.(*cidInfo).offset
+						}
+					} else {
+						oldOffset = 0
+					}
+
+					thischalinfo.maxlength += int64(act.(*cidInfo).offset-oldOffset) * df.DefaultSegmentSize
+					thischalinfo.tmpCid.Delete(k)
+					return true
+				})
+			}
+		}
+	}()
 
 	if thischalresult, ok := getChalresult(pu, chaltime); ok {
 		thischalresult.h = chal.C
@@ -133,32 +188,25 @@ func doChallengeBLS12(pu PU, blocks []string, chaltime int64) {
 		hByte, err := proto.Marshal(hProto)
 		if err != nil {
 			log.Println("marshal h failed, err: ", err)
-			if thischalinfo, ok := getChalinfo(pu); ok {
-				thischalinfo.inChallenge = 0
-			}
+			fail = true
 			return
 		}
 
 		km, err := metainfo.NewKeyMeta(pu.uid, metainfo.Challenge, utils.UnixToString(chaltime))
 		if err != nil {
 			log.Println("construct challenge KV error :", err)
-			if thischalinfo, ok := getChalinfo(pu); ok {
-				thischalinfo.inChallenge = 0
-			}
+			fail = true
 			return
 		}
 		metaValue := b58.Encode(hByte)
 		_, err = sendMetaRequest(km, metaValue, pu.pid)
 		if err != nil {
 			log.Println("DoChallengeBLS12 error :", err)
-			if thischalinfo, ok := getChalinfo(pu); ok {
-				thischalinfo.inChallenge = 0
-			}
+			fail = true
 			return
 		}
 	}
 	return
-
 }
 
 //handleProofResultBls12 收到provider返回的挑战结果的回调
