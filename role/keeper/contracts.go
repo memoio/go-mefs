@@ -132,6 +132,7 @@ func ukAddProvider(uid, pid, sk string) error {
 			log.Println("ukAddProvider GetUpkeeping() error", err)
 			return err
 		}
+
 		uk, err = GetUpkeeping(gp) //保存之后重试。还是出错就返回
 		if err != nil {
 			log.Println("ukAddProvider GetUpkeeping() error", err)
@@ -155,14 +156,20 @@ func ukAddProvider(uid, pid, sk string) error {
 		return err
 	}
 
-	log.Println("add provider to: ", userAddr)
+	if localKeeperIsMaster(uid) {
+		log.Println("add provider to: ", userAddr)
 
-	err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
-	if err != nil {
-		log.Println("ukAddProvider AddProvider() error", err)
-		return err
+		err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
+		if err != nil {
+			log.Println("ukAddProvider AddProvider() error", err)
+			return err
+		}
+		// update uk info
+		uk.ProviderIDs = append(uk.ProviderIDs, pid)
 	}
+
 	// update uk info
 	uk.ProviderIDs = append(uk.ProviderIDs, pid)
+
 	return nil
 }
