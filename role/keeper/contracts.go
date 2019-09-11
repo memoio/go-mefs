@@ -154,6 +154,9 @@ func ukAddProvider(uid, pid, sk string) error {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
+
+	log.Println("add provider to: ", userAddr)
+
 	err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
 	if err != nil {
 		log.Println("ukAddProvider AddProvider() error", err)
