@@ -154,11 +154,25 @@ func UploadTest(count int) error {
 	objsInBucket.Range(func(k, v interface{}) bool {
 		objectName := k.(string)
 		bucketName := v.(string)
-		_, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
+		outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
 			fmt.Println("download file ", objectName, " err:", err)
 			return true
 		}
+
+		obj, err := sh.HeadObject(objectName, bucketName, shell.SetAddress(addr))
+		if err != nil {
+			fmt.Println("head file ", objectName, " err:", err)
+			return true
+		}
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(outer)
+		if buf.Len() != int(obj.Objects[0].ObjectSize) {
+			fmt.Println("download file ", objectName, " err:", err)
+			return true
+		}
+
 		fileDownloadSuccessNum++
 		return true
 	})
