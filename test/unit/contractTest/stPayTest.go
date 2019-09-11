@@ -97,7 +97,7 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		log.Println("deploy Upkeping err:", err)
 		return err
 	}
-	log.Println("depoly upkepping success, contract addr: ", ukaddr.Hex(), ", contract hash: ", trans.Hash().String())
+	log.Println("depoly upkepping success, contract addr: ", ukaddr.Hex(), ", trans hash: ", trans.Hash().String())
 
 	log.Println("begin to query upkeeping's balance")
 	retryCount := 0
@@ -123,69 +123,12 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		}
 	}
 
-	log.Println("begin to initiate spacetime pay")
-	err = contracts.SpaceTimePay(uk, localAddr, listProviderAddr[0], userSk, amount)
-	if err != nil {
-		log.Fatal("spacetime pay err:", err)
-		return err
-	}
-	log.Println("spacetime pay complete")
-
-	log.Println("begin to query results of spacetime pay")
-
-	retryCount = 0
-	for {
-		retryCount++
-		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr.String())
-		if amountUk.Cmp(big.NewInt(234500)) < 0 {
-			log.Println("keeper's balance change")
-			for kAddr, amount := range mapKeeperAddr {
-				amountNow := queryBalance(kAddr.String())
-				amountCost := big.NewInt(0)
-				amountCost.Sub(amountNow, amount)
-				log.Println(kAddr.String(), ":", amountCost)
-				if kAddr != localAddr {
-					if amountCost.Cmp(big.NewInt(41)) < 0 {
-						log.Fatal("keeper gets wrong pay")
-					}
-				}
-
-			}
-
-			log.Println("provider's balance change")
-			for pAddr, amount := range mapProviderAddr {
-				amountNow := queryBalance(pAddr.String())
-				amountCost := big.NewInt(0)
-				amountCost.Sub(amountNow, amount)
-				log.Println(pAddr.String(), ":", amountCost)
-				if listProviderAddr[0] == pAddr && amountCost.Cmp(big.NewInt(123*9)) < 0 {
-					log.Fatal("provider gets wrong pay")
-				}
-			}
-			break
-		}
-
-		if retryCount > 20 {
-			log.Fatal("st pay fails")
-		}
-	}
-
 	log.Println("begin to query upkeeping's information")
 
 	retryCount = 0
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-
-		uk, err = upKeeping.NewUpKeeping(ukaddr, contracts.GetClient(ethEndPoint))
-		if err != nil {
-			if retryCount > 20 {
-				log.Fatal("newUkErr:", err)
-				break
-			}
-			continue
-		}
 
 		item, err := contracts.GetUpkeepingInfo(localAddr, uk)
 		if err != nil {
@@ -236,6 +179,57 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 
 		if pnum != pCount {
 			log.Fatal("Contract provider count is not equal to preset: ", pCount)
+		}
+
+		log.Println("upkeeping's information is right")
+		break
+	}
+
+	log.Println("begin to initiate spacetime pay")
+	err = contracts.SpaceTimePay(uk, localAddr, listProviderAddr[0], userSk, amount)
+	if err != nil {
+		log.Fatal("spacetime pay err:", err)
+		return err
+	}
+	log.Println("spacetime pay complete")
+
+	log.Println("begin to query results of spacetime pay")
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		amountUk := queryBalance(ukaddr.String())
+		if amountUk.Cmp(big.NewInt(234500)) < 0 {
+			log.Println("keeper's balance change")
+			for kAddr, amount := range mapKeeperAddr {
+				amountNow := queryBalance(kAddr.String())
+				amountCost := big.NewInt(0)
+				amountCost.Sub(amountNow, amount)
+				log.Println(kAddr.String(), ":", amountCost)
+				if kAddr != localAddr {
+					if amountCost.Cmp(big.NewInt(41)) < 0 {
+						log.Fatal("keeper gets wrong pay")
+					}
+				}
+
+			}
+
+			log.Println("provider's balance change")
+			for pAddr, amount := range mapProviderAddr {
+				amountNow := queryBalance(pAddr.String())
+				amountCost := big.NewInt(0)
+				amountCost.Sub(amountNow, amount)
+				log.Println(pAddr.String(), ":", amountCost)
+				if listProviderAddr[0] == pAddr && amountCost.Cmp(big.NewInt(123*9)) < 0 {
+					log.Fatal("provider gets wrong pay")
+				}
+			}
+			break
+		}
+
+		if retryCount > 20 {
+			log.Fatal("st pay fails")
 		}
 	}
 
