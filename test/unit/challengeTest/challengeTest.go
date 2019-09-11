@@ -106,7 +106,7 @@ func ChallengeTest() error {
 		storagekb := float64(r) / 1024.0
 		endTime := time.Now().Unix()
 		speed := storagekb / float64(endTime-beginTime)
-		log.Println("  Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
+		log.Println("Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
 		log.Println(ob.String() + "address: " + addr)
 
 	}
