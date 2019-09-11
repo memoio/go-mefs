@@ -35,12 +35,10 @@ type chalresult struct {
 //getChalresult 传入各层key，获取对应的chalresult结构指针，若无法取到，可能结构体还没被创建，返回nil
 func getChalresult(thisPU PU, time int64) (*chalresult, bool) {
 	thischalinfo, ok := getChalinfo(thisPU)
-	if thischalinfo == nil {
+	if !ok || thischalinfo == nil {
 		return nil, false
 	}
-	if !ok {
-		return nil, false
-	}
+
 	thischalresult, ok := thischalinfo.Time.Load(time)
 	if !ok {
 		return nil, false

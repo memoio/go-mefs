@@ -48,8 +48,29 @@ type cidInfo struct {
 func getChalinfo(thisPU PU) (*chalinfo, bool) {
 	thischalinfo, ok := LedgerInfo.Load(thisPU)
 	if !ok {
+		isTestUser := false
+		addr, err := address.GetAddressFromID(thisPU.uid)
+		if err == nil {
+			_, _, err = contracts.GetUKFromResolver(addr)
+			if err != nil {
+				isTestUser = true
+			}
+		}
+
+		var newCid, newTime sync.Map
+		newchalinfo := &chalinfo{
+			Time:     newTime,
+			Cid:      newCid,
+			testuser: isTestUser,
+		}
+		LedgerInfo.Store(thisPU, newchalinfo)
+	}
+
+	thischalinfo, ok = LedgerInfo.Load(thisPU)
+	if !ok {
 		return nil, false
 	}
+
 	return thischalinfo.(*chalinfo), true
 }
 

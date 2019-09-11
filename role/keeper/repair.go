@@ -6,13 +6,10 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
@@ -153,24 +150,6 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 			} else if thischalinfo.inChallenge == 0 {
 				thischalinfo.Cid.Store(blockID, newcidinfo)
 			}
-		} else {
-			isTestUser := false
-			addr, err := address.GetAddressFromID(newpu.uid)
-			if err == nil {
-				_, _, err = contracts.GetUKFromResolver(addr)
-				if err != nil {
-					isTestUser = true
-				}
-			}
-
-			var newCid, newTime sync.Map
-			newCid.Store(blockID, newcidinfo)
-			newchalinfo := &chalinfo{
-				Time:     newTime,
-				Cid:      newCid,
-				testuser: isTestUser,
-			}
-			LedgerInfo.Store(newpu, newchalinfo)
 		}
 
 		oldchalinfo, isExist := getChalinfo(oldpu)

@@ -6,13 +6,10 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -233,26 +230,8 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 			}
 			thechalinfo.maxlength += int64(offset-oldOffset) * df.DefaultSegmentSize
 		}
-	} else {
-		isTestUser := false
-		addr, err := address.GetAddressFromID(newpu.uid)
-		if err == nil {
-			_, _, err = contracts.GetUKFromResolver(addr)
-			if err != nil {
-				isTestUser = true
-			}
-		}
-
-		var newCid, newTime sync.Map
-		newCid.Store(blockID, newcidinfo)
-		newchalinfo := &chalinfo{
-			Time:      newTime,
-			Cid:       newCid,
-			testuser:  isTestUser,
-			maxlength: int64(offset * df.DefaultSegmentSize),
-		}
-		LedgerInfo.Store(newpu, newchalinfo)
 	}
+
 	addCredit(pid)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local") //最后，保存数据到本地
 	if err != nil {
