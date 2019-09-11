@@ -43,6 +43,11 @@ const (
 	dhtVerboseOptionName = "v"
 )
 
+type queryEvent struct {
+	ID    string
+	Extra string
+}
+
 var queryDhtCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "Find the closest Peer IDs to a given Peer ID by querying the DHT.",
@@ -314,7 +319,16 @@ var getValuefromDhtCmd = &cmds.Command{
 		}()
 
 		for e := range events {
-			if err := res.Emit(e); err != nil {
+			ne := &queryEvent{
+				ID:    e.ID.Pretty(),
+				Extra: e.Extra,
+			}
+
+			if e.Type != notif.Value {
+				continue
+			}
+
+			if err := res.Emit(ne); err != nil {
 				return err
 			}
 		}
@@ -322,24 +336,18 @@ var getValuefromDhtCmd = &cmds.Command{
 		return nil
 	},
 	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *notif.QueryEvent) error {
-			pfm := pfuncMap{
-				notif.Value: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
-					if verbose {
-						fmt.Fprintf(out, "got value: '%s'\n", obj.Extra)
-					} else {
-						fmt.Fprintln(out, obj.Extra)
-					}
-				},
-			}
-
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *queryEvent) error {
 			verbose, _ := req.Options[dhtVerboseOptionName].(bool)
-			printEvent(out, w, verbose, pfm)
+			if verbose {
+				fmt.Fprintf(w, "got value: '%s'\n", out.Extra)
+			} else {
+				fmt.Fprint(w, out.Extra)
+			}
 
 			return nil
 		}),
 	},
-	Type: notif.QueryEvent{},
+	Type: queryEvent{},
 }
 
 var literFromDhtCmd = &cmds.Command{
