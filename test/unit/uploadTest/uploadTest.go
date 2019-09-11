@@ -54,12 +54,12 @@ func UploadTest(count int) error {
 	fmt.Println("GetIDFromAddress success,uid is", uid)
 	transferTo(big.NewInt(1000000000000000000), addr)
 	for {
+		time.Sleep(30 * time.Second)
 		balance := queryBalance(addr)
 		if balance.Cmp(big.NewInt(10000000000)) > 0 {
 			break
 		}
 		fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
-		time.Sleep(10 * time.Second)
 	}
 	err = sh.StartUser(addr)
 	if err != nil {
