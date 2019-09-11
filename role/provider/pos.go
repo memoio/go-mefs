@@ -228,6 +228,12 @@ func generatePosBlocks(increaseSpace uint64) {
 	// DataEncodeToMul()
 	// send BlockMeta to keepers
 	log.Println("generate pos blcoks")
+
+	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+	if err != nil {
+		return
+	}
+
 	var totalIncreased uint64
 	for {
 		if totalIncreased >= increaseSpace {
@@ -280,10 +286,6 @@ func generatePosBlocks(increaseSpace uint64) {
 		}
 
 		// 本地更新
-		posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
-		if err != nil {
-			continue
-		}
 		posValue := posCidPrefix
 		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
@@ -297,6 +299,11 @@ func generatePosBlocks(increaseSpace uint64) {
 func deletePosBlocks(decreseSpace uint64) {
 	log.Println("data is about to exceed the space limit, delete pos blcoks")
 
+	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+	if err != nil {
+		return
+	}
+
 	// delete last blocks
 	var totalDecresed uint64
 	for {
@@ -305,30 +312,34 @@ func deletePosBlocks(decreseSpace uint64) {
 		}
 		//删除块
 		deleteBlocks := []string{}
+		j := 0
 		for i := 0; i < 5; i++ {
 			blockID := posCidPrefix + "_" + strconv.Itoa(i)
 			ncid := cid.NewCidV2([]byte(blockID))
 			err := localNode.Blockstore.DeleteBlock(ncid)
 			if err != nil {
-				log.Println("delete block in func deletePosBlocks() error :", err, " blockID :", blockID)
-				return
+				log.Println("delete block: ", blockID, " error :", err)
+				j++
+			} else {
+				log.Println("delete block : ", blockID, " success")
+				totalDecresed += uint64(mullen)
+				deleteBlocks = append(deleteBlocks, blockID)
 			}
-			log.Println("delete block : ", blockID, " success")
-			totalDecresed += uint64(5 * mullen)
-
-			deleteBlocks = append(deleteBlocks, blockID)
 		}
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
-		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosDelete)
-		if err != nil {
-			log.Println("construct put blockMeta KV error :", err)
-			return
+		if j < 5 {
+			km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosDelete)
+			if err != nil {
+				log.Println("construct put blockMeta KV error :", err)
+				return
+			}
+			metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
+			for _, keeper := range keeperIDs {
+				sendMetaRequest(km, metavalue, keeper)
+			}
 		}
-		metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
-		for _, keeper := range keeperIDs {
-			sendMetaRequest(km, metavalue, keeper)
-		}
+
 		//更新Gid,Sid
 		curSid = (curSid + 1023) % 1024
 		if curSid == 1023 {
@@ -336,6 +347,14 @@ func deletePosBlocks(decreseSpace uint64) {
 		}
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		log.Println("after delete ,Gid :", curGid, "\n sid :", curSid, "\ncid prefix :", posCidPrefix)
+
+		posValue := posCidPrefix
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+		if err != nil {
+			log.Println("CmdPutTo posKM error :", err)
+			continue
+		}
+
 	}
 }
 
