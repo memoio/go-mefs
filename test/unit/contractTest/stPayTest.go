@@ -191,7 +191,7 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		log.Fatal("spacetime pay err:", err)
 		return err
 	}
-	log.Println("spacetime pay complete")
+	log.Println("spacetime pay trigger")
 
 	log.Println("begin to query results of spacetime pay")
 
@@ -232,6 +232,64 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 			log.Fatal("st pay fails")
 		}
 	}
+
+	log.Println("begin to test addProvider")
+
+	providerAddr, err := address.GetAddressFromID(serverPids[pCount])
+	if err != nil {
+		log.Println("ukAddProvider GetAddressFromID() error", err)
+		return err
+	}
+
+	auth = bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(100)
+	trans, err = uk.AddProvider(auth, []common.Address{providerAddr})
+	if err != nil {
+		log.Fatal("ukAddProvider AddProvider() error", err)
+		return err
+	}
+
+	log.Println("AddProvider trans hash: ", trans.Hash().String())
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+
+		item, err := contracts.GetUpkeepingInfo(localAddr, uk)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Upkeeping has no information, err: ", err)
+				break
+			}
+			continue
+		}
+
+		if len(item.ProviderIDs) != pCount+1 {
+			if retryCount > 20 {
+				log.Fatal("Upkeeping addProvider fails")
+				break
+			}
+			continue
+		}
+
+		i := 0
+		for _, keeper := range item.ProviderIDs {
+			if serverPids[pCount] == keeper {
+				break
+			}
+			i++
+		}
+
+		if len(item.ProviderIDs) == i {
+			log.Fatal("Upkeeping addProvider adds wrong providers")
+		}
+
+		log.Println("upkeeping's addProvider is right")
+		break
+	}
+
+	log.Println("upkeeping's tests pass")
 
 	return nil
 }
