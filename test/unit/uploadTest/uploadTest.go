@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -25,6 +26,8 @@ import (
 const randomDataSize = 1024 * 1024 * 10
 const dataCount = 3
 const parityCount = 2
+
+var objsInBucket sync.Map
 
 func main() {
 	count := flag.Int("count", 200, "count of file we want to upload")
@@ -48,7 +51,7 @@ func UploadTest(count int) error {
 		return err
 	}
 
-	fmt.Println("GetIDFromAddress success,uid is",uid)
+	fmt.Println("GetIDFromAddress success,uid is", uid)
 	transferTo(big.NewInt(1000000000000000000), addr)
 	for {
 		balance := queryBalance(addr)
@@ -64,6 +67,8 @@ func UploadTest(count int) error {
 		return err
 	}
 
+	bucketName := "Bucket0"
+
 	for {
 		err := sh.ShowStorage(shell.SetAddress(addr))
 		if err != nil {
@@ -77,7 +82,6 @@ func UploadTest(count int) error {
 		opts = append(opts, shell.SetDataCount(dataCount))
 		opts = append(opts, shell.SetParityCount(parityCount))
 		opts = append(opts, shell.SetPolicy(df.RsPolicy))
-		bucketName := "Bucket0"
 		bk, err := sh.CreateBucket(bucketName, opts...)
 		if err != nil {
 			time.Sleep(20 * time.Second)
@@ -88,13 +92,12 @@ func UploadTest(count int) error {
 		fmt.Println(addr, "started, begin to upload")
 		break
 	}
-	bucketName := "Bucket1"
-	bucketNum := 1
+
+	bucketNum := 0
 	errNum := 0
 	fileNum := 0
 	fileUploadSuccessNum := 0
 
-	var bucketOfFile []int
 	//upload file
 	for {
 		r := rand.Int63n(randomDataSize)
@@ -102,66 +105,69 @@ func UploadTest(count int) error {
 		fillRandom(data)
 		buf := bytes.NewBuffer(data)
 		objectName := addr + "_" + strconv.Itoa(fileNum)
-		fmt.Println("\n  Begin to upload file",fileNum,"，Filename is", objectName, "Size is", ToStorageSize(r), "addr", addr)
+		fmt.Println("\n  Begin to upload file", fileNum, "，Filename is", objectName, "Size is", ToStorageSize(r), "addr", addr)
 		uploadBeginTime := time.Now().Unix()
 		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
-			bucketOfFile = append(bucketOfFile, 0)
-			fmt.Println(addr, "Upload failed in file ",fileNum,",", err)
-			if errNum == 0 {
+			errNum++
+			fmt.Println(addr, "Upload failed in file ", fileNum, ",", err)
+			if errNum < 2 {
 				bucketNum++
 				var opts []func(*shell.RequestBuilder) error
 				opts = append(opts, shell.SetAddress(addr))
 				opts = append(opts, shell.SetDataCount(dataCount))
 				opts = append(opts, shell.SetParityCount(parityCount))
 				opts = append(opts, shell.SetPolicy(df.RsPolicy))
-				bucketName = "Bucket"+string(bucketNum)
+				bucketName = "Bucket" + string(bucketNum)
 				_, errBucket := sh.CreateBucket(bucketName, opts...)
 				if errBucket != nil {
-					time.Sleep(20 * time.Second)
-					fmt.Println(addr, " not start, waiting, err : ", err)
+					fmt.Println("create bucket err: ", err)
+					time.Sleep(2 * time.Minute)
 					continue
 				}
-				errNum = 1
-				fileNum++
 			} else {
 				fmt.Println("\n连续两次更换bucket后依然上传失败，可能是网络故障，停止上传")
-				fmt.Println("upload ",fileNum," files,",fileUploadSuccessNum," files uploaded success.fileUploadSuccess rate is",fileUploadSuccessNum/fileNum)
+				fmt.Println("upload ", fileNum, " files,", fileUploadSuccessNum, " files uploaded success.fileUploadSuccess rate is", fileUploadSuccessNum/fileNum)
+				break
+			}
+		} else {
+			errNum = 0
+			objsInBucket.Store(objectName, bucketName)
+
+			storagekb := float64(r) / 1024.0
+			uploadEndTime := time.Now().Unix()
+			speed := fmt.Sprintf("%.2f", storagekb/float64(uploadEndTime-uploadBeginTime))
+			fmt.Println("  Upload file", fileNum, "success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
+			fmt.Println(ob.String() + "address: " + addr)
+			fileUploadSuccessNum++
+			if fileNum == count {
+				fmt.Println("upload test complete")
+				fmt.Println("upload ", fileNum, " files,", fileUploadSuccessNum, " files success.fileUploadSuccess rate is", fileUploadSuccessNum/count)
 				break
 			}
 		}
-		bucketOfFile = append(bucketOfFile, bucketNum)
-		storagekb := float64(r) / 1024.0
-		uploadEndTime := time.Now().Unix()
-		speed := fmt.Sprintf("%.2f", storagekb / float64(uploadEndTime-uploadBeginTime))
-		fmt.Println("  Upload file",fileNum,"success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
-		fmt.Println(ob.String() + "address: " + addr)
 		fileNum++
-		fileUploadSuccessNum++
-		if fileNum == count {
-			fmt.Println("upload test success")
-			fmt.Println("upload ",fileNum," files,",fileUploadSuccessNum," files success.fileUploadSuccess rate is",fileUploadSuccessNum/count)
-			break
-		}
-		errNum = 0
 	}
 	//download file
 	fileDownloadSuccessNum := 0
-	for i, num := range bucketOfFile {
-        if num == 0 {//上传失败
-			continue
-		}
-		objectName := addr + "_" + strconv.Itoa(i)
-		bucketName := "Bucket"+string(num)
+
+	objsInBucket.Range(func(k, v interface{}) bool {
+		objectName := k.(string)
+		bucketName := v.(string)
 		_, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
-			fmt.Println(addr, "download failed in file ",i,",", err)
+			fmt.Println("download file ", objectName, " err:", err)
+			return true
 		}
-		fmt.Println(addr, "download file ",i,"success")
 		fileDownloadSuccessNum++
-    }
-	fmt.Println("download test success")
-	fmt.Println("download ",fileUploadSuccessNum," files,",fileDownloadSuccessNum," files success.fileDownloadSuccess rate is",fileDownloadSuccessNum/fileUploadSuccessNum)
+		return true
+	})
+
+	fmt.Println("download test complete")
+	fmt.Println("download ", fileDownloadSuccessNum, " files,")
+
+	fmt.Println("upload: ", fileNum, "; success:", fileUploadSuccessNum, " rate is", fileUploadSuccessNum/count)
+	fmt.Println("downlaod: ", fileNum, "; success:", fileDownloadSuccessNum, " rate is", fileDownloadSuccessNum/fileUploadSuccessNum)
 	return nil
 }
 
@@ -241,7 +247,7 @@ func transferTo(value *big.Int, addr string) {
 		log.Fatal(err)
 	}
 	fmt.Println("types.SignTx success")
-	
+
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		log.Fatal(err)
@@ -263,4 +269,3 @@ func queryBalance(addr string) *big.Int {
 	}
 	return balance
 }
-
