@@ -165,7 +165,8 @@ func getFreeSpace() {
 func posRegular(ctx context.Context) {
 	log.Println("Pos start!")
 
-	ticker := time.NewTicker(time.Minute)
+	go doGenerateOrDelete()
+	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
