@@ -159,7 +159,7 @@ func ukAddProvider(uid, pid, sk string) error {
 		log.Println("ukAddProvider AddProvider() error", err)
 		return err
 	}
-	//uk.ProviderAddrs = append(uk.ProviderAddrs, providerAddr.String())
+	// update uk info
 	uk.ProviderIDs = append(uk.ProviderIDs, pid)
 	return nil
 }

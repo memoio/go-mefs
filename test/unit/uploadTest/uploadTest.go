@@ -170,7 +170,7 @@ func UploadTest(count int) error {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(outer)
 		if buf.Len() != int(obj.Objects[0].ObjectSize) {
-			fmt.Println("download file ", objectName, " err:", err)
+			fmt.Println("download file ", objectName, "failed, got: ", buf.Len(), "expected: ", obj.Objects[0].ObjectSize)
 			return true
 		}
 

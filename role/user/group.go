@@ -61,7 +61,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 		}
 
 	}
-	log.Println(gp.Userid, "balance", balance)
+	log.Println(uaddr.String(), " balance", balance)
 	// 说明该user没钱，该user为testuser;否则为有金额的实际用户
 	if balance.Cmp(big.NewInt(0)) <= 0 {
 		// 判断是否为初始化启动
