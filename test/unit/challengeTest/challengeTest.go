@@ -181,9 +181,16 @@ func ChallengeTest() error {
 		return err
 	}
 
-	log.Println("delete block :", cid, " in provider", provider)
-	time.Sleep(42 * time.Minute)
+	time.Sleep(2 * time.Minute)
+	ret, err = getBlock(sh, cid, provider) //获取块的MD5
+	if err == nil {
+		log.Println("get block from provider")
+		return err
+	}
 
+	log.Println("successfully delete block :", cid, " in provider", provider)
+
+	time.Sleep(40 * time.Minute)
 	//获取新的provider，从新的provider上获得块的MD5
 	var newProvider string
 	res, err := sh.GetFrom(blockMeta, keeper)
