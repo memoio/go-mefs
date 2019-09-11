@@ -139,6 +139,11 @@ func (s *blockService) GetBlockFrom(ctx context.Context, pid string, ncid string
 		if err != nil {
 			return nil, err
 		}
+
+		if bdata == metainfo.MetaHandlerComplete {
+			return nil, errors.New("get block failed")
+		}
+
 		c := cid.NewCidV2([]byte(ncid))
 		b, err := blocks.NewBlockWithCid([]byte(bdata), c)
 		if err != nil {

@@ -109,7 +109,11 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 	res, userID, key, value, err := verify(sigByte)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
-	} else if res { //验证通过
+		return "", err
+	}
+
+	if res {
+		// 验证通过
 		// 内存channel的value变化
 		// 然后持久化
 		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
@@ -129,15 +133,14 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value.String(), "local")
 			if err != nil {
 				log.Println("cmdPutErr:", err)
-				return string(b.RawData()), err
 			}
 		}
 		return string(b.RawData()), nil
-	} else { //验证不通过
-		log.Printf("verify is false %s", splitedNcid[0])
 	}
 
-	return "", nil
+	log.Printf("verify is false %s", splitedNcid[0])
+
+	return "", errors.New("Signature is wrong")
 }
 
 // verify verifies the transaction
@@ -186,7 +189,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	value := big.NewInt(0)
 	value = value.Add(channelItem.Value, big.NewInt(addValue))
 
-	if money.Cmp(value) != 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
+	if money.Cmp(value) >= 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
 		log.Println("value is different from money,  value is: ", value.String())
 		return false, "", "", nil, nil
 	}
