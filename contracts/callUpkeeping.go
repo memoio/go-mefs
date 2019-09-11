@@ -155,7 +155,7 @@ func GetUpkeepingInfo(localAddress common.Address, uk *upKeeping.UpKeeping) (
 		From: localAddress,
 	})
 	if err != nil {
-		fmt.Println("getOfferParamsErr:", err)
+		fmt.Println("GetUpkeepingInfo:", err)
 		return item, err
 	}
 	var keepers []string

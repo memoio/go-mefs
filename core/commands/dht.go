@@ -26,16 +26,16 @@ var DhtCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"query":         queryDhtCmd,
-		"findpeer":      findPeerDhtCmd,
-		"get":           getValueDhtCmd,
-		"put":           putValueDhtCmd,
-		"putto":         putValuetoDhtCmd,
-		"getfrom":       getValuefromDhtCmd,
-		"liter":         literDhtCmd,
-		"literfrom":     literFromDhtCmd,
-		"append":        appendValueDhtCmd,
-		"challengeTest": challengeTestDhtCmd,
+		"query":      queryDhtCmd,
+		"findpeer":   findPeerDhtCmd,
+		"get":        getValueDhtCmd,
+		"put":        putValueDhtCmd,
+		"putto":      putValuetoDhtCmd,
+		"getfrom":    getValuefromDhtCmd,
+		"liter":      literDhtCmd,
+		"literfrom":  literFromDhtCmd,
+		"append":     appendValueDhtCmd,
+		"deletefrom": deleteFromDhtCmd,
 	},
 }
 
@@ -778,7 +778,7 @@ func printEvent(obj *notif.QueryEvent, out io.Writer, verbose bool, override pfu
 	}
 }
 
-var challengeTestDhtCmd = &cmds.Command{
+var deleteFromDhtCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "在provider上删除块，用在测试挑战修复的时候",
 		ShortDescription: `新加功能`,
@@ -807,7 +807,7 @@ var challengeTestDhtCmd = &cmds.Command{
 
 		go func() {
 			defer cancel()
-			_, err = nd.Routing.(*dht.IpfsDHT).SendMetaRequest(key, "", to, "challengeTestDhtCmd")
+			_, err = nd.Routing.(*dht.IpfsDHT).SendMetaRequest(key, "", to, "deletefrom")
 			if err != nil {
 				fmt.Println("delete block error :", err)
 				return

@@ -84,6 +84,10 @@ type OfferItem struct {
 	Price      int64 // 合约给出的单价
 }
 
+func init() {
+	EndPoint = "http://212.64.28.207:8101"
+}
+
 //GetClient get rpc-client based the endPoint
 func GetClient(endPoint string) *ethclient.Client {
 	client, err := rpc.Dial(endPoint)

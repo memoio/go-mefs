@@ -225,9 +225,9 @@ func (s *Shell) ListKeepers(options ...LfsOpts) (*PeerList, error) {
 	return res, nil
 }
 
-func (s *Shell) ChallengeTest(key, to string, options ...LfsOpts) (string, error) {
+func (s *Shell) DeleteFrom(key, to string, options ...LfsOpts) (string, error) {
 	var res string
-	rb := s.Request("dht/challengeTest", key, to)
+	rb := s.Request("dht/deletefrom", key, to)
 	for _, option := range options {
 		option(rb)
 	}

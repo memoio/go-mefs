@@ -43,13 +43,13 @@ func ChallengeTest() error {
 	sh := shell.NewShell("localhost:5001")
 	testuser, err := sh.CreateUser()
 	if err != nil {
-		fmt.Println("Create user failed :", err)
+		log.Fatal("Create user failed :", err)
 		return err
 	}
 	addr := testuser.Address
 	uid, err := address.GetIDFromAddress(addr)
 	if err != nil {
-		fmt.Println("address to id failed")
+		log.Fatal("address to id failed")
 		return err
 	}
 	transferTo(big.NewInt(1000000000000000000), addr)
@@ -58,19 +58,19 @@ func ChallengeTest() error {
 		if balance.Cmp(big.NewInt(10000000000)) > 0 {
 			break
 		}
-		fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+		log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 		time.Sleep(10 * time.Second)
 	}
 	err = sh.StartUser(addr)
 	if err != nil {
-		fmt.Println("Start user failed :", err)
+		log.Fatal("Start user failed :", err)
 		return err
 	}
 	for {
 		err := sh.ShowStorage(shell.SetAddress(addr))
 		if err != nil {
 			time.Sleep(20 * time.Second)
-			fmt.Println(addr, " not start, waiting..., err : ", err)
+			log.Println(addr, " not start, waiting..., err : ", err)
 			continue
 		}
 		var opts []func(*shell.RequestBuilder) error
@@ -82,11 +82,11 @@ func ChallengeTest() error {
 		bk, err := sh.CreateBucket(bucketName, opts...)
 		if err != nil {
 			time.Sleep(20 * time.Second)
-			fmt.Println(addr, " not start, waiting, err : ", err)
+			log.Println(addr, " not start, waiting, err : ", err)
 			continue
 		}
-		fmt.Println(bk, "addr:", addr)
-		fmt.Println(addr, "started, begin to upload")
+		log.Println(bk, "addr:", addr)
+		log.Println(addr, "started, begin to upload")
 		break
 	}
 	//然后开始上传文件
@@ -96,7 +96,7 @@ func ChallengeTest() error {
 		fillRandom(data)
 		buf := bytes.NewBuffer(data)
 		objectName := addr + "_" + strconv.Itoa(int(r))
-		fmt.Println("  Begin to upload", objectName, "Size is", ToStorageSize(r), "addr", addr)
+		log.Println("Begin to upload", objectName, "Size is", ToStorageSize(r), "addr", addr)
 		beginTime := time.Now().Unix()
 		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
@@ -106,8 +106,8 @@ func ChallengeTest() error {
 		storagekb := float64(r) / 1024.0
 		endTime := time.Now().Unix()
 		speed := storagekb / float64(endTime-beginTime)
-		fmt.Println("  Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
-		fmt.Println(ob.String() + "address: " + addr)
+		log.Println("  Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
+		log.Println(ob.String() + "address: " + addr)
 
 	}
 	check := 0
@@ -115,12 +115,13 @@ func ChallengeTest() error {
 	for {
 		check++
 		if check > 5 {
+			log.Fatal("Challenge time not change")
 			return errors.New("ChallengeTest failed, Last challenge time not change")
 		}
 		time.Sleep(5 * time.Minute)
 		getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr))
 		if err != nil {
-			fmt.Println("List Objects failed :", err)
+			log.Println("List Objects failed :", err)
 			return err
 		}
 		log.Println("Object Name :", getOb.Objects[0].ObjectName, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
@@ -133,52 +134,54 @@ func ChallengeTest() error {
 
 	keepers, err := sh.ListKeepers(shell.SetAddress(addr))
 	if err != nil {
-		fmt.Println("list keepers error :", err)
+		log.Println("list keepers error :", err)
 		return err
 	}
 	keeper := keepers.Peers[0].PeerID
-	fmt.Println("keeper :", keepers.Peers[0].PeerID)
+	log.Println("keeper :", keepers.Peers[0].PeerID)
 	bm, err := metainfo.NewBlockMeta(uid, "1", "0", "0")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return err
 	}
 	cid := bm.ToString()
 	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.Local, metainfo.SyncTypeBlock)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return err
 	}
 	blockMeta := kmBlock.ToString()
-	fmt.Println("blockMeta : ", blockMeta)
+	log.Println("blockMeta : ", blockMeta)
 	var provider string
 	resPid, err := sh.GetFrom(blockMeta, keeper)
 	if err == nil {
 		provider = strings.Split(resPid.Extra, "|")[0]
-		fmt.Println("provider :", provider)
+		log.Println("provider :", provider)
 	} else {
-		fmt.Println("get blockmeta error :", err)
+		log.Println("get blockmeta error :", err)
 		return err
 	}
 	ret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if err != nil || ret == "" {
-		fmt.Println("get block from old provider error :", err)
+		log.Println("get block from old provider error :", err)
 		return err
 	}
-	fmt.Println("md5 of block`s rawdata :", ret)
+	log.Println("md5 of block`s rawdata :", ret)
 
 	//在provider上删除指定块
 	km, err := metainfo.NewKeyMeta(cid, metainfo.DeleteBlock)
 	if err != nil {
-		fmt.Println("construct del block KV error :", err)
+		log.Println("construct del block KV error :", err)
 		return err
 	}
-	_, err = sh.ChallengeTest(km.ToString(), provider)
+
+	_, err = sh.DeleteFrom(km.ToString(), provider)
 	if err != nil {
 		fmt.Println("run dht challengeTest error :", err)
 		return err
 	}
-	fmt.Println("delete block :", cid, " in provider")
+
+	log.Println("delete block :", cid, " in provider")
 	time.Sleep(42 * time.Minute)
 
 	//获取新的provider，从新的provider上获得块的MD5
@@ -186,22 +189,22 @@ func ChallengeTest() error {
 	res, err := sh.GetFrom(blockMeta, keeper)
 	if err == nil {
 		newProvider = strings.Split(res.Extra, "|")[0]
-		fmt.Println("newProvider :", newProvider)
+		log.Println("newProvider :", newProvider)
 	} else {
-		fmt.Println("get newblockmeta error :", err)
+		log.Println("get newblockmeta error :", err)
 		return err
 	}
 
 	newRet, err := getBlock(sh, cid, newProvider)
 	if err != nil || newRet == "" {
-		fmt.Println("get block from new provider error :", err)
+		log.Println("get block from new provider error :", err)
 		return err
 	}
-	fmt.Println("md5 of repaired block`s rawdata :", newRet)
+	log.Println("md5 of repaired block`s rawdata :", newRet)
 	if ret == newRet {
-		fmt.Println("Repair success")
+		log.Println("Repair success")
 	} else {
-		fmt.Println("old and new block`s rawdata md5 not match")
+		log.Println("old and new block`s rawdata md5 not match")
 		return errors.New("repair failed")
 	}
 	return nil
@@ -237,30 +240,30 @@ const ethEndPoint = "http://212.64.28.207:8101"
 func transferTo(value *big.Int, addr string) {
 	client, err := ethclient.Dial(ethEndPoint)
 	if err != nil {
-		fmt.Println("rpc.Dial err", err)
+		log.Println("rpc.Dial err", err)
 		log.Fatal(err)
 	}
-	fmt.Println("ethclient.Dial success")
+	log.Println("ethclient.Dial success")
 
 	privateKey, err := crypto.HexToECDSA("928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("crypto.HexToECDSA success")
+	log.Println("crypto.HexToECDSA success")
 
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
 		log.Fatal("error casting public key to ECDSA")
 	}
-	fmt.Println("cast public key to ECDSA success")
+	log.Println("cast public key to ECDSA success")
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("client.PendingNonceAt success")
+	log.Println("client.PendingNonceAt success")
 	gasLimit := uint64(21000) // in units
 
 	gasPrice := big.NewInt(30000000000) // in wei (30 gwei)
@@ -268,14 +271,14 @@ func transferTo(value *big.Int, addr string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("client.SuggestGasPrice success")
+	log.Println("client.SuggestGasPrice success")
 
 	toAddress := common.HexToAddress(addr[2:])
 	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
 
 	chainID, err := client.NetworkID(context.Background())
 	if err != nil {
-		fmt.Println("client.NetworkID error,use the default chainID")
+		log.Println("client.NetworkID error,use the default chainID")
 		chainID = big.NewInt(666)
 	}
 
@@ -283,20 +286,20 @@ func transferTo(value *big.Int, addr string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("types.SignTx success")
-	
+	log.Println("types.SignTx success")
+
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("transfer ", value.String(), "to", addr)
-	fmt.Printf("tx sent: %s\n", signedTx.Hash().Hex())
+	log.Println("transfer ", value.String(), "to", addr)
+	log.Printf("tx sent: %s\n", signedTx.Hash().Hex())
 }
 
 func queryBalance(addr string) *big.Int {
 	client, err := ethclient.Dial(ethEndPoint)
 	if err != nil {
-		fmt.Println("rpc.Dial err", err)
+		log.Println("rpc.Dial err", err)
 		log.Fatal(err)
 	}
 	Address := common.HexToAddress(addr[2:])
@@ -313,10 +316,10 @@ func getBlock(sh *shell.Shell, cid, provider string) (string, error) {
 	for i < 10 {
 		ret, err := sh.GetBlockFrom(cid, provider)
 		if err == nil {
-			fmt.Println("Getblock success in ", i+1, " try")
+			log.Println("Getblock success in ", i+1, " try")
 			return ret, nil
 		}
-		fmt.Println("get block failed, now try again")
+		log.Println("get block failed, now try again")
 		i++
 	}
 	return "", err
