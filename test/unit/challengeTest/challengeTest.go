@@ -177,11 +177,11 @@ func ChallengeTest() error {
 
 	_, err = sh.DeleteFrom(km.ToString(), provider)
 	if err != nil {
-		fmt.Println("run dht challengeTest error :", err)
+		fmt.Println("run dht delete error :", err)
 		return err
 	}
 
-	log.Println("delete block :", cid, " in provider")
+	log.Println("delete block :", cid, " in provider", provider)
 	time.Sleep(42 * time.Minute)
 
 	//获取新的provider，从新的provider上获得块的MD5

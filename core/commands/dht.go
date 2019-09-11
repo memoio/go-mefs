@@ -802,11 +802,7 @@ var deleteFromDhtCmd = &cmds.Command{
 		key := req.Arguments[0]
 		to := req.Arguments[1]
 
-		ctx, cancel := context.WithCancel(req.Context)
-		ctx, events := notif.RegisterForQueryEvents(ctx)
-
 		go func() {
-			defer cancel()
 			_, err = nd.Routing.(*dht.IpfsDHT).SendMetaRequest(key, "", to, "deletefrom")
 			if err != nil {
 				fmt.Println("delete block error :", err)
@@ -814,33 +810,6 @@ var deleteFromDhtCmd = &cmds.Command{
 			}
 		}()
 
-		for e := range events {
-			if err := res.Emit(e); err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return res.Emit("ok")
 	},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *notif.QueryEvent) error {
-			pfm := pfuncMap{
-				notif.FinalPeer: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
-					if verbose {
-						fmt.Fprintf(out, "* closest peer %s\n", obj.ID)
-					}
-				},
-				notif.Value: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
-					fmt.Fprintf(out, "%s\n", obj.ID.Pretty())
-				},
-			}
-
-			verbose, _ := req.Options[dhtVerboseOptionName].(bool)
-
-			printEvent(out, w, verbose, pfm)
-
-			return nil
-		}),
-	},
-	Type: notif.QueryEvent{},
 }
