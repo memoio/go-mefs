@@ -196,8 +196,9 @@ func doGenerateOrDelete() {
 	}
 	ratio := float64(usedSpace) / totalSpace
 	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",(usedSpace)/totalSpace is: ", ratio)
+
 	if ratio <= LowWater {
-		generatePosBlocks(uint64(totalSpace / 10))
+		generatePosBlocks(uint64(totalSpace * (LowWater - ratio)))
 	} else if ratio >= HighWater {
 		deletePosBlocks(uint64(usedSpace / 10))
 	}
@@ -226,6 +227,7 @@ func generatePosBlocks(increaseSpace uint64) {
 	// fillRandom()
 	// DataEncodeToMul()
 	// send BlockMeta to keepers
+	log.Println("generate pos blcoks")
 	var totalIncreased uint64
 	for {
 		if totalIncreased >= increaseSpace {
@@ -293,9 +295,10 @@ func generatePosBlocks(increaseSpace uint64) {
 }
 
 func deletePosBlocks(decreseSpace uint64) {
+	log.Println("data is about to exceed the space limit, delete pos blcoks")
+
 	// delete last blocks
 	var totalDecresed uint64
-
 	for {
 		if totalDecresed >= decreseSpace {
 			break
