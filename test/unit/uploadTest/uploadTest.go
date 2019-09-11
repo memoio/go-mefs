@@ -95,7 +95,7 @@ func UploadTest(count int) error {
 
 	bucketNum := 0
 	errNum := 0
-	fileNum := 0
+	fileNum := 1
 	fileUploadSuccessNum := 0
 
 	//upload file

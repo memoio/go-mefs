@@ -697,7 +697,7 @@ var lfsGetObjectCmd = &cmds.Command{
 			defer file.Close()
 			n, err := io.Copy(file, outReader)
 			if err != nil {
-				fmt.Println("Download failed-", err)
+				fmt.Println("Download failed - ", err)
 				return err
 			}
 			fmt.Printf("GetObject to %s success，Size: %d\n", fpath, n)

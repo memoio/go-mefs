@@ -92,12 +92,12 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 	auth.GasPrice = big.NewInt(100)
 
 	client := contracts.GetClient(ethEndPoint)
-	ukaddr, _, uk, err := upKeeping.DeployUpKeeping(auth, client, localAddr, listKeeperAddr, listProviderAddr, big.NewInt(10), big.NewInt(1024), big.NewInt(111))
+	ukaddr, trans, uk, err := upKeeping.DeployUpKeeping(auth, client, localAddr, listKeeperAddr, listProviderAddr, big.NewInt(10), big.NewInt(1024), big.NewInt(111))
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err
 	}
-	log.Println("depoly upkepping success, contract addr: ", ukaddr.Hex())
+	log.Println("depoly upkepping success, contract addr: ", ukaddr.Hex(), ", contract hash: ", trans.Hash().String())
 
 	log.Println("begin to query upkeeping's balance")
 	retryCount := 0
@@ -120,64 +120,6 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		}
 		if retryCount > 20 {
 			log.Fatal("Upkeeping has no balance")
-		}
-	}
-
-	log.Println("begin to query upkeeping's information")
-
-	retryCount = 0
-	for {
-		retryCount++
-		time.Sleep(30 * time.Second)
-		item, err := contracts.GetUpkeepingInfo(localAddr, uk)
-		if err != nil {
-			if retryCount > 20 {
-				log.Fatal("Upkeeping has no information")
-				break
-			}
-			continue
-		}
-
-		if item.Duration != int64(10) {
-			log.Fatal("Contract duration", item.Duration, " is not equal to preset: 10")
-		}
-
-		if item.Capacity != int64(1024) {
-			log.Fatal("Contract duration ", item.Capacity, " is not equal to preset: 1024")
-		}
-
-		if item.Price != int64(111) {
-			log.Fatal("Contract price ", item.Price, " is not equal to preset: 111")
-		}
-
-		knum := 0
-
-		for _, kp := range listKeeperAddr {
-			kid, _ := address.GetIDFromAddress(kp.String())
-			for _, keeper := range item.KeeperIDs {
-				if kid == keeper {
-					knum++
-				}
-			}
-		}
-
-		if knum != kCount {
-			log.Fatal("Contract keeper count is not equal to preset: ", kCount+1)
-		}
-
-		pnum := 0
-
-		for _, kp := range listProviderAddr {
-			kid, _ := address.GetIDFromAddress(kp.String())
-			for _, keeper := range item.ProviderIDs {
-				if kid == keeper {
-					pnum++
-				}
-			}
-		}
-
-		if pnum != pCount {
-			log.Fatal("Contract provider count is not equal to preset: ", pCount)
 		}
 	}
 
@@ -226,6 +168,74 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 
 		if retryCount > 20 {
 			log.Fatal("st pay fails")
+		}
+	}
+
+	log.Println("begin to query upkeeping's information")
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+
+		uk, err = upKeeping.NewUpKeeping(ukaddr, contracts.GetClient(ethEndPoint))
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("newUkErr:", err)
+				break
+			}
+			continue
+		}
+
+		item, err := contracts.GetUpkeepingInfo(localAddr, uk)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Upkeeping has no information, err: ", err)
+				break
+			}
+			continue
+		}
+
+		if item.Duration != int64(10) {
+			log.Fatal("Contract duration", item.Duration, " is not equal to preset: 10")
+		}
+
+		if item.Capacity != int64(1024) {
+			log.Fatal("Contract duration ", item.Capacity, " is not equal to preset: 1024")
+		}
+
+		if item.Price != int64(111) {
+			log.Fatal("Contract price ", item.Price, " is not equal to preset: 111")
+		}
+
+		knum := 0
+
+		for _, kp := range listKeeperAddr {
+			kid, _ := address.GetIDFromAddress(kp.String())
+			for _, keeper := range item.KeeperIDs {
+				if kid == keeper {
+					knum++
+				}
+			}
+		}
+
+		if knum != kCount {
+			log.Fatal("Contract keeper count is not equal to preset: ", kCount+1)
+		}
+
+		pnum := 0
+
+		for _, kp := range listProviderAddr {
+			kid, _ := address.GetIDFromAddress(kp.String())
+			for _, keeper := range item.ProviderIDs {
+				if kid == keeper {
+					pnum++
+				}
+			}
+		}
+
+		if pnum != pCount {
+			log.Fatal("Contract provider count is not equal to preset: ", pCount)
 		}
 	}
 
