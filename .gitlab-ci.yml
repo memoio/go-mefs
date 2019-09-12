@@ -1,4 +1,4 @@
-image: limcos/mefs_compile_env:latest
+image: yydfjt/docker-mefs-env:latest
 
 stages:
   - golangci-lint
@@ -122,10 +122,7 @@ contract_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - make install
-    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
-    - ./ScTest.sh
-  after_script:
-    - cat ~/daemon.stdout
+    - go run test/unit/contractTest/stPayTest.go
   tags:
     - "47.92.5.51"
   only:
