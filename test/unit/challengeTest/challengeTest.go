@@ -183,7 +183,7 @@ func ChallengeTest() error {
 
 	time.Sleep(2 * time.Minute)
 	nret, err := getBlock(sh, cid, provider) //获取块的MD5
-	if nret != "" {
+	if nret != "" && err == nil {
 		log.Println("get block from provider")
 		return err
 	}
