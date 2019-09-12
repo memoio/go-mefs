@@ -54,6 +54,7 @@ func UploadTest(count int) error {
 
 	fmt.Println("GetIDFromAddress success,uid is", uid)
 	transferTo(big.NewInt(1000000000000000000), addr)
+	time.Sleep(90 * time.Second)
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(addr)
