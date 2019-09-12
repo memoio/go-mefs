@@ -189,7 +189,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	value := big.NewInt(0)
 	value = value.Add(channelItem.Value, big.NewInt(addValue))
 
-	if money.Cmp(value) >= 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
+	if money.Cmp(value) < 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
 		log.Println("value is different from money,  value is: ", value.String())
 		return false, "", "", nil, nil
 	}
