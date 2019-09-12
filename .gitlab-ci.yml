@@ -1,4 +1,4 @@
-image: yydfjt/docker-mefs-env:latest
+image: memoio/mefs-env:latest
 
 stages:
   - golangci-lint
