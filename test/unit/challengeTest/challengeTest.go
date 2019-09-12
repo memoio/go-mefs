@@ -67,7 +67,7 @@ func ChallengeTest() error {
 		return err
 	}
 	for {
-		err := sh.ShowStorage(shell.SetAddress(addr))
+		_, err := sh.ShowStorage(shell.SetAddress(addr))
 		if err != nil {
 			time.Sleep(20 * time.Second)
 			log.Println(addr, " not start, waiting..., err : ", err)
@@ -182,8 +182,8 @@ func ChallengeTest() error {
 	}
 
 	time.Sleep(2 * time.Minute)
-	ret, err = getBlock(sh, cid, provider) //获取块的MD5
-	if err == nil {
+	nret, err := getBlock(sh, cid, provider) //获取块的MD5
+	if nret != "" {
 		log.Println("get block from provider")
 		return err
 	}

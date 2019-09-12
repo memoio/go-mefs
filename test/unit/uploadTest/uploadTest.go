@@ -71,7 +71,7 @@ func UploadTest(count int) error {
 	bucketName := "Bucket0"
 
 	for {
-		err := sh.ShowStorage(shell.SetAddress(addr))
+		_, err := sh.ShowStorage(shell.SetAddress(addr))
 		if err != nil {
 			time.Sleep(20 * time.Second)
 			fmt.Println(addr, " not start, waiting..., err : ", err)

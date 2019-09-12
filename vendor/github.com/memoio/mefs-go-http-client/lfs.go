@@ -199,7 +199,7 @@ func (s *Shell) Fsync(options ...LfsOpts) error {
 	return nil
 }
 
-func (s *Shell) ShowStorage(options ...LfsOpts) error {
+func (s *Shell) ShowStorage(options ...LfsOpts) (string, error) {
 	var res string
 	rb := s.Request("lfs/show_storage")
 	for _, option := range options {
@@ -207,9 +207,9 @@ func (s *Shell) ShowStorage(options ...LfsOpts) error {
 	}
 
 	if err := rb.Exec(context.Background(), &res); err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return res, nil
 }
 
 func (s *Shell) ListKeepers(options ...LfsOpts) (*PeerList, error) {
