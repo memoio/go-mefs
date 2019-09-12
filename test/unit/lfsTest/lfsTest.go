@@ -92,19 +92,19 @@ func lfsTest() error {
 	}
 
 	if bk.Buckets[0].BucketName != bucketName {
-		log.Fatal("create bucket", bucketName, "fails")
+		log.Println("create bucket", bucketName, "fails")
 	}
 
 	if bk.Buckets[0].Policy != df.RsPolicy {
-		log.Fatal("create bucket fails Policy")
+		log.Println("create bucket fails Policy")
 	}
 
 	if bk.Buckets[0].DataCount != dataCount {
-		log.Fatal("create bucket fails datacount")
+		log.Println("create bucket fails datacount")
 	}
 
 	if bk.Buckets[0].ParityCount != parityCount {
-		log.Fatal("create bucket fails paritycount")
+		log.Println("create bucket fails paritycount")
 	}
 
 	log.Println("4. test rs put bucket")
@@ -175,23 +175,23 @@ func lfsTest() error {
 
 	bk, err = sh.HeadBucket(mbucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Fatal("create mbucket err: ", err)
+		log.Println("create mbucket err: ", err)
 	}
 
 	if bk.Buckets[0].BucketName != mbucketName {
-		log.Fatal("create mbucket", mbucketName, "fails")
+		log.Println("create mbucket", mbucketName, "fails")
 	}
 
 	if bk.Buckets[0].Policy != df.MulPolicy {
-		log.Fatal("create mbucket fails Policy")
+		log.Println("create mbucket fails Policy")
 	}
 
 	if bk.Buckets[0].DataCount != 1 {
-		log.Fatal("create mbucket fails datacount")
+		log.Println("create mbucket fails datacount")
 	}
 
 	if bk.Buckets[0].ParityCount != parityCount+1 {
-		log.Fatal("create mbucket fails paritycount")
+		log.Println("create mbucket fails paritycount")
 	}
 
 	log.Println("7. test mul put object")
