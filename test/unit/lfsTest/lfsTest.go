@@ -156,7 +156,6 @@ func lfsTest() error {
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
 		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
-		return err
 	}
 
 	log.Println("6. test mul create bucket")
@@ -242,7 +241,6 @@ func lfsTest() error {
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
 		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
-		return err
 	}
 
 	log.Println("9. test showstorage")

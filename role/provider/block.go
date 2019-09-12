@@ -163,11 +163,6 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 		return true, "", "", nil, nil
 	}
 
-	//判断value值是否正确
-	if money.Cmp(big.NewInt(0)) == 0 { //传过来的value值如果是0，就表示是测试环境，直接返回true
-		return true, "", "", nil, nil
-	}
-
 	// 从内存获得value
 	userID, err := address.GetIDFromAddress(userAddr.String())
 	if err != nil {
@@ -191,7 +186,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 
 	if money.Cmp(value) < 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
 		log.Println("value is different from money,  value is: ", value.String())
-		return false, "", "", nil, nil
+		//return false, "", "", nil, nil
 	}
 
 	//判断签名是否正确

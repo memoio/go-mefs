@@ -116,13 +116,13 @@ unit_test:
   tags:
     - "47.92.5.51"
 
-contract_test:
+upkeeping_test:
   stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - make install
-    - go run test/unit/contractTest/stPayTest.go
+    - go run test/unit/upkeepingTest/upkeepingTest.go
   tags:
     - "47.92.5.51"
   only:
