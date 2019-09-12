@@ -163,6 +163,22 @@ js_API_test:
   only:
     - schedules
 
+lfs_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - make install
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 lfsTest.sh
+    - ./lfsTest.sh
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
 challenge_test:
   stage: challenge-test
   when: always
