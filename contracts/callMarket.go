@@ -36,6 +36,7 @@ func DeployQuery(userAddress common.Address, sk *ecdsa.PrivateKey, capacity int6
 
 	//获得mapper
 	auth := bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 	mapper, err := deployMapper(userAddress, resolver, auth, client)
 	if err != nil {
@@ -59,6 +60,7 @@ func DeployQuery(userAddress common.Address, sk *ecdsa.PrivateKey, capacity int6
 
 	// 部署query
 	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	queryAddr, _, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 	if err != nil {
 		fmt.Println("deployQueryErr:", err)
@@ -68,6 +70,7 @@ func DeployQuery(userAddress common.Address, sk *ecdsa.PrivateKey, capacity int6
 
 	//queryAddress放进mapper,多尝试几次，以免出现未知错误
 	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	for addToMapperCount := 0; addToMapperCount < 2; addToMapperCount++ {
 		time.Sleep(10 * time.Second)
 		_, err = mapper.Add(auth, queryAddr)
@@ -113,6 +116,7 @@ func SetQueryCompleted(hexKey string, userAddress common.Address, queryAddress c
 		return err
 	}
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	_, err = query.SetCompleted(auth)
 	if err != nil {
 		fmt.Println("setCompletedErr:", err)
@@ -166,6 +170,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 		return err
 	}
 	auth := bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 	mapper, err := deployMapper(providerAddress, resolverInstance, auth, client)
 	if err != nil {
@@ -188,6 +193,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 	}
 	//部署offer
 	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	offerAddr, _, _, err := market.DeployOffer(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price)) //提供存储容量 存储时段 存储单价
 	if err != nil {
 		fmt.Println("deployOfferErr:", err)
@@ -197,6 +203,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 
 	//offerAddress放进mapper,多尝试几次，以免出现未知错误
 	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	for addToMapperCount := 0; addToMapperCount < 2; addToMapperCount++ {
 		time.Sleep(10 * time.Second)
 		_, err = mapper.Add(auth, offerAddr)

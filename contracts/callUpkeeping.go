@@ -29,6 +29,7 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 		return err
 	}
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
 	//获得mapper
@@ -40,6 +41,7 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 	// 部署UpKeeping
 	// 用户需要支付的金额
 	auth = bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.Value = moneyAccount
 	ukAddr, _, _, err := upKeeping.DeployUpKeeping(auth, client,
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
@@ -52,6 +54,7 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 
 	//uk放进mapper
 	auth = bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	for addToMapperCount := 0; addToMapperCount < 2; addToMapperCount++ {
 		time.Sleep(10 * time.Second)
 		_, err = mapper.Add(auth, ukAddr)
@@ -133,7 +136,7 @@ func SpaceTimePay(uk *upKeeping.UpKeeping, userAddress common.Address, providerA
 	//构建auth,用keeper的私钥
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(spaceTimePayGasPrice)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.GasLimit = spaceTimePayGasLimit
 	tran, err := uk.SpaceTimePay(auth, providerAddr, money) //合约余额不足会自动报错返回
 
@@ -196,6 +199,7 @@ func AddProvider(hexKey string, userAddress common.Address, providerAddress []co
 
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 
 	_, err = uk.AddProvider(auth, providerAddress)
 	if err != nil {

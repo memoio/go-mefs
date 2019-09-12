@@ -28,6 +28,7 @@ const (
 	InvalidAddr          = "0x0000000000000000000000000000000000000000"
 	spaceTimePayGasLimit = uint64(400000)
 	spaceTimePayGasPrice = 100
+	defaultGasPrice      = 100
 )
 
 var (
@@ -119,8 +120,10 @@ func DeployResolverForChannel(hexKey string, localAddress common.Address, indexe
 	fmt.Println("begin deploy resolver...")
 	sk, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
+	auth.GasPrice = big.NewInt(100)
 	//查看是否已经部署过
 	_, resolverAddrGetted, err := indexer.Get(&bind.CallOpts{
 		From: localAddress,
@@ -136,6 +139,7 @@ func DeployResolverForChannel(hexKey string, localAddress common.Address, indexe
 
 	//provider部署resolver
 	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	resolverAddr, _, _, err := resolver.DeployResolver(auth, client)
 	if err != nil {
 		fmt.Println("deployResolverErr:", err)
@@ -147,6 +151,7 @@ func DeployResolverForChannel(hexKey string, localAddress common.Address, indexe
 	//resolver-for-channel的key为providerAddr.string()
 	fmt.Print("wait for resolverAddr added into indexer...")
 	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	_, err = indexer.Add(auth, localAddress.String(), resolverAddr)
 	if err != nil {
 		fmt.Println("\naddResolverErr:", err)
@@ -155,6 +160,7 @@ func DeployResolverForChannel(hexKey string, localAddress common.Address, indexe
 
 	//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
 	for {
+		time.Sleep(30 * time.Second)
 		_, resolverAddrGetted, err = indexer.Get(&bind.CallOpts{
 			From: localAddress,
 		}, localAddress.String())
@@ -166,7 +172,6 @@ func DeployResolverForChannel(hexKey string, localAddress common.Address, indexe
 			fmt.Println("done!")
 			break
 		}
-		time.Sleep(10 * time.Second)
 	}
 
 	fmt.Println("resolver have been successfully deployed!")

@@ -98,6 +98,7 @@ func IsProvider(localaddress common.Address) (bool, error) {
 func KeeperContract(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
 	//暂时将质押金额设为0
@@ -130,6 +131,7 @@ func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err e
 
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 
 	_, err = keeper.Set(auth, localAddress, isKeeper)
 	if err != nil {
@@ -142,6 +144,7 @@ func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err e
 func ProviderContract(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
 	//暂时将存储容量、质押金额设为0
@@ -174,6 +177,7 @@ func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (e
 
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	_, err = provider.Set(auth, localAddress, isProvider)
 	if err != nil {
 		return err

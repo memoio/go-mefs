@@ -121,7 +121,6 @@ upkeeping_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
     - go run test/unit/upkeepingTest/upkeepingTest.go
   tags:
     - "47.92.5.51"
@@ -133,9 +132,7 @@ channel_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
-    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
-    - ./Channel_test.sh
+    - go run test/unit/channelTest/channelTest.go
   after_script:
     - cat ~/daemon.stdout
   tags:

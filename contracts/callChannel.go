@@ -20,6 +20,8 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 	var channelAddr common.Address
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
+
 	client := GetClient(EndPoint)
 
 	//根据key(provider的地址)从indexer中获得对应的resolver
@@ -31,6 +33,8 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 
 	//从上面的resolver中，获得本user的mapper，如果没有，则部署mapper
 	auth = bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
+
 	mapper, err := deployMapper(localAddress, resolver, auth, client)
 	if err != nil {
 		return channelAddr, err
@@ -38,6 +42,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 
 	//本user与指定的provider部署channel合约
 	auth = bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.Value = moneyToChannel //放进合约里的钱
 	channelAddr, _, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
 	if err != nil {
@@ -49,6 +54,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 
 	//将channel合约地址channelAddr放进上述的mapper中
 	auth = bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	_, err = mapper.Add(auth, channelAddr)
 	if err != nil {
 		fmt.Println("addChannelErr:", err)
@@ -59,6 +65,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 	for i := 1; ; i++ {
 		if i%10 == 0 { //每隔10次如果还get不到合约地址，就再触发一次添加合约到mapper
 			auth = bind.NewKeyedTransactor(key)
+			auth.GasPrice = big.NewInt(defaultGasPrice)
 			_, err = mapper.Add(auth, channelAddr)
 			if err != nil {
 				fmt.Println("addChannelErr:", err)
@@ -76,7 +83,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 		if length != 0 && channelGetted[length-1] == channelAddr {
 			break
 		}
-		time.Sleep(8 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 
 	fmt.Println("channel-contract with", providerAddress.String(), "have been successfully deployed!")
@@ -104,6 +111,7 @@ func ChannelTimeout(hexKey string, localAddress common.Address, providerAddress 
 	}
 
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	_, err = channelContract.ChannelTimeout(auth)
 	if err != nil {
 		fmt.Println("channelTimeOutErr:", err)
@@ -140,6 +148,7 @@ func CloseChannel(hexKey string, localAddress common.Address, ownerAddress commo
 	//用user的签名来触发closeChannel()
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.GasLimit = 8000000
 	_, err = channelContract.CloseChannel(auth, hashNew, value, sig)
 	if err != nil {
