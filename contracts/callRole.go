@@ -275,7 +275,39 @@ func DeployKeeperProviderMap(hexKey string, localAddress common.Address) (*role.
 	return keeperProviderMapInstance, nil
 }
 
-func addKeeperProvidersToKPMap(keeperProviderMapInstance *role.KeeperProviderMap, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
+func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role.KeeperProviderMap, error) {
+	var keeperProviderInstance *role.KeeperProviderMap
+
+	indexerAddr := common.HexToAddress(IndexerHex)
+	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	if err != nil {
+		fmt.Println("newIndexerErr:", err)
+		return keeperProviderInstance, err
+	}
+
+	_, keeperproviderMapContractAddr, err := indexer.Get(&bind.CallOpts{
+		From: localAddress,
+	}, "keeperProviderMap")
+	if err != nil {
+		fmt.Println("getkeeperproviderMapContractErr:", err)
+		return keeperProviderInstance, err
+	}
+
+	keeperProviderInstance, err = role.NewKeeperProviderMap(keeperproviderMapContractAddr, GetClient(EndPoint))
+	if err != nil {
+		fmt.Println("newKeeperProviderMapContractErr:", err)
+		return keeperProviderInstance, err
+	}
+	return keeperProviderInstance, nil
+}
+
+func addKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
+	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	if err != nil {
+		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		return err
+	}
+
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		fmt.Println("HexToECDSAErr:", err)
@@ -291,7 +323,13 @@ func addKeeperProvidersToKPMap(keeperProviderMapInstance *role.KeeperProviderMap
 	return nil
 }
 
-func deleteKeeper(keeperProviderMapInstance *role.KeeperProviderMap, hexKey string, keeperAddress common.Address) error {
+func deleteKeeper(localAddress common.Address, hexKey string, keeperAddress common.Address) error {
+	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	if err != nil {
+		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		return err
+	}
+
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		fmt.Println("HexToECDSAErr:", err)
@@ -307,7 +345,13 @@ func deleteKeeper(keeperProviderMapInstance *role.KeeperProviderMap, hexKey stri
 	return nil
 }
 
-func deleteProvider(keeperProviderMapInstance *role.KeeperProviderMap, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
+func deleteProvider(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
+	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	if err != nil {
+		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		return err
+	}
+
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		fmt.Println("HexToECDSAErr:", err)
@@ -323,9 +367,16 @@ func deleteProvider(keeperProviderMapInstance *role.KeeperProviderMap, hexKey st
 	return nil
 }
 
-func getAllKeeperInKPMap(keeperProviderMapInstance *role.KeeperProviderMap, localAddress common.Address) ([]common.Address, error) {
+func getAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) {
 	var keeperAddresses []common.Address
-	keeperAddresses, err := keeperProviderMapInstance.GetAllKeeper(&bind.CallOpts{
+
+	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	if err != nil {
+		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		return nil, err
+	}
+
+	keeperAddresses, err = keeperProviderMapInstance.GetAllKeeper(&bind.CallOpts{
 		From: localAddress,
 	})
 	if err != nil {
@@ -335,9 +386,16 @@ func getAllKeeperInKPMap(keeperProviderMapInstance *role.KeeperProviderMap, loca
 	return keeperAddresses, nil
 }
 
-func getProviderInKPMap(keeperProviderMapInstance *role.KeeperProviderMap, localAddress common.Address, keeperAddress common.Address) ([]common.Address, error) {
+func getProviderInKPMap(localAddress common.Address, keeperAddress common.Address) ([]common.Address, error) {
 	var providerAddresses []common.Address
-	providerAddresses, err := keeperProviderMapInstance.GetProvider(&bind.CallOpts{
+
+	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	if err != nil {
+		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		return nil, err
+	}
+
+	providerAddresses, err = keeperProviderMapInstance.GetProvider(&bind.CallOpts{
 		From: localAddress,
 	}, keeperAddress)
 	if err != nil {
