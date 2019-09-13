@@ -42,6 +42,7 @@ var (
 	ErrContractNotPutToMapper = errors.New("the upKeeping-contract has not been added to mapper within a specified period of time")
 	ErrMarketType             = errors.New("The market type is error, please input correct market type")
 	ErrNotDeployedMarket      = errors.New("has not deployed query or offer")
+	ErrNewContractInstance    = errors.New("new contractInstace failed")
 )
 
 type UpKeepingItem struct {

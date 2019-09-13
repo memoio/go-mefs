@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -183,4 +184,165 @@ func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (e
 		return err
 	}
 	return nil
+}
+
+//DeployKeeperProviderMap deploy KeeperProviderMap-contract
+func DeployKeeperProviderMap(hexKey string, localAddress common.Address) (*role.KeeperProviderMap, error) {
+	fmt.Println("begin deploy keeperProviderMap...")
+
+	var keeperProviderMapInstance *role.KeeperProviderMap
+
+	//获得resolver
+	resolver, err := getResolverFromIndexer(localAddress, "keeperProviderMap")
+	if err != nil {
+		fmt.Println("getResolverErr:", err)
+		return nil, err
+	}
+
+	//获得mapper
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		fmt.Println("HexToECDSAErr:", err)
+		return nil, err
+	}
+	auth := bind.NewKeyedTransactor(key)
+	client := GetClient(EndPoint)
+	mapper, err := deployMapper(localAddress, resolver, auth, client)
+	if err != nil {
+		return nil, err
+	}
+
+	//查看是否已经部署过keeperProviderMap，如果部署过就直接返回
+	keeperProviderMapAddressesGetted, err := mapper.Get(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		fmt.Println("getOfferAddressesErr:", err)
+		return nil, err
+	}
+	if len(keeperProviderMapAddressesGetted) != 0 && keeperProviderMapAddressesGetted[0].String() != InvalidAddr { //代表用户之前就部署过keeperProviderMap
+		fmt.Println("you have deployed keeperProviderMap already")
+		keeperProviderMapInstance, err = role.NewKeeperProviderMap(keeperProviderMapAddressesGetted[0], client)
+		if err != nil {
+			fmt.Println("newKeeperProviderMapInstanceErr:", err)
+			return nil, ErrNewContractInstance
+		}
+		return keeperProviderMapInstance, nil
+	}
+
+	//之前没有部署过，部署keeperProviderMap合约
+	auth = bind.NewKeyedTransactor(key)
+	keeperProviderMapAddr, _, keeperProviderMapInstance, err := role.DeployKeeperProviderMap(auth, client)
+	if err != nil {
+		fmt.Println("deployKeeperProviderMapErr:", err)
+		return nil, err
+	}
+
+	//keeperProviderMap放进mapper
+	auth = bind.NewKeyedTransactor(key)
+	for addToMapperCount := 0; addToMapperCount < 2; addToMapperCount++ {
+		time.Sleep(10 * time.Second)
+		_, err = mapper.Add(auth, keeperProviderMapAddr)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		fmt.Println("addukErr:", err)
+		return nil, err
+	}
+	//尝试从mapper中获取keeperProviderMap，以检测keeperProviderMap是否已放进mapper中
+	var contracts []common.Address
+	for i := 0; i < 30; i++ {
+		contracts, err = mapper.Get(&bind.CallOpts{
+			From: localAddress,
+		})
+		if err != nil {
+			fmt.Println("getContractsErr:", err)
+			return nil, err
+		}
+		if len(contracts) == 0 || contracts[0].String() == InvalidAddr { //ukAddr还没放进mapper
+			time.Sleep(10 * time.Second)
+		} else {
+			break
+		}
+	}
+	if len(contracts) == 0 || contracts[0].String() == InvalidAddr {
+		fmt.Println("keeperProviderMap-contract have not been put to mapper!")
+		return nil, ErrContractNotPutToMapper
+	}
+	fmt.Println("keeperProviderMap-contract have been successfully deployed!")
+	return keeperProviderMapInstance, nil
+}
+
+func addKeeperProvidersToKPMap(keeperProviderMapInstance *role.KeeperProviderMap, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		fmt.Println("HexToECDSAErr:", err)
+		return err
+	}
+	auth := bind.NewKeyedTransactor(key)
+
+	_, err = keeperProviderMapInstance.Add(auth, keeperAddress, providerAddresses)
+	if err != nil {
+		fmt.Println("addKeeperProviderTokpMapErr:", err)
+		return err
+	}
+	return nil
+}
+
+func deleteKeeper(keeperProviderMapInstance *role.KeeperProviderMap, hexKey string, keeperAddress common.Address) error {
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		fmt.Println("HexToECDSAErr:", err)
+		return err
+	}
+	auth := bind.NewKeyedTransactor(key)
+
+	_, err = keeperProviderMapInstance.DelKeeper(auth, keeperAddress)
+	if err != nil {
+		fmt.Println("deleteKeeperInkpMapErr:", err)
+		return err
+	}
+	return nil
+}
+
+func deleteProvider(keeperProviderMapInstance *role.KeeperProviderMap, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		fmt.Println("HexToECDSAErr:", err)
+		return err
+	}
+	auth := bind.NewKeyedTransactor(key)
+
+	_, err = keeperProviderMapInstance.DelProvider(auth, keeperAddress, providerAddress)
+	if err != nil {
+		fmt.Println("deleteProviderInkpMapErr:", err)
+		return err
+	}
+	return nil
+}
+
+func getAllKeeperInKPMap(keeperProviderMapInstance *role.KeeperProviderMap, localAddress common.Address) ([]common.Address, error) {
+	var keeperAddresses []common.Address
+	keeperAddresses, err := keeperProviderMapInstance.GetAllKeeper(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		fmt.Println("deleteProviderInkpMapErr:", err)
+		return nil, err
+	}
+	return keeperAddresses, nil
+}
+
+func getProviderInKPMap(keeperProviderMapInstance *role.KeeperProviderMap, localAddress common.Address, keeperAddress common.Address) ([]common.Address, error) {
+	var providerAddresses []common.Address
+	providerAddresses, err := keeperProviderMapInstance.GetProvider(&bind.CallOpts{
+		From: localAddress,
+	}, keeperAddress)
+	if err != nil {
+		fmt.Println("deleteProviderInkpMapErr:", err)
+		return nil, err
+	}
+	return providerAddresses, nil
 }
