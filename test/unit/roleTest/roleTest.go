@@ -88,7 +88,7 @@ func testRole() (err error) {
 			}
 			continue
 		}
-		log.Println("test set keeper success")
+		log.Println("set keeper success")
 		break
 	}
 
@@ -117,7 +117,7 @@ func testRole() (err error) {
 			}
 			continue
 		}
-		log.Println("test set provider success")
+		log.Println("set provider success")
 		break
 	}
 
@@ -152,7 +152,7 @@ func testRole() (err error) {
 		}
 
 		if flag {
-			log.Println("Get All Keeper In KPMap success")
+			log.Println("get keeper from kpmap success")
 		} else {
 			if retryCount > 20 {
 				log.Fatal("Get Keeper fails")
@@ -185,7 +185,7 @@ func testRole() (err error) {
 		}
 
 		if flag {
-			log.Println("Get Provider In KPMap success")
+			log.Println("get provider from kpmap success")
 		} else {
 			if retryCount > 20 {
 				log.Fatal("Get Provider fails")
@@ -194,6 +194,7 @@ func testRole() (err error) {
 		}
 		break
 	}
+	log.Println("add kp to kpmap success")
 
 	log.Println("test delete provider from kpmap")
 
@@ -229,7 +230,7 @@ func testRole() (err error) {
 			}
 			continue
 		} else {
-			log.Println("delete provider success")
+			log.Println("delete provider from kpmap success")
 		}
 		break
 	}
@@ -268,7 +269,7 @@ func testRole() (err error) {
 			}
 			continue
 		} else {
-			log.Println("Delete Keeper In KPMap Success")
+			log.Println("delete keeper from kpmap success")
 		}
 		break
 	}
@@ -292,7 +293,7 @@ func testRole() (err error) {
 			}
 			continue
 		}
-		log.Println("test set keeper fasle success")
+		log.Println("set keeper fasle success")
 		break
 	}
 
@@ -314,7 +315,7 @@ func testRole() (err error) {
 			}
 			continue
 		}
-		log.Println("test set provider false success")
+		log.Println("set provider false success")
 		break
 	}
 

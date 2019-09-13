@@ -140,6 +140,19 @@ channel_test:
   only:
     - schedules
 
+role_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - go run test/unit/roleTest/roleTest.go
+  after_script:
+    - cat ~/daemon.stdout
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
 js_API_test:
   stage: short-test
   when: always

@@ -195,7 +195,7 @@ func doGenerateOrDelete() {
 		return
 	}
 	ratio := float64(usedSpace) / totalSpace
-	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",(usedSpace)/totalSpace is: ", ratio)
+	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
 	if ratio <= LowWater {
 		generatePosBlocks(uint64(totalSpace * (LowWater - ratio)))
