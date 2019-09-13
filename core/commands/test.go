@@ -35,19 +35,25 @@ var TestCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"keeper":         KeeperCmd,
-		"helloworld":     helloWorldCmd, //命令行操作写法示例
-		"localinfo":      infoCmd,
-		"resultsummary":  resultSummaryCmd,
-		"sc":             smartContractCmd,  //合约全流程测试
-		"deployKeeper":   deployKeeperCmd,   //deploy keeper contract
-		"setKeeper":      setKeeperCmd,      //将传入的账户设为keeper
-		"deployProvider": deployProviderCmd, //deploy keeper contract
-		"setProvider":    setProviderCmd,    //将传入的账户设为provider
-		"channelTimeout": channelTimeoutCmd, //测试channel合约的部署以及channelTimeout()
-		"closeChannel":   closeChannelCmd,   //测试channel合约的部署以及closeChannel()
-		"showBalance":    showBalanceCmd,    //用于测试，查看自己的余额或者指定账户的余额
-		"savePay":        savePayCmd,
+		"keeper":                   KeeperCmd,
+		"helloworld":               helloWorldCmd, //命令行操作写法示例
+		"localinfo":                infoCmd,
+		"resultsummary":            resultSummaryCmd,
+		"sc":                       smartContractCmd,  //合约全流程测试
+		"deployKeeper":             deployKeeperCmd,   //deploy keeper contract
+		"setKeeper":                setKeeperCmd,      //将传入的账户设为keeper
+		"deployProvider":           deployProviderCmd, //deploy keeper contract
+		"setProvider":              setProviderCmd,    //将传入的账户设为provider
+		"channelTimeout":           channelTimeoutCmd, //测试channel合约的部署以及channelTimeout()
+		"closeChannel":             closeChannelCmd,   //测试channel合约的部署以及closeChannel()
+		"showBalance":              showBalanceCmd,    //用于测试，查看自己的余额或者指定账户的余额
+		"savePay":                  savePayCmd,
+		"deployKeeperProviderMap":  deployKeeperProviderMapCmd,  //部署 KeeperProviderMap 合约
+		"addKeeperProviderToKPMap": addKeeperProviderToKPMapCmd, //往KeeperProviderMap里添加keeper和provider
+		"deleteProviderInKPMap":    deleteProviderInKPMapCmd,    //删除KeeperProviderMap里的指定provider
+		"deleteKeeperInKPMap":      deleteKeeperInKPMapCmd,      //删除keeperProviderMap里的指定keeper
+		"getProviderInKPMap":       getProviderInKPMapCmd,       //获得keeperProviderMap合约中与指定keeper关联的所有provider
+		"getAllKeeperInKPMap":      getAllKeeperInKPMapCmd,      //获得keeperProviderMap合约中的所有keeper
 	},
 }
 
@@ -575,4 +581,324 @@ func testCloseChannel(localAddr common.Address, hexKey string, ethEndPoint strin
 		return errors.New("close channel failed")
 	}
 	return nil
+}
+
+var deployKeeperProviderMapCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test deployKeeperProviderMap",
+		ShortDescription: "deploy KeeperProviderMap contract",
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+		hexKey, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
+		if err != nil {
+			fmt.Println("getHexPKErr", err)
+			return err
+		}
+		config, err := n.Repo.Config()
+		if err != nil {
+			return err
+		}
+		ethEndPoint := config.Eth
+
+		err = testDeployKeeperProviderMap(localAddress, hexKey, ethEndPoint)
+		if err != nil {
+			return err
+		}
+		list := &StringList{}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+func testDeployKeeperProviderMap(localAddr common.Address, hexKey string, ethEndPoint string) (err error) {
+	balance, err := contracts.QueryBalance(localAddr.String()) //查看账户余额
+	if err != nil {
+		fmt.Println("QueryBalanceErr", err)
+		return err
+	}
+	fmt.Println("balance:", balance)
+
+	//部署KeeperProviderMap合约
+	err = contracts.DeployKeeperProviderMap(hexKey)
+	if err != nil {
+		fmt.Println("deployKeeperProviderMapErr:", err)
+		return err
+	}
+
+	time.Sleep(30 * time.Second)
+	balanceLater, err := contracts.QueryBalance(localAddr.String()) //查看部署后的账户余额
+	amountCost := big.NewInt(0)
+	amountCost.Sub(balance, balanceLater)
+	fmt.Println("部署KeeperProviderMap消耗的金额:", amountCost)
+
+	return nil
+}
+
+var addKeeperProviderToKPMapCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test addKeeperProviderToKPMapCmd",
+		ShortDescription: "add KeeperProvider to KeeperProviderMap contract",
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+		hexKey, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
+		if err != nil {
+			fmt.Println("getHexPKErr", err)
+			return err
+		}
+		config, err := n.Repo.Config()
+		if err != nil {
+			return err
+		}
+		ethEndPoint := config.Eth
+
+		tmpKeeperID := "8MHS9fZzRaHNj4mP1kYDebwySmLzaw"
+		keeperAddr, _ := address.GetAddressFromID(tmpKeeperID)
+		var tmpProviderIDs = []string{"8MHXst83NnSfYHnyqWMVjwjt2GiutV", "8MGrkL5cUpPsPbePvCfwCx6HemwDvy"}
+		var providerAddrs []common.Address
+		for _, tmpPid := range tmpProviderIDs {
+			tempAddr, _ := address.GetAddressFromID(tmpPid)
+			providerAddrs = append(providerAddrs, tempAddr)
+		}
+
+		err = testaddKeeperProviderToKPMap(localAddress, hexKey, ethEndPoint, keeperAddr, providerAddrs)
+		if err != nil {
+			return err
+		}
+		list := &StringList{}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+func testaddKeeperProviderToKPMap(localAddr common.Address, hexKey string, ethEndPoint string, keeperAddr common.Address, providerAddrs []common.Address) (err error) {
+	balance, err := contracts.QueryBalance(localAddr.String()) //查看账户余额
+	if err != nil {
+		fmt.Println("QueryBalanceErr", err)
+		return err
+	}
+	fmt.Println("balance:", balance)
+
+	//添加具有合作关系的keeper和providers
+	err = contracts.AddKeeperProvidersToKPMap(localAddr, hexKey, keeperAddr, providerAddrs)
+	if err != nil {
+		fmt.Println("addKeeperProviderToKPMapErr:", err)
+		return err
+	}
+
+	time.Sleep(30 * time.Second)
+	balanceLater, err := contracts.QueryBalance(localAddr.String()) //查看部署后的账户余额
+	amountCost := big.NewInt(0)
+	amountCost.Sub(balance, balanceLater)
+	fmt.Println("addKeeperProviderToKPMap消耗的金额:", amountCost)
+
+	return nil
+}
+
+var deleteProviderInKPMapCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test delete Provider in KPMap",
+		ShortDescription: "delete Provider in KeeperProviderMap contract",
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+		hexKey, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
+		if err != nil {
+			fmt.Println("getHexPKErr", err)
+			return err
+		}
+
+		tmpKeeperID := "8MHS9fZzRaHNj4mP1kYDebwySmLzaw"
+		keeperAddr, _ := address.GetAddressFromID(tmpKeeperID)
+		tmpProviderID := "8MHXst83NnSfYHnyqWMVjwjt2GiutV"
+		providerAddr, _ := address.GetAddressFromID(tmpProviderID)
+
+		//删除KeeperProviderMap合约中指定keeper下的一个provider
+		err = contracts.DeleteProviderFromKPMap(localAddress, hexKey, keeperAddr, providerAddr)
+		if err != nil {
+			fmt.Println("DeleteProviderErr:", err)
+			return err
+		}
+		list := &StringList{}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var deleteKeeperInKPMapCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test delete keeper in KPMap",
+		ShortDescription: "delete keeper in KeeperProviderMap contract",
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+		hexKey, err := fr.GetHexPrivKeyFromKS(n.Identity, n.Password)
+		if err != nil {
+			fmt.Println("getHexPKErr", err)
+			return err
+		}
+
+		tmpKeeperID := "8MHS9fZzRaHNj4mP1kYDebwySmLzaw"
+		keeperAddr, _ := address.GetAddressFromID(tmpKeeperID)
+
+		//删除KeeperProviderMap合约中指定的keeper以及与keeper关联的所有provider
+		err = contracts.DeleteKeeperFromKPMap(localAddress, hexKey, keeperAddr)
+		if err != nil {
+			fmt.Println("DeleteKeeperErr:", err)
+			return err
+		}
+		list := &StringList{}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var getProviderInKPMapCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test get providers in KPMap",
+		ShortDescription: "get providers with keeper-index in KeeperProviderMap contract",
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+
+		tmpKeeperID := "8MHS9fZzRaHNj4mP1kYDebwySmLzaw"
+		keeperAddr, _ := address.GetAddressFromID(tmpKeeperID)
+
+		//获得KeeperProviderMap合约中与指定的keeper关联的所有provider
+		providerAddrsGetted, err := contracts.GetProviderInKPMap(localAddress, keeperAddr)
+		if err != nil {
+			fmt.Println("GetProviderInKPMapErr:", err)
+			return err
+		}
+
+		var providerIDsList []string
+		if len(providerAddrsGetted) > 0 {
+			for _, tmpProviderAddr := range providerAddrsGetted {
+				tempID, _ := address.GetIDFromAddress(tmpProviderAddr.String())
+				providerIDsList = append(providerIDsList, tempID)
+			}
+		}
+
+		list := &StringList{
+			ChildLists: providerIDsList,
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var getAllKeeperInKPMapCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test get all keepers in KPMap",
+		ShortDescription: "get all keepers in KeeperProviderMap contract",
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env) //获取当前ipfsnode
+		if err != nil {
+			return err
+		}
+		id := n.Identity.Pretty()
+		localAddress, err := ad.GetAddressFromID(id)
+		if err != nil {
+			return err
+		}
+
+		//获得KeeperProviderMap合约中与指定的keeper关联的所有provider
+		keeperAddrsGetted, err := contracts.GetAllKeeperInKPMap(localAddress)
+		if err != nil {
+			fmt.Println("GetAllKeeperInKPMapErr:", err)
+			return err
+		}
+
+		var keeperIDsList []string
+		if len(keeperAddrsGetted) > 0 {
+			for _, tmpKeeperAddr := range keeperAddrsGetted {
+				tempID, _ := address.GetIDFromAddress(tmpKeeperAddr.String())
+				keeperIDsList = append(keeperIDsList, tempID)
+			}
+		}
+
+		list := &StringList{
+			ChildLists: keeperIDsList,
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
 }
