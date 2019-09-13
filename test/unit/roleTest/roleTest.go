@@ -43,9 +43,25 @@ func main() {
 		log.Println(kpAddr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 	}
 
+	//if err := testDeploy(); err != nil {
+	//	log.Fatal(err)
+	//}
+
 	if err := testRole(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func testDeploy() error {
+	_, err := contracts.DeployKeeperProviderMap(adminSk)
+	if err != nil {
+		log.Println("DeployKeeperProviderMap err:", err)
+		return err
+	}
+
+	time.Sleep(2 * time.Minute)
+
+	return nil
 }
 
 func testRole() (err error) {
@@ -77,7 +93,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider")
-	proAddr, _, err := createAddr()
+	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
 	}
@@ -104,6 +120,153 @@ func testRole() (err error) {
 		log.Println("test set provider success")
 		break
 	}
+
+	log.Println("test set add kp")
+
+	err = contracts.AddKeeperProvidersToKPMap(keeperAddr, kpSk, keeperAddr, []common.Address{providerAddr})
+	if err != nil {
+		log.Println("Add Keeper Providers To KPMap err:", err)
+		return err
+	}
+
+	log.Println("test get keeper from kpmap")
+	retryCount = 0
+	flag := false
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		kps, err := contracts.GetAllKeeperInKPMap(keeperAddr)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Get All Keeper In KPMap fails")
+			}
+			continue
+		}
+
+		for _, kc := range kps {
+			log.Println(kc.String())
+			if kc.String() == keeperAddr.String() {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			log.Println("Get All Keeper In KPMap success")
+		} else {
+			log.Println("Get Keeper fails")
+		}
+		break
+	}
+
+	log.Println("test get provider from kpmap")
+	retryCount = 0
+	flag = false
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		pids, err := contracts.GetProviderInKPMap(providerAddr, keeperAddr)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Get Provider In KPMap fails")
+			}
+			continue
+		}
+
+		for _, pidr := range pids {
+			log.Println(pidr.String())
+			if pidr.String() == providerAddr.String() {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			log.Println("Get Provider In KPMap success")
+		} else {
+			log.Println("Get Provider fails")
+		}
+		break
+	}
+
+	log.Println("test delete provider from kpmap")
+
+	err = contracts.DeleteProviderFromKPMap(providerAddr, proSk, keeperAddr, providerAddr)
+	if err != nil {
+		log.Fatal("delete provider from kpmap err:", err)
+	}
+
+	retryCount = 0
+	flag = false
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		pids, err := contracts.GetProviderInKPMap(providerAddr, keeperAddr)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Get Provider In KPMap fails")
+			}
+			continue
+		}
+
+		flag = false
+		for _, pidr := range pids {
+			if pidr.String() == providerAddr.String() {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			if retryCount > 20 {
+				log.Println("Delete Provider In KPMap Fails")
+			}
+			continue
+		} else {
+			log.Println("delete provider success")
+		}
+		break
+	}
+
+	log.Println("test delete keeper from kpmap")
+
+	err = contracts.DeleteKeeperFromKPMap(providerAddr, proSk, keeperAddr)
+	if err != nil {
+		log.Fatal("delete keeper from kpmap err:", err)
+	}
+
+	retryCount = 0
+	flag = false
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		kps, err := contracts.GetAllKeeperInKPMap(keeperAddr)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Get All Keeper In KPMap fails")
+			}
+			continue
+		}
+
+		flag = false
+		for _, kc := range kps {
+			if kc.String() == keeperAddr.String() {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			if retryCount > 20 {
+				log.Println("Delete Keeper In KPMap Fails")
+			}
+			continue
+		} else {
+			log.Println("Delete Keeper In KPMap Success")
+		}
+		break
+	}
+
 	log.Println("test set keeper false")
 
 	err = contracts.SetKeeper(keeperAddr, adminSk, false)
