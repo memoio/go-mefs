@@ -94,7 +94,7 @@ func spaceTimePay() {
 func doSpaceTimePay(groupid string, pidString string, price int64) {
 	if isMasterKeeper(groupid, pidString) { //只有master节点进行支付过程
 		log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
-		defer log.Println("=====spacetimepay=====")
+		defer log.Println("========spacetimepay========")
 		log.Printf("groupid:%s:\npid:%s\n", groupid, pidString)
 		scGroupid, _ := ad.GetAddressFromID(groupid)              //获得userAddress
 		ukaddr, uk, err := contracts.GetUKFromResolver(scGroupid) //查询合约
@@ -112,21 +112,20 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 		startTime := checkLastPayTime(groupid, pidString)
 		spaceTime, lastTime := resultSummary(groupid, pidString, startTime, utils.GetUnixNow()) //根据时间段获取时空值
 		amount := convertSpacetime(spaceTime, price)                                            //将时空值转换成支付金额
-		if amount.Sign() <= 0 {
-			return
-		}
-		pAddr, _ := ad.GetAddressFromID(pidString)                                   //providerAddress
-		hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //得到本节点的私钥
-		if err != nil {
-			log.Println("GetHexPrivKeyFromKS() failed: ", err)
-			return
-		}
-		log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
+		if amount.Sign() > 0 {
+			pAddr, _ := ad.GetAddressFromID(pidString)                                   //providerAddress
+			hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //得到本节点的私钥
+			if err != nil {
+				log.Println("GetHexPrivKeyFromKS() failed: ", err)
+				return
+			}
+			log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err = contracts.SpaceTimePay(uk, scGroupid, pAddr, hexPk, amount) //进行支付
-		if err != nil {
-			log.Println("contracts.SpaceTimePay() failed: ", err)
-			return
+			err = contracts.SpaceTimePay(uk, scGroupid, pAddr, hexPk, amount) //进行支付
+			if err != nil {
+				log.Println("contracts.SpaceTimePay() failed: ", err)
+				return
+			}
 		}
 
 		km, metaValue, err := saveLastPay(groupid, pidString, "signature", "proof", startTime, lastTime, spaceTime)
@@ -134,8 +133,10 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 			log.Println("saveLastPay() failed: ", err)
 			return
 		}
-		km.SetKeyType(metainfo.Sync)
-		metaSyncTo(km, metaValue) //此次支付结果同步到其他的节点
+		if amount.Sign() > 0 {
+			km.SetKeyType(metainfo.Sync)
+			metaSyncTo(km, metaValue) //此次支付结果同步到其他的节点
+		}
 		log.Println("spaceTimePay complete!")
 	}
 }
@@ -160,6 +161,12 @@ func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 //进行一次挑战结果的汇总
 //传入user和provider的id，返回时空值spacetime
 func resultSummary(uid string, pid string, timeStart int64, timeEnd int64) (*big.Int, int64) {
+
+	if timeEnd-timeStart > int64(24*3600) {
+		log.Println("pay interval is longer than 1 day")
+		return big.NewInt(0), 0
+	}
+
 	timeList, lenghList := fetchChalresult(uid, pid, timeStart, timeEnd) //取数据
 	spacetime := big.NewInt(0)
 	if len(timeList) <= 1 || len(lenghList) <= 1 {
