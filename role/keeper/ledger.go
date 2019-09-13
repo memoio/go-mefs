@@ -149,6 +149,10 @@ func checkLedger(ctx context.Context) {
 						return true
 					}
 
+					if !isMasterKeeper(pu.uid, pu.pid) {
+						return true
+					}
+
 					thischalinfo := v.(*chalinfo)
 					thischalinfo.Cid.Range(func(key, value interface{}) bool {
 						//log.Println("avaltime :", value.(*cidInfo).availtime)

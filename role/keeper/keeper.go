@@ -74,6 +74,7 @@ type PeerInfo struct {
 	enableTendermint bool
 	offerBook        sync.Map // 存储连接的provider部署的Offer条约，K-provider的id，V-Offer实例
 	queryBook        sync.Map // 存储连接的user部署的Query条约，K-user的id，V-Query实例
+	kpMapBook        sync.Map
 }
 
 type storageInfo struct {
@@ -161,7 +162,35 @@ func localKeeperIsMaster(groupid string) bool {
 // if this provider belongs to this keeper, then this keeper is master
 // else call localKeeperIsMaster
 func isMasterKeeper(groupid string, pid string) bool {
-	return localKeeperIsMaster(groupid)
+	thisGroupsInfo, ok := getGroupsInfo(groupid)
+	if !ok {
+		log.Println("localkeeperIsMaster err! There is no information in Pinfo,groupid:", groupid)
+		return false
+	}
+	var mymaster []string
+	for _, keeper := range thisGroupsInfo.Keepers {
+		pids, err := getKpMap(keeper.KID)
+		if err != nil {
+			continue
+		}
+		for _, npid := range pids {
+			if npid == pid {
+				mymaster = append(mymaster, keeper.KID)
+				break
+			}
+		}
+	}
+
+	if len(mymaster) > 0 {
+		masterID := getMasterID(mymaster)
+		if masterID == localNode.Identity.Pretty() {
+			return true
+		} else {
+			return false
+		}
+	} else {
+		return localKeeperIsMaster(groupid)
+	}
 }
 
 //getMasterID  根据传入的keeper列表，选出一个master，返回其id

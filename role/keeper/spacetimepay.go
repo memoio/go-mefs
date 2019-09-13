@@ -92,7 +92,7 @@ func spaceTimePay() {
 //支付需要的信息：支付者 接受者 金额（时空值） 时间（段） proof
 //先根据本地保存的挑战信息 汇总一段时间内的挑战结果，然后将挑战结果发给同组的其他keeper（同步），收到其他keeper的确认信息后，进行支付操作
 func doSpaceTimePay(groupid string, pidString string, price int64) {
-	if localKeeperIsMaster(groupid) { //只有master节点进行支付过程
+	if isMasterKeeper(groupid, pidString) { //只有master节点进行支付过程
 		log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
 		defer log.Println("=====spacetimepay=====")
 		log.Printf("groupid:%s:\npid:%s\n", groupid, pidString)

@@ -29,10 +29,8 @@ func checkrepairlist(ctx context.Context) {
 			select {
 			case cid := <-repch:
 				uid := cid[:utils.IDLength]
-				if localKeeperIsMaster(uid) {
-					log.Println("repairing cid: ", cid)
-					RepairBlock(ctx, uid, cid)
-				}
+				log.Println("repairing cid: ", cid)
+				RepairBlock(ctx, uid, cid)
 			case <-ctx.Done():
 				return
 			}
