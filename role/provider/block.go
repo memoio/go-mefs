@@ -198,7 +198,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	if err != nil {
 		return false, "", "", nil, err
 	}
-	res, err := contracts.VerifySig(signForChannel.GetUserPK(), sig, channelAddr, value)
+	res, err := contracts.VerifySig(signForChannel.GetUserPK(), sig, channelAddr, money)
 	if err != nil {
 		return false, "", "", nil, err
 	}
