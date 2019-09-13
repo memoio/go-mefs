@@ -158,6 +158,12 @@ func localKeeperIsMaster(groupid string) bool {
 	return localKeeper.MasterType == IsMaster
 }
 
+// if this provider belongs to this keeper, then this keeper is master
+// else call localKeeperIsMaster
+func isMasterKeeper(groupid string, pid string) bool {
+	return localKeeperIsMaster(groupid)
+}
+
 //getMasterID  根据传入的keeper列表，选出一个master，返回其id
 //目前的做法是简单排序后选排在中间的节点，选master策略可以进一步修改
 func getMasterID(kidlist []string) string {
