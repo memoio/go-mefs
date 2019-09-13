@@ -634,7 +634,7 @@ func testDeployKeeperProviderMap(localAddr common.Address, hexKey string, ethEnd
 	fmt.Println("balance:", balance)
 
 	//部署KeeperProviderMap合约
-	err = contracts.DeployKeeperProviderMap(hexKey, localAddr)
+	err = contracts.DeployKeeperProviderMap(hexKey)
 	if err != nil {
 		fmt.Println("deployKeeperProviderMapErr:", err)
 		return err
@@ -751,7 +751,7 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 		providerAddr, _ := address.GetAddressFromID(tmpProviderID)
 
 		//删除KeeperProviderMap合约中指定keeper下的一个provider
-		err = contracts.DeleteProvider(localAddress, hexKey, keeperAddr, providerAddr)
+		err = contracts.DeleteProviderFromKPMap(localAddress, hexKey, keeperAddr, providerAddr)
 		if err != nil {
 			fmt.Println("DeleteProviderErr:", err)
 			return err
@@ -793,7 +793,7 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 		keeperAddr, _ := address.GetAddressFromID(tmpKeeperID)
 
 		//删除KeeperProviderMap合约中指定的keeper以及与keeper关联的所有provider
-		err = contracts.DeleteKeeper(localAddress, hexKey, keeperAddr)
+		err = contracts.DeleteKeeperFromKPMap(localAddress, hexKey, keeperAddr)
 		if err != nil {
 			fmt.Println("DeleteKeeperErr:", err)
 			return err

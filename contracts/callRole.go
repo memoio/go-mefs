@@ -186,7 +186,7 @@ func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (e
 }
 
 //DeployKeeperProviderMap deploy KeeperProviderMap-contract
-func DeployKeeperProviderMap(hexKey string) (*role.KeeperProviderMap, error) {
+func DeployKeeperProviderMap(hexKey string) error {
 	fmt.Println("begin deploy keeperProviderMap...")
 
 	//之前没有部署过，部署keeperProviderMap合约
@@ -195,23 +195,23 @@ func DeployKeeperProviderMap(hexKey string) (*role.KeeperProviderMap, error) {
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
-	keeperProviderMapAddr, _, keeperProviderMapInstance, err := role.DeployKeeperProviderMap(auth, client)
+	keeperProviderMapAddr, _, _, err := role.DeployKeeperProviderMap(auth, client)
 	if err != nil {
 		fmt.Println("deployKeeperProviderMapErr:", err)
-		return nil, err
+		return err
 	}
 
 	indexerAddr := common.HexToAddress(IndexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
-		return nil, err
+		return err
 	}
 
 	indexer.Add(auth, "keeperProviderMap", keeperProviderMapAddr)
 
 	fmt.Println("keeperProviderMap-contract have been successfully deployed!")
-	return keeperProviderMapInstance, nil
+	return nil
 }
 
 func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role.KeeperProviderMap, error) {

@@ -53,7 +53,7 @@ func main() {
 }
 
 func testDeploy() error {
-	_, err := contracts.DeployKeeperProviderMap(adminSk)
+	err := contracts.DeployKeeperProviderMap(adminSk)
 	if err != nil {
 		log.Println("DeployKeeperProviderMap err:", err)
 		return err
