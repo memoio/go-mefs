@@ -143,8 +143,8 @@ func testRole() (err error) {
 			continue
 		}
 
+		flag := false
 		for _, kc := range kps {
-			log.Println(kc.String())
 			if kc.String() == keeperAddr.String() {
 				flag = true
 				break
@@ -154,7 +154,10 @@ func testRole() (err error) {
 		if flag {
 			log.Println("Get All Keeper In KPMap success")
 		} else {
-			log.Println("Get Keeper fails")
+			if retryCount > 20 {
+				log.Fatal("Get Keeper fails")
+			}
+			continue
 		}
 		break
 	}
@@ -173,8 +176,8 @@ func testRole() (err error) {
 			continue
 		}
 
+		flag = false
 		for _, pidr := range pids {
-			log.Println(pidr.String())
 			if pidr.String() == providerAddr.String() {
 				flag = true
 				break
@@ -184,7 +187,10 @@ func testRole() (err error) {
 		if flag {
 			log.Println("Get Provider In KPMap success")
 		} else {
-			log.Println("Get Provider fails")
+			if retryCount > 20 {
+				log.Fatal("Get Provider fails")
+			}
+			continue
 		}
 		break
 	}
@@ -219,7 +225,7 @@ func testRole() (err error) {
 
 		if flag {
 			if retryCount > 20 {
-				log.Println("Delete Provider In KPMap Fails")
+				log.Fatal("Delete Provider In KPMap Fails")
 			}
 			continue
 		} else {
@@ -258,7 +264,7 @@ func testRole() (err error) {
 
 		if flag {
 			if retryCount > 20 {
-				log.Println("Delete Keeper In KPMap Fails")
+				log.Fatal("Delete Keeper In KPMap Fails")
 			}
 			continue
 		} else {
