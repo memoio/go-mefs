@@ -9,6 +9,7 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) error {
@@ -75,6 +76,10 @@ func GetUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 }
 
 func SaveChannel(userID string) error {
+	if pos.GetPosId() == userID {
+		return nil
+	}
+
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
