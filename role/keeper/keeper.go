@@ -46,7 +46,6 @@ const (
 //一个组中的keeper信息
 type KeeperInGroup struct {
 	KID        string
-	ID         string
 	PubKey     string
 	MasterType KeeperType
 }
@@ -96,9 +95,34 @@ var usersConfigs sync.Map
 func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 	thisGroupinfo, ok := PInfo.Load(groupid)
 	if !ok {
-		log.Println("getGroupsInfo err,groupid:", groupid)
-		return nil, false
+		tempInfo := &GroupsInfo{
+			User:    groupid,
+			GroupID: groupid,
+		}
+
+		err := SaveUpkeeping(tempInfo, groupid)
+		if err != nil {
+			log.Println("getGroupsInfo err, groupid:", groupid)
+			return nil, false
+		}
+
+		tempInfo.Providers = tempInfo.upkeeping.ProviderIDs
+
+		for _, kp := range tempInfo.upkeeping.KeeperIDs {
+			keeperG := &KeeperInGroup{
+				KID: kp,
+			}
+			if kp == localNode.Identity.Pretty() {
+				tempInfo.LocalKeeper = keeperG
+				continue
+			}
+
+			tempInfo.Keepers = append(tempInfo.Keepers, keeperG)
+		}
+		PInfo.Store(groupid, tempInfo)
+		return tempInfo, true
 	}
+
 	out, ok := thisGroupinfo.(*GroupsInfo) //做类型断言的检查，接口的类型转换出错说明数据有问题，报错
 	if !ok {
 		log.Println("thisGroupinfo.(*GroupsInfo) err！", thisGroupinfo)
