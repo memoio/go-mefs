@@ -43,6 +43,7 @@ var (
 	ErrMarketType             = errors.New("The market type is error, please input correct market type")
 	ErrNotDeployedMarket      = errors.New("has not deployed query or offer")
 	ErrNewContractInstance    = errors.New("new contractInstace failed")
+	ErrNotDeployedKPMap       = errors.New("has not deployed keeperProviderMap contract")
 )
 
 type UpKeepingItem struct {
