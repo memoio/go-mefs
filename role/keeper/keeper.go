@@ -40,6 +40,7 @@ const (
 	STORAGESYNCTIME  = 10 * time.Minute
 	SPACETIMEPAYTIME = time.Hour
 	CONPEERTIME      = 5 * time.Minute
+	KPMAPTIME        = 10 * time.Minute
 )
 
 //一个组中的keeper信息
@@ -245,6 +246,7 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 	go spaceTimePayRegular(ctx)
 	go checkStorage(ctx)
 	go checkPeers(ctx)
+	go getKpMapRegular(ctx)
 	return nil
 }
 
@@ -966,6 +968,23 @@ func checkPeers(ctx context.Context) {
 		case <-ticker.C:
 			go func() {
 				checkConnectedPeer()
+			}()
+		}
+	}
+}
+
+func getKpMapRegular(ctx context.Context) {
+	log.Println("Get kpMap from chain start!")
+
+	ticker := time.NewTicker(KPMAPTIME)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			go func() {
+				saveKpMap()
 			}()
 		}
 	}
