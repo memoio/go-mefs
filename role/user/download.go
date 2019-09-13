@@ -23,7 +23,7 @@ import (
 
 const DefaultBufSize = 1024 * 1024 * 4
 
-const DefaultJobsCount = 3
+const DefaultJobsCount = 1
 
 type writeFunc func([]byte, int32, error)
 
