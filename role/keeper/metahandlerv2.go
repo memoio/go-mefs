@@ -176,30 +176,6 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 
 	// 收到的信息整理完成，接下来开始分情况填充PInfo,若本节点是第一个收到user信息的，则负责转发
 
-	_, ok := getGroupsInfo(userID)
-
-	if ok { //本地已有保存好的user信息,通知usertendermint的状态
-		kmRes, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeBft)
-		if err != nil {
-			log.Println("handleNewUserNotif err: ", err)
-		}
-		var resValue string
-		if !localPeerInfo.enableTendermint {
-			resValue = "simple"
-			log.Println("use simple mode，groupID: ", userID)
-		}
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmRes.ToString(), resValue, "local") //放在本地供User或Provider启动的时候查询
-		if err != nil {
-			log.Println("handleNewUserNotif err: ", err)
-		}
-		kmRes.SetKeyType(metainfo.UserInitNotifRes)
-		_, err = sendMetaRequest(kmRes, resValue, from)
-		if err != nil {
-			log.Println("handleNewUserNotif err: ", err)
-		}
-		return //直接返回
-
-	}
 	//没有保存好的user信息，填充Pinfo
 	go fillPinfo(userID, keepers, providers, from)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmKid.ToString(), splited[0], "local") //替换本地的User信息

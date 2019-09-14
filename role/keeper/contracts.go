@@ -220,7 +220,7 @@ func getKpMap(keeperID string) ([]string, error) {
 	var ret []string
 	res, ok := localPeerInfo.kpMapBook.Load(keeperID)
 	if !ok {
-		log.Println("get keeper from kpmap fails")
+		//log.Println("get keeper from kpmap fails")
 		return ret, errors.New("No keeper in kpmap")
 	}
 
