@@ -9,6 +9,7 @@ import (
 
 	coreiface "github.com/memoio/go-mefs/core/coreapi/interface"
 	caopts "github.com/memoio/go-mefs/core/coreapi/interface/options"
+	"github.com/memoio/go-mefs/role/user"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 )
@@ -72,8 +73,10 @@ func (api *BlockAPI) Get(ctx context.Context, p string) (io.Reader, error) {
 }
 
 func (api *BlockAPI) GetFrom(ctx context.Context, p string, peerid string) (io.Reader, error) {
-
-	var sig []byte
+	sig, err := user.BuildSignMessage()
+	if err != nil {
+		return nil, err
+	}
 	b, err := api.node.Blocks.GetBlockFrom(ctx, peerid, p, 2*time.Minute, sig)
 	if b == nil && err != nil {
 		return nil, err

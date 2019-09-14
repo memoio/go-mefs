@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	cli "github.com/urfave/cli"
 	util "github.com/memoio/go-mefs/source/metb/util"
+	cli "github.com/urfave/cli"
 )
 
 func parseRange(s string) ([]int, error) {

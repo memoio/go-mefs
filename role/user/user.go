@@ -25,12 +25,13 @@ const (
 	Starting UserState = iota
 	Collecting
 	CollectCompleted
+	OnDeploy
 	GroupStarted
 	BothStarted
 )
 
 var StateList = []string{
-	"starting", "Collecting", "CollectComplited", "GroupStarted", "BothStarted",
+	"Starting", "Collecting", "CollectComplited", "OnDeploy", "GroupStarted", "BothStarted",
 }
 
 type UsersInfo struct {
@@ -68,49 +69,42 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 	}
 	userkey, err := fsrepo.GetPrivateKeyFromKeystore(us.UserID, keypath, pwd)
 	if err != nil {
-		return ErrGetSecreteKey
+		return err
 	}
 	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps)
-	if !isInit {
-		//在这里先尝试获取一次Bls config，如果失败，在启动完Groupservice的时候会再试一次
-		err = gp.loadBLS12Config()
-		if err != nil {
-			log.Println("Load BLS12 Config error:", err)
-		}
-	}
 	err = SetGroupService(gp)
 	if err != nil {
-		fmt.Println("SetGroupService()err")
+		log.Println("SetGroupService()err")
 		return err
 	}
 	// user联网
 	err = gp.StartGroupService(ctx, pwd, isInit)
 	if err != nil {
-		fmt.Println("StartGroupService(()err")
+		log.Println("StartGroupService(()err")
 		return err
 	}
 
 	cs := ConstructContractService(us.UserID)
 	err = SetContractService(us.UserID, cs)
 	if err != nil {
-		fmt.Println("SetContractService()err")
+		log.Println("SetContractService()err")
 		return err
 	}
 	err = cs.SaveContracts()
 	if err != nil {
-		fmt.Println("SaveContracts err:", err)
+		log.Println("SaveContracts err:", err)
 	}
 
 	lfs := ConstructLfsService(us.UserID, userkey.PrivateKey)
 
 	err = SetLfsService(lfs)
 	if err != nil {
-		fmt.Println("SetLfsService()err")
+		log.Println("SetLfsService()err")
 		return err
 	}
 	err = lfs.StartLfsService(ctx)
 	if err != nil {
-		fmt.Println("StartLfsService()err")
+		log.Println("StartLfsService()err")
 		return err
 	}
 
@@ -333,9 +327,9 @@ func PersistBeforeExit() error {
 			}
 			err = UserService.LfsService.Fsync(false)
 			if err != nil {
-				fmt.Printf("Sorry, something wrong in persisting for %s: %v\n", UserID, err)
+				log.Printf("Sorry, something wrong in persisting for %s: %v\n", UserID, err)
 			} else {
-				fmt.Printf("User %s Persist completed\n", UserID)
+				log.Printf("User %s Persist completed\n", UserID)
 			}
 			UserService.CancelFunc() //释放资源
 		}
@@ -346,8 +340,8 @@ func PersistBeforeExit() error {
 //输出本节点的信息
 func ShowInfo(userID string) map[string]string {
 	outmap := map[string]string{}
-	fmt.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
-	defer fmt.Println("================================")
+	log.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
+	defer log.Println("================================")
 	gp := GetGroupService(userID)
 	lfs := GetLfsService(userID)
 	if lfs == nil {
@@ -396,12 +390,7 @@ func ShowInfo(userID string) map[string]string {
 		outmap["error"] = "GetAddressFromID() err:" + err.Error()
 		return outmap
 	}
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		outmap["error"] = "Config() err:" + err.Error()
-		return outmap
-	}
-	amountLocal, err := contracts.QueryBalance(cfg.Eth, addrLocal.Hex())
+	amountLocal, err := contracts.QueryBalance(addrLocal.Hex())
 	if err != nil {
 		outmap["error"] = "QueryBalance() err:" + err.Error()
 	}
@@ -414,9 +403,13 @@ func ShowInfo(userID string) map[string]string {
 		return outmap
 	}
 	//计算当前合约的花费(合约总金额-当前余额)
-	upkeeping := cs.GetUpkeepingItem()
+	upkeeping, err := cs.GetUpkeepingItem()
+	if err != nil {
+		outmap["error"] = "GetUpkeepingItem() err:" + err.Error()
+		return outmap
+	}
 	outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr
-	amountUpkeeping, err := contracts.QueryBalance(cfg.Eth, upkeeping.UpKeepingAddr)
+	amountUpkeeping, err := contracts.QueryBalance(upkeeping.UpKeepingAddr)
 	if err != nil {
 		outmap["error"] = "QueryBalance()err:" + err.Error()
 		return outmap
@@ -428,7 +421,6 @@ func ShowInfo(userID string) map[string]string {
 	var moneyAccount = new(big.Int)
 	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
-	fmt.Printf("%v", upkeeping)
 	outmap["upkeeping cost:"] = big.NewInt(0).Sub(moneyAccount, amountUpkeeping).String()
 	outmap["upkeeping.Duration:"] = big.NewInt(upkeeping.Duration).String()
 	outmap["upkeeping.Capacity"] = big.NewInt(upkeeping.Capacity).String()

@@ -5,10 +5,9 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/role/pb"
+	"github.com/memoio/go-mefs/role"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -25,6 +24,7 @@ const (
 var (
 	ErrUnmatchedPeerID         = errors.New("Peer ID is not match")
 	ErrProviderServiceNotReady = errors.New("Provider service is not ready")
+	ErrGetContractItem         = errors.New("Can't get contract Item")
 )
 
 type ProviderContracts struct {
@@ -32,10 +32,6 @@ type ProviderContracts struct {
 	channelBook   sync.Map // K-user的id, V-Channel
 	queryBook     sync.Map // K-user的id, V-Query
 	offer         contracts.OfferItem
-}
-
-type UserBLS12Config struct {
-	PubKey *mcl.PublicKey
 }
 
 func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
@@ -56,9 +52,11 @@ func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error)
 	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
 }
 
-func getNewUserConfig(userID, keeperID string) (*UserBLS12Config, error) {
-	userPubKey := new(mcl.PublicKey)
-	userConfig := &UserBLS12Config{}
+func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
+	pubKeyI, ok := usersConfigs.Load(userID)
+	if ok {
+		return pubKeyI.(*mcl.PublicKey), nil
+	}
 
 	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
 	if err != nil {
@@ -67,45 +65,34 @@ func getNewUserConfig(userID, keeperID string) (*UserBLS12Config, error) {
 	userconfigkey := kmBls12.ToString()
 	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, keeperID)
 	if err != nil {
-		return userConfig, err
+		return nil, err
 	}
 
-	userconfigProto := &pb.UserBLS12Config{}
-	err = proto.Unmarshal(userconfigbyte, userconfigProto) //反序列化
+	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
 	if err != nil {
-		return userConfig, err
-	}
-	err = userPubKey.BlsPK.Deserialize(userconfigProto.PubkeyBls)
-	if err != nil {
-		return userConfig, err
-	}
-	err = userPubKey.G.Deserialize(userconfigProto.PubkeyG)
-	if err != nil {
-		return userConfig, err
-	}
-	userPubKey.U = make([]mcl.G1, mcl.N)
-	for i, u := range userconfigProto.PubkeyU {
-		if i >= mcl.N {
-			break
-		}
-		err = userPubKey.U[i].Deserialize(u)
-		if err != nil {
-			return userConfig, err
-		}
-	}
-	userPubKey.W = make([]mcl.G2, mcl.N)
-	for i, w := range userconfigProto.PubkeyW {
-		if i >= mcl.N {
-			break
-		}
-		err = userPubKey.W[i].Deserialize(w)
-		if err != nil {
-			return userConfig, err
-		}
+		return nil, err
 	}
 
-	userConfig = &UserBLS12Config{
-		PubKey: userPubKey,
+	usersConfigs.Store(userID, mkey.Pk)
+
+	return mkey.Pk, nil
+}
+
+func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
+	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	if err != nil {
+		return nil, err
 	}
-	return userConfig, nil
+	userconfigkey := kmBls12.ToString()
+	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, keeperID)
+	if err != nil {
+		return nil, err
+	}
+
+	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
+	if err != nil {
+		return nil, err
+	}
+
+	return mkey.Sk, nil
 }

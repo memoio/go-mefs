@@ -2,11 +2,17 @@ package keeper
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
+
+	df "github.com/memoio/go-mefs/data-format"
 )
 
 //LedgerInfo 存放挑战信息的内存结构体
@@ -20,13 +26,15 @@ type PU struct {
 	uid string
 }
 
-//chalinfo 作为LedgerInfo的value
+//chalinfo 作为LedgerInfo的value key是PU对
 type chalinfo struct {
 	Time        sync.Map //某provider下user数据在某时刻发起挑战的结果，key为挑战发起时间的时间戳，格式为int64,value为chalresult
 	Cid         sync.Map
 	tmpCid      sync.Map
+	chalCid     []string //当前挑战的块
 	inChallenge int
-	maxlength   uint32
+	maxlength   int64
+	testuser    bool // 记录是否是test用户，用于不发起挑战
 }
 
 type cidInfo struct {
@@ -40,11 +48,33 @@ type cidInfo struct {
 func getChalinfo(thisPU PU) (*chalinfo, bool) {
 	thischalinfo, ok := LedgerInfo.Load(thisPU)
 	if !ok {
+		isTestUser := false
+		addr, err := address.GetAddressFromID(thisPU.uid)
+		if err == nil {
+			_, _, err = contracts.GetUKFromResolver(addr)
+			if err != nil {
+				isTestUser = true
+			}
+		}
+
+		var newCid, newTime sync.Map
+		newchalinfo := &chalinfo{
+			Time:     newTime,
+			Cid:      newCid,
+			testuser: isTestUser,
+		}
+		LedgerInfo.Store(thisPU, newchalinfo)
+	}
+
+	thischalinfo, ok = LedgerInfo.Load(thisPU)
+	if !ok {
 		return nil, false
 	}
+
 	return thischalinfo.(*chalinfo), true
 }
 
+//doAddBlocktoLedger 将block信息加入本地LedgerInfo结构体里的Cid字段，用于挑战
 func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) error {
 	pu := PU{
 		pid: pid,
@@ -62,6 +92,7 @@ func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) erro
 			thischalinfo.tmpCid.Store(blockid, newcidinfo)
 		} else if thischalinfo.inChallenge == 0 {
 			thischalinfo.Cid.Store(blockid, newcidinfo)
+			thischalinfo.maxlength += int64(offset * df.DefaultSegmentSize)
 		}
 		return nil
 	}
@@ -69,17 +100,40 @@ func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) erro
 	var Cid sync.Map
 	var Time sync.Map
 	Cid.Store(blockid, newcidinfo)
+
+	isTestUser := false
+	addr, err := address.GetAddressFromID(pu.uid)
+	if err == nil {
+		_, _, err = contracts.GetUKFromResolver(addr)
+		if err != nil {
+			isTestUser = true
+		}
+	}
+
 	newchalinfo := &chalinfo{
-		Cid:  Cid,
-		Time: Time,
+		Cid:      Cid,
+		Time:     Time,
+		testuser: isTestUser,
 	}
 	LedgerInfo.Store(pu, newchalinfo)
 	return nil
 
 }
 
+//deleteBlockInLedger 删除LedgerInfo中的块信息，传入保存这个块的pid和块信息结构体
+func deleteBlockInLedger(pid string, bm *metainfo.BlockMeta) {
+	pu := PU{
+		pid: pid,
+		uid: bm.GetUid(),
+	}
+	if thischalinfo, ok := getChalinfo(pu); ok {
+		thischalinfo.Cid.Delete(bm.ToString())
+		thischalinfo.tmpCid.Delete(bm.ToString())
+	}
+}
+
 func checkLedger(ctx context.Context) {
-	fmt.Println("CheckLedger() start!")
+	log.Println("Check Ledger start!")
 	time.Sleep(2 * CHALTIME)
 	ticker := time.NewTicker(CHECKTIME)
 	defer ticker.Stop()
@@ -90,12 +144,21 @@ func checkLedger(ctx context.Context) {
 		case <-ticker.C:
 			go func() {
 				LedgerInfo.Range(func(k, v interface{}) bool {
+					pu := k.(PU)
+					if pu.uid == pos.GetPosId() {
+						return true
+					}
+
+					if !isMasterKeeper(pu.uid, pu.pid) {
+						return true
+					}
+
 					thischalinfo := v.(*chalinfo)
 					thischalinfo.Cid.Range(func(key, value interface{}) bool {
-						//fmt.Println("avaltime :", value.(*cidInfo).availtime)
+						//log.Println("avaltime :", value.(*cidInfo).availtime)
 						if EXPIRETIME < (utils.GetUnixNow()-value.(*cidInfo).availtime) && value.(*cidInfo).repair < 3 {
-							fmt.Println("need repair cid :", key.(string))
-							value.(*cidInfo).repair += 1
+							log.Println("Need repair cid: ", key.(string))
+							value.(*cidInfo).repair++
 							repch <- key.(string)
 						}
 						return true

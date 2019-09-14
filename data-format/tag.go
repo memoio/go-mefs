@@ -57,8 +57,8 @@ func GenTagForSegment(segment, index []byte, tagFlag, segmentSize uint64, keyset
 }
 
 func genBLS12Tag(keySet *mcl.KeySet, segment, index []byte) ([]byte, error) {
-	if keySet == nil {
-		return nil, errors.New("bls12 keyset not construct")
+	if keySet == nil || keySet.Sk == nil {
+		return nil, errors.New("bls12 private keyset not construct")
 	}
 	return mcl.GenTag(keySet, segment, index)
 }

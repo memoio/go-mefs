@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"bytes"
-	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -300,7 +300,7 @@ func fillPinfo(groupid string, keepers []*KeeperInGroup, providers []string, fro
 		}
 	}
 	if localkeeper == nil { //本地节点可能不在这个组中，则直接返回
-		fmt.Println(ErrNotKeeperInThisGroup)
+		log.Println(ErrNotKeeperInThisGroup)
 		return
 	}
 	tempInfo := &GroupsInfo{
@@ -313,20 +313,20 @@ func fillPinfo(groupid string, keepers []*KeeperInGroup, providers []string, fro
 	if !localPeerInfo.enableTendermint { //初始化tendermint之前进行判断本节点是否使用tendermint
 		kmRes, err := metainfo.NewKeyMeta(groupid, metainfo.Local, metainfo.SyncTypeBft)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		resValue := "simple"
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmRes.ToString(), resValue, "local") //放在本地供User或Provider启动的时候查询是否为拜占庭容错节点
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 		kmRes.SetKeyType(metainfo.UserInitNotifRes)
 		_, err = sendMetaRequest(kmRes, resValue, from)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
-		fmt.Println("本节点不使用Tendermint，GroupID:", groupid)
+		log.Println("use simple mode，GroupID:", groupid)
 	}
 	return
 }

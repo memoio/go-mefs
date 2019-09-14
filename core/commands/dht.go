@@ -26,22 +26,27 @@ var DhtCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"query":         queryDhtCmd,
-		"findpeer":      findPeerDhtCmd,
-		"get":           getValueDhtCmd,
-		"put":           putValueDhtCmd,
-		"putto":         putValuetoDhtCmd,
-		"getfrom":       getValuefromDhtCmd,
-		"liter":         literDhtCmd,
-		"literfrom":     literFromDhtCmd,
-		"append":        appendValueDhtCmd,
-		"challengeTest": challengeTestDhtCmd,
+		"query":      queryDhtCmd,
+		"findpeer":   findPeerDhtCmd,
+		"get":        getValueDhtCmd,
+		"put":        putValueDhtCmd,
+		"putto":      putValuetoDhtCmd,
+		"getfrom":    getValuefromDhtCmd,
+		"liter":      literDhtCmd,
+		"literfrom":  literFromDhtCmd,
+		"append":     appendValueDhtCmd,
+		"deletefrom": deleteFromDhtCmd,
 	},
 }
 
 const (
 	dhtVerboseOptionName = "v"
 )
+
+type queryEvent struct {
+	ID    string
+	Extra string
+}
 
 var queryDhtCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
@@ -314,7 +319,16 @@ var getValuefromDhtCmd = &cmds.Command{
 		}()
 
 		for e := range events {
-			if err := res.Emit(e); err != nil {
+			ne := &queryEvent{
+				ID:    e.ID.Pretty(),
+				Extra: e.Extra,
+			}
+
+			if e.Type != notif.Value {
+				continue
+			}
+
+			if err := res.Emit(ne); err != nil {
 				return err
 			}
 		}
@@ -322,24 +336,18 @@ var getValuefromDhtCmd = &cmds.Command{
 		return nil
 	},
 	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *notif.QueryEvent) error {
-			pfm := pfuncMap{
-				notif.Value: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
-					if verbose {
-						fmt.Fprintf(out, "got value: '%s'\n", obj.Extra)
-					} else {
-						fmt.Fprintln(out, obj.Extra)
-					}
-				},
-			}
-
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *queryEvent) error {
 			verbose, _ := req.Options[dhtVerboseOptionName].(bool)
-			printEvent(out, w, verbose, pfm)
+			if verbose {
+				fmt.Fprintf(w, "got value: '%s'\n", out.Extra)
+			} else {
+				fmt.Fprint(w, out.Extra)
+			}
 
 			return nil
 		}),
 	},
-	Type: notif.QueryEvent{},
+	Type: queryEvent{},
 }
 
 var literFromDhtCmd = &cmds.Command{
@@ -770,7 +778,7 @@ func printEvent(obj *notif.QueryEvent, out io.Writer, verbose bool, override pfu
 	}
 }
 
-var challengeTestDhtCmd = &cmds.Command{
+var deleteFromDhtCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "在provider上删除块，用在测试挑战修复的时候",
 		ShortDescription: `新加功能`,
@@ -794,45 +802,14 @@ var challengeTestDhtCmd = &cmds.Command{
 		key := req.Arguments[0]
 		to := req.Arguments[1]
 
-		ctx, cancel := context.WithCancel(req.Context)
-		ctx, events := notif.RegisterForQueryEvents(ctx)
-
 		go func() {
-			defer cancel()
-			_, err = nd.Routing.(*dht.IpfsDHT).SendMetaRequest(key, "", to, "challengeTestDhtCmd")
+			_, err = nd.Routing.(*dht.IpfsDHT).SendMetaRequest(key, "", to, "deletefrom")
 			if err != nil {
 				fmt.Println("delete block error :", err)
 				return
 			}
 		}()
 
-		for e := range events {
-			if err := res.Emit(e); err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return res.Emit("ok")
 	},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *notif.QueryEvent) error {
-			pfm := pfuncMap{
-				notif.FinalPeer: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
-					if verbose {
-						fmt.Fprintf(out, "* closest peer %s\n", obj.ID)
-					}
-				},
-				notif.Value: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
-					fmt.Fprintf(out, "%s\n", obj.ID.Pretty())
-				},
-			}
-
-			verbose, _ := req.Options[dhtVerboseOptionName].(bool)
-
-			printEvent(out, w, verbose, pfm)
-
-			return nil
-		}),
-	},
-	Type: notif.QueryEvent{},
 }

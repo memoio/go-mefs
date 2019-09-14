@@ -12,6 +12,8 @@ import (
 	"sort"
 	"sync"
 
+	cmds "github.com/ipfs/go-ipfs-cmds"
+	mprome "github.com/ipfs/go-metrics-prometheus"
 	version "github.com/memoio/go-mefs"
 	mcl "github.com/memoio/go-mefs/bls12"
 	utilmain "github.com/memoio/go-mefs/cmd/mefs/util"
@@ -27,9 +29,6 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-
-	cmds "github.com/ipfs/go-ipfs-cmds"
-	mprome "github.com/ipfs/go-metrics-prometheus"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,6 +58,7 @@ const (
 	secretKeyKwd              = "secretKey"
 	reDeployOfferKwd          = "reDeployOffer"
 	netKeyKwd                 = "netKey"
+	posKwd                    = "pos"
 )
 
 var (
@@ -133,6 +133,7 @@ environment variable:
 
 	Options: []cmds.Option{
 		cmds.BoolOption(initOptionKwd, "Initialize mefs with default settings if not already initialized"),
+		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
@@ -243,6 +244,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
+	contracts.EndPoint = cfg.Eth
+
 	routingOption := cfg.Routing.Type
 	if routingOption == "" {
 		routingOption = routingOptionDHTKwd
@@ -285,13 +288,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	if !cfg.Test {
 		//从合约中获取账户角色
-		endPoint := cfg.Eth
 		localAddress, err := address.GetAddressFromID(nid)
 		if err != nil {
 			log.Error("error from get address from id: ", err)
 			return err
 		}
-		isKeeper, err := contracts.IsKeeper(endPoint, localAddress)
+		isKeeper, err := contracts.IsKeeper(localAddress)
 		if err != nil {
 			log.Error("error from IsKeeper: ", err)
 			return err
@@ -299,7 +301,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 		} else {
-			isProvider, err := contracts.IsProvider(endPoint, localAddress)
+			isProvider, err := contracts.IsProvider(localAddress)
 			if err != nil {
 				log.Error("error from IsProvider: ", err)
 				return err
@@ -308,21 +310,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				cfg.Role = metainfo.RoleProvider
 			} else {
 				cfg.Role = metainfo.RoleUser
-				//查询是否部署过upKeeping合约
-				_, _, err = contracts.GetUKFromResolver(endPoint, localAddress)
-				switch err {
-				case nil: //部署过
-					cfg.IsInit = false
-				case contracts.ErrNotDeployedMapper, contracts.ErrNotDeployedUk: //没有部署过
-					cfg.IsInit = true
-				default:
-					return err
-				}
 			}
 		}
 	}
-	contracts.EndPoint = cfg.Eth
-
 	value := cfg.Role //角色信息的value
 	err = node.Routing.(*dht.IpfsDHT).CmdPutTo(keystring, value, "local")
 	if err != nil {
@@ -456,6 +446,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&provider.ProviderHandlerV2{Role: metainfo.RoleProvider})
 		if err != nil {
 			return err
+		}
+
+		pos, _ := req.Options[posKwd].(bool)
+		if pos {
+			fmt.Println("Start pos Service")
+			go provider.PosSerivce()
 		}
 	default:
 	}

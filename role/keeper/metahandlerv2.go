@@ -3,12 +3,11 @@ package keeper
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/memoio/go-mefs/contracts"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -39,7 +38,7 @@ func (keeper *KeeperHandlerV2) HandleMetaMessage(metaKey, metaValue, from string
 	case metainfo.UserDeployedContracts: //user部署好合约
 		go handleUserDeloyedContracts(km, metaValue, from)
 	case metainfo.DeleteBlock: //user删除块
-		go handleDeleteBlockMeta(km, from)
+		go handleDeleteBlockMeta(km)
 	case metainfo.NewKPReq: //user申请新的provider
 		return handleNewProviderReq(km, metaValue)
 	case metainfo.BlockMetaInfo: //user发送块元数据
@@ -56,6 +55,10 @@ func (keeper *KeeperHandlerV2) HandleMetaMessage(metaKey, metaValue, from string
 		return handleQueryInfo(km)
 	case metainfo.GetPeerAddr:
 		return handlePeerAddr(km)
+	case metainfo.PosAdd:
+		go handlePosAdd(km, metaValue, from)
+	case metainfo.PosDelete:
+		go handlePosDelete(km, metaValue, from)
 	case metainfo.Test:
 		go handleTest(km)
 	default: //没有匹配的信息，丢弃
@@ -76,75 +79,75 @@ func (keeper *KeeperHandlerV2) GetRole() (string, error) {
 //返回keeper和provider id组成的字符串，格式为 userID/"UserInitReq"/keepercount/providercount kid1kid2../pid1pid2..
 //TODO:可以从合约中查询KUP关系
 func handleUserInitReq(km *metainfo.KeyMeta, from string) {
-	fmt.Println("handleUserInitReq()", km.ToString(), "From:", from)
+	log.Println("handleUserInitReq: ", km.ToString(), " From: ", from)
 	userID := km.GetMid()
 	options := km.GetOptions()
 	queryAddr := options[2]
-	fmt.Println("Query合约信息：", queryAddr)
+	log.Println("Query合约信息：", queryAddr)
 	var keeperCount, providerCount int
 	if queryAddr == contracts.InvalidAddr {
-		fmt.Println("没有部署query合约，使用init信息中要求的KP数量")
+		log.Println("No query contracts，use k/p numbers in init request")
 		ks, err := strconv.Atoi(options[0])
 		if err != nil {
-			fmt.Println(err)
+			log.Println("handleUserInitReq: ", err)
 			return
 		}
 		ps, err := strconv.Atoi(options[1])
 		if err != nil {
-			fmt.Println(err)
+			log.Println("handleUserInitReq: ", err)
 			return
 		}
 		keeperCount = ks
 		providerCount = ps
 	} else {
-		fmt.Println("部署过query合约，从合约中查询需求")
+		log.Println("Get k/p numbers from query contract of user: ", userID)
 		localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty())
-		_, _, _, ks, ps, complete, err := contracts.GetQueryParams(contracts.EndPoint, localAddr, common.HexToAddress(queryAddr))
-		if complete || err != nil {
-			fmt.Println("complete:", complete, "error:", err)
+		item, err := contracts.GetQueryInfo(localAddr, common.HexToAddress(queryAddr))
+		if item.Completed || err != nil {
+			log.Println("complete:", item.Completed, "error:", err)
 			return
 		}
-		keeperCount = int(ks.Int64())
-		providerCount = int(ps.Int64())
+		keeperCount = int(item.KeeperNums)
+		providerCount = int(item.ProviderNums)
 	}
-	fmt.Println("keeperCount:", keeperCount, "providerCount:", providerCount)
+	log.Println(userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount)
 	//查询出user的keeper和provider
 	//首先看看内存里是否有该节点
 	response, err := userInitInMem(userID, keeperCount, providerCount)
 	if err != nil { //内存查找出错，在硬盘中找
 		response, err = userInitInLocal(userID, keeperCount, providerCount)
 		if err != nil { //硬盘查找也出错 就直接返回
-			fmt.Println(err)
+			log.Println("handleUserInitReq err: ", err)
 			return
 		}
 	}
 	if response == "" { //没错，但是结果是空，为新user
 		response, err = newUserInit(userID, keeperCount, providerCount)
 		if err != nil {
-			fmt.Println(err)
+			log.Println("handleUserInitReq err: ", err)
 			return
 		}
 	}
 	km.SetKeyType(metainfo.UserInitRes)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), response, "local") //在本地保存一份，这里keytype为UserInitRes
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleUserInitReq err: ", err)
 		return
 	}
 	sendMetaRequest(km, response, from)
 }
 
 func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
-	fmt.Println("NewUserNotif", km.ToString(), metaValue, "From:", from)
+	log.Println("NewUserNotif", km.ToString(), metaValue, "From:", from)
 	userID := km.GetMid()
 	kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
 	kmPid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypePid)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
 
@@ -178,21 +181,21 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 	if ok { //本地已有保存好的user信息,通知usertendermint的状态
 		kmRes, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeBft)
 		if err != nil {
-			fmt.Println(err)
+			log.Println("handleNewUserNotif err: ", err)
 		}
 		var resValue string
 		if !localPeerInfo.enableTendermint {
 			resValue = "simple"
-			fmt.Println("本节点不使用Tendermint，GroupID:", userID)
+			log.Println("use simple mode，groupID: ", userID)
 		}
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmRes.ToString(), resValue, "local") //放在本地供User或Provider启动的时候查询
 		if err != nil {
-			fmt.Println(err)
+			log.Println("handleNewUserNotif err: ", err)
 		}
 		kmRes.SetKeyType(metainfo.UserInitNotifRes)
 		_, err = sendMetaRequest(kmRes, resValue, from)
 		if err != nil {
-			fmt.Println(err)
+			log.Println("handleNewUserNotif err: ", err)
 		}
 		return //直接返回
 
@@ -201,12 +204,12 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 	go fillPinfo(userID, keepers, providers, from)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmKid.ToString(), splited[0], "local") //替换本地的User信息
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmPid.ToString(), splited[1], "local")
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
 	if _, ok := localPeerInfo.UserCache.Get(userID); ok { //本地没有保存好的user信息 但是waitlist里有
@@ -223,23 +226,23 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 }
 
 func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
-	fmt.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
+	log.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
 	tempInfo, ok := getGroupsInfo(km.GetMid())
 	if !ok {
-		fmt.Println("Can't find ", km.GetMid(), "'s GroupInfo")
+		log.Println("Can't find ", km.GetMid(), "'s GroupInfo")
 		return
 	}
 	err := SaveUpkeeping(tempInfo, km.GetMid())
 	if err != nil {
-		fmt.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
+		log.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
 	} else {
-		fmt.Println("Save ", km.GetMid(), "'s Upkeeping success")
+		log.Println("Save ", km.GetMid(), "'s Upkeeping success")
 	}
 	err = SaveQuery(km.GetMid())
 	if err != nil {
-		fmt.Println("Save ", km.GetMid(), "'s Query err", err)
+		log.Println("Save ", km.GetMid(), "'s Query err", err)
 	} else {
-		fmt.Println("Save ", km.GetMid(), "'s Query success")
+		log.Println("Save ", km.GetMid(), "'s Query success")
 	}
 }
 
@@ -247,55 +250,50 @@ func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
 func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
 	options := km.GetOptions()
 	if len(options) < 1 {
-		fmt.Println("handleSync()error:", metainfo.ErrIllegalKey, km.ToString())
+		log.Println("handleSync()error:", metainfo.ErrIllegalKey, km.ToString())
 	}
 	syncType := options[0]
 	var err error
 	switch syncType { //TODO:检查参数是否完整
 	case metainfo.SyncTypeBlock:
-		err = syncBlock(km, metaValue)
+		err = handleSyncBlock(km, metaValue)
 	case metainfo.SyncTypeChalPay:
-		err = syncChalPay(km, metaValue)
+		err = handleSyncChalPay(km, metaValue)
 	case metainfo.SyncTypeChalRes:
-		err = syncChalres(km, metaValue)
+		err = handleSyncChalres(km, metaValue)
 	case metainfo.SyncTypeUID, metainfo.SyncTypePid, metainfo.SyncTypeKid:
 		err = syncKUPIDs(km, metaValue)
 	default:
 		err = ErrorWrongSyncType
 	}
 	if err != nil {
-		fmt.Printf("handleSync()error:%s\nmetakey:%s\nmetavalue:%s\nfrom:%s\n", err, km.ToString(), metaValue, from)
+		log.Printf("handleSync()error:%s\nmetakey:%s\nmetavalue:%s\nfrom:%s\n", err, km.ToString(), metaValue, from)
 	}
 }
 
 func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 	blockID := km.GetMid()
-	if len(blockID) <= utils.IDLength {
-		fmt.Println(ErrUnmatchedPeerID)
-		return
-	}
-
 	bm, err := metainfo.GetBlockMeta(blockID)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleBlockMeta err: ", err)
 		return
 	}
 
 	km.SetKeyType(metainfo.Local)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local")
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleBlockMeta err: ", err)
 		return
 	}
 
 	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
 	if len(splitedValue) < 2 {
-		fmt.Println(metainfo.ErrIllegalValue)
+		log.Println("handleBlockMeta err: ", metainfo.ErrIllegalValue)
 		return
 	}
 	offset, err := strconv.Atoi(splitedValue[1])
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleBlockMeta err: ", err)
 		return
 	}
 	pid := splitedValue[0]
@@ -306,7 +304,7 @@ func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 
 	err = doAddBlocktoLedger(splitedValue[0], bm.GetUid(), blockID, offset)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleBlockMeta err: ", err)
 	}
 	return
 }
@@ -319,12 +317,12 @@ func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
 	tmpmaxSpace := ops[0]
 	actulDataSpacestr, err := strconv.ParseUint(ops[1], 10, 64)
 	if err != nil {
-		fmt.Println("strconv dataSpace error :", err)
+		log.Println("handleStorageSync err: ", err)
 		return
 	}
 	rawDataSpacestr, err := strconv.ParseUint(ops[2], 10, 64)
 	if err != nil {
-		fmt.Println("strconv rawdataSpace error :", err)
+		log.Println("handleStorageSync err: ", err)
 		return
 	}
 	tmpStorageInfo := &storageInfo{
@@ -335,21 +333,35 @@ func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
 	localPeerInfo.Storage.Store(pid, tmpStorageInfo)
 }
 
-func handleDeleteBlockMeta(km *metainfo.KeyMeta, from string) { //立即删除某些块的元数据
+func handleDeleteBlockMeta(km *metainfo.KeyMeta) { //立即删除某些块的元数据 由user发送给所有keeper
 	blockID := km.GetMid()
-	if len(blockID) <= utils.IDLength {
-		fmt.Println(ErrUnmatchedPeerID)
+	bm, err := metainfo.GetBlockMeta(blockID)
+	if err != nil {
+		log.Println("handleDeleteBlockMeta err: ", err)
 		return
 	}
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
 	if err != nil {
-		fmt.Println(err)
+		log.Println("handleDeleteBlockMeta err: ", err)
+		return
+	}
+
+	//获取保存这个块的provider
+	metavalueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmBlock.ToString(), "local")
+	if err != nil {
+		log.Println("handleDeleteBlockMeta err: ", err)
+		return
+	}
+	splitedValue := strings.Split(string(metavalueByte), metainfo.DELIMITER)
+	if len(splitedValue) < 2 {
+		log.Println("handleDeleteBlockMeta err: ", metainfo.ErrIllegalValue)
 		return
 	}
 	err = localNode.Routing.(*dht.IpfsDHT).DeleteLocal(kmBlock.ToString())
 	if err != nil && err != ds.ErrNotFound {
-		fmt.Println(err)
+		log.Println("handleDeleteBlockMeta err: ", err)
 	}
+	deleteBlockInLedger(splitedValue[0], bm)
 }
 
 func handleNewProviderReq(km *metainfo.KeyMeta, metaValue string) (string, error) {
@@ -401,7 +413,7 @@ func handlePeerAddr(km *metainfo.KeyMeta) (string, error) {
 		pid := c.RemotePeer()
 		if pid.Pretty() == peerID {
 			addr := c.RemoteMultiaddr()
-			fmt.Println(addr.String())
+			log.Println("handlePeerAddr: ", addr.String())
 			return addr.String(), nil
 		}
 	}
@@ -449,7 +461,7 @@ func handleQueryInfo(km *metainfo.KeyMeta) (string, error) {
 }
 
 func handleTest(km *metainfo.KeyMeta) {
-	fmt.Println("测试用回调函数")
-	fmt.Println("km.mid:", km.GetMid())
-	fmt.Println("km.options", km.GetOptions())
+	log.Println("测试用回调函数")
+	log.Println("km.mid:", km.GetMid())
+	log.Println("km.options", km.GetOptions())
 }

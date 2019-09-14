@@ -2,16 +2,15 @@ package keeper
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
-	"sync"
 
+	df "github.com/memoio/go-mefs/data-format"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	"github.com/memoio/go-mefs/utils/metainfo"
-
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var (
@@ -29,10 +28,15 @@ func metaSyncTo(keyMeta *metainfo.KeyMeta, metaValue string, targets ...string) 
 		return
 	}
 
+	// sync block meta seems to too heavily
+	if options[0] == metainfo.SyncTypeBlock {
+		return
+	}
+
 	if len(targets) == 0 { //获取同步对象
 		targets, err = getTarget(mainID, options[0])
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 	}
@@ -42,7 +46,7 @@ func metaSyncTo(keyMeta *metainfo.KeyMeta, metaValue string, targets ...string) 
 	for _, p := range targets {
 		_, err := sendMetaRequest(keyMeta, metaValue, p)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 	}
@@ -85,8 +89,8 @@ func getTarget(mainID, syncType string) ([]string, error) {
 }
 
 //该函数用于将master发来的支付信息，构造两份信息，一份为最近一次支付结果保存在本地，一份为支付信息，保存在内存中和本地
-//(groupid/"sync"/"chalpay"/pid/begin_time/end_time, spacetime/signature/proof)
-func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
+//(groupid/"sync"/"chalpay"/pid/beginTime/endTime, spacetime/signature/proof)
+func handleSyncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 	groupid := km.GetMid()
 	options := km.GetOptions()
 	if len(options) < 4 {
@@ -101,7 +105,7 @@ func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 	endTime := utils.StringToUnix(options[3])
 	st, ok := big.NewInt(0).SetString(splitedMetaValue[0], 0)
 	if !ok {
-		fmt.Println("SetString()err!value:", splitedMetaValue[0])
+		log.Println("SetString()err!value: ", splitedMetaValue[0])
 		return metainfo.ErrIllegalValue
 	}
 
@@ -114,14 +118,17 @@ func syncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 }
 
 // syncProof 收到单次挑战信息同步的操作，保存在内存和硬盘中
-// uid/"sync"/"chalres"/pid/kid/time,length/result/proof
-func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
+// uid/"sync"/"chalres"/pid/kid/time,length/result/proof/sum/h
+func handleSyncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	groupid := km.GetMid()
 	options := km.GetOptions()
 	if len(options) < 4 {
 		return metainfo.ErrIllegalKey
 	}
 	splitedMetaValue := strings.Split(metaValue, metainfo.DELIMITER)
+	if len(splitedMetaValue) < 7 {
+		return metainfo.ErrIllegalValue
+	}
 	timerec := utils.StringToUnix(options[3])   //转换收到的时间信息格式
 	l, err := strconv.Atoi(splitedMetaValue[0]) //转换长度信息格式
 	if err != nil {
@@ -132,14 +139,25 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	if res == "0" {
 		chalres = false
 	}
+	thisSum, err := strconv.Atoi(splitedMetaValue[2])
+	if err != nil {
+		return err
+	}
+	thisH, err := strconv.Atoi(splitedMetaValue[3])
+	if err != nil {
+		return err
+	}
+	proofStr := strings.Join(splitedMetaValue[4:], metainfo.DELIMITER)
 	thischalresult := &chalresult{ //构建挑战结果
-		kid:            options[2],
-		pid:            options[1],
-		uid:            groupid,
-		challenge_time: timerec,
-		proof:          splitedMetaValue[2],
-		length:         uint32(l),
-		res:            chalres,
+		kid:           options[2],
+		pid:           options[1],
+		uid:           groupid,
+		challengeTime: timerec,
+		sum:           int64(thisSum),
+		h:             thisH,
+		res:           chalres,
+		proof:         proofStr,
+		length:        int64(l),
 	}
 
 	pu := PU{
@@ -148,20 +166,15 @@ func syncChalres(km *metainfo.KeyMeta, metaValue string) error {
 	}
 	thischalinfo, ok := getChalinfo(pu)
 	if !ok {
-		return errors.New("getchalinfo error")
+		return ErrNoChalInfo
 	}
 	thischalinfo.Time.Store(timerec, thischalresult) //放到LedgerInfo里
-	km.SetKeyType(metainfo.Local)
-	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local") //保存在本地
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 //syncBlock 收到数据块信息的同步操作
 // blockID/"sync"/"block",pid/length
-func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
+func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 	km.SetKeyType(metainfo.Local)
 	splitedMetaValue := strings.Split(metaValue, metainfo.DELIMITER)
 	if len(splitedMetaValue) < 2 {
@@ -194,37 +207,31 @@ func syncBlock(km *metainfo.KeyMeta, metaValue string) error {
 		pid: pid,
 		uid: uid,
 	}
-	LedgerInfo.Range(func(k, v interface{}) bool {
-		thischalinfo := v.(*chalinfo)
-		thischalinfo.Cid.Range(func(key, value interface{}) bool {
-			if strings.Compare(key.(string), blockID) == 0 {
-				thischalinfo.Cid.Delete(blockID)
-				fmt.Println("delete old meta data")
-			}
-			return true
-		})
-		return true
-	})
+
 	newcidinfo := &cidInfo{
 		availtime: utils.GetUnixNow(),
 		repair:    0,
 		offset:    offset,
 	}
+
+	oldOffset := 0
 	if thechalinfo, ok := getChalinfo(newpu); ok {
 		if thechalinfo.inChallenge == 1 {
 			thechalinfo.tmpCid.Store(blockID, newcidinfo)
 		} else if thechalinfo.inChallenge == 0 {
-			thechalinfo.Cid.Store(blockID, newcidinfo)
+			act, loaded := thechalinfo.Cid.LoadOrStore(blockID, newcidinfo)
+			if loaded {
+				oldOffset = act.(*cidInfo).offset
+				if oldOffset < offset {
+					act.(*cidInfo).offset = offset
+				}
+			} else {
+				oldOffset = 0
+			}
+			thechalinfo.maxlength += int64(offset-oldOffset) * df.DefaultSegmentSize
 		}
-	} else {
-		var newCid, newTime sync.Map
-		newCid.Store(blockID, newcidinfo)
-		newchalinfo := &chalinfo{
-			Time: newTime,
-			Cid:  newCid,
-		}
-		LedgerInfo.Store(newpu, newchalinfo)
 	}
+
 	addCredit(pid)
 	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local") //最后，保存数据到本地
 	if err != nil {

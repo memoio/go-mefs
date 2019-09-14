@@ -2,17 +2,21 @@ package user
 
 import (
 	"encoding/hex"
-	"fmt"
+	"log"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+
 	fr "github.com/memoio/go-mefs/repo/fsrepo"
+	pb "github.com/memoio/go-mefs/role/user/pb"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func getParamsForDeploy(userID, passwd string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
+func buildUKParams(userID, passwd string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
 	var keepers, providers []common.Address
 	//得到参与部署智能合约的userID的正确格式
 	userAddress, err := ad.GetAddressFromID(userID)
@@ -48,17 +52,17 @@ func getParamsForDeploy(userID, passwd string, localPeersInfo PeersInfo) (string
 	return hexPK, userAddress, keepers, providers, nil
 }
 
-func getParamsForSign(userID string, providerID string, privateKey []byte) (common.Address, common.Address, string, error) {
+func buildSignParams(userID string, providerID string, privateKey []byte) (common.Address, common.Address, string, error) {
 	var userAddress, providerAddress common.Address
 	providerAddress, err := ad.GetAddressFromID(providerID)
 	if err != nil {
-		fmt.Println("GetProAddrErr", err)
+		log.Println("GetProAddr err: ", err)
 		return userAddress, providerAddress, "", err
 	}
 
 	userAddress, err = ad.GetAddressFromID(userID)
 	if err != nil {
-		fmt.Println("GetLocalAddrErr", err)
+		log.Println("GetLocalAddr err: ", err)
 		return userAddress, providerAddress, "", err
 	}
 
@@ -68,4 +72,19 @@ func getParamsForSign(userID string, providerID string, privateKey []byte) (comm
 	hex.Encode(enc, pkByte)
 
 	return userAddress, providerAddress, string(enc), nil
+}
+
+// BuildSignMessage builds sign message for test or repair
+func BuildSignMessage() ([]byte, error) {
+	money := big.NewInt(123)
+	moneyByte := money.Bytes()
+	message := &pb.SignForChannel{
+		Money: moneyByte,
+	}
+	mes, err := proto.Marshal(message)
+	if err != nil {
+		log.Println("protoMarshal failed err: ", err)
+		return nil, err
+	}
+	return mes, nil
 }

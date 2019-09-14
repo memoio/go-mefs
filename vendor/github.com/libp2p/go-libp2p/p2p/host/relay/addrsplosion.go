@@ -148,11 +148,11 @@ func sanitizeAddrsplodedSet(public, private []ma.Multiaddr) []ma.Multiaddr {
 				continue
 			}
 
-			if pa.port == 4001 || pa.port == 4002 {
-				// it's a default port, use it
-				result = append(result, pa.addr)
-				haveAddr = true
-			}
+			// if pa.port == 4001 || pa.port == 4002 {
+			// it's a default port, use it
+			result = append(result, pa.addr)
+			haveAddr = true
+			// }
 		}
 
 		if !haveAddr {

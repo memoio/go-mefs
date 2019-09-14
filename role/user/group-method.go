@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -16,6 +15,9 @@ import (
 
 //GetKeepers 返回本节点拥有的keeper信息，并且检查连接状况 传入参数为返回信息的数量，-1为全部
 func (gp *GroupService) GetKeepers(count int) ([]string, []string, error) {
+	if gp == nil {
+		return nil, nil, ErrGroupServiceNotReady
+	}
 	if len(gp.localPeersInfo.Keepers) == 0 {
 		return nil, nil, ErrNoEnoughKeeper
 	}
@@ -58,6 +60,9 @@ func (gp *GroupService) GetKeepers(count int) ([]string, []string, error) {
 
 //GetLocalProviders 从本地PeersInfo中 返回本节点provider信息,并且检查连接状况
 func (gp *GroupService) GetLocalProviders() ([]string, []string, error) {
+	if gp == nil {
+		return nil, nil, ErrGroupServiceNotReady
+	}
 	state, err := GetUserServiceState(gp.Userid)
 	if err != nil {
 		return nil, nil, err
@@ -88,6 +93,9 @@ func (gp *GroupService) GetLocalProviders() ([]string, []string, error) {
 
 //GetProviders 返回provider信息，
 func (gp *GroupService) GetProviders(count int) ([]string, error) {
+	if gp == nil {
+		return nil, ErrGroupServiceNotReady
+	}
 	state, err := GetUserServiceState(gp.Userid)
 	if err != nil {
 		return nil, err
@@ -135,6 +143,9 @@ func (gp *GroupService) GetProviders(count int) ([]string, error) {
 //从provider获取数据块的元数据，传入数据块id号
 //返回值为保存数据块的pid，offset，错误信息
 func (gp *GroupService) GetBlockProviders(blockID string) (string, int, error) {
+	if gp == nil {
+		return "", 0, ErrGroupServiceNotReady
+	}
 	var pidstr string
 	var offset int
 	state, err := GetUserServiceState(gp.Userid)
@@ -187,6 +198,9 @@ func (gp *GroupService) GetBlockProviders(blockID string) (string, int, error) {
 }
 
 func (gp *GroupService) PutDataMetaToKeepers(blockID string, provider string, offset int) error {
+	if gp == nil {
+		return ErrGroupServiceNotReady
+	}
 	state, err := GetUserServiceState(gp.Userid)
 	if err != nil {
 		return err
@@ -196,14 +210,14 @@ func (gp *GroupService) PutDataMetaToKeepers(blockID string, provider string, of
 	}
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockMetaInfo, metainfo.SyncTypeBlock)
 	if err != nil {
-		fmt.Println("construct put blockMeta KV error :", err)
+		log.Println("construct put blockMeta KV error :", err)
 		return err
 	}
 	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
 	for _, keeper := range gp.localPeersInfo.Keepers {
 		_, err = sendMetaRequest(kmBlock, metaValue, keeper.KeeperID)
 		if err != nil {
-			fmt.Println("send metaMessage to ", keeper.KeeperID, " error :", err)
+			log.Println("send metaMessage to ", keeper.KeeperID, " error :", err)
 		}
 	}
 	return nil
@@ -211,6 +225,9 @@ func (gp *GroupService) PutDataMetaToKeepers(blockID string, provider string, of
 
 //删除块
 func (gp *GroupService) DeleteBlocksFromProvider(blockID string, updateMeta bool) error {
+	if gp == nil {
+		return ErrGroupServiceNotReady
+	}
 	state, err := GetUserServiceState(gp.Userid)
 	if err != nil {
 		return err
@@ -228,7 +245,7 @@ func (gp *GroupService) DeleteBlocksFromProvider(blockID string, updateMeta bool
 
 	km, err := metainfo.NewKeyMeta(blockID, metainfo.DeleteBlock)
 	if err != nil {
-		fmt.Println("construct delete block KV error :", err)
+		log.Println("construct delete block KV error :", err)
 		return err
 	}
 	pid, err := peer.IDB58Decode(provider)

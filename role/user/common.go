@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/memoio/go-mefs/contracts"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -23,8 +25,7 @@ const (
 	DefaultDuration int64 = 10      //单位：天
 	DefaultPrice    int64 = 1000000 //单位：wei
 
-	DefaultPassword       = "123456"
-	SegementCount   int32 = 256
+	DefaultPassword = "123456"
 
 	//LFS
 	maxObjectNameLen = 4096 //设定文件名和路径可占用的最长字节数
@@ -75,29 +76,39 @@ type GroupService struct {
 //------LFS Type--------
 type LfsService struct {
 	CurrentLog *Logs //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
+	InProcess  int   //表示此lfs上是否有操作，如上传下载，避免过程中user被Kill
 	UserID     string
 	PrivateKey []byte
 }
 
 type Logs struct {
-	Sb           *pb.SuperBlock
-	SbMux        sync.Mutex
-	SbModified   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
-	BucketByName map[string]*pb.BucketInfo           //通过BucketName找到Bucket信息
-	BucketByID   map[int32]*pb.BucketInfo            //通过BucketID知道到Bucket信息
-	Entries      map[int32]map[string]*pb.ObjectInfo //通过BucketID检索Bucket下文件
-	State        map[int32]*BucketState              //通过BucketID确定Bucket的状态
+	Sb             *SuperBlock
+	BucketNameToID map[string]int32  //通过BucketName找到Bucket信息
+	BucketByID     map[int32]*Bucket //通过BucketID知道到Bucket信息
 }
 
-type BucketState struct {
-	Dirty bool
-	Mu    sync.Mutex
+type SuperBlock struct {
+	pb.SuperBlockInfo
+	Bitset *bitset.BitSet
+	SbMux  sync.Mutex
+	Dirty  bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+}
+
+type Bucket struct {
+	pb.BucketInfo
+	Objects map[string]*Object //通过BucketID检索Bucket下文件
+	Dirty   bool
+	Lock    sync.RWMutex
+}
+
+type Object struct {
+	pb.ObjectInfo
+	Lock sync.RWMutex
 }
 
 var (
 	ErrPolicy                    = errors.New("the policy is error")
 	ErrBalance                   = errors.New("your account's balance is insufficient, we will not deploy contract")
-	ErrGetSecreteKey             = errors.New("get user's secrete key error")
 	ErrKeySetIsNil               = errors.New("user's Keyset is nil")
 	ErrUserNotExist              = errors.New("user not exist")
 	ErrUserBookIsNil             = errors.New("the User book is nil")
@@ -169,4 +180,19 @@ func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
 	ctx = context.WithValue(ctx, "caller", caller)*/
 	_, err := localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
 	return err
+}
+
+// 对数组进行乱序操作，以便user随机选择providers
+func disorderArray(array []string) []string {
+	var temp string
+	var num int
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(array) - 1; i >= 0; i-- {
+		num = r.Intn(i + 1)
+		temp = array[i]
+		array[i] = array[num]
+		array[num] = temp
+	}
+
+	return array
 }

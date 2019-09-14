@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"fmt"
+	"log"
 	"strconv"
 
 	cid "github.com/memoio/go-mefs/source/go-cid"
@@ -32,7 +32,7 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 	case metainfo.Test:
 		go handleTest(km)
 	case metainfo.UserInitReq:
-		fmt.Println("keytype：UserInitReq 不处理")
+		log.Println("keytype：UserInitReq, do not handle it")
 	case metainfo.UserDeployedContracts:
 		go handleUserDeployedContracts(km, metaKey, from)
 	case metainfo.Challenge:
@@ -45,11 +45,13 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 		go handleDeleteBlock(km, from)
 	case metainfo.GetBlock:
 		res, err := handleGetBlock(km, from)
-		if err == nil {
+		if err != nil {
+			log.Println("getBlcokError: ", err)
+		} else {
 			return res, nil
 		}
 	case metainfo.PutBlock:
-		handlePutBlock(km, metaValue, from)
+		go handlePutBlock(km, metaValue, from)
 	default: //没有匹配的信息，报错
 		return "", metainfo.ErrWrongType
 	}
@@ -64,26 +66,26 @@ func (provider *ProviderHandlerV2) GetRole() (string, error) {
 func hanldeStorageSync(kid string) error {
 	cfg, err := localNode.Repo.Config()
 	if err != nil {
-		fmt.Println("get config failed :", err)
+		log.Println("get config failed: ", err)
 		return err
 	}
 	maxSpace := cfg.Datastore.StorageMax
 	dataStore := localNode.Repo.Datastore()
 	actulDataSpace, err := ds.DiskUsage(dataStore)
 	if err != nil {
-		fmt.Println("get disk usage failed :", err)
+		log.Println("get disk usage failed: ", err)
 		return err
 	}
 	rawDataSpace := actulDataSpace
 	km, err := metainfo.NewKeyMeta(kid, metainfo.StorageSync)
 	if err != nil {
-		fmt.Println("construct StorageSync KV error :", err)
+		log.Println("construct StorageSync KV error :", err)
 		return err
 	}
 	value := maxSpace + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(rawDataSpace, 10)
 	_, err = sendMetaRequest(km, value, kid)
 	if err != nil {
-		fmt.Println("send error :", err)
+		log.Println("send error :", err)
 		return err
 	}
 	return nil
@@ -100,7 +102,7 @@ func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
 }
 
 func handleTest(km *metainfo.KeyMeta) {
-	fmt.Println("测试用回调函数")
-	fmt.Println("km.mid:", km.GetMid())
-	fmt.Println("km.options", km.GetOptions())
+	log.Println("测试用回调函数")
+	log.Println("km.mid:", km.GetMid())
+	log.Println("km.options", km.GetOptions())
 }

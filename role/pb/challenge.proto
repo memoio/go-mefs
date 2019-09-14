@@ -14,7 +14,7 @@ message pu{
 message chalin{
     map<string,cidin>Cidin = 1;
     map<string,chalres>Chalres = 2;
-    uint32 maxlength = 3;
+    int64 maxlength = 3;
 }
 
 message LedgerInfo{
@@ -32,8 +32,8 @@ message chalres{
     string Keeper = 1;
     string Provider = 2;
     string User = 3;
-    uint32 Sum = 4;
-    uint32 Length =5;
+    int64 Sum = 4;
+    int64 Length =5;
     int64 H = 6;
     bool Res = 7;
     string Proof = 8;
