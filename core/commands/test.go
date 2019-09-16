@@ -80,7 +80,7 @@ var infoCmd = &cmds.Command{
 		id := n.Identity.Pretty()
 		localAddress, _ := address.GetAddressFromID(id)
 		cfg, _ := n.Repo.Config()
-		stringList := []string{"id:" + id, "address:" + localAddress.String(), "Role:" + cfg.Role}
+		stringList := []string{"id: " + id, "address: " + localAddress.String(), "Role: " + cfg.Role}
 		switch cfg.Role {
 		case metainfo.RoleUser:
 			outmap := user.ShowInfo(id)

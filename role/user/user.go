@@ -343,87 +343,90 @@ func ShowInfo(userID string) map[string]string {
 	log.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
 	defer log.Println("================================")
 	gp := GetGroupService(userID)
-	lfs := GetLfsService(userID)
-	if lfs == nil {
-		outmap["error"] = "lfsService==nil"
+	if gp == nil {
+		outmap["error: "] = "groupService==nil"
 		return outmap
 	}
-	if gp == nil {
-		outmap["error"] = "groupService==nil"
+
+	lfs := GetLfsService(userID)
+	if lfs == nil {
+		outmap["error: "] = "lfsService==nil"
 		return outmap
 	}
 
 	//查keeper
 	unconKeepers, conKeepers, err := gp.GetKeepers(-1)
 	if err != nil {
-		outmap["error"] = "GetKeepers(-1)err:" + err.Error()
+		outmap["error: "] = "GetKeepers(-1)err:" + err.Error()
 		return outmap
 	}
-	outmap["unconKeepers:"] = ""
-	outmap["conKeepers:"] = ""
+	outmap["unconKeepers: "] = ""
+	outmap["conKeepers: "] = ""
 	for _, keeper := range unconKeepers {
-		outmap["unconKeepers:"] += "," + keeper
+		outmap["unconKeepers: "] += "," + keeper
 	}
 	for _, keeper := range conKeepers {
-		outmap["conKeepers:"] += "," + keeper
+		outmap["conKeepers: "] += "," + keeper
 	}
 
 	//查provider
 
 	unconProviders, conProviders, err := gp.GetLocalProviders()
 	if err != nil {
-		outmap["error"] = "GetLocalProviders()err:" + err.Error()
+		outmap["error: "] = "GetLocalProviders()err:" + err.Error()
 		return outmap
 	}
-	outmap["conProviders:"] = ""
-	outmap["unconProviders:"] = ""
+	outmap["conProviders: "] = ""
+	outmap["unconProviders: "] = ""
 	for _, provider := range unconProviders {
-		outmap["unconProviders:"] += "," + provider
+		outmap["unconProviders: "] += "," + provider
 	}
 	for _, provider := range conProviders {
-		outmap["conProviders:"] += "," + provider
+		outmap["conProviders: "] += "," + provider
 	}
 
 	//查本节点余额
 	addrLocal, err := ad.GetAddressFromID(userID)
 	if err != nil {
-		outmap["error"] = "GetAddressFromID() err:" + err.Error()
+		outmap["error: "] = "GetAddressFromID() err:" + err.Error()
 		return outmap
 	}
 	amountLocal, err := contracts.QueryBalance(addrLocal.Hex())
 	if err != nil {
-		outmap["error"] = "QueryBalance() err:" + err.Error()
+		outmap["error: "] = "QueryBalance() err:" + err.Error()
 	}
-	outmap["localBalance:"] = amountLocal.String()
+	outmap["user balance: "] = amountLocal.String()
 
 	//查upkeeping合约信息
 	cs := GetContractService(userID)
 	if cs == nil {
-		outmap["error"] = "ContractService==nil"
+		outmap["error: "] = "ContractService==nil"
 		return outmap
 	}
 	//计算当前合约的花费(合约总金额-当前余额)
 	upkeeping, err := cs.GetUpkeepingItem()
 	if err != nil {
-		outmap["error"] = "GetUpkeepingItem() err:" + err.Error()
+		outmap["error: "] = "GetUpkeepingItem() err:" + err.Error()
 		return outmap
 	}
 	outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr
 	amountUpkeeping, err := contracts.QueryBalance(upkeeping.UpKeepingAddr)
 	if err != nil {
-		outmap["error"] = "QueryBalance()err:" + err.Error()
+		outmap["error: "] = "QueryBalance()err:" + err.Error()
 		return outmap
 	}
-	d := gp.storeDays
-	s := gp.storeSize
-	price := gp.storePrice
+	outmap["ukeeping balance: "] = amountUpkeeping.String()
+
+	d := upkeeping.Duration
+	s := upkeeping.Capacity
+	price := upkeeping.Price
 	var moneyPerDay = new(big.Int)
 	var moneyAccount = new(big.Int)
 	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
 	outmap["upkeeping cost:"] = big.NewInt(0).Sub(moneyAccount, amountUpkeeping).String()
 	outmap["upkeeping.Duration:"] = big.NewInt(upkeeping.Duration).String()
-	outmap["upkeeping.Capacity"] = big.NewInt(upkeeping.Capacity).String()
+	outmap["upkeeping.Capacity:"] = big.NewInt(upkeeping.Capacity).String()
 
 	//查询当前使用的存储空间
 	buckets, err := lfs.ListBucket("")
