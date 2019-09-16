@@ -72,7 +72,7 @@ func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error
 		},
 
 		IsInit: true,
-		Eth:    "http://212.64.28.207:8101",
+		Eth:    "http://47.92.5.51:8101",
 		Test:   false,
 
 		Gateway: Gateway{
