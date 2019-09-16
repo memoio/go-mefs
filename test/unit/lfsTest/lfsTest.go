@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
@@ -25,7 +26,13 @@ const randomDataSize = 1024 * 1024 * 10
 const dataCount = 2
 const parityCount = 3
 
+var ethEndPoint string
+
 func main() {
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.Parse()
+	ethEndPoint = *eth
+
 	err := lfsTest()
 	if err != nil {
 		log.Fatal(err)
@@ -279,8 +286,6 @@ func fillRandom(p []byte) {
 		}
 	}
 }
-
-const ethEndPoint = "http://212.64.28.207:8101"
 
 func transferTo(value *big.Int, addr string) {
 	client, err := ethclient.Dial(ethEndPoint)

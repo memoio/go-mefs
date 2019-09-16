@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
@@ -13,14 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/metainfo"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/metainfo"
 	shell "github.com/memoio/mefs-go-http-client"
 )
 
@@ -33,7 +33,12 @@ const bucketName = "Bucket01"
 const dataCount = 3
 const parityCount = 2
 
+var ethEndPoint string
+
 func main() {
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.Parse()
+	ethEndPoint = *eth
 	if err := ChallengeTest(); err != nil {
 		log.Fatal(err)
 	}
@@ -244,8 +249,6 @@ func fillRandom(p []byte) {
 		}
 	}
 }
-
-const ethEndPoint = "http://212.64.28.207:8101"
 
 func transferTo(value *big.Int, addr string) {
 	client, err := ethclient.Dial(ethEndPoint)
