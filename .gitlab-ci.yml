@@ -7,6 +7,9 @@ stages:
   - challenge-test
   - upload-test
 
+variables:
+  UPCOUNNT: "100"
+
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
   - cd $GOPATH/src/github.com/memoio
@@ -212,6 +215,7 @@ upload_test:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - echo $UPCOUNT
     - chmod 777 uploadTest.sh
     - ./uploadTest.sh
   after_script:
