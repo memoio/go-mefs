@@ -9,7 +9,6 @@ import (
 
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
@@ -35,6 +34,13 @@ func StartProviderService(ctx context.Context, node *core.MefsNode, capacity int
 			} else {
 				break
 			}
+		}
+
+		err = SaveOffer()
+		if err != nil {
+			log.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
+		} else {
+			log.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
 		}
 	}
 
@@ -77,19 +83,12 @@ func PersistBeforeExit() error {
 }
 
 func storageSync(ctx context.Context) error {
-	cfg, err := localNode.Repo.Config()
+	actulDataSpace, err := getDiskUsage()
 	if err != nil {
-		log.Println("get config failed: ", err)
 		return err
 	}
-	maxSpace := cfg.Datastore.StorageMax
-	dataStore := localNode.Repo.Datastore()
-	actulDataSpace, err := ds.DiskUsage(dataStore)
-	if err != nil {
-		log.Println("get disk usage failed: ", err)
-		return err
-	}
-	rawDataSpace := actulDataSpace
+
+	maxSpace := getDiskTotal()
 
 	klist, ok := contracts.GetKeepersOfPro(localNode.Identity.Pretty())
 	if !ok {
@@ -102,7 +101,7 @@ func storageSync(ctx context.Context) error {
 		return err
 	}
 
-	value := maxSpace + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(rawDataSpace, 10)
+	value := strconv.FormatUint(maxSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10)
 
 	for _, kid := range klist {
 		_, err = sendMetaRequest(km, value, kid)

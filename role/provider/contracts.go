@@ -32,12 +32,6 @@ func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) e
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Query success")
 	}
-	err = SaveOffer()
-	if err != nil {
-		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
-	} else {
-		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
-	}
 	return nil
 }
 

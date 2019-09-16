@@ -75,9 +75,8 @@ type PeerInfo struct {
 }
 
 type storageInfo struct {
-	maxSpace       string
-	actulDataSpace uint64
-	rawDataSpace   uint64
+	maxSpace  uint64
+	usedSpace uint64
 }
 
 var localPeerInfo *PeerInfo

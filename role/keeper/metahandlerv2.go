@@ -286,25 +286,24 @@ func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 }
 
 func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
-	ops := strings.Split(value, metainfo.DELIMITER)
-	if len(ops) < 3 {
+	vals := strings.Split(value, metainfo.DELIMITER)
+	if len(vals) < 2 {
 		return
 	}
-	tmpmaxSpace := ops[0]
-	actulDataSpacestr, err := strconv.ParseUint(ops[1], 10, 64)
+
+	total, err := strconv.ParseUint(vals[0], 10, 64)
 	if err != nil {
 		log.Println("handleStorageSync err: ", err)
 		return
 	}
-	rawDataSpacestr, err := strconv.ParseUint(ops[2], 10, 64)
+	used, err := strconv.ParseUint(vals[1], 10, 64)
 	if err != nil {
 		log.Println("handleStorageSync err: ", err)
 		return
 	}
 	tmpStorageInfo := &storageInfo{
-		maxSpace:       tmpmaxSpace,
-		actulDataSpace: actulDataSpacestr,
-		rawDataSpace:   rawDataSpacestr,
+		maxSpace:  total,
+		usedSpace: used,
 	}
 	localPeerInfo.Storage.Store(pid, tmpStorageInfo)
 }
