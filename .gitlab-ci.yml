@@ -9,6 +9,7 @@ stages:
 
 variables:
   UPCOUNNT: "100"
+  NETKEY: "dev"
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
@@ -184,7 +185,8 @@ lfs_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 lfsTest.sh
-    - ./lfsTest.sh
+    - echo $NETKEY
+    - ./lfsTest.sh $NETKEY
   after_script:
     - cat ~/daemon.stdout
   tags:
@@ -200,7 +202,8 @@ challenge_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 challengeTest.sh
-    - ./challengeTest.sh
+    - echo $NETKEY
+    - ./challengeTest.sh $NETKEY
   after_script:
     - cat ~/daemon.stdout
   tags:
@@ -215,9 +218,10 @@ upload_test:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
-    - echo $UPCOUNT
     - chmod 777 uploadTest.sh
-    - ./uploadTest.sh
+    - echo $NETKEY
+    - echo $UPCOUNT
+    - ./uploadTest.sh $NETKEY $UPCOUNT
   after_script:
     - cat ~/daemon.stdout
   tags:
