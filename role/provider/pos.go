@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"log"
 	"math/rand"
 	"strconv"
@@ -16,7 +15,6 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -123,44 +121,6 @@ func PosSerivce(ctx context.Context) {
 	posRegular(ctx)
 }
 
-// getDiskUsage gets the disk usage
-func getDiskUsage() (uint64, error) {
-	dataStore := localNode.Repo.Datastore()
-	DataSpace, err := ds.DiskUsage(dataStore)
-	if err != nil {
-		log.Println("get disk usage failed :", err)
-		return 0, err
-	}
-	return DataSpace, nil
-}
-
-// getDiskTotal gets the disk total space which is set in config
-func getDiskTotal() (float64, error) {
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println("getDiskTotal error :", err)
-		return 0, err
-	}
-	maxSpaceStr := strings.Replace(cfg.Datastore.StorageMax, "GB", "", 1)
-	maxSpaceInGB, err := strconv.ParseFloat(maxSpaceStr, 64)
-	if err != nil {
-		log.Println("PraseUint maxSpaceStr to maxspace error :", err)
-		return 0, err
-	}
-
-	if maxSpaceInGB == 0 {
-		return 0, errors.New("max space is zero")
-	}
-
-	maxSpaceInByte := maxSpaceInGB * 1024 * 1024 * 1024
-	return maxSpaceInByte, nil
-}
-
-// getDiskUsage gets the disk total space which is set in config
-func getFreeSpace() {
-	return
-}
-
 // posRegular checks posBlocks and decide to add/delete
 func posRegular(ctx context.Context) {
 	log.Println("Pos start!")
@@ -190,15 +150,14 @@ func doGenerateOrDelete() {
 	if err != nil {
 		return
 	}
-	totalSpace, err := getDiskTotal()
-	if err != nil {
-		return
-	}
-	ratio := float64(usedSpace) / totalSpace
+
+	totalSpace := getDiskTotal()
+
+	ratio := float64(usedSpace / totalSpace)
 	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
 	if ratio <= LowWater {
-		generatePosBlocks(uint64(totalSpace * (LowWater - ratio)))
+		generatePosBlocks(uint64(float64(totalSpace) * (LowWater - ratio)))
 	} else if ratio >= HighWater {
 		deletePosBlocks(uint64(usedSpace / 10))
 	}

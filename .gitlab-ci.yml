@@ -168,7 +168,6 @@ js_API_test:
     when: stuck_or_timeout_failure
   only:
     - schedules
-    - dev
 
 lfs_test:
   stage: short-test

@@ -27,6 +27,7 @@ import (
 	"github.com/memoio/go-mefs/role/provider"
 	"github.com/memoio/go-mefs/role/user"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
@@ -49,9 +50,9 @@ const (
 	writableKwd               = "writable"
 	enableMultiplexKwd        = "enable-mplex-experiment"
 	enableTendermintKwd       = "tendermint"
-	capacityKwd               = "storage-capacity"
-	durationKwd               = "storage-time"
-	priceKwd                  = "storage-price"
+	capacityKwd               = "storageCapacity"
+	durationKwd               = "storageDuration"
+	priceKwd                  = "storagePrice"
 	ksKwd                     = "keeperSla"
 	psKwd                     = "providerSla"
 	passwordKwd               = "password"
@@ -138,13 +139,13 @@ environment variable:
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(defaultPassword),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
 		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(provider.ReDeployOffer),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
-		cmds.Int64Option(priceKwd, "p", "implement user needs or provider offers how much price of storage").WithDefault(provider.DefaultPrice),
+		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
@@ -425,7 +426,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				return err
 			}
 			go func() {
-				err = us.StartUserService(us.Context, cfg.IsInit, defaultPassword, user.DefaultCapacity, user.DefaultDuration, user.DefaultPrice, user.KeeperSLA, user.ProviderSLA)
+				err = us.StartUserService(us.Context, cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA)
 				if err != nil {
 					fmt.Println("Start local user failed:", err)
 					err := user.KillUser(node.Identity.Pretty())
@@ -438,7 +439,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	case metainfo.RoleProvider: //provider和keeper同样
 		rdo, _ := req.Options[reDeployOfferKwd].(bool)
-		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
+		err = provider.StartProviderService(req.Context, node, provider.DefaultCapacity, provider.DefaultDuration, utils.STOREPRICEPEDOLLAR, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err

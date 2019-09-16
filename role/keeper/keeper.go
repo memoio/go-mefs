@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	lru "github.com/hashicorp/golang-lru"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/memoio/go-mefs/contracts"
@@ -70,16 +69,14 @@ type PeerInfo struct {
 	Providers        []string
 	Storage          sync.Map
 	Credit           sync.Map
-	UserCache        *lru.Cache //收到Init请求，但未确认的User先记录在这里,长时间不相应则删除user在本地的信息
 	enableTendermint bool
 	offerBook        sync.Map // 存储连接的provider部署的Offer条约，K-provider的id，V-Offer实例
 	queryBook        sync.Map // 存储连接的user部署的Query条约，K-user的id，V-Query实例
 }
 
 type storageInfo struct {
-	maxSpace       string
-	actulDataSpace uint64
-	rawDataSpace   uint64
+	maxSpace  uint64
+	usedSpace uint64
 }
 
 var localPeerInfo *PeerInfo
@@ -236,18 +233,13 @@ func getMasterID(kidlist []string) string {
 func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermint bool) error {
 	//初始化各类结构体
 	localNode = node
-	userCache, err := lru.New(100)
-	if err != nil {
-		return err
-	}
 	var credit, storage sync.Map
 	localPeerInfo = &PeerInfo{
-		UserCache: userCache,
-		Credit:    credit,
-		Storage:   storage,
+		Credit:  credit,
+		Storage: storage,
 	}
 
-	err = loadAllUser() //加载本地保存的数据
+	err := loadAllUser() //加载本地保存的数据
 	if err != nil {
 		localNode = nil
 		localPeerInfo = nil
@@ -878,6 +870,7 @@ func checkConnectedPeer(ctx context.Context) error {
 			if isProvider {
 				log.Println("Connect to connected provider: ", id)
 				localPeerInfo.Providers = append(localPeerInfo.Providers, id)
+				SaveOffer(id)
 				err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), id, "local") //把当前连接的所有providers信息存到本地的leveldb中
 				if err != nil {
 					return err
