@@ -99,6 +99,81 @@ func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error
 	return conf, identity.PrivKey, nil
 }
 
+//Init init config
+func InitTestnet(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error) {
+	var identity Identity
+	var err error
+	if sk == "" {
+		identity, err = identityConfig(out, nBitsForKeypair)
+		if err != nil {
+			return nil, "", err
+		}
+	} else {
+		identity, err = identityConfigSK(out, sk)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
+	bootstrapPeers, err := DefaultBootstrapPeers()
+	if err != nil {
+		return nil, "", err
+	}
+
+	datastore := DefaultDatastoreConfig()
+
+	conf := &Config{
+		Role: "user",
+		API: API{
+			HTTPHeaders: map[string][]string{},
+		},
+
+		// setup the node's default addresses.
+		// NOTE: two swarm listen addrs, one tcp, one utp.
+		Addresses: addressesConfig(),
+
+		Datastore: datastore,
+		Bootstrap: BootstrapPeerStrings(bootstrapPeers),
+		PeerID:    identity.PeerID,
+		Discovery: Discovery{
+			MDNS: MDNS{
+				Enabled:  true,
+				Interval: 10,
+			},
+		},
+
+		Routing: Routing{
+			Type: "dht",
+		},
+
+		IsInit: true,
+		Eth:    "http://47.92.5.51:8101",
+		Test:   false,
+
+		Gateway: Gateway{
+			RootRedirect: "",
+			Writable:     false,
+			PathPrefixes: []string{},
+			HTTPHeaders: map[string][]string{
+				"Access-Control-Allow-Origin":  {"*"},
+				"Access-Control-Allow-Methods": {"GET"},
+				"Access-Control-Allow-Headers": {"X-Requested-With", "Range"},
+			},
+			APICommands: []string{},
+		},
+		Swarm: SwarmConfig{
+			ConnMgr: ConnMgr{
+				LowWater:    DefaultConnMgrLowWater,
+				HighWater:   DefaultConnMgrHighWater,
+				GracePeriod: DefaultConnMgrGracePeriod.String(),
+				Type:        "basic",
+			},
+		},
+	}
+
+	return conf, identity.PrivKey, nil
+}
+
 // DefaultConnMgrHighWater is the default value for the connection managers
 // 'high water' mark
 const DefaultConnMgrHighWater = 900
