@@ -305,7 +305,7 @@ func deletePosBlocks(decreseSpace uint64) {
 			curGid -= 1024
 		}
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		log.Println("after delete ,Gid :", curGid, "\n sid :", curSid, "\ncid prefix :", posCidPrefix)
+		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, "\ncid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
 		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
