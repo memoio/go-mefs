@@ -239,8 +239,8 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 		ShortDescription: "add KeeperProvider to KeeperProviderMap contract",
 	},
 	Arguments: []cmds.Argument{ //参数列表
-		cmds.StringArg("kaddress", true, true, "keeper address, 0x...").EnableStdin(),
-		cmds.StringArg("paddress", true, true, "provider address, 0x...").EnableStdin(),
+		cmds.StringArg("kaddress", true, false, "keeper address, 0x...").EnableStdin(),
+		cmds.StringArg("paddress", true, false, "provider address, 0x...").EnableStdin(),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
@@ -287,8 +287,8 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 		ShortDescription: "delete Provider in KeeperProviderMap contract",
 	},
 	Arguments: []cmds.Argument{ //参数列表
-		cmds.StringArg("kaddress", true, true, "keeper address, 0x...").EnableStdin(),
-		cmds.StringArg("paddress", true, true, "provider address, 0x...").EnableStdin(),
+		cmds.StringArg("kaddress", true, false, "keeper address, 0x...").EnableStdin(),
+		cmds.StringArg("paddress", true, false, "provider address, 0x...").EnableStdin(),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
@@ -333,7 +333,7 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 		ShortDescription: "delete keeper in KeeperProviderMap contract",
 	},
 	Arguments: []cmds.Argument{ //参数列表
-		cmds.StringArg("kaddress", true, true, "keeper address, 0x...").EnableStdin(),
+		cmds.StringArg("kaddress", true, false, "keeper address, 0x...").EnableStdin(),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
@@ -376,7 +376,7 @@ var getProviderInKPMapCmd = &cmds.Command{
 		ShortDescription: "get providers with keeper-index in KeeperProviderMap contract",
 	},
 	Arguments: []cmds.Argument{ //参数列表
-		cmds.StringArg("kaddress", true, true, "keeper address, 0x...").EnableStdin(),
+		cmds.StringArg("kaddress", true, false, "keeper address, 0x...").EnableStdin(),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
