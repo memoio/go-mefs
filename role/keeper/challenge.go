@@ -76,9 +76,8 @@ func ChallengeProviderBLS12() {
 			if thischalinfo.inChallenge == 1 {
 				go cleanLastChallenge(pu, thischalinfo, challengetime)
 				return true
-			} else {
-				thischalinfo.inChallenge = 1
 			}
+			thischalinfo.inChallenge = 1
 		}
 
 		var ret []string

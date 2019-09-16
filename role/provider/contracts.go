@@ -14,7 +14,7 @@ import (
 
 func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) error {
 	log.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
-	err := SaveUpkeeping(km.GetMid())
+	err := saveUpkeeping(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
 	} else {
@@ -26,7 +26,7 @@ func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) e
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Channel success")
 	}
-	err = SaveQuery(km.GetMid())
+	err = saveQuery(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Query err", err)
 	} else {
@@ -35,7 +35,7 @@ func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) e
 	return nil
 }
 
-func SaveUpkeeping(userID string) error {
+func saveUpkeeping(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func SaveUpkeeping(userID string) error {
 	return nil
 }
 
-func GetUpkeeping(userID string) (contracts.UpKeepingItem, error) {
+func getUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 	var upkeepingItem contracts.UpKeepingItem
 	value, ok := ProContracts.upKeepingBook.Load(userID)
 	if !ok {
@@ -151,7 +151,7 @@ func GetChannels() []contracts.ChannelItem {
 	return channels
 }
 
-func SaveQuery(userID string) error {
+func saveQuery(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func SaveQuery(userID string) error {
 	return nil
 }
 
-func GetQuery(userID string) (contracts.QueryItem, error) {
+func getQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := ProContracts.queryBook.Load(userID)
 	if !ok {
@@ -186,7 +186,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 	return queryItem, nil
 }
 
-func SaveOffer() error {
+func saveOffer() error {
 	proID := localNode.Identity.Pretty()
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
@@ -206,7 +206,7 @@ func SaveOffer() error {
 	return nil
 }
 
-func GetOffer() (contracts.OfferItem, error) {
+func getOffer() (contracts.OfferItem, error) {
 	if ProContracts.offer.OfferAddr == "" || ProContracts.offer.ProviderID == "" {
 		log.Println("OfferItem hasn't set")
 		return ProContracts.offer, ErrGetContractItem

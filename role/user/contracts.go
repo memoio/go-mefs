@@ -24,7 +24,7 @@ func ConstructContractService(userID string) *ContractService {
 }
 
 func (cs *ContractService) SaveContracts() error {
-	err := cs.SaveUpkeeping()
+	err := cs.saveUpkeeping()
 	if err != nil {
 		return err
 	}
@@ -32,18 +32,18 @@ func (cs *ContractService) SaveContracts() error {
 	if err != nil {
 		return err
 	}
-	err = cs.SaveQuery()
+	err = cs.saveQuery()
 	if err != nil {
 		return err
 	}
-	err = cs.SaveOffer()
+	err = cs.saveOffer()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (cs *ContractService) SaveUpkeeping() error {
+func (cs *ContractService) saveUpkeeping() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (cs *ContractService) SaveChannel() error {
 	return nil
 }
 
-func (cs *ContractService) SaveQuery() error {
+func (cs *ContractService) saveQuery() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (cs *ContractService) SaveQuery() error {
 	return nil
 }
 
-func (cs *ContractService) SaveOffer() error {
+func (cs *ContractService) saveOffer() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err

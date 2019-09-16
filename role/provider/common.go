@@ -112,7 +112,7 @@ func getDiskUsage() (uint64, error) {
 // getDiskTotal gets the disk total space which is set in config
 func getDiskTotal() uint64 {
 	var maxSpaceInByte uint64
-	offerItem, err := GetOffer()
+	offerItem, err := getOffer()
 	if err != nil {
 		maxSpaceInByte = 10 * 1024 * 1024 * 1024
 	} else {

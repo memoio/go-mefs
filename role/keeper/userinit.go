@@ -269,7 +269,7 @@ func newUserInit(userID string, keeperCount, providerCount int, price int64) (st
 
 		result, _ := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmRole.ToString(), providerID) //确认这个节点的角色信息
 		if string(result) == metainfo.RoleProvider {
-			offerItem, err := GetOffer(providerID)
+			offerItem, err := getOffer(providerID)
 			if err != nil {
 				continue
 			}

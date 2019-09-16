@@ -63,7 +63,7 @@ func PosSerivce(ctx context.Context) {
 			log.Println("Save upkeeping in posService error, exit from pos mode.")
 			return
 		}
-		err := SaveUpkeeping(posID)
+		err := saveUpkeeping(posID)
 		if err == nil {
 			break
 		}

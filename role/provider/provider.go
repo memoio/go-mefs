@@ -36,7 +36,7 @@ func StartProviderService(ctx context.Context, node *core.MefsNode, capacity int
 			}
 		}
 
-		err = SaveOffer()
+		err = saveOffer()
 		if err != nil {
 			log.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
 		} else {
