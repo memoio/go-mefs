@@ -7,6 +7,10 @@ stages:
   - challenge-test
   - upload-test
 
+variables:
+  UPCOUNNT: "100"
+  NETKEY: "dev"
+
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
   - cd $GOPATH/src/github.com/memoio
@@ -24,9 +28,7 @@ role-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 bls12-golint:
   stage: golangci-lint
@@ -38,9 +40,7 @@ bls12-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 contracts-golint:
   stage: golangci-lint
@@ -52,9 +52,7 @@ contracts-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 data_format-golint:
   stage: golangci-lint
@@ -66,9 +64,7 @@ data_format-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 utils-golint:
   stage: golangci-lint
@@ -80,9 +76,7 @@ utils-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 mefs-golint:
   stage: golangci-lint
@@ -94,9 +88,7 @@ mefs-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 compile:
   stage: compile
@@ -181,7 +173,8 @@ lfs_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 lfsTest.sh
-    - ./lfsTest.sh
+    - echo $NETKEY
+    - ./lfsTest.sh $NETKEY
   after_script:
     - cat ~/daemon.stdout
   tags:
@@ -197,7 +190,8 @@ challenge_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 challengeTest.sh
-    - ./challengeTest.sh
+    - echo $NETKEY
+    - ./challengeTest.sh $NETKEY
   after_script:
     - cat ~/daemon.stdout
   tags:
@@ -213,7 +207,9 @@ upload_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 uploadTest.sh
-    - ./uploadTest.sh
+    - echo $NETKEY
+    - echo $UPCOUNT
+    - ./uploadTest.sh $NETKEY $UPCOUNT
   after_script:
     - cat ~/daemon.stdout
   tags:
