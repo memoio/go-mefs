@@ -34,12 +34,11 @@ const (
 const (
 	EXPIRETIME       = int64(30 * 60) //超过这个时间，触发修复，单位：秒
 	CHALTIME         = 5 * time.Minute
-	CHECKTIME        = 6 * time.Minute
+	CHECKTIME        = 7 * time.Minute
 	PERSISTTIME      = 3 * time.Minute
-	STORAGESYNCTIME  = 10 * time.Minute
-	SPACETIMEPAYTIME = time.Hour
+	SPACETIMEPAYTIME = 61 * time.Minute
 	CONPEERTIME      = 5 * time.Minute
-	KPMAPTIME        = 10 * time.Minute
+	KPMAPTIME        = 11 * time.Minute
 )
 
 //一个组中的keeper信息
@@ -265,7 +264,6 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 	go checkrepairlist(ctx)
 	go checkLedger(ctx)
 	go spaceTimePayRegular(ctx)
-	go checkStorage(ctx)
 	go checkPeers(ctx)
 	go getKpMapRegular(ctx)
 	return nil
@@ -948,32 +946,6 @@ func newConnPeerRole(peerIDch chan string, ctx context.Context) error { //处理
 
 func IsKeeperServiceRunning() bool {
 	return localNode != nil && localPeerInfo != nil
-}
-
-func checkStorage(ctx context.Context) {
-	log.Println("Check storage start!")
-	ticker := time.NewTicker(STORAGESYNCTIME)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go func() {
-				for _, pid := range localPeerInfo.Providers {
-					km, err := metainfo.NewKeyMeta(pid, metainfo.StorageSync)
-					if err != nil {
-						log.Println("construct Storage sync KV error :", err)
-						return
-					}
-					_, err = sendMetaRequest(km, "", pid)
-					if err != nil {
-						log.Println("sendMetaRequest error:", err)
-					}
-				}
-			}()
-		}
-	}
 }
 
 func checkPeers(ctx context.Context) {
