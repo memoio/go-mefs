@@ -3,37 +3,35 @@ package user
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"runtime"
 	"sync"
 	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/core"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 //-------Group Type------
 
 const (
-	KeeperSLA             = 4 //暂定
+	KeeperSLA             = 2 //暂定
 	ProviderSLA           = 6
 	DefaultCapacity int64 = 100     //单位：MB
 	DefaultDuration int64 = 10      //单位：天
 	DefaultPrice    int64 = 1000000 //单位：wei
-	IDLength              = 30
 
-	DefaultPassword       = "123456"
-	SegementCount   int32 = 256
-	connectTryCount       = 6
+	DefaultPassword = "123456"
+
 	//LFS
 	maxObjectNameLen = 4096 //设定文件名和路径可占用的最长字节数
 
 	DefaultGetBlockDelay = 30 * time.Second
 
-	BlockSize                    = 1024 * 1024 //暂定一个块中纯data的大小，1k
 	defaultMetaBackupCount int32 = 3
 	MAXLISTVALUE                 = 100
 	flushLocalBackup             = 1
@@ -43,8 +41,6 @@ const (
 type KeeperInfo struct {
 	IsBFT     bool //标识Keeper组采取的同步方法
 	KeeperID  string
-	P2PAddr   string
-	RpcAddr   string
 	Connected bool
 }
 type PeersInfo struct {
@@ -69,7 +65,6 @@ type GroupService struct {
 	tempKeepers    []string //先收集Keeper和Provider暂存，然后到时间挑选（目前是随机，以后可让User自己选）
 	tempProviders  []string
 	PrivateKey     []byte
-	localNode      *core.MefsNode
 	KeySet         *mcl.KeySet
 	storeDays      int64 //表示部署合约时的存储数据时间，单位是“天”
 	storeSize      int64 //表示部署合约时的存储数据大小，单位是“MB”
@@ -81,30 +76,39 @@ type GroupService struct {
 //------LFS Type--------
 type LfsService struct {
 	CurrentLog *Logs //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
+	InProcess  int   //表示此lfs上是否有操作，如上传下载，避免过程中user被Kill
 	UserID     string
 	PrivateKey []byte
 }
 
 type Logs struct {
-	Node         *core.MefsNode
-	Sb           *pb.SuperBlock
-	SbMux        sync.Mutex
-	SbModified   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
-	BucketByName map[string]*pb.BucketInfo           //通过BucketName找到Bucket信息
-	BucketByID   map[int32]*pb.BucketInfo            //通过BucketID知道到Bucket信息
-	Entries      map[int32]map[string]*pb.ObjectInfo //通过BucketID检索Bucket下文件
-	State        map[int32]*BucketState              //通过BucketID确定Bucket的状态
+	Sb             *SuperBlock
+	BucketNameToID map[string]int32  //通过BucketName找到Bucket信息
+	BucketByID     map[int32]*Bucket //通过BucketID知道到Bucket信息
 }
 
-type BucketState struct {
-	Dirty bool
-	Mu    sync.Mutex
+type SuperBlock struct {
+	pb.SuperBlockInfo
+	Bitset *bitset.BitSet
+	SbMux  sync.Mutex
+	Dirty  bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+}
+
+type Bucket struct {
+	pb.BucketInfo
+	Objects map[string]*Object //通过BucketID检索Bucket下文件
+	Dirty   bool
+	Lock    sync.RWMutex
+}
+
+type Object struct {
+	pb.ObjectInfo
+	Lock sync.RWMutex
 }
 
 var (
 	ErrPolicy                    = errors.New("the policy is error")
 	ErrBalance                   = errors.New("your account's balance is insufficient, we will not deploy contract")
-	ErrGetSecreteKey             = errors.New("get user's secrete key error")
 	ErrKeySetIsNil               = errors.New("user's Keyset is nil")
 	ErrUserNotExist              = errors.New("user not exist")
 	ErrUserBookIsNil             = errors.New("the User book is nil")
@@ -147,26 +151,26 @@ var (
 	ErrWrongInitState       = errors.New("wrong init state")
 )
 
-func (gp *GroupService) sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
+func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
 	caller := ""
 	for _, i := range []int{0, 1, 2, 3, 4} {
 		pc, _, _, _ := runtime.Caller(i)
 		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
 	}
-	return gp.localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
+	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
 }
 
-func (gp *GroupService) sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
+func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
 	caller := ""
 	for _, i := range []int{0, 1, 2, 3, 4} {
 		pc, _, _, _ := runtime.Caller(i)
 		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
 	}
-	return gp.localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
+	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
 }
 
 // broadcastMetaMessage 广播发送信息，现在只针对初始化流程写
-func (gp *GroupService) broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
+func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -174,6 +178,21 @@ func (gp *GroupService) broadcastMetaMessage(km *metainfo.KeyMeta, metavalue str
 	/*pc, _, _, _ := runtime.Caller(2)
 	caller := runtime.FuncForPC(pc).Name()
 	ctx = context.WithValue(ctx, "caller", caller)*/
-	_, err := gp.localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
+	_, err := localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
 	return err
+}
+
+// 对数组进行乱序操作，以便user随机选择providers
+func disorderArray(array []string) []string {
+	var temp string
+	var num int
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(array) - 1; i >= 0; i-- {
+		num = r.Intn(i + 1)
+		temp = array[i]
+		array[i] = array[num]
+		array[num] = temp
+	}
+
+	return array
 }

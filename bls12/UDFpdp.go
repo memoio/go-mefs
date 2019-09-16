@@ -1,8 +1,8 @@
 package mcl
 
 import (
-	"math/rand"
 	"crypto/sha512"
+	"math/rand"
 	"time"
 
 	big "github.com/ncw/gmp"
@@ -243,10 +243,10 @@ func produceEiForEachSegmentFastTRF(keys *KeySetUDF, index []byte) []byte {
 	ei := make([]byte, numOfAtoms*32)
 
 	for j := 0; j < numOfAtoms; j++ {
-		fastPow.Exp(temp, tempT, keys.Sk.phiConv)   // 知道phi(N)，速度快
+		fastPow.Exp(temp, tempT, keys.Sk.phiConv) // 知道phi(N)，速度快
 		h := sha512.Sum512_224([]byte(string(index) + string(j)))
-        hij.SetBytes(h[:])
-		eij.Exp(hij, fastPow, keys.Pk.NConv)        // eij = h(index_j)^(2^T)
+		hij.SetBytes(h[:])
+		eij.Exp(hij, fastPow, keys.Pk.NConv) // eij = h(index_j)^(2^T)
 		copy(ei[j*32:(j+1)*32], eij.Bytes())
 	}
 
@@ -262,10 +262,10 @@ func produceEiForEachSegmentSlowTRF(key *PublicKeyUDF, index []byte) []byte {
 	ei := make([]byte, numOfAtoms*32)
 
 	for j := 0; j < numOfAtoms; j++ {
-		slowPow.Exp(temp, tempT, nil)               // phi(N)未知，速度慢
+		slowPow.Exp(temp, tempT, nil) // phi(N)未知，速度慢
 		h := sha512.Sum512_224([]byte(string(index) + string(j)))
-        hij.SetBytes(h[:])
-		eij.Exp(hij, slowPow, key.NConv)            // eij = h(index_j)^(2^T)
+		hij.SetBytes(h[:])
+		eij.Exp(hij, slowPow, key.NConv) // eij = h(index_j)^(2^T)
 		copy(ei[j*32:(j+1)*32], eij.Bytes())
 	}
 

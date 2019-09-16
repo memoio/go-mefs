@@ -3,10 +3,11 @@ package keeper
 import (
 	"errors"
 	"runtime"
-	"time"
 
 	"github.com/memoio/go-mefs/utils/metainfo"
 
+	mcl "github.com/memoio/go-mefs/bls12"
+	"github.com/memoio/go-mefs/role"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 )
 
@@ -19,13 +20,9 @@ var (
 	ErrNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
 	ErrPInfoTypeAssert       = errors.New("type asserts err in PInfo")
 	ErrNoChalInfo            = errors.New("can not find this chalinfo")
+	ErrGetContractItem       = errors.New("Can't get contract Item")
+	ErrIncorrectParams       = errors.New("Input incorrect params.")
 )
-
-//tendermint启动时，获取启动信息中所需的时间参数。同组内时间参数需一致，目前用该函数获取
-func getTendermintTime() time.Time {
-	tendermintTime, _ := time.Parse("2006-01-02 15:04:05", "2019-03-30 13:00:00")
-	return tendermintTime
-}
 
 func addCredit(provider string) {
 	val, ok := localPeerInfo.Credit.Load(provider)
@@ -53,6 +50,44 @@ func reduceCredit(provider string) {
 		}
 		localPeerInfo.Credit.Store(provider, cre)
 	}
+}
+
+//获得用于证明的user的公用参数
+func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
+	pubKeyI, ok := usersConfigs.Load(userID)
+	if ok {
+		return pubKeyI.(*mcl.PublicKey), nil
+	}
+
+	userconfigbyte, err := getUserBLS12ConfigByte(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	usersConfigs.Store(userID, mkey.Pk)
+
+	return mkey.Pk, nil
+}
+
+func getUserBLS12ConfigByte(userID string) ([]byte, error) {
+	if !IsKeeperServiceRunning() {
+		return nil, ErrKeeperServiceNotReady
+	}
+	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	if err != nil {
+		return nil, err
+	}
+	userconfigkey := kmBls12.ToString()
+	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, "local")
+	if err != nil {
+		return nil, err
+	}
+	return userconfigbyte, nil
 }
 
 //=============v2版本信息结构,上面的信息修改后逐渐删除===============

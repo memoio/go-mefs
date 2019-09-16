@@ -23,12 +23,10 @@ var buckid = 1
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
 var Rslen = 2 * 1024 * 1024
 var Mullen = 1 * 1024 * 1024
-var opt = &DataformatOption{
-	CidPrefix:   "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0",
+var opt = &DataEncoder{
 	DataCount:   3,
 	ParityCount: 2,
 	TagFlag:     BLS12,
-	BeginOffset: 0,
 	SegmentSize: DefaultSegmentSize,
 }
 
@@ -42,7 +40,7 @@ func UploadRspolicy(data []byte) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	encodeData, _, err := opt.Encode(data)
+	encodeData, _, err := opt.Encode(data, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +57,7 @@ func UploadMulpolicy(data []byte) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	encodeData, _, err := opt.Encode(data)
+	encodeData, _, err := opt.Encode(data, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -73,12 +71,12 @@ func Download(data [][]byte) ([]byte, error) {
 	var err error
 	switch opt.Policy {
 	case RsPolicy:
-		filedata, err = GetFileDataFromSripe(data, int(opt.DataCount), int(opt.BeginOffset), -1)
+		filedata, err = GetFileDataFromSripe(data, int(opt.DataCount), 0, -1)
 		if err != nil {
 			fmt.Println("error is : ", err)
 		}
 	case MulPolicy:
-		filedata, err = GetSegsFromData(data[0], int(opt.BeginOffset), -1)
+		filedata, err = GetSegsFromData(data[0], 0, -1)
 		if err != nil {
 			fmt.Println("error is : ", err)
 		}
@@ -104,7 +102,7 @@ func TestEncode(t *testing.T) {
 
 	// 多副本含前缀
 	opt.Policy = MulPolicy
-	stripe, offset, err := opt.Encode(tmpData)
+	stripe, offset, err := opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,7 +110,7 @@ func TestEncode(t *testing.T) {
 	fmt.Println(len(stripe))
 
 	// 多副本不含前缀
-	stripe, offset, err = opt.Encode(tmpData)
+	stripe, offset, err = opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -121,7 +119,7 @@ func TestEncode(t *testing.T) {
 
 	// RS含前缀
 	opt.Policy = RsPolicy
-	stripe, offset, err = opt.Encode(tmpData)
+	stripe, offset, err = opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,7 +127,7 @@ func TestEncode(t *testing.T) {
 	fmt.Println(len(stripe))
 
 	// RS不含前缀
-	stripe, offset, err = opt.Encode(tmpData)
+	stripe, offset, err = opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +147,7 @@ func TestRepair(t *testing.T) {
 	fillRandom(tmpData)
 	// 副本修复
 	opt.Policy = MulPolicy
-	stripe, offset, err := opt.Encode(tmpData)
+	stripe, offset, err := opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -176,7 +174,7 @@ func TestRepair(t *testing.T) {
 
 	// RS修复
 	opt.Policy = RsPolicy
-	stripe, offset, err = opt.Encode(tmpData)
+	stripe, offset, err = opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -229,7 +227,7 @@ func TestRepairCorrect(t *testing.T) {
 	Md5 := md5.Sum(tmpData)
 	// 副本检验
 	opt.Policy = MulPolicy
-	stripe, offset, err := opt.Encode(tmpData)
+	stripe, offset, err := opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -261,15 +259,15 @@ func TestRepairCorrect(t *testing.T) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		newTag, err := GenTagForSegment(segment, []byte(opt.CidPrefix+"_"+strconv.Itoa(i)+"_0"), uint64(opt.TagFlag), opt.SegmentSize, opt.KeySet)
+		newTag, err := GenTagForSegment(segment, []byte("8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_0"), uint64(opt.TagFlag), opt.SegmentSize, opt.KeySet)
 		if err != nil {
 			log.Fatal(err)
 		}
-		boo := mcl.VerifyTag(segment, newTag, opt.CidPrefix+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
+		boo := mcl.VerifyTag(segment, newTag, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
 		if boo == false {
 			t.Error("error")
 		}
-		boo = mcl.VerifyTag(segment, tag, opt.CidPrefix+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
+		boo = mcl.VerifyTag(segment, tag, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
 		if boo == false {
 			t.Error("error")
 		}
@@ -277,7 +275,7 @@ func TestRepairCorrect(t *testing.T) {
 
 	// RS检验
 	opt.Policy = RsPolicy
-	stripe, offset, err = opt.Encode(tmpData)
+	stripe, offset, err = opt.Encode(tmpData, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -309,15 +307,15 @@ func TestRepairCorrect(t *testing.T) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		newTag, err := GenTagForSegment(segment, []byte(opt.CidPrefix+"_"+strconv.Itoa(i)+"_0"), uint64(opt.TagFlag), opt.SegmentSize, opt.KeySet)
+		newTag, err := GenTagForSegment(segment, []byte("8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_0"), uint64(opt.TagFlag), opt.SegmentSize, opt.KeySet)
 		if err != nil {
 			log.Fatal(err)
 		}
-		boo := mcl.VerifyTag(segment, newTag, opt.CidPrefix+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
+		boo := mcl.VerifyTag(segment, newTag, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
 		if boo == false {
 			t.Error("error")
 		}
-		boo = mcl.VerifyTag(segment, tag, opt.CidPrefix+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
+		boo = mcl.VerifyTag(segment, tag, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_0", opt.KeySet.Pk)
 		if boo == false {
 			t.Error("error")
 		}
@@ -346,7 +344,7 @@ func TestUploadRspolicy(t *testing.T) {
 		fmt.Println("error is : ", err)
 	}
 	for i := 0; i < int(opt.DataCount+opt.ParityCount); i++ {
-		tmpdir := path.Join(dir, opt.CidPrefix+"_"+strconv.Itoa(i)+"_Rspolicy")
+		tmpdir := path.Join(dir, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_Rspolicy")
 		f, err := os.Create(tmpdir)
 		if err != nil {
 			fmt.Println("error is : ", err)
@@ -367,7 +365,7 @@ func TestDownloadRspolicy(t *testing.T) {
 	data := make([][]byte, opt.DataCount+opt.ParityCount)
 	dir := path.Join(os.Getenv("HOME"), "encodetest")
 	for i := 0; i < int(opt.DataCount+opt.ParityCount); i++ {
-		f, err := os.Open(path.Join(dir, opt.CidPrefix+"_"+strconv.Itoa(i)) + "_Rspolicy")
+		f, err := os.Open(path.Join(dir, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)) + "_Rspolicy")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -421,7 +419,7 @@ func TestUploadMulpolicy(t *testing.T) {
 		fmt.Println("error is : ", err)
 	}
 	for i := 0; i < int(opt.DataCount+opt.ParityCount); i++ {
-		tmpdir := path.Join(dir, opt.CidPrefix+"_"+strconv.Itoa(i)+"_Mulpolicy")
+		tmpdir := path.Join(dir, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)+"_Mulpolicy")
 		f, err := os.Create(tmpdir)
 		if err != nil {
 			fmt.Println("error is : ", err)
@@ -442,7 +440,7 @@ func TestDownloadMulpolicy(t *testing.T) {
 	data := make([][]byte, opt.DataCount+opt.ParityCount)
 	dir := path.Join(os.Getenv("HOME"), "encodetest")
 	for i := 0; i < int(opt.DataCount+opt.ParityCount); i++ {
-		f, err := os.Open(path.Join(dir, opt.CidPrefix+"_"+strconv.Itoa(i)) + "_Mulpolicy")
+		f, err := os.Open(path.Join(dir, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0"+"_"+strconv.Itoa(i)) + "_Mulpolicy")
 		if err != nil {
 			log.Fatal(err)
 		}

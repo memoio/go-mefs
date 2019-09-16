@@ -43,7 +43,7 @@ func (bus Buckets) String() string {
 
 func (s *Shell) HeadBucket(BucketName string, options ...LfsOpts) (*Buckets, error) {
 	var bks Buckets
-	rb := s.Request("lfs/head_Bucket", BucketName)
+	rb := s.Request("lfs/head_bucket", BucketName)
 	for _, option := range options {
 		option(rb)
 	}

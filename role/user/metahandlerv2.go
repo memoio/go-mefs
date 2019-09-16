@@ -1,7 +1,7 @@
 package user
 
 import (
-	"fmt"
+	"log"
 	"strings"
 
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -29,7 +29,7 @@ func (user *UserHandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (s
 
 	switch keytype {
 	case metainfo.UserInitReq:
-		fmt.Println("keytype：UserInitReq 不处理")
+		log.Println("keytype：UserInitReq 不处理")
 	case metainfo.UserInitRes: //keeper初始化的回复
 		go gService.handleUserInitRes(km, metaValue, from)
 	case metainfo.UserInitNotifRes: //keeper初始化确认的回复
@@ -37,9 +37,9 @@ func (user *UserHandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (s
 	case metainfo.Test:
 		handleTest(km)
 	case metainfo.GetBlock:
-		fmt.Println("getBlock: ", km.ToString())
+		log.Println("getBlock: ", km.ToString())
 	case metainfo.PutBlock:
-		fmt.Println("putBlock: ", km.ToString())
+		log.Println("putBlock: ", km.ToString())
 	default: //没有匹配的信息，报错
 		return "", metainfo.ErrWrongType
 	}
@@ -53,15 +53,15 @@ func (gp *GroupService) handleUserInitRes(km *metainfo.KeyMeta, metaValue, from 
 	defer gp.initResMutex.Unlock()
 	userState, err := GetUserServiceState(gp.Userid)
 	if err != nil {
-		fmt.Println("handleUserInitRes()GetUserServiceState()err:", err, "userid:", gp.Userid)
+		log.Println("handleUserInitRes()GetUserServiceState()err:", err, "userid:", gp.Userid)
 	}
 	if userState == Collecting { //收集信息阶段，才继续
 		//确认和Keeper连接了
-		kids, err := gp.localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), from) //尝试从该节点获取Kids
+		kids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), from) //尝试从该节点获取Kids
 		if len(kids) == 0 && err != nil {
-			fmt.Println("handleUserInitRes()error:", ErrCannotConnectKeeper)
+			log.Println("handleUserInitRes()error:", ErrCannotConnectKeeper)
 		}
-		fmt.Println("Receive: InitResponse，来源：", from, "值：", metaValue)
+		log.Println("Receive: InitResponse，来源：", from, "值：", metaValue)
 		splitedMeta := strings.Split(metaValue, metainfo.DELIMITER)
 		if len(splitedMeta) == 2 {
 			gp.addKeepersAndProviders(splitedMeta[0], splitedMeta[1]) //把keeper信息和provider信息加入到备选中
@@ -75,12 +75,12 @@ func (gp *GroupService) handleUserInitNotifRes(metaValue, from string) {
 	defer gp.initResMutex.Unlock()
 	userState, err := GetUserServiceState(gp.Userid)
 	if err != nil {
-		fmt.Println("handleUserInitNotifRes()GetUserServiceState()err:", err, "userid:", gp.Userid)
+		log.Println("handleUserInitNotifRes()GetUserServiceState()err:", err, "userid:", gp.Userid)
 	}
 	if userState == CollectCompleted && len(gp.localPeersInfo.Keepers) != 0 { //收集信息完成阶段，继续
 		err := gp.keeperConfirm(from, metaValue)
 		if err != nil {
-			fmt.Println("handleUserInitNotifRes()error", err)
+			log.Println("handleUserInitNotifRes()error", err)
 		}
 	}
 }
@@ -91,7 +91,7 @@ func (user *UserHandlerV2) GetRole() (string, error) {
 }
 
 func handleTest(km *metainfo.KeyMeta) {
-	fmt.Println("测试用回调函数")
-	fmt.Println("km.mid:", km.GetMid())
-	fmt.Println("km.options", km.GetOptions())
+	log.Println("测试用回调函数")
+	log.Println("km.mid:", km.GetMid())
+	log.Println("km.options", km.GetOptions())
 }

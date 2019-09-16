@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs/go-ipfs/core/commands"
 	serial "github.com/memoio/go-mefs/config/serialize"
 	"github.com/whyrusleeping/stump"
 )
@@ -600,18 +601,21 @@ func ConnectNodes(from, to MefsNode, timeout string) error {
 		return nil
 	}
 
-	out, err := to.RunCmd("mefs", "id", "-f", "<addrs>")
+	out, err := to.RunCmd("mefs", "id")
 	if err != nil {
 		return fmt.Errorf("error checking node address: %s", err)
 	}
-
+	//去掉换行符
+	out = out[:len(out)-1]
+	output := commands.IdOutput{}
+	json.Unmarshal([]byte(out), &output)
 	stump.Log("connecting %s -> %s\n", from, to)
 
-	addrs := strings.Fields(string(out))
-	fmt.Println("Addresses: ", addrs)
-	orderishAddresses(addrs)
-	for i := 0; i < len(addrs); i++ {
-		addr := addrs[i]
+	// addrs := strings.Fields(string(out))
+	fmt.Println("Addresses: ", output.Addresses)
+	orderishAddresses(output.Addresses)
+	for i := 0; i < len(output.Addresses); i++ {
+		addr := output.Addresses[i]
 		stump.Log("trying mefs swarm connect %s", addr)
 
 		args := []string{"mefs", "swarm", "connect", addr}

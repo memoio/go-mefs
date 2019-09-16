@@ -8,7 +8,7 @@ MAINTAINER suzakinishi <ccyansnow@gmail.com>
 
 # download mefs
 
-RUN wget -P /usr/local/bin/ http://97.64.124.20:8000/mefs    \
+RUN wget -P /usr/local/bin/ http://212.64.28.207:4000/mefs    \
  && chmod 777 /usr/local/bin/mefs   
 
 # 4001: Swarm TCP; should be exposed to the public

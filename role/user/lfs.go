@@ -2,13 +2,12 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
-	"github.com/memoio/go-mefs/core"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -21,10 +20,10 @@ func ConstructLfsService(userID string, privKey []byte) *LfsService {
 	}
 }
 
-func (lfs *LfsService) StartLfsService(ctx context.Context, node *core.MefsNode) error {
-	err := lfs.startLfs(ctx, node)
+func (lfs *LfsService) StartLfsService(ctx context.Context) error {
+	err := lfs.startLfs(ctx)
 	if err != nil {
-		fmt.Println("Lfs start err : ", err)
+		log.Println("Lfs start err : ", err)
 		return err
 	}
 	go lfs.PersistMetaBlock(ctx)
@@ -33,9 +32,9 @@ func (lfs *LfsService) StartLfsService(ctx context.Context, node *core.MefsNode)
 
 //lfs节点启动，从本地或者本节点provider处获取currentLog信息进行填充，填充不了才进行currentlog的初始化操作
 //填充顺序：超级块-Bucket数据-Bucket中Object数据
-func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error {
+func (lfs *LfsService) startLfs(ctx context.Context) error {
 	var err error
-	lfs.CurrentLog, err = lfs.loadSuperBlock(node) //先加载超级块
+	lfs.CurrentLog, err = lfs.loadSuperBlock() //先加载超级块
 	if err != nil || lfs.CurrentLog == nil {
 		log.Println("Cannot get metaBlock", err)
 		//启动失败，证明本地无metablock
@@ -51,7 +50,7 @@ func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error 
 				select {
 				case <-tick:
 					if tickCount >= 60 { //超过十分钟还没有Keeper，出故障了
-						fmt.Println("Cannot start lfs service-", ErrNoKeepers)
+						log.Println("Cannot start lfs service-", ErrNoKeepers)
 						return ErrNoKeepers
 					}
 
@@ -68,18 +67,18 @@ func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error 
 				}
 			}
 		}
-		lfs.CurrentLog, err = lfs.loadSuperBlock(node) //找到keeper再加载一次超级块
+		lfs.CurrentLog, err = lfs.loadSuperBlock() //找到keeper再加载一次超级块
 		if err != nil || lfs.CurrentLog == nil {
-			fmt.Println("load superblock fail, so begin to init Lfs :", lfs.UserID)
-			lfs.CurrentLog, err = initLfs(node) //初始化
+			log.Println("load superblock fail, so begin to init Lfs :", lfs.UserID)
+			lfs.CurrentLog, err = initLfs() //初始化
 			if err != nil {
 				log.Println(ErrCannotStartLfsService)
 				return ErrCannotStartLfsService
 			}
-			fmt.Println(lfs.UserID + " : Lfs Service is ready")
+			log.Println(lfs.UserID + " : Lfs Service is ready")
 			err = SetUserState(lfs.UserID, BothStarted)
 			if err != nil {
-				fmt.Println("SetUserState failed")
+				log.Println("SetUserState failed")
 			}
 			return nil
 		}
@@ -94,59 +93,57 @@ func (lfs *LfsService) startLfs(ctx context.Context, node *core.MefsNode) error 
 			log.Println(ErrCannotStartLfsService, err)
 			return err
 		}
-		fmt.Println("Objects in bucket-", Bucket.BucketName, "is loaded")
+		log.Println("Objects in bucket-", Bucket.BucketName, "is loaded")
 	}
-	fmt.Println(lfs.UserID + " : Lfs Service is ready")
+	log.Println(lfs.UserID + " : Lfs Service is ready")
 	err = SetUserState(lfs.UserID, BothStarted)
 	if err != nil {
-		fmt.Println("SetUserState failed")
+		log.Println("SetUserState failed")
 	}
 	return nil
 }
 
-func initLfs(node *core.MefsNode) (*Logs, error) {
-	log, err := InitLogs(node)
+func initLfs() (*Logs, error) {
+	log, err := InitLogs()
 	if err != nil {
 		return nil, err
 	}
 	return log, err
 }
 
-func InitLogs(node *core.MefsNode) (*Logs, error) {
+func InitLogs() (*Logs, error) {
 	sb := newSuperBlock()
-	entries := make(map[int32]map[string]*pb.ObjectInfo)
-	bucketByID := make(map[int32]*pb.BucketInfo)
-	bucketByName := make(map[string]*pb.BucketInfo)
-	state := make(map[int32]*BucketState)
+	bucketByID := make(map[int32]*Bucket)
+	bucketNameToID := make(map[string]int32)
 	return &Logs{
-		Node:         node,
-		Sb:           sb,
-		SbModified:   true,
-		BucketByID:   bucketByID,
-		BucketByName: bucketByName,
-		Entries:      entries,
-		State:        state,
+		Sb:             sb,
+		BucketByID:     bucketByID,
+		BucketNameToID: bucketNameToID,
 	}, nil
 }
 
-func newSuperBlock() *pb.SuperBlock {
-	buckets := make(map[int32]string)
-	return &pb.SuperBlock{
-		Buckets:         buckets,
-		MetaBackupCount: defaultMetaBackupCount,
-		NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
-		MagicNumber:     0xfb,
-		Version:         1,
+func newSuperBlock() *SuperBlock {
+	bitset := bitset.New(256)
+	return &SuperBlock{
+		SuperBlockInfo: pb.SuperBlockInfo{
+			BucketsSet:      nil,
+			MetaBackupCount: defaultMetaBackupCount,
+			NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
+			MagicNumber:     0xfb,
+			Version:         1},
+		Bitset: bitset,
+		Dirty:  true,
 	}
 }
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (lfs *LfsService) PersistMetaBlock(ctx context.Context) error {
 	persistMetaInterval = 10 * time.Second
-	tick := time.Tick(persistMetaInterval)
+	tick := time.NewTicker(persistMetaInterval)
+	defer tick.Stop()
 	for {
 		select {
-		case <-tick:
+		case <-tick.C:
 			state, err := GetUserServiceState(lfs.UserID)
 			if err != nil {
 				return err
@@ -198,64 +195,63 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 	for _, provider := range providers {
 		channel, err := cs.GetChannelItem(provider)
 		if err != nil {
-			fmt.Println("GetChannelItem err:", provider, err)
 			continue
 		}
 		// 保存本地形式：K-provider，V-channel此时的value
 		km, err := metainfo.NewKeyMeta(channel.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
 		if err != nil {
-			fmt.Println("NewKeyMeta err:", provider, err)
+			log.Println("NewKeyMeta err:", provider, err)
 			continue
 		}
-		err = lfs.CurrentLog.Node.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), channel.Value.String(), "local")
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), channel.Value.String(), "local")
 		if err != nil {
-			fmt.Println("CmdPutTo error", provider, err)
+			log.Println("CmdPutTo error", provider, err)
 			continue
 		}
 	}
-	if lfs.CurrentLog.SbModified || isForce { //将超级块信息保存在本地
+	if lfs.CurrentLog.Sb.Dirty || isForce { //将超级块信息保存在本地
 		err := lfs.flushSuperBlockLocal(lfs.CurrentLog.Sb)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Flush Superblock to local finish. The uid is ", lfs.UserID)
+		log.Println("Flush Superblock to local finish. The uid is ", lfs.UserID)
 	}
 
-	for BucketID, State := range lfs.CurrentLog.State { //bucket信息和object信息保存在本地
-		if State.Dirty || isForce {
-			err := lfs.flushObjectsInfoLocal(BucketID, lfs.CurrentLog.Entries[BucketID])
+	for _, bucket := range lfs.CurrentLog.BucketByID { //bucket信息和object信息保存在本地
+		if bucket.Dirty || isForce {
+			err := lfs.flushObjectsInfoLocal(bucket)
 			if err != nil {
 				return err
 			}
-			err = lfs.flushBucketInfoLocal(lfs.CurrentLog.BucketByID[BucketID])
+			err = lfs.flushBucketInfoLocal(bucket)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Flush %s BucketInfo and Objects Info to local finish. The uid is %s\n", lfs.CurrentLog.BucketByID[BucketID].BucketName, lfs.UserID)
+			log.Printf("Flush %s BucketInfo and Objects Info to local finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
 		}
 	}
 
-	if lfs.CurrentLog.SbModified || isForce {
+	if lfs.CurrentLog.Sb.Dirty || isForce {
 		err := lfs.flushSuperBlockToProvider(lfs.CurrentLog.Sb)
 		if err != nil {
 			return err
 		}
-		lfs.CurrentLog.SbModified = false
-		fmt.Println("Flush Superblock to provider finish. The uid is ", lfs.UserID)
+		lfs.CurrentLog.Sb.Dirty = false
+		log.Println("Flush Superblock to provider finish. The uid is ", lfs.UserID)
 	}
 
-	for BucketID, State := range lfs.CurrentLog.State {
-		if State.Dirty || isForce {
-			err := lfs.flushObjectsInfoToProvider(BucketID, lfs.CurrentLog.Entries[BucketID])
+	for _, bucket := range lfs.CurrentLog.BucketByID {
+		if bucket.Dirty || isForce {
+			err := lfs.flushObjectsInfoToProvider(bucket)
 			if err != nil {
 				return err
 			}
-			err = lfs.flushBucketInfoToProvider(lfs.CurrentLog.BucketByID[BucketID])
+			err = lfs.flushBucketInfoToProvider(bucket)
 			if err != nil {
 				return err
 			}
-			lfs.CurrentLog.State[BucketID].Dirty = false
-			fmt.Printf("Flush %s BucketInfo and Objects Info to provider finish. The uid is %s\n", lfs.CurrentLog.BucketByID[BucketID].BucketName, lfs.UserID)
+			bucket.Dirty = false
+			log.Printf("Flush %s BucketInfo and Objects Info to provider finish. The uid is %s\n", bucket.BucketName, lfs.UserID)
 		}
 	}
 
