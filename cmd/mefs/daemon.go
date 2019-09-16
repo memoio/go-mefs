@@ -438,7 +438,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	case metainfo.RoleProvider: //provider和keeper同样
 		rdo, _ := req.Options[reDeployOfferKwd].(bool)
-		err = provider.StartProviderService(node, capacity, duration, price, rdo)
+		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err
@@ -451,7 +451,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		if pos {
 			fmt.Println("Start pos Service")
-			go provider.PosSerivce()
+			go provider.PosSerivce(req.Context)
 		}
 	default:
 	}

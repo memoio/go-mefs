@@ -74,7 +74,6 @@ type PeerInfo struct {
 	enableTendermint bool
 	offerBook        sync.Map // 存储连接的provider部署的Offer条约，K-provider的id，V-Offer实例
 	queryBook        sync.Map // 存储连接的user部署的Query条约，K-user的id，V-Query实例
-	kpMapBook        sync.Map
 }
 
 type storageInfo struct {
@@ -201,29 +200,27 @@ func isMasterKeeper(groupid string, pid string) bool {
 		return false
 	}
 	var mymaster []string
-	for _, keeper := range thisGroupsInfo.Keepers {
-		pids, err := getKpMap(keeper.KID)
-		if err != nil {
-			continue
+	mykids, ok := contracts.GetKeepersOfPro(pid)
+	if ok {
+		for _, keeper := range thisGroupsInfo.Keepers {
+			for _, nkid := range mykids {
+				if nkid == keeper.KID {
+					mymaster = append(mymaster, keeper.KID)
+					break
+				}
+			}
 		}
-		for _, npid := range pids {
-			if npid == pid {
-				mymaster = append(mymaster, keeper.KID)
-				break
+		if len(mymaster) > 0 {
+			masterID := getMasterID(mymaster)
+			if masterID == localNode.Identity.Pretty() {
+				return true
+			} else {
+				return false
 			}
 		}
 	}
 
-	if len(mymaster) > 0 {
-		masterID := getMasterID(mymaster)
-		if masterID == localNode.Identity.Pretty() {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return localKeeperIsMaster(groupid)
-	}
+	return localKeeperIsMaster(groupid)
 }
 
 //getMasterID  根据传入的keeper列表，选出一个master，返回其id
@@ -698,7 +695,7 @@ func SearchAllKeepersAndProviders(ctx context.Context) error {
 
 	loadKnownKeepersAndProviders(ctx) //先加载持久化的keeper和Provider看看，有助于快速恢复
 	//go newConnPeerRole(PeerIDch, ctx) //此协程不断处理新连接的节点
-	err := checkConnectedPeer() //查看当前连接的节点的角色
+	err := checkConnectedPeer(ctx) //查看当前连接的节点的角色
 	if err != nil {
 		return err
 	}
@@ -765,7 +762,7 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 	return nil
 }
 
-func checkLocalPeers() {
+func checkLocalPeers(ctx context.Context) {
 	var tmpKeepers []string
 	for _, keeper := range localPeerInfo.Keepers {
 		kid, err := peer.IDB58Decode(keeper)
@@ -776,7 +773,7 @@ func checkLocalPeers() {
 		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 			tmpKeepers = append(tmpKeepers, keeper)
 		} else {
-			sc.ConnectTo(context.Background(), localNode, keeper)
+			sc.ConnectTo(ctx, localNode, keeper)
 			if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 				tmpKeepers = append(tmpKeepers, keeper)
 			}
@@ -794,7 +791,7 @@ func checkLocalPeers() {
 		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 			tmpProviders = append(tmpProviders, provider)
 		} else {
-			sc.ConnectTo(context.Background(), localNode, provider)
+			sc.ConnectTo(ctx, localNode, provider)
 			if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 				tmpProviders = append(tmpProviders, provider)
 			}
@@ -803,11 +800,11 @@ func checkLocalPeers() {
 	localPeerInfo.Providers = tmpProviders
 }
 
-func checkConnectedPeer() error {
+func checkConnectedPeer(ctx context.Context) error {
 	if !IsKeeperServiceRunning() {
 		return ErrKeeperServiceNotReady
 	}
-	checkLocalPeers()
+	checkLocalPeers(ctx)
 
 	localID := localNode.Identity.Pretty() //本地id
 
@@ -990,7 +987,7 @@ func checkPeers(ctx context.Context) {
 	log.Println("Check connected peer start!")
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
-	checkConnectedPeer()
+	checkConnectedPeer(ctx)
 	ticker := time.NewTicker(CONPEERTIME)
 	defer ticker.Stop()
 	for {
@@ -999,7 +996,7 @@ func checkPeers(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				checkConnectedPeer()
+				checkConnectedPeer(ctx)
 			}()
 		}
 	}
@@ -1008,6 +1005,8 @@ func checkPeers(ctx context.Context) {
 func getKpMapRegular(ctx context.Context) {
 	log.Println("Get kpMap from chain start!")
 
+	peerID := localNode.Identity.Pretty()
+	contracts.SaveKpMap(peerID)
 	ticker := time.NewTicker(KPMAPTIME)
 	defer ticker.Stop()
 	for {
@@ -1016,7 +1015,7 @@ func getKpMapRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				saveKpMap()
+				contracts.SaveKpMap(peerID)
 			}()
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -16,6 +17,7 @@ import (
 	"github.com/memoio/go-mefs/contracts/mapper"
 	"github.com/memoio/go-mefs/contracts/resolver"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 // config中的ETH，在daemon中赋值
@@ -86,6 +88,12 @@ type OfferItem struct {
 	Duration   int64
 	Price      int64 // 合约给出的单价
 }
+
+type kpItem struct {
+	keeperIDs []string
+}
+
+var kpMap sync.Map
 
 func init() {
 	EndPoint = "http://212.64.28.207:8101"
@@ -281,4 +289,49 @@ func getMapperInstance(localAddress common.Address, ownerAddress common.Address,
 		return nil, err
 	}
 	return mapperInstance, nil
+}
+
+func SaveKpMap(peerId string) error {
+	localAddr, err := address.GetAddressFromID(peerId)
+	if err != nil {
+		log.Println("saveKpMap GetAddressFromID() error", err)
+		return err
+	}
+	kps, err := GetAllKeeperInKPMap(localAddr)
+	if err != nil {
+		log.Println("saveKpMap GetAllKeepers() error", err)
+		return err
+	}
+
+	for _, kpaddr := range kps {
+		pids, err := GetProviderInKPMap(localAddr, kpaddr)
+		if err != nil {
+			log.Println("get provider from kpmap err:", err)
+		}
+		if len(pids) > 0 {
+			keeperID, _ := address.GetIDFromAddress(kpaddr.String())
+			kidList := []string{keeperID}
+			for _, paddr := range pids {
+				pid, _ := address.GetIDFromAddress(paddr.String())
+				res, ok := kpMap.Load(pid)
+				if ok {
+					res.(*kpItem).keeperIDs = append(res.(*kpItem).keeperIDs, keeperID)
+				} else {
+					kidres := &kpItem{
+						keeperIDs: kidList,
+					}
+					kpMap.Store(keeperID, kidres)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func GetKeepersOfPro(peerId string) ([]string, bool) {
+	res, ok := kpMap.Load(peerId)
+	if !ok {
+		return nil, false
+	}
+	return res.(*kpItem).keeperIDs, true
 }

@@ -98,6 +98,8 @@ func lfsTest() error {
 		log.Println("create bucket err: ", err)
 	}
 
+	fmt.Println(bk.Buckets)
+
 	if bk.Buckets[0].BucketName != bucketName {
 		log.Println("create bucket", bucketName, "fails")
 	}
@@ -155,14 +157,14 @@ func lfsTest() error {
 
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
+		log.Fatal("download file ", objectName, " err:", err)
 		return err
 	}
 
 	obuf := new(bytes.Buffer)
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
 	}
 
 	log.Println("6. test mul create bucket")
@@ -184,6 +186,8 @@ func lfsTest() error {
 		log.Println("create mbucket err: ", err)
 	}
 
+	fmt.Println(bk.Buckets)
+
 	if bk.Buckets[0].BucketName != mbucketName {
 		log.Println("create mbucket", mbucketName, "fails")
 	}
@@ -192,11 +196,11 @@ func lfsTest() error {
 		log.Println("create mbucket fails Policy")
 	}
 
-	if bk.Buckets[0].DataCount != 1 {
+	if bk.Buckets[0].DataCount != dataCount {
 		log.Println("create mbucket fails datacount")
 	}
 
-	if bk.Buckets[0].ParityCount != parityCount+1 {
+	if bk.Buckets[0].ParityCount != parityCount {
 		log.Println("create mbucket fails paritycount")
 	}
 
@@ -240,21 +244,21 @@ func lfsTest() error {
 
 	outer, err = sh.GetObject(objectName, mbucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
+		log.Fatal("download file ", objectName, " err:", err)
 		return err
 	}
 
 	obuf = new(bytes.Buffer)
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
 	}
 
 	log.Println("9. test showstorage")
 
 	res, err := sh.ShowStorage(shell.SetAddress(addr))
 	if err != nil {
-		log.Println(addr, " not start, waiting..., err : ", err)
+		log.Fatal("show storage err : ", err)
 	}
 
 	log.Println("storage: ", res)

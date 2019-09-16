@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"context"
 	"strings"
 
 	"github.com/mgutz/ansi"
@@ -55,5 +56,5 @@ func FlushKeepersAndProviders() error {
 	if !IsKeeperServiceRunning() {
 		return ErrKeeperServiceNotReady
 	}
-	return checkConnectedPeer()
+	return checkConnectedPeer(context.Background())
 }
