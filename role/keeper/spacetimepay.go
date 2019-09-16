@@ -164,7 +164,7 @@ func resultSummary(uid string, pid string, timeStart int64, timeEnd int64) (*big
 
 	if timeEnd-timeStart > int64(24*3600) {
 		log.Println("pay interval is longer than 1 day")
-		return big.NewInt(0), 0
+		return big.NewInt(0), timeEnd
 	}
 
 	timeList, lenghList := fetchChalresult(uid, pid, timeStart, timeEnd) //取数据
