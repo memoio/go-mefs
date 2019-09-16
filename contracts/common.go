@@ -20,7 +20,7 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 )
 
-// config中的ETH，在daemon中赋值
+// EndPoint config中的ETH，在daemon中赋值
 var EndPoint string
 
 const (
@@ -39,15 +39,22 @@ var (
 	//ErrNotDeployedResolver the provider has not deployed resolver
 	ErrNotDeployedResolver = errors.New("has not deployed resolver")
 	//ErrNotDeployedUk the user has not deployed uk in the specified mapper
-	ErrNotDeployedUk          = errors.New("has not deployed upKeeping")
-	ErrNotDeployedChannel     = errors.New("the user has not deployed channel-contract with you")
+	ErrNotDeployedUk = errors.New("has not deployed upKeeping")
+	// ErrNotDeployedChannel is
+	ErrNotDeployedChannel = errors.New("the user has not deployed channel-contract with you")
+	// ErrContractNotPutToMapper is
 	ErrContractNotPutToMapper = errors.New("the upKeeping-contract has not been added to mapper within a specified period of time")
-	ErrMarketType             = errors.New("The market type is error, please input correct market type")
-	ErrNotDeployedMarket      = errors.New("has not deployed query or offer")
-	ErrNewContractInstance    = errors.New("new contractInstace failed")
-	ErrNotDeployedKPMap       = errors.New("has not deployed keeperProviderMap contract")
+	// ErrMarketType is
+	ErrMarketType = errors.New("The market type is error, please input correct market type")
+	// ErrNotDeployedMarket is
+	ErrNotDeployedMarket = errors.New("has not deployed query or offer")
+	// ErrNewContractInstance is
+	ErrNewContractInstance = errors.New("new contract Instace failed")
+	// ErrNotDeployedKPMap is
+	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
 )
 
+// UpKeepingItem has upkeeping information
 type UpKeepingItem struct {
 	UserID        string // 部署upkeeping的userid
 	UpKeepingAddr string // 合约地址
@@ -61,6 +68,7 @@ type UpKeepingItem struct {
 	StartTime     string // 部署的时间
 }
 
+// ChannelItem has channel information
 type ChannelItem struct {
 	UserID      string // 部署Channel的userid
 	ProID       string
@@ -70,6 +78,7 @@ type ChannelItem struct {
 	Duration    int64  // timeout
 }
 
+// QueryItem has query information
 type QueryItem struct {
 	UserID       string // 部署Query的userid
 	QueryAddr    string
@@ -81,6 +90,7 @@ type QueryItem struct {
 	Completed    bool
 }
 
+// OfferItem has offer information
 type OfferItem struct {
 	ProviderID string // 部署Offer的providerid
 	OfferAddr  string
@@ -291,8 +301,9 @@ func getMapperInstance(localAddress common.Address, ownerAddress common.Address,
 	return mapperInstance, nil
 }
 
-func SaveKpMap(peerId string) error {
-	localAddr, err := address.GetAddressFromID(peerId)
+// SaveKpMap saves kpmap
+func SaveKpMap(peerID string) error {
+	localAddr, err := address.GetAddressFromID(peerID)
 	if err != nil {
 		log.Println("saveKpMap GetAddressFromID() error", err)
 		return err
@@ -328,8 +339,9 @@ func SaveKpMap(peerId string) error {
 	return nil
 }
 
-func GetKeepersOfPro(peerId string) ([]string, bool) {
-	res, ok := kpMap.Load(peerId)
+// GetKeepersOfPro get keepers of some provider
+func GetKeepersOfPro(peerID string) ([]string, bool) {
+	res, ok := kpMap.Load(peerID)
 	if !ok {
 		return nil, false
 	}

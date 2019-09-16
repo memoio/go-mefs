@@ -10,7 +10,7 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func SaveUpkeeping(gp *GroupsInfo, userID string) error {
+func saveUpkeeping(gp *GroupsInfo, userID string) error {
 	if gp == nil {
 		return ErrIncorrectParams
 	}
@@ -40,15 +40,14 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	return nil
 }
 
-func GetUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
+func getUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
 	if gp.upkeeping.UserID == "" || gp.upkeeping.UpKeepingAddr == "" {
-		log.Println("OfferItem hasn't set")
 		return gp.upkeeping, ErrGetContractItem
 	}
 	return gp.upkeeping, nil
 }
 
-func SaveQuery(userID string) error {
+func saveQuery(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -72,7 +71,7 @@ func SaveQuery(userID string) error {
 	return nil
 }
 
-func GetQuery(userID string) (contracts.QueryItem, error) {
+func getQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := localPeerInfo.queryBook.Load(userID)
 	if !ok {
@@ -83,7 +82,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 	return queryItem, nil
 }
 
-func SaveOffer(providerID string) error {
+func saveOffer(providerID string) error {
 	proAddr, err := address.GetAddressFromID(providerID)
 	if err != nil {
 		return err
@@ -107,7 +106,7 @@ func SaveOffer(providerID string) error {
 	return nil
 }
 
-func GetOffer(providerID string) (contracts.OfferItem, error) {
+func getOffer(providerID string) (contracts.OfferItem, error) {
 	var offerItem contracts.OfferItem
 	value, ok := localPeerInfo.offerBook.Load(providerID)
 	if !ok {
@@ -125,17 +124,17 @@ func ukAddProvider(uid, pid, sk string) error {
 		log.Println("ukAddProvider getGroupsInfo() error")
 		return ErrNoGroupsInfo
 	}
-	uk, err := GetUpkeeping(gp)
+	uk, err := getUpkeeping(gp)
 	if err != nil {
-		err := SaveUpkeeping(gp, uid)
+		err := saveUpkeeping(gp, uid)
 		if err != nil {
-			log.Println("ukAddProvider GetUpkeeping() error", err)
+			log.Println("ukAddProvider getUpkeeping() error", err)
 			return err
 		}
 
-		uk, err = GetUpkeeping(gp) //保存之后重试。还是出错就返回
+		uk, err = getUpkeeping(gp) //保存之后重试。还是出错就返回
 		if err != nil {
-			log.Println("ukAddProvider GetUpkeeping() error", err)
+			log.Println("ukAddProvider getUpkeeping() error", err)
 			return err
 		}
 	}

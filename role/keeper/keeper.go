@@ -95,7 +95,7 @@ func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 			GroupID: groupid,
 		}
 
-		err := SaveUpkeeping(tempInfo, groupid)
+		err := saveUpkeeping(tempInfo, groupid)
 		if err != nil {
 			log.Println("getGroupsInfo err, groupid:", groupid)
 			return nil, false
@@ -593,18 +593,18 @@ func loadAllUser() error {
 				}
 			}
 			// 保存Upkeeping信息
-			err = SaveUpkeeping(&userPeersInfo, userID)
+			err = saveUpkeeping(&userPeersInfo, userID)
 			if err != nil {
 				log.Println("Save ", userID, "'s Upkeeping error: ", err)
 			}
 			// 保存Query信息
-			err = SaveQuery(userID)
+			err = saveQuery(userID)
 			if err != nil {
 				log.Println("Save ", userID, "'s Query error: ", err)
 			}
 			// 保存Offer信息
 			for _, provider := range userPeersInfo.Providers {
-				err = SaveOffer(provider)
+				err = saveOffer(provider)
 				if err != nil {
 					log.Println("Save ", provider, "'s Offer error: ", err)
 				}
@@ -868,7 +868,7 @@ func checkConnectedPeer(ctx context.Context) error {
 			if isProvider {
 				log.Println("Connect to connected provider: ", id)
 				localPeerInfo.Providers = append(localPeerInfo.Providers, id)
-				SaveOffer(id)
+				saveOffer(id)
 				err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), id, "local") //把当前连接的所有providers信息存到本地的leveldb中
 				if err != nil {
 					return err
@@ -925,7 +925,7 @@ func newConnPeerRole(peerIDch chan string, ctx context.Context) error { //处理
 				}
 				if i == len(localPeerInfo.Providers) {
 					log.Println("Connect to new connect provider: ", id)
-					err := SaveOffer(id)
+					err := saveOffer(id)
 					if err != nil {
 						log.Println("Save ", id, "'s Offer err in newConnPeerRole", err)
 					} else {

@@ -67,7 +67,7 @@ func spaceTimePay() {
 			return true
 		}
 		for _, pidString := range thisGroupsInfo.Providers { //循环当前user的provider
-			uk, err := GetUpkeeping(thisGroupsInfo)
+			uk, err := getUpkeeping(thisGroupsInfo)
 			if err != nil {
 				log.Println("getUpkeeping err: ", err)
 				continue

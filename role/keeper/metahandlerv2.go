@@ -212,13 +212,13 @@ func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
 		log.Println("Can't find ", km.GetMid(), "'s GroupInfo")
 		return
 	}
-	err := SaveUpkeeping(tempInfo, km.GetMid())
+	err := saveUpkeeping(tempInfo, km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping success")
 	}
-	err = SaveQuery(km.GetMid())
+	err = saveQuery(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Query err", err)
 	} else {

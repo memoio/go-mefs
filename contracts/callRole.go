@@ -240,6 +240,7 @@ func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role
 	return keeperProviderInstance, nil
 }
 
+// AddKeeperProvidersToKPMap adds provider/keeper to kpmap
 func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
@@ -263,6 +264,7 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 	return nil
 }
 
+// DeleteKeeperFromKPMap deletes keeper from kpmap
 func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address) error {
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
@@ -286,6 +288,7 @@ func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAdd
 	return nil
 }
 
+// DeleteProviderFromKPMap deletes provider from kpmap
 func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
@@ -309,6 +312,7 @@ func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperA
 	return nil
 }
 
+// GetAllKeeperInKPMap get keepers in kpmap
 func GetAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) {
 	var keeperAddresses []common.Address
 
@@ -328,6 +332,7 @@ func GetAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) 
 	return keeperAddresses, nil
 }
 
+// GetProviderInKPMap gets providers from kpmap
 func GetProviderInKPMap(localAddress common.Address, keeperAddress common.Address) ([]common.Address, error) {
 	var providerAddresses []common.Address
 
