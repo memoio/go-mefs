@@ -189,7 +189,7 @@ var setProviderCmd = &cmds.Command{
 
 		hexPk := adminSk //此私钥部署过keeper合约
 
-		err := contracts.SetKeeper(common.HexToAddress(addr), hexPk, isProvider)
+		err := contracts.SetProvider(common.HexToAddress(addr), hexPk, isProvider)
 		if err != nil {
 			fmt.Println("setProvider err:", err)
 			return err
