@@ -14,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
@@ -112,6 +113,9 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		keeperCount = int(item.KeeperNums)
 		providerCount = int(item.ProviderNums)
 		price = item.Price
+		if pos.GetPosId() == userID {
+			price = int64(utils.STOREPRICEPEDOLLAR)
+		}
 	}
 	log.Println(userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount, "price: ", price)
 	//查询出user的keeper和provider
