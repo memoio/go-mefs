@@ -74,7 +74,6 @@ type PeerInfo struct {
 	enableTendermint bool
 	offerBook        sync.Map // 存储连接的provider部署的Offer条约，K-provider的id，V-Offer实例
 	queryBook        sync.Map // 存储连接的user部署的Query条约，K-user的id，V-Query实例
-	kpMapBook        sync.Map
 }
 
 type storageInfo struct {
@@ -201,29 +200,27 @@ func isMasterKeeper(groupid string, pid string) bool {
 		return false
 	}
 	var mymaster []string
-	for _, keeper := range thisGroupsInfo.Keepers {
-		pids, err := getKpMap(keeper.KID)
-		if err != nil {
-			continue
+	mykids, ok := contracts.GetKeepersOfPro(pid)
+	if ok {
+		for _, keeper := range thisGroupsInfo.Keepers {
+			for _, nkid := range mykids {
+				if nkid == keeper.KID {
+					mymaster = append(mymaster, keeper.KID)
+					break
+				}
+			}
 		}
-		for _, npid := range pids {
-			if npid == pid {
-				mymaster = append(mymaster, keeper.KID)
-				break
+		if len(mymaster) > 0 {
+			masterID := getMasterID(mymaster)
+			if masterID == localNode.Identity.Pretty() {
+				return true
+			} else {
+				return false
 			}
 		}
 	}
 
-	if len(mymaster) > 0 {
-		masterID := getMasterID(mymaster)
-		if masterID == localNode.Identity.Pretty() {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return localKeeperIsMaster(groupid)
-	}
+	return localKeeperIsMaster(groupid)
 }
 
 //getMasterID  根据传入的keeper列表，选出一个master，返回其id
@@ -1008,6 +1005,8 @@ func checkPeers(ctx context.Context) {
 func getKpMapRegular(ctx context.Context) {
 	log.Println("Get kpMap from chain start!")
 
+	peerID := localNode.Identity.Pretty()
+	contracts.SaveKpMap(peerID)
 	ticker := time.NewTicker(KPMAPTIME)
 	defer ticker.Stop()
 	for {
@@ -1016,7 +1015,7 @@ func getKpMapRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				saveKpMap()
+				contracts.SaveKpMap(peerID)
 			}()
 		}
 	}

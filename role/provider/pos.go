@@ -52,7 +52,7 @@ var opt = &df.DataEncoder{
 	SegmentSize: df.DefaultSegmentSize,
 }
 
-func PosSerivce() {
+func PosSerivce(ctx context.Context) {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
 	posID = pos.GetPosId()
@@ -120,7 +120,7 @@ func PosSerivce() {
 	}
 
 	//开始pos
-	posRegular(context.Background())
+	posRegular(ctx)
 }
 
 // getDiskUsage gets the disk usage

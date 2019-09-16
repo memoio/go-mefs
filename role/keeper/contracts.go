@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"errors"
 	"log"
 	"strings"
 
@@ -10,10 +9,6 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
-
-type kpItem struct {
-	keeperIDs []string
-}
 
 func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	if gp == nil {
@@ -177,52 +172,4 @@ func ukAddProvider(uid, pid, sk string) error {
 	uk.ProviderIDs = append(uk.ProviderIDs, pid)
 
 	return nil
-}
-
-func saveKpMap() error {
-	localAddr, err := ad.GetAddressFromID(localNode.Identity.Pretty())
-	if err != nil {
-		log.Println("saveKpMap GetAddressFromID() error", err)
-		return err
-	}
-	kps, err := contracts.GetAllKeeperInKPMap(localAddr)
-	if err != nil {
-		log.Println("saveKpMap GetAllKeepers() error", err)
-		return err
-	}
-
-	for _, kpaddr := range kps {
-		pids, err := contracts.GetProviderInKPMap(localAddr, kpaddr)
-		if err != nil {
-			log.Println("get provider from kpmap err:", err)
-		}
-		if len(pids) > 0 {
-			keeperID, _ := ad.GetIDFromAddress(kpaddr.String())
-			var kidList []string
-			for _, paddr := range pids {
-				pid, _ := ad.GetIDFromAddress(paddr.String())
-				kidList = append(kidList, pid)
-			}
-
-			kidres := &kpItem{
-				keeperIDs: kidList,
-			}
-			res, ok := localPeerInfo.kpMapBook.LoadOrStore(keeperID, kidres)
-			if ok {
-				res.(*kpItem).keeperIDs = kidList
-			}
-		}
-	}
-	return nil
-}
-
-func getKpMap(keeperID string) ([]string, error) {
-	var ret []string
-	res, ok := localPeerInfo.kpMapBook.Load(keeperID)
-	if !ok {
-		//log.Println("get keeper from kpmap fails")
-		return ret, errors.New("No keeper in kpmap")
-	}
-
-	return res.(*kpItem).keeperIDs, nil
 }
