@@ -6,7 +6,7 @@ echo -e "\nstep 1,mefs init\n"
 mefs init
 
 echo -e "\nstep 2,run mefs daemon\n"
-mefs daemon >> ~/daemon.stdout 2>&1 &
+mefs daemon --netKey=$1 >> ~/daemon.stdout 2>&1 &
 echo -e "\ndaemon is ready wait 1min to connect"
 time sleep 60
 
