@@ -85,6 +85,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 	queryAddr := options[2]
 	log.Println("Query合约信息：", queryAddr)
 	var keeperCount, providerCount int
+	var price int64
 	if queryAddr == contracts.InvalidAddr {
 		log.Println("No query contracts，use k/p numbers in init request")
 		ks, err := strconv.Atoi(options[0])
@@ -99,6 +100,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		}
 		keeperCount = ks
 		providerCount = ps
+		price = int64(utils.STOREPRICEPEDOLLAR)
 	} else {
 		log.Println("Get k/p numbers from query contract of user: ", userID)
 		localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty())
@@ -109,8 +111,9 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		}
 		keeperCount = int(item.KeeperNums)
 		providerCount = int(item.ProviderNums)
+		price = item.Price
 	}
-	log.Println(userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount)
+	log.Println(userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount, "price: ", price)
 	//查询出user的keeper和provider
 	//首先看看内存里是否有该节点
 	response, err := userInitInMem(userID, keeperCount, providerCount)
@@ -122,7 +125,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		}
 	}
 	if response == "" { //没错，但是结果是空，为新user
-		response, err = newUserInit(userID, keeperCount, providerCount)
+		response, err = newUserInit(userID, keeperCount, providerCount, price)
 		if err != nil {
 			log.Println("handleUserInitReq err: ", err)
 			return
@@ -187,9 +190,6 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 	if err != nil {
 		log.Println("handleNewUserNotif err: ", err)
 		return
-	}
-	if _, ok := localPeerInfo.UserCache.Get(userID); ok { //本地没有保存好的user信息 但是waitlist里有
-		localPeerInfo.UserCache.Remove(userID)
 	}
 
 	//如果ledgerinfo中有该user的信息，则清除。
