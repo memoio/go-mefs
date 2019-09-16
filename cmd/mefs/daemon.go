@@ -202,6 +202,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	hexsk, _ := req.Options[secretKeyKwd].(string)
 	password, _ := req.Options[passwordKwd].(string)
+	nKey, _ := req.Options[netKeyKwd].(string)
 
 	// first, whether user has provided the initialization flag. we may be
 	// running in an uninitialized state.
@@ -210,7 +211,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		// cfg 为配置根路径
 		cfg := cctx.ConfigRoot
 		if !fsrepo.IsInitialized(cfg) {
-			err := doInit(os.Stdout, cfg, nBitsForKeypairDefault, password, nil, hexsk)
+			err := doInit(os.Stdout, cfg, nBitsForKeypairDefault, password, nil, hexsk, nKey)
 			if err != nil {
 				return err
 			}
@@ -261,8 +262,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	default:
 		return fmt.Errorf("unrecognized routing option: %s", routingOption)
 	}
-
-	nKey, _ := req.Options[netKeyKwd].(string)
 
 	node, err := core.NewNode(req.Context, ncfg, password, nKey) //根据配置信息获得本地mefs节点实例
 	if err != nil {
@@ -439,7 +438,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	case metainfo.RoleProvider: //provider和keeper同样
 		rdo, _ := req.Options[reDeployOfferKwd].(bool)
-		err = provider.StartProviderService(req.Context, node, provider.DefaultCapacity, provider.DefaultDuration, utils.STOREPRICEPEDOLLAR, rdo)
+		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err

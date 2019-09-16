@@ -22,12 +22,12 @@ const (
 	IDLength = 30
 
 	//READPRICEPERMB 读支付中1MB内容需要支付的金额
-	READPRICEPERMB = 1000000
+	READPRICEPERMB int64 = 1000000
 
 	// Stored price 0.2$/TB*Month
 	// 1 eth=0.01$
 	// wei/MB*hour
-	STOREPRICEPEDOLLAR = 26500000000
+	STOREPRICEPEDOLLAR int64 = 26500000000
 
 	//BlockSize 暂定一个块中纯data的大小，1k
 	BlockSize = 1024 * 1024
