@@ -286,7 +286,7 @@ var lfsStartUserCmd = &cmds.Command{
 		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
 		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(user.DefaultDuration),
 		cmds.Int64Option("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(user.DefaultCapacity),
-		cmds.Int64Option("price", "p", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.Int64Option("price", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(user.KeeperSLA),
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(user.ProviderSLA),
 	},

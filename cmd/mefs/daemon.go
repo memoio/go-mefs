@@ -50,9 +50,9 @@ const (
 	writableKwd               = "writable"
 	enableMultiplexKwd        = "enable-mplex-experiment"
 	enableTendermintKwd       = "tendermint"
-	capacityKwd               = "storage-capacity"
-	durationKwd               = "storage-time"
-	priceKwd                  = "storage-price"
+	capacityKwd               = "storageCapacity"
+	durationKwd               = "storageDuration"
+	priceKwd                  = "storagePrice"
 	ksKwd                     = "keeperSla"
 	psKwd                     = "providerSla"
 	passwordKwd               = "password"
@@ -145,7 +145,7 @@ environment variable:
 		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(provider.ReDeployOffer),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
-		cmds.Int64Option(priceKwd, "p", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
