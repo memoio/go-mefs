@@ -30,7 +30,7 @@ const parityCount = 2
 var objsInBucket sync.Map
 
 func main() {
-	count := flag.Int("count", 200, "count of file we want to upload")
+	count := flag.Int("count", 100, "count of file we want to upload")
 	flag.Parse()
 	err := UploadTest(*count)
 	if err != nil {

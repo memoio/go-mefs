@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -16,7 +17,6 @@ import (
 
 //DeployChannelContract deploy channel-contract, timeOut's unit is second
 func DeployChannelContract(hexKey string, localAddress common.Address, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int) (common.Address, error) {
-	fmt.Println("begin deploy channel-contract with", providerAddress.String(), "...")
 	var channelAddr common.Address
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
@@ -31,59 +31,98 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 		return channelAddr, err
 	}
 
-	//从上面的resolver中，获得本user的mapper，如果没有，则部署mapper
-	auth = bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-
-	mapper, err := deployMapper(localAddress, resolver, auth, client)
-	if err != nil {
-		return channelAddr, err
-	}
-
 	//本user与指定的provider部署channel合约
-	auth = bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.Value = moneyToChannel //放进合约里的钱
-	channelAddr, _, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
-	if err != nil {
-		fmt.Println("deployChannelErr:", err)
-		return channelAddr, err
-	}
-
-	log.Println("channelContractAddr:", channelAddr.String())
-
-	//将channel合约地址channelAddr放进上述的mapper中
-	auth = bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	_, err = mapper.Add(auth, channelAddr)
-	if err != nil {
-		fmt.Println("addChannelErr:", err)
-		return channelAddr, err
-	}
-
-	//验证channelAddr是否已经放进了mapper中
-	for i := 1; ; i++ {
-		if i%10 == 0 { //每隔10次如果还get不到合约地址，就再触发一次添加合约到mapper
-			auth = bind.NewKeyedTransactor(key)
-			auth.GasPrice = big.NewInt(defaultGasPrice)
-			_, err = mapper.Add(auth, channelAddr)
-			if err != nil {
-				fmt.Println("addChannelErr:", err)
+	retryCount := 0
+	for {
+		retryCount++
+		auth = bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.Value = moneyToChannel //放进合约里的钱
+		channelAddr, _, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
+		if err != nil {
+			if retryCount > 3 {
+				fmt.Println("deploy Channel Err:", err)
 				return channelAddr, err
 			}
+			time.Sleep(time.Minute)
+			continue
 		}
-		channelGetted, err := mapper.Get(&bind.CallOpts{
-			From: localAddress,
-		})
+		break
+	}
+
+	//从上面的resolver中，获得本user的mapper，如果没有，则部署mapper
+	retryCount = 0
+	var mapperInstance *mapper.Mapper
+	for {
+		retryCount++
+		auth = bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+
+		mapperInstance, err = deployMapper(localAddress, resolver, auth, client)
 		if err != nil {
-			fmt.Println("getChannelErr:", err)
-			return channelAddr, err
+			if retryCount > 3 {
+				log.Println("deploy Mapper for Channel Err:", err)
+				return channelAddr, err
+			}
+			time.Sleep(time.Minute)
+			continue
 		}
-		length := len(channelGetted)
-		if length != 0 && channelGetted[length-1] == channelAddr {
+		break
+
+	}
+
+	//将channel合约地址channelAddr放进上述的mapper中
+	retryCount = 0
+	retryGet := 0
+	addCount := 0
+	getFlag := false
+	for {
+		retryCount++
+		auth = bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		_, err = mapperInstance.Add(auth, channelAddr)
+		if err != nil {
+			if retryCount > 3 {
+				fmt.Println("add Channel to Mapper Err:", err)
+				return channelAddr, err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		for {
+			retryGet++
+			channelGetted, err := mapperInstance.Get(&bind.CallOpts{
+				From: localAddress,
+			})
+			if err != nil {
+				if retryGet > 30 {
+					fmt.Println("get Channel from Mapper Err:", err)
+					return channelAddr, err
+				}
+				time.Sleep(20 * time.Second)
+				continue
+			}
+			length := len(channelGetted)
+			if length != 0 && channelGetted[length-1] == channelAddr {
+				getFlag = true
+				break
+			}
+			if retryGet > 30 {
+				break
+			}
+			time.Sleep(10 * time.Second)
+		}
+
+		if getFlag {
 			break
+		} else {
+			if addCount > 5 {
+				return channelAddr, errors.New("add channel to mapper fails")
+			}
+			addCount++
+			continue
 		}
-		time.Sleep(10 * time.Second)
 	}
 
 	fmt.Println("channel-contract with", providerAddress.String(), "have been successfully deployed!")

@@ -195,7 +195,6 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 	for _, provider := range providers {
 		channel, err := cs.GetChannelItem(provider)
 		if err != nil {
-			log.Println("GetChannelItem err:", provider, err)
 			continue
 		}
 		// 保存本地形式：K-provider，V-channel此时的value

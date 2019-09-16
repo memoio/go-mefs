@@ -106,19 +106,27 @@ func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 			return nil, false
 		}
 
-		tempInfo.Providers = tempInfo.upkeeping.ProviderIDs
-
+		flag := false
 		for _, kp := range tempInfo.upkeeping.KeeperIDs {
 			keeperG := &KeeperInGroup{
 				KID: kp,
 			}
 			if kp == localNode.Identity.Pretty() {
+				flag = true
 				tempInfo.LocalKeeper = keeperG
 				continue
 			}
 
 			tempInfo.Keepers = append(tempInfo.Keepers, keeperG)
 		}
+
+		if !flag {
+			log.Println(groupid, "is not my user")
+			return nil, false
+		}
+
+		tempInfo.Providers = tempInfo.upkeeping.ProviderIDs
+
 		PInfo.Store(groupid, tempInfo)
 		return tempInfo, true
 	}
