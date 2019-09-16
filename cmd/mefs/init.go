@@ -9,14 +9,14 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	oldcmds "github.com/memoio/go-mefs/commands"
+	config "github.com/memoio/go-mefs/config"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
-	config "github.com/memoio/go-mefs/config"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
 	nBitsForKeypairDefault = 2048
-	defaultPassword        = "123456"
 )
 
 var initCmd = &cmds.Command{
@@ -36,7 +36,7 @@ environment variable:
 		cmds.FileArg("default-config", false, false, "Initialize with the given configuration.").EnableStdin(),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the privateKey").WithDefault(defaultPassword),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the privateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
 	},
 	PreRun: func(req *cmds.Request, env cmds.Environment) error {
@@ -84,7 +84,7 @@ environment variable:
 }
 
 func initWithDefaults(out io.Writer, repoRoot string) error {
-	return doInit(out, repoRoot, nBitsForKeypairDefault, defaultPassword, nil, "")
+	return doInit(out, repoRoot, nBitsForKeypairDefault, utils.DefaultPassword, nil, "")
 }
 
 func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string, conf *config.Config, prikey string) error {

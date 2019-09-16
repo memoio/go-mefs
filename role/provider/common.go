@@ -16,9 +16,8 @@ const (
 	//ReDeployOffer redeploy offer-contract,default is false
 	ReDeployOffer = false
 
-	DefaultCapacity int64 = 2000   //单位：MB
-	DefaultDuration int64 = 200    //单位：天
-	DefaultPrice    int64 = 100000 //单位：wei
+	DefaultCapacity int64 = 100000 //单位：MB
+	DefaultDuration int64 = 365    //单位：天
 )
 
 var (

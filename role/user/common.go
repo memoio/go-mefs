@@ -21,11 +21,8 @@ import (
 const (
 	KeeperSLA             = 2 //暂定
 	ProviderSLA           = 6
-	DefaultCapacity int64 = 100     //单位：MB
-	DefaultDuration int64 = 10      //单位：天
-	DefaultPrice    int64 = 1000000 //单位：wei
-
-	DefaultPassword = "123456"
+	DefaultCapacity int64 = 100 //单位：MB
+	DefaultDuration int64 = 10  //单位：天
 
 	//LFS
 	maxObjectNameLen = 4096 //设定文件名和路径可占用的最长字节数

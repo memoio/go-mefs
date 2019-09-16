@@ -33,6 +33,8 @@ const (
 	BlockSize = 1024 * 1024
 
 	SegementCount = 256
+
+	DefaultPassword = "123456"
 )
 
 //false 意味着有，true表示无重复

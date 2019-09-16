@@ -7,7 +7,7 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	config "github.com/memoio/go-mefs/config"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
-	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
@@ -31,7 +31,7 @@ var createCmd = &cmds.Command{
 	Arguments: []cmds.Argument{},
 	Options: []cmds.Option{
 		cmds.StringOption(SecreteKey, "sk", "The practice user's privatekey that you want to create").WithDefault(""),
-		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(user.DefaultPassword),
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		var address string
@@ -39,7 +39,7 @@ var createCmd = &cmds.Command{
 		path, _ := config.PathRoot()
 		pwd, found := req.Options[PassWord].(string)
 		if pwd == "" || !found {
-			pwd = user.DefaultPassword
+			pwd = utils.DefaultPassword
 		}
 		sk, found := req.Options[SecreteKey].(string)
 		if sk == "" || !found {
