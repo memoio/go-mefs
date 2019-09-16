@@ -29,9 +29,13 @@ const parityCount = 2
 
 var objsInBucket sync.Map
 
+var ethEndPoint string
+
 func main() {
 	count := flag.Int("count", 100, "count of file we want to upload")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
 	flag.Parse()
+	ethEndPoint = *eth
 	err := UploadTest(*count)
 	if err != nil {
 		log.Fatal(err)
@@ -211,8 +215,6 @@ func fillRandom(p []byte) {
 		}
 	}
 }
-
-const ethEndPoint = "http://212.64.28.207:8101"
 
 func transferTo(value *big.Int, addr string) {
 	client, err := ethclient.Dial(ethEndPoint)

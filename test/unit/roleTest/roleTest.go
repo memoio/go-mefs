@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"flag"
 	"log"
 	"math/big"
 	"os"
@@ -25,9 +26,13 @@ const (
 	adminSk = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
 )
 
-const ethEndPoint = "http://212.64.28.207:8101"
+var ethEndPoint string
 
 func main() {
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.Parse()
+	ethEndPoint = *eth
+
 	balance := queryBalance(kpAddr)
 	if balance.Cmp(big.NewInt(1000000000000)) <= 0 {
 		transferTo(big.NewInt(1000000000000), kpAddr)
