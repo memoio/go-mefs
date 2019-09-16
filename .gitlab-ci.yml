@@ -28,9 +28,7 @@ role-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 bls12-golint:
   stage: golangci-lint
@@ -42,9 +40,7 @@ bls12-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 contracts-golint:
   stage: golangci-lint
@@ -56,9 +52,7 @@ contracts-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 data_format-golint:
   stage: golangci-lint
@@ -70,9 +64,7 @@ data_format-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 utils-golint:
   stage: golangci-lint
@@ -84,9 +76,7 @@ utils-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 mefs-golint:
   stage: golangci-lint
@@ -98,9 +88,7 @@ mefs-golint:
     - "47.92.5.51"
   allow_failure: true
   only:
-    - dev
     - master
-    - testnet
 
 compile:
   stage: compile
