@@ -55,9 +55,26 @@ var deployKeeperCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexPk := adminSk
 
-		err := contracts.KeeperContract(hexPk)
+		err = contracts.KeeperContract(hexPk)
 		if err != nil {
 			fmt.Println("keeper合约部署错误:", err)
 			return err
@@ -96,11 +113,25 @@ var setKeeperCmd = &cmds.Command{
 			return nil
 		}
 
-		args := req.Arguments
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		var addr string
-		node, _ := cmdenv.GetNode(env) //获取当前mefsnode
-		if len(args) > 0 {
-			addr = args[0]
+		if len(req.Arguments) > 0 {
+			addr = req.Arguments[0]
 		} else {
 			id := node.Identity.Pretty()
 			localAddress, _ := address.GetAddressFromID(id)
@@ -111,7 +142,7 @@ var setKeeperCmd = &cmds.Command{
 
 		hexPk := adminSk //此私钥部署过keeper合约
 
-		err := contracts.SetKeeper(common.HexToAddress(addr), hexPk, isKeeper)
+		err = contracts.SetKeeper(common.HexToAddress(addr), hexPk, isKeeper)
 		if err != nil {
 			fmt.Println("setKeeper err:", err)
 			return err
@@ -136,9 +167,26 @@ var deployProviderCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexPk := adminSk
 
-		err := contracts.ProviderContract(hexPk)
+		err = contracts.ProviderContract(hexPk)
 		if err != nil {
 			fmt.Println("keeper合约部署错误:", err)
 			return err
@@ -175,13 +223,28 @@ var setProviderCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
-		args := req.Arguments
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		var addr string
-		n, _ := cmdenv.GetNode(env) //获取当前mefsnode
-		if len(args) > 0 {
-			addr = args[0]
+		if len(req.Arguments) > 0 {
+			addr = req.Arguments[0]
 		} else {
-			id := n.Identity.Pretty()
+			id := node.Identity.Pretty()
 			localAddress, _ := address.GetAddressFromID(id)
 			addr = localAddress.String()
 		}
@@ -189,7 +252,7 @@ var setProviderCmd = &cmds.Command{
 
 		hexPk := adminSk //此私钥部署过keeper合约
 
-		err := contracts.SetProvider(common.HexToAddress(addr), hexPk, isProvider)
+		err = contracts.SetProvider(common.HexToAddress(addr), hexPk, isProvider)
 		if err != nil {
 			fmt.Println("setProvider err:", err)
 			return err
@@ -214,8 +277,25 @@ var deployKeeperProviderMapCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexSk := adminSk
-		err := contracts.DeployKeeperProviderMap(hexSk)
+		err = contracts.DeployKeeperProviderMap(hexSk)
 		if err != nil {
 			fmt.Println("deployKeeperProviderMapErr:", err)
 			return err
@@ -251,6 +331,23 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexSk := adminSk
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
@@ -261,7 +358,7 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 		keeperAddr := common.HexToAddress(kaddr[2:])
 		providerAddr := common.HexToAddress(paddr[2:])
 
-		err := contracts.AddKeeperProvidersToKPMap(localAddress, hexSk, keeperAddr, []common.Address{providerAddr})
+		err = contracts.AddKeeperProvidersToKPMap(localAddress, hexSk, keeperAddr, []common.Address{providerAddr})
 		if err != nil {
 			fmt.Println("addKeeperProviderToKPMapErr:", err)
 			return err
@@ -299,6 +396,23 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexSk := adminSk
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
@@ -310,7 +424,7 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 		providerAddr := common.HexToAddress(paddr[2:])
 
 		//删除KeeperProviderMap合约中指定keeper下的一个provider
-		err := contracts.DeleteProviderFromKPMap(localAddress, hexSk, keeperAddr, providerAddr)
+		err = contracts.DeleteProviderFromKPMap(localAddress, hexSk, keeperAddr, providerAddr)
 		if err != nil {
 			fmt.Println("DeleteProviderErr:", err)
 			return err
@@ -344,6 +458,23 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 			fmt.Println("CodeName is wrong")
 			return nil
 		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexSk := adminSk
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
@@ -353,7 +484,7 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 		keeperAddr := common.HexToAddress(kaddr[2:])
 
 		//删除KeeperProviderMap合约中指定的keeper以及与keeper关联的所有provider
-		err := contracts.DeleteKeeperFromKPMap(localAddress, hexSk, keeperAddr)
+		err = contracts.DeleteKeeperFromKPMap(localAddress, hexSk, keeperAddr)
 		if err != nil {
 			fmt.Println("DeleteKeeperErr:", err)
 			return err
@@ -382,6 +513,22 @@ var getProviderInKPMapCmd = &cmds.Command{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexSk := adminSk
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
@@ -427,6 +574,22 @@ var getAllKeeperInKPMapCmd = &cmds.Command{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+
 		hexSk := adminSk
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
