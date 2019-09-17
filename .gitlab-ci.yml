@@ -128,8 +128,6 @@ channel_test:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
     - go run test/unit/channelTest/channelTest.go -eth=$ETHENDPOINT
-  after_script:
-    - cat ~/daemon.stdout
   tags:
     - "47.92.5.51"
   only:
@@ -142,8 +140,6 @@ role_test:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
     - go run test/unit/roleTest/roleTest.go -eth=$ETHENDPOINT
-  after_script:
-    - cat ~/daemon.stdout
   tags:
     - "47.92.5.51"
   only:

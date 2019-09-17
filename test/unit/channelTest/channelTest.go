@@ -59,9 +59,7 @@ func main() {
 }
 
 func testChannelTimeout() (err error) {
-	log.Println("==========channel timeout=========")
-
-	log.Println("test deploy channel resolver")
+	log.Println("==========test channel timeout=========")
 	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -76,6 +74,7 @@ func testChannelTimeout() (err error) {
 
 	providerAddr := common.HexToAddress(proAddr[2:])
 
+	log.Println("test deploy channel resolver")
 	_, err = contracts.DeployResolverForChannel(proSk, providerAddr, indexer)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
@@ -93,7 +92,7 @@ func testChannelTimeout() (err error) {
 		return err
 	}
 
-	log.Println("test query channel balance")
+	log.Println("test query channel balance: ", channelAddr.String())
 	retryCount := 0
 	cbalance := queryBalance(channelAddr.String())
 	for {
@@ -161,7 +160,7 @@ func testChannelTimeout() (err error) {
 }
 
 func testCloseChannel() (err error) {
-	log.Println("test deploy channel resolver")
+	log.Println("test close channel")
 	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -176,6 +175,7 @@ func testCloseChannel() (err error) {
 
 	providerAddr := common.HexToAddress(proAddr[2:])
 
+	log.Println("test deploy channel resolver")
 	_, err = contracts.DeployResolverForChannel(userSk, providerAddr, indexer)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
@@ -193,7 +193,7 @@ func testCloseChannel() (err error) {
 		return err
 	}
 
-	log.Println("test query channel balance")
+	log.Println("test query channel balance: ", channelAddr.String())
 	retryCount := 0
 	cbalance := queryBalance(channelAddr.String())
 	for {
