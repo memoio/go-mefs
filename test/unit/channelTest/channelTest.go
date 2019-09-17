@@ -41,7 +41,7 @@ func main() {
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(userAddr)
-		if balance.Cmp(big.NewInt(1000000000000)) > 0 {
+		if balance.Cmp(big.NewInt(1000000000000)) >= 0 {
 			break
 		}
 
