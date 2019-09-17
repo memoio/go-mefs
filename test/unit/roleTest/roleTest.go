@@ -202,6 +202,77 @@ func testRole() (err error) {
 		}
 		break
 	}
+
+	log.Println("test set provider second")
+	proAddr2, _, err := createAddr()
+	if err != nil {
+		log.Fatal("create provider fails")
+	}
+
+	providerAddr2 := common.HexToAddress(proAddr2[2:])
+
+	err = contracts.SetProvider(providerAddr2, adminSk, true)
+	if err != nil {
+		log.Println("setProvider2 err:", err)
+		return err
+	}
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		res, err := contracts.IsProvider(providerAddr2)
+		if err != nil || res == false {
+			if retryCount > 20 {
+				log.Fatal("set provider2 fails")
+			}
+			continue
+		}
+		log.Println("set provider2 success")
+		break
+	}
+
+	log.Println("test set add kp second")
+
+	err = contracts.AddKeeperProvidersToKPMap(keeperAddr, kpSk, keeperAddr, []common.Address{providerAddr2})
+	if err != nil {
+		log.Println("Add Keeper Providers To KPMap err:", err)
+		return err
+	}
+
+	log.Println("test get provider from kpmap second")
+	retryCount = 0
+	flag = false
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		pids, err := contracts.GetProviderInKPMap(providerAddr2, keeperAddr)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Get Provider2 In KPMap fails")
+			}
+			continue
+		}
+
+		flag = false
+		for _, pidr := range pids {
+			if pidr.String() == providerAddr2.String() {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			log.Println("get provider from kpmap success")
+		} else {
+			if retryCount > 20 {
+				log.Fatal("Get Provider fails")
+			}
+			continue
+		}
+		break
+	}
+
 	log.Println("add kp to kpmap success")
 
 	log.Println("test delete provider from kpmap")
@@ -324,6 +395,28 @@ func testRole() (err error) {
 			continue
 		}
 		log.Println("set provider false success")
+		break
+	}
+
+	log.Println("test set provider false second")
+	err = contracts.SetProvider(providerAddr2, adminSk, false)
+	if err != nil {
+		log.Println("setProvider err:", err)
+		return err
+	}
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		res, err := contracts.IsProvider(providerAddr2)
+		if err != nil || res == true {
+			if retryCount > 20 {
+				log.Fatal("set provider2 false fails")
+			}
+			continue
+		}
+		log.Println("set provider2 false success")
 		break
 	}
 
