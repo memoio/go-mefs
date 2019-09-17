@@ -99,7 +99,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider")
-	proAddr, proSk, err := createAddr()
+	proAddr, _, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
 	}
@@ -204,7 +204,7 @@ func testRole() (err error) {
 
 	log.Println("test delete provider from kpmap")
 
-	err = contracts.DeleteProviderFromKPMap(providerAddr, proSk, keeperAddr, providerAddr)
+	err = contracts.DeleteProviderFromKPMap(keeperAddr, adminSk, keeperAddr, providerAddr)
 	if err != nil {
 		log.Fatal("delete provider from kpmap err:", err)
 	}
@@ -243,7 +243,7 @@ func testRole() (err error) {
 
 	log.Println("test delete keeper from kpmap")
 
-	err = contracts.DeleteKeeperFromKPMap(providerAddr, proSk, keeperAddr)
+	err = contracts.DeleteKeeperFromKPMap(keeperAddr, kpSk, keeperAddr)
 	if err != nil {
 		log.Fatal("delete keeper from kpmap err:", err)
 	}
