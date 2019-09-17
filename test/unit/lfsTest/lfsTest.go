@@ -16,7 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	shell "github.com/memoio/mefs-go-http-client"
 )
@@ -351,15 +353,14 @@ func transferTo(value *big.Int, addr string) {
 }
 
 func queryBalance(addr string) *big.Int {
-	client, err := ethclient.Dial(ethEndPoint)
+	var result string
+	client, err := rpc.Dial(ethEndPoint)
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
+		log.Fatal("rpc.dial err:", err)
 	}
-	Address := common.HexToAddress(addr[2:])
-	balance, err := client.PendingBalanceAt(context.Background(), Address)
+	err = client.Call(&result, "eth_getBalance", addr, "latest")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.call err:", err)
 	}
-	return balance
+	return utils.HexToBigInt(result)
 }
