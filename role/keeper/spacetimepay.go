@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"github.com/memoio/go-mefs/utils/pos"
 	"log"
 	"math/big"
 	"sort"
@@ -108,6 +109,10 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 			return
 		}
 		log.Printf("ukaddr:%s\nukbalance:%s\n", ukaddr, ukBalance.String())
+
+		if groupid == pos.GetPosId() {
+			price = pos.GetPosPrice()
+		}
 
 		startTime := checkLastPayTime(groupid, pidString)
 		spaceTime, lastTime := resultSummary(groupid, pidString, startTime, utils.GetUnixNow()) //根据时间段获取时空值

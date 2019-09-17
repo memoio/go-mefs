@@ -3,6 +3,7 @@ package pos
 import (
 	"encoding/hex"
 
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -23,4 +24,8 @@ func GetPosAddr() string {
 func GetPosId() string {
 	id, _ := address.GetIDFromAddress(GetPosAddr())
 	return id
+}
+
+func GetPosPrice() int64 {
+	return utils.STOREPRICEPEDOLLAR / 10
 }
