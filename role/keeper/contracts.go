@@ -21,7 +21,7 @@ func saveUpkeeping(gp *GroupsInfo, userID string) error {
 	}
 	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
-		log.Println("get ", userID, "'s ukAddr err:", err)
+		log.Println(userID, "has not deployed upkeeping")
 		return err
 	}
 	// get upkkeeping params

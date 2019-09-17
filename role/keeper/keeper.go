@@ -97,7 +97,6 @@ func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 
 		err := saveUpkeeping(tempInfo, groupid)
 		if err != nil {
-			log.Println("getGroupsInfo err, groupid:", groupid)
 			return nil, false
 		}
 
