@@ -12,10 +12,11 @@ import (
 
 	"github.com/elgris/jsondiff"
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	config "github.com/memoio/go-mefs/config"
+	"github.com/memoio/go-mefs/contracts"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	repo "github.com/memoio/go-mefs/repo"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
-	config "github.com/memoio/go-mefs/config"
 )
 
 // ConfigUpdateOutput is config profile apply command's output
@@ -104,6 +105,8 @@ Set the value of the 'Datastore.Path' key:
 					e := "Role can only be 'user、keeper or provider'"
 					return cmds.ClientError(e)
 				}
+			case "Eth":
+				contracts.EndPoint = value
 			default:
 			}
 			if parseJSON, _ := req.Options[configJSONOptionName].(bool); parseJSON {

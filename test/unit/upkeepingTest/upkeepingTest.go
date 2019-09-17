@@ -23,7 +23,7 @@ import (
 const (
 	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	moneyTo  = 1000000000000000000
+	moneyTo  = 1000000000000000
 )
 
 var serverKids = []string{"8MHS9fZzRaHNj4mP1kYDebwySmLzaw", "8MGRZbvn8caS431icB2P1uT74B3EHh", "8MJCzFbpXCvdfzmJy5L8jiw4w1qPdY", "8MKX58Ko5vBeJUkfgpkig53jZzwqoW", "8MHYzNkm6dF9SWU5u7Py8MJ31vJrzS", "8MK2saApPQMoNfVmnRDiApoAWFzo2K"}
@@ -32,14 +32,15 @@ var serverPids = []string{"8MHXst83NnSfYHnyqWMVjwjt2GiutV", "8MGrkL5cUpPsPbePvCf
 var ethEndPoint string
 
 func main() {
-	kCount := 3
-	pCount := 5
-	amount := big.NewInt(1230)
-
 	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
 	flag.Parse()
 	ethEndPoint = *eth
 
+	kCount := 3
+	pCount := 5
+	amount := big.NewInt(1230)
+
+	contracts.EndPoint = ethEndPoint
 	balance := queryBalance(userAddr)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
 		transferTo(big.NewInt(moneyTo), userAddr)
