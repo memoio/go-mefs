@@ -16,7 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	shell "github.com/memoio/mefs-go-http-client"
 )
@@ -173,11 +175,11 @@ func lfsTest() error {
 	mbucketName := "Bucket1"
 	var mopts []func(*shell.RequestBuilder) error
 	mopts = append(mopts, shell.SetAddress(addr))
-	mopts = append(mopts, shell.SetDataCount(2))
+	mopts = append(mopts, shell.SetDataCount(dataCount))
 	mopts = append(mopts, shell.SetParityCount(parityCount))
 	mopts = append(mopts, shell.SetPolicy(df.MulPolicy))
 
-	_, errBucket := sh.CreateBucket(mbucketName, opts...)
+	_, errBucket := sh.CreateBucket(mbucketName, mopts...)
 	if errBucket != nil {
 		log.Println("create mbucket err: ", err)
 	}
@@ -197,11 +199,11 @@ func lfsTest() error {
 		log.Println("create mbucket fails Policy")
 	}
 
-	if bk.Buckets[0].DataCount != dataCount {
+	if bk.Buckets[0].DataCount != 1 {
 		log.Println("create mbucket fails datacount")
 	}
 
-	if bk.Buckets[0].ParityCount != parityCount {
+	if bk.Buckets[0].ParityCount != parityCount+dataCount-1 {
 		log.Println("create mbucket fails paritycount")
 	}
 
@@ -351,15 +353,14 @@ func transferTo(value *big.Int, addr string) {
 }
 
 func queryBalance(addr string) *big.Int {
-	client, err := ethclient.Dial(ethEndPoint)
+	var result string
+	client, err := rpc.Dial(ethEndPoint)
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
+		log.Fatal("rpc.dial err:", err)
 	}
-	Address := common.HexToAddress(addr[2:])
-	balance, err := client.PendingBalanceAt(context.Background(), Address)
+	err = client.Call(&result, "eth_getBalance", addr, "latest")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.call err:", err)
 	}
-	return balance
+	return utils.HexToBigInt(result)
 }
