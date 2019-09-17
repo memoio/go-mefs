@@ -175,11 +175,11 @@ func lfsTest() error {
 	mbucketName := "Bucket1"
 	var mopts []func(*shell.RequestBuilder) error
 	mopts = append(mopts, shell.SetAddress(addr))
-	mopts = append(mopts, shell.SetDataCount(2))
+	mopts = append(mopts, shell.SetDataCount(dataCount))
 	mopts = append(mopts, shell.SetParityCount(parityCount))
 	mopts = append(mopts, shell.SetPolicy(df.MulPolicy))
 
-	_, errBucket := sh.CreateBucket(mbucketName, opts...)
+	_, errBucket := sh.CreateBucket(mbucketName, mopts...)
 	if errBucket != nil {
 		log.Println("create mbucket err: ", err)
 	}
@@ -199,11 +199,11 @@ func lfsTest() error {
 		log.Println("create mbucket fails Policy")
 	}
 
-	if bk.Buckets[0].DataCount != dataCount {
+	if bk.Buckets[0].DataCount != 1 {
 		log.Println("create mbucket fails datacount")
 	}
 
-	if bk.Buckets[0].ParityCount != parityCount {
+	if bk.Buckets[0].ParityCount != parityCount+dataCount-1 {
 		log.Println("create mbucket fails paritycount")
 	}
 
