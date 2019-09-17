@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -242,6 +243,20 @@ func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role
 
 // AddKeeperProvidersToKPMap adds provider/keeper to kpmap
 func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
+
+	res, err := IsKeeper(keeperAddress)
+	if err != nil || res == false {
+		fmt.Println(keeperAddress.String(), "is not a keeper")
+	}
+
+	for _, proAddresses := range providerAddresses {
+		res, err = IsProvider(proAddresses)
+		if err != nil || res == false {
+			fmt.Println(proAddresses.String(), "is not a provider")
+			return error
+		}
+	}
+
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
 		fmt.Println("getKeeperProviderMapInstanceErr:", err)
