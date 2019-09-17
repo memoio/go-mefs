@@ -25,7 +25,7 @@ import (
 const (
 	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	moneyTo  = 1000000000000000000
+	moneyTo  = 1000000000000000
 )
 
 var ethEndPoint string
@@ -34,6 +34,8 @@ func main() {
 	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
 	flag.Parse()
 	ethEndPoint = *eth
+
+	contracts.EndPoint = ethEndPoint
 
 	balance := queryBalance(userAddr)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {

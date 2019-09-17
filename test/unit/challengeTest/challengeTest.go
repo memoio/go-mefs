@@ -43,6 +43,7 @@ func main() {
 	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
 	flag.Parse()
 	ethEndPoint = *eth
+
 	if err := ChallengeTest(); err != nil {
 		log.Fatal(err)
 	}
