@@ -24,7 +24,7 @@ import (
 const (
 	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	moneyTo  = 1000000000000000
+	moneyTo  = 1000000000000000000
 )
 
 var ethEndPoint string
@@ -313,7 +313,7 @@ func createAddr() (string, string, error) {
 	hex.Encode(enc, skByteEth)
 
 	balance := queryBalance(addressHex)
-	if balance.Cmp(big.NewInt(moneyTo)) < 0 {
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
 		transferTo(big.NewInt(moneyTo), addressHex)
 	}
 

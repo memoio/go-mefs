@@ -33,6 +33,8 @@ const bucketName = "Bucket01"
 const dataCount = 3
 const parityCount = 2
 
+const moneyTo = 1000000000000000000
+
 var ethEndPoint string
 
 func main() {
@@ -57,14 +59,14 @@ func ChallengeTest() error {
 		log.Fatal("address to id failed")
 		return err
 	}
-	transferTo(big.NewInt(1000000000000000000), addr)
+	transferTo(big.NewInt(moneyTo), addr)
 
 	time.Sleep(90 * time.Second)
 
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(addr)
-		if balance.Cmp(big.NewInt(10000000000)) > 0 {
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
 		log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
