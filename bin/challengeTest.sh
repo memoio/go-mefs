@@ -3,7 +3,7 @@
 echo -e "mefs challenge test"
 
 echo -e "\nstep 1,mefs init\n"
-mefs init
+mefs init --netKey=$2
 
 echo -e "\nstep 2,run mefs daemon\n"
 mefs daemon --netKey=$2 >> ~/daemon.stdout 2>&1 &
