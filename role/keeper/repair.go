@@ -3,10 +3,8 @@ package keeper
 import (
 	"context"
 	"log"
-	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
@@ -43,7 +41,7 @@ func checkrepairlist(ctx context.Context) {
 func RepairBlock(ctx context.Context, userID string, blockID string) {
 	var cpids, ugid []string
 	var offset int
-	var response string
+	response := ""
 	blkinfo, err := metainfo.GetBlockMeta(blockID)
 	if err != nil {
 		log.Println("Get Block Meta error :", blockID, err)
@@ -82,11 +80,15 @@ func RepairBlock(ctx context.Context, userID string, blockID string) {
 
 	if len(response) > 0 {
 		if !sc.ConnectTo(ctx, localNode, response) {
-			response = SearchNewProvider(ctx, userID, ugid)
-			if response == "" {
-				log.Println("Repair failed, no extra provider")
-				return
-			}
+			response = ""
+		}
+	}
+
+	if response == "" {
+		response = SearchNewProvider(ctx, userID, ugid)
+		if response == "" {
+			log.Println("Repair failed, no extra provider")
+			return
 		}
 	}
 
@@ -215,7 +217,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 //TODO:how to improve the search algorithm
 //TODO:is a Timer needed？
 func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
-	var response string
+	response := ""
 	gp, ok := getGroupsInfo(uid)
 	if !ok {
 		log.Println("SearchNewProvider getGroupsInfo() error")
@@ -228,28 +230,22 @@ func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
 		return response
 	}
 
-	retry := 0
-	//return the provider id we need
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) //r is a time seed.we use it to create the random number
-	for {
-		retry++
-		response = gp.Providers[r.Intn(lenp)] //first we find a random provider
-		var j, flag int
-		flag = 0
-		for j = 0; j < len(ugid); j++ { //this provider may belong to this stripe already
-			if response != ugid[j] {
+	tmpProvider := utils.DisorderArray(gp.Providers)
+	for _, tmpPro := range tmpProvider {
+		flag := 0
+		for j := 0; j < len(ugid); j++ { //this provider may belong to this stripe already
+			if tmpPro != ugid[j] {
 				flag++
 			}
 		}
+
 		if flag == len(ugid) {
 			if sc.ConnectTo(ctx, localNode, response) {
+				response = tmpPro
 				break
 			}
 		}
-
-		if retry > 5*len(ugid) {
-			return ""
-		}
 	}
+
 	return response
 }

@@ -473,7 +473,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	}
 
 	//选择provider
-	gp.tempProviders = disorderArray(gp.tempProviders)
+	gp.tempProviders = utils.DisorderArray(gp.tempProviders)
 	for i := 0; i < len(gp.tempProviders); {
 		if i >= gp.providerSLA {
 			break

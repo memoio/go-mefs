@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -134,4 +135,19 @@ func Writable(path string) error {
 		return errors.New("'" + path + "' is not writable")
 	}
 	return nil
+}
+
+// 对数组进行乱序操作，以便user随机选择providers
+func DisorderArray(array []string) []string {
+	var temp string
+	var num int
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(array) - 1; i >= 0; i-- {
+		num = r.Intn(i + 1)
+		temp = array[i]
+		array[i] = array[num]
+		array[num] = temp
+	}
+
+	return array
 }
