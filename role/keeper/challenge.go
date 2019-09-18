@@ -175,6 +175,9 @@ func doChallengeBLS12(pu PU, blocks []string, chaltime int64) {
 		}
 	}()
 
+	// get user config once; in case provider cannot get it
+	getUserBLS12Config(pu.uid)
+
 	if thischalresult, ok := getChalresult(pu, chaltime); ok {
 		thischalresult.h = chal.C
 

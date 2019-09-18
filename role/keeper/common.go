@@ -84,10 +84,23 @@ func getUserBLS12ConfigByte(userID string) ([]byte, error) {
 	}
 	userconfigkey := kmBls12.ToString()
 	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, "local")
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return userconfigbyte, nil
 	}
-	return userconfigbyte, nil
+	gp, ok := getGroupsInfo(userID)
+	if !ok {
+		return nil, errors.New("no groupinfo")
+	}
+
+	for _, gkeeper := range gp.Keepers {
+		userconfigbyte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, gkeeper.KID)
+		if err == nil {
+			localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userconfigkey, string(userconfigbyte), "local")
+			return userconfigbyte, nil
+		}
+	}
+
+	return nil, errors.New("no user configkey")
 }
 
 //=============v2版本信息结构,上面的信息修改后逐渐删除===============

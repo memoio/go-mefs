@@ -24,8 +24,8 @@ import (
 var EndPoint string
 
 const (
-	//IndexerHex indexerAddress, it is well known
-	IndexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
+	//indexerHex indexerAddress, it is well known
+	indexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
 	//InvalidAddr implements invalid contracts-address
 	InvalidAddr          = "0x0000000000000000000000000000000000000000"
 	spaceTimePayGasLimit = uint64(400000)
@@ -148,7 +148,7 @@ func getResolverFromIndexer(localAddress common.Address, key string) (common.Add
 	var resolverInstance *resolver.Resolver
 
 	client := GetClient(EndPoint)
-	indexerAddr := common.HexToAddress(IndexerHex)
+	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, client)
 	if err != nil {
 		log.Println("new Indexer err: ", err)
@@ -187,7 +187,7 @@ func deployResolver(localAddress common.Address, hexKey, key string) (common.Add
 
 	client := GetClient(EndPoint)
 
-	indexerAddr := common.HexToAddress(IndexerHex)
+	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, client)
 	if err != nil {
 		log.Println("new Indexer err: ", err)
