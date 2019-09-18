@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	//ReDeployOffer redeploy offer-contract,default is false
-	ReDeployOffer = false
-
 	DefaultCapacity int64 = 100000 //单位：MB
 	DefaultDuration int64 = 365    //单位：天
 )

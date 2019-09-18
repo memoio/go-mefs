@@ -142,7 +142,7 @@ environment variable:
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
-		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(provider.ReDeployOffer),
+		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
@@ -399,6 +399,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
+	rdo, ok := req.Options[reDeployOfferKwd].(bool)
+	if !ok {
+		fmt.Println("input wrong value for redeploy.")
+		return errRepoExists
+	}
+
 	switch value {
 	case metainfo.RoleKeeper:
 		enableTendermint, _ := req.Options[enableTendermintKwd].(bool)
@@ -425,7 +431,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				return err
 			}
 			go func() {
-				err = us.StartUserService(us.Context, cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA)
+				err = us.StartUserService(us.Context, cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
 				if err != nil {
 					fmt.Println("Start local user failed:", err)
 					err := user.KillUser(node.Identity.Pretty())
@@ -437,7 +443,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}()
 		}
 	case metainfo.RoleProvider: //provider和keeper同样
-		rdo, _ := req.Options[reDeployOfferKwd].(bool)
 		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)

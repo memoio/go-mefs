@@ -67,6 +67,7 @@ type GroupService struct {
 	storePrice     int64 //表示部署合约时的存储价格大小，单位是“wei”
 	keeperSLA      int   //表示部署合约时的keeper参数，目前是keeper数量
 	providerSLA    int   //表示部署合约时的provider参数，目前是provider数量
+	reDeploy       bool  //是否重新部署offer
 }
 
 //------LFS Type--------
