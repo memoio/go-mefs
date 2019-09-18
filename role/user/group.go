@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
@@ -252,8 +251,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			return ErrBalance
 		}
 
-		sk := crypto.ToECDSAUnsafe(gp.PrivateKey)
-		queryAddr, err = contracts.DeployQuery(addr, sk, gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
+		queryAddr, err = contracts.DeployQuery(addr, address.SkByteToString(gp.PrivateKey), gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
 		if err != nil {
 			return err
 		}

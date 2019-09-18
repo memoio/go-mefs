@@ -18,7 +18,7 @@ import (
 func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
 	fmt.Println("begin deploy upKeeping...")
 	//获得resolver
-	resolver, err := getResolverFromIndexer(userAddress, "memoriae")
+	_, resolver, err := getResolverFromIndexer(userAddress, "memoriae")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return err
@@ -28,19 +28,17 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 		fmt.Println("HexToECDSAErr:", err)
 		return err
 	}
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	client := GetClient(EndPoint)
 
 	//获得mapper
-	mapper, err := deployMapper(userAddress, resolver, auth, client)
+	mapper, err := deployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return err
 	}
 
 	// 部署UpKeeping
 	// 用户需要支付的金额
-	auth = bind.NewKeyedTransactor(key)
+	client := GetClient(EndPoint)
+	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.Value = moneyAccount
 	ukAddr, _, _, err := upKeeping.DeployUpKeeping(auth, client,
@@ -94,7 +92,7 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 //GetUKFromResolver get upKeeping-contract from the mapper, and get the mapper from the resolver
 func GetUKFromResolver(ownerAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
 	//获得resolver
-	resolver, err := getResolverFromIndexer(ownerAddress, "memoriae")
+	_, resolver, err := getResolverFromIndexer(ownerAddress, "memoriae")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return InvalidAddr, uk, err

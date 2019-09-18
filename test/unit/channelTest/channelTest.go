@@ -200,7 +200,7 @@ func testCloseChannel() (err error) {
 		break
 	}
 
-	chanAddr, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
+	chanAddr, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
 	if err != nil {
 		log.Fatal("GetChannelAddr fails:", err)
 		return err

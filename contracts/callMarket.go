@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"log"
@@ -26,15 +25,21 @@ const (
 )
 
 //DeployQuery user use it to deploy query-contract
-func DeployQuery(userAddress common.Address, sk *ecdsa.PrivateKey, capacity int64, duration int64, price int64, ks int, ps int, reDeployQuery bool) (common.Address, error) {
+func DeployQuery(userAddress common.Address, hexKey string, capacity int64, duration int64, price int64, ks int, ps int, reDeployQuery bool) (common.Address, error) {
 	fmt.Println("begin to deploy query-contract...")
 
 	var queryAddr common.Address
 
 	//获得resolver
-	resolver, err := getResolverFromIndexer(userAddress, "query")
+	_, resolver, err := getResolverFromIndexer(userAddress, "query")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
+		return queryAddr, err
+	}
+
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
 		return queryAddr, err
 	}
 
@@ -42,7 +47,7 @@ func DeployQuery(userAddress common.Address, sk *ecdsa.PrivateKey, capacity int6
 	auth := bind.NewKeyedTransactor(sk)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
-	mapper, err := deployMapper(userAddress, resolver, auth, client)
+	mapper, err := deployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return queryAddr, err
 	}
@@ -173,7 +178,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 	fmt.Println("begin to deploy offer-contract...")
 
 	//获得resolver实例
-	resolverInstance, err := getResolverFromIndexer(providerAddress, "offer")
+	_, resolverInstance, err := getResolverFromIndexer(providerAddress, "offer")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return err
@@ -188,7 +193,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 	auth := bind.NewKeyedTransactor(sk)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
-	mapper, err := deployMapper(providerAddress, resolverInstance, auth, client)
+	mapper, err := deployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
 	if err != nil {
 		fmt.Println("deployMapperErr:", err)
 		return err
@@ -298,13 +303,13 @@ func getMarketAddrs(localAddr, ownerAddr common.Address, addrType MarketType) ([
 	var err error
 	switch addrType {
 	case Offer:
-		resolverInstance, err = getResolverFromIndexer(localAddr, "offer")
+		_, resolverInstance, err = getResolverFromIndexer(localAddr, "offer")
 		if err != nil {
 			fmt.Println("getResolverErr:", err)
 			return marketAddr, err
 		}
 	case Query:
-		resolverInstance, err = getResolverFromIndexer(localAddr, "query")
+		_, resolverInstance, err = getResolverFromIndexer(localAddr, "query")
 		if err != nil {
 			fmt.Println("getResolverErr:", err)
 			return marketAddr, err
