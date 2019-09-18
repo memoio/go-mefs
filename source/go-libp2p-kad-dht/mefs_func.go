@@ -374,3 +374,21 @@ func (dht *IpfsDHT) handleAppendValue(ctx context.Context, p peer.ID, pmes *pb.M
 
 	return pmes, err
 }
+
+func (dht *IpfsDHT) bootstrapRegular() {
+	fmt.Println("dht bootstrap reqular start!")
+
+	ctx := dht.ctx
+
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			go dht.Bootstrap(ctx)
+		}
+	}
+
+}
