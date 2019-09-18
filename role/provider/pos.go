@@ -114,6 +114,9 @@ func PosService(ctx context.Context) {
 		}
 	}
 
+	traversePath()
+	log.Println("pos blocks reaches gid: ", curGid, ", sid: ", curSid)
+
 	//开始pos
 	posRegular(ctx)
 }
@@ -135,6 +138,41 @@ func posRegular(ctx context.Context) {
 				go doGenerateOrDelete()
 			}
 		}
+	}
+}
+
+func traversePath() {
+	exist := false
+	gid := 0
+	for {
+		sid := 0
+		for sid = 0; sid < 1024; sid++ {
+			posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_0"
+			ncid := cid.NewCidV2([]byte(posCid))
+			exist, err := localNode.Blockstore.Has(ncid)
+			if err != nil {
+				continue
+			}
+			if !exist {
+				break
+			}
+		}
+		if exist && sid == 1024 {
+			gid += 1024
+			continue
+		}
+
+		curSid = (curSid + 1023) % 1024
+		if curSid == 1023 {
+			curGid = gid - 1024
+			if curGid < 0 {
+				curSid = -1
+			}
+		}
+
+		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+
+		break
 	}
 }
 
