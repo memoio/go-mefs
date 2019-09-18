@@ -200,7 +200,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		rand.Seed(time.Now().UnixNano())
 		fillRandom(tmpData)
 		// 配置部分
-		//更新stripeID、bucketID
+		// 更新stripeID、bucketID
 		curSid = (curSid + 1) % 1024
 		if curSid == 0 {
 			curGid += 1024
@@ -282,6 +282,22 @@ func deletePosBlocks(decreseSpace uint64) {
 				deleteBlocks = append(deleteBlocks, blockID)
 			}
 		}
+
+		//更新Gid,Sid
+		curSid = (curSid + 1023) % 1024
+		if curSid == 1023 {
+			curGid -= 1024
+		}
+		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
+
+		posValue := posCidPrefix
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+		if err != nil {
+			log.Println("CmdPutTo posKM error :", err)
+			continue
+		}
+
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
 		if j < 5 {
@@ -295,22 +311,6 @@ func deletePosBlocks(decreseSpace uint64) {
 				sendMetaRequest(km, metavalue, keeper)
 			}
 		}
-
-		//更新Gid,Sid
-		curSid = (curSid + 1023) % 1024
-		if curSid == 1023 {
-			curGid -= 1024
-		}
-		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, "\ncid prefix :", posCidPrefix)
-
-		posValue := posCidPrefix
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
-		if err != nil {
-			log.Println("CmdPutTo posKM error :", err)
-			continue
-		}
-
 	}
 }
 
