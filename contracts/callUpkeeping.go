@@ -70,23 +70,23 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 }
 
 //GetUKFromResolver get upKeeping-contract from the mapper, and get the mapper from the resolver
-func GetUKFromResolver(ownerAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
+func GetUKFromResolver(localAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
 	//获得resolver
-	_, resolver, err := getResolverFromIndexer(ownerAddress, "memoriae")
+	_, resolverInstance, err := getResolverFromIndexer(localAddress, "memoriae")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return InvalidAddr, uk, err
 	}
 
-	//获得mapper
-	_, mapperInstance, err := getMapperInstance(ownerAddress, ownerAddress, resolver)
+	// 获得mapper
+	_, mapperInstance, err := getMapperInstance(localAddress, localAddress, resolverInstance)
 	if err != nil {
 		fmt.Println("get Mapper Instance err:", err)
 		return InvalidAddr, uk, err
 	}
 
-	//获得mapper中的合约
-	ukAddr, err := getLatestAddrFromMapper(ownerAddress, mapperInstance)
+	// 获得mapper中的合约
+	ukAddr, err := getLatestAddrFromMapper(localAddress, mapperInstance)
 	if err != nil {
 		return InvalidAddr, uk, err
 	}
