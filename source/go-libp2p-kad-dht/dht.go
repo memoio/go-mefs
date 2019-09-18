@@ -105,8 +105,6 @@ func New(ctx context.Context, h host.Host, options ...opts.Option) (*IpfsDHT, er
 		}
 	}
 
-	go dht.Bootstrap(dht.ctx)
-
 	return dht, nil
 }
 

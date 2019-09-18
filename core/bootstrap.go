@@ -16,9 +16,9 @@ import (
 	procctx "github.com/jbenet/goprocess/context"
 	periodicproc "github.com/jbenet/goprocess/periodic"
 	host "github.com/libp2p/go-libp2p-core/host"
+	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
-	inet "github.com/libp2p/go-libp2p-core/network"
 	config "github.com/memoio/go-mefs/config"
 )
 
@@ -100,10 +100,11 @@ func Bootstrap(n *MefsNode, cfg BootstrapConfig) (io.Closer, error) {
 	proc := periodicproc.Tick(cfg.Period, periodic)
 	proc.Go(periodic) // run one right now.
 
-	// kick off Routing.Bootstrap
+	// kick off Routing.Bootstrap?
+	// run dht.Bootstrap, we need to reach out
 	if n.Routing != nil {
-		ctx := procctx.OnClosingContext(proc)
-		if err := n.Routing.Bootstrap(ctx); err != nil {
+		// ctx := procctx.OnClosingContext(proc)
+		if err := n.Routing.Bootstrap(n.ctx); err != nil {
 			proc.Close()
 			return nil, err
 		}
