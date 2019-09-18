@@ -1,4 +1,4 @@
-// package blockservice implements a BlockService interface that provides
+// Package blockservice implements a BlockService interface that provides
 // a single GetBlock/AddBlock interface that seamlessly retrieves data either
 // locally or from a remote peer through the exchange.
 package blockservice
@@ -21,10 +21,6 @@ import (
 )
 
 var log = logging.Logger("blockservice")
-
-var ErrNotFound = errors.New("blockservice: key not found")
-
-const NEWCIDLENGTH int = 30
 
 // BlockService is a hybrid block datastore. It stores data in a local
 // datastore and may retrieve data from a remote Exchange.
@@ -56,7 +52,7 @@ type blockService struct {
 	checkFirst bool
 }
 
-// NewBlockService creates a BlockService with given datastore instance.
+// New creates a BlockService with given datastore instance.
 func New(bs blockstore.Blockstore, rt routing.IpfsRouting) BlockService {
 	if rt == nil {
 		log.Warning("blockservice running in local (offline) mode.")
@@ -109,10 +105,15 @@ func (s *blockService) PutBlockTo(o blocks.Block, pid string) error {
 			km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock)
 			ncid = km.ToString()
 		}
-		_, err := s.rt.(*dht.IpfsDHT).SendMetaRequest(ncid, string(o.RawData()), pid, "putBlockTo")
+		res, err := s.rt.(*dht.IpfsDHT).SendMetaRequest(ncid, string(o.RawData()), pid, "putBlockTo")
 		if err != nil {
 			return err
 		}
+
+		if res == metainfo.MetaPutBlockErr {
+			return errors.New(metainfo.MetaPutBlockErr)
+		}
+
 		return nil
 	}
 	return errors.New("Routing is nil")

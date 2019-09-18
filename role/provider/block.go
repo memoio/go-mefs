@@ -23,74 +23,111 @@ import (
 func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 	// key is cid|ops|type|begin|end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
-	bcid := cid.NewCidV2([]byte(splitedNcid[0]))
-	if len(splitedNcid) < 5 {
-		Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
-		if err != nil {
-			log.Printf("Error create block %s: %s", bcid.String(), err)
-			return err
-		}
-		err = localNode.Blockstore.Put(Nblk)
-		if err != nil {
-			log.Printf("Error writing block to datastore: %s", err)
-			return err
-		}
+	if len(splitedNcid) == 0 {
+		return errors.New("No value in km")
+	}
+	bmeta, err := metainfo.GetBlockMeta(splitedNcid[0])
+	if err != nil {
 		return nil
 	}
 
-	typ := splitedNcid[2]
-
-	switch typ {
-	case "append":
-		if has, err := localNode.Blockstore.Has(bcid); !has || err != nil {
-			log.Printf("Error append field to block %s: %s", bcid.String(), err)
-			return err
-		}
-		beginOffset, err := strconv.Atoi(splitedNcid[3])
-		if err != nil {
-			log.Printf("Error append field to block %s: %s", bcid.String(), err)
-			return err
-		}
-		endOffset, err := strconv.Atoi(splitedNcid[4])
-		if err != nil {
-			log.Printf("Error append field to block %s: %s", bcid.String(), err)
-			return err
-		}
-		err = localNode.Blockstore.Append(bcid, []byte(value), beginOffset, endOffset)
-		if err != nil {
-			log.Printf("Error append field to block %s: %s", bcid.String(), err)
-			return err
-		}
-	case "update":
-		_, err := strconv.Atoi(splitedNcid[3])
-		if err != nil {
-			log.Printf("Error append field to block %s: %s", bcid.String(), err)
-			return err
-		}
-		_, err = strconv.Atoi(splitedNcid[4])
-		if err != nil {
-			log.Printf("Error append field to block %s: %s", bcid.String(), err)
-			return err
-		}
-		if has, _ := localNode.Blockstore.Has(bcid); true == has {
-			err := localNode.Blockstore.DeleteBlock(bcid)
-			if err != nil {
-				log.Printf("Error delete block %s: %s", bcid.String(), err)
+	isMyuser := false
+	// 保存合约
+	upItem, err := getUpkeeping(bmeta.GetUid())
+	if err != nil {
+		go saveUpkeeping(bmeta.GetUid())
+	} else {
+		localID := localNode.Identity.Pretty()
+		for _, proID := range upItem.ProviderIDs {
+			if localID == proID {
+				isMyuser = true
+				offerItem, err := getOffer()
+				if err != nil {
+					return err
+				}
+				if upItem.Price < offerItem.Price {
+					return errors.New("price is lower now")
+				}
+				break
 			}
 		}
-		Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
-		if err != nil {
-			log.Printf("Error create block %s: %s", bcid.String(), err)
-			return err
-		}
-		err = localNode.Blockstore.Put(Nblk)
-		if err != nil {
-			log.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
-			return err
-		}
-	default:
-		log.Printf("Wrong type in put block")
 	}
+
+	if !isMyuser {
+		return errors.New("NotMyUser")
+	}
+
+	go func() {
+		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
+		if len(splitedNcid) < 5 {
+			Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
+			if err != nil {
+				log.Printf("Error create block %s: %s", bcid.String(), err)
+				return
+			}
+			err = localNode.Blockstore.Put(Nblk)
+			if err != nil {
+				log.Printf("Error writing block to datastore: %s", err)
+				return
+			}
+			return
+		}
+
+		typ := splitedNcid[2]
+
+		switch typ {
+		case "append":
+			if has, err := localNode.Blockstore.Has(bcid); !has || err != nil {
+				log.Printf("Error append field to block %s: %s", bcid.String(), err)
+				return
+			}
+			beginOffset, err := strconv.Atoi(splitedNcid[3])
+			if err != nil {
+				log.Printf("Error append field to block %s: %s", bcid.String(), err)
+				return
+			}
+			endOffset, err := strconv.Atoi(splitedNcid[4])
+			if err != nil {
+				log.Printf("Error append field to block %s: %s", bcid.String(), err)
+				return
+			}
+			err = localNode.Blockstore.Append(bcid, []byte(value), beginOffset, endOffset)
+			if err != nil {
+				log.Printf("Error append field to block %s: %s", bcid.String(), err)
+				return
+			}
+		case "update":
+			_, err := strconv.Atoi(splitedNcid[3])
+			if err != nil {
+				log.Printf("Error append field to block %s: %s", bcid.String(), err)
+				return
+			}
+			_, err = strconv.Atoi(splitedNcid[4])
+			if err != nil {
+				log.Printf("Error append field to block %s: %s", bcid.String(), err)
+				return
+			}
+			if has, _ := localNode.Blockstore.Has(bcid); true == has {
+				err := localNode.Blockstore.DeleteBlock(bcid)
+				if err != nil {
+					log.Printf("Error delete block %s: %s", bcid.String(), err)
+				}
+			}
+			Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
+			if err != nil {
+				log.Printf("Error create block %s: %s", bcid.String(), err)
+				return
+			}
+			err = localNode.Blockstore.Put(Nblk)
+			if err != nil {
+				log.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
+				return
+			}
+		default:
+			log.Printf("Wrong type in put block")
+		}
+	}()
+
 	return nil
 }
 

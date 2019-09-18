@@ -47,7 +47,11 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 			return res, nil
 		}
 	case metainfo.PutBlock:
-		go handlePutBlock(km, metaValue, from)
+		err := handlePutBlock(km, metaValue, from)
+		if err != nil {
+			log.Println("put Blcok Error: ", err)
+			return metainfo.MetaPutBlockErr, nil
+		}
 	default: //没有匹配的信息，报错
 		return "", metainfo.ErrWrongType
 	}
