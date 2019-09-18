@@ -63,7 +63,7 @@ func PersistBeforeExit() error {
 	if localNode == nil || ProContracts == nil {
 		return ErrProviderServiceNotReady
 	}
-	channels := GetChannels()
+	channels := getChannels()
 	for _, channel := range channels {
 		// 保存本地形式：K-userID，V-channel此时的value
 		km, err := metainfo.NewKeyMeta(channel.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)

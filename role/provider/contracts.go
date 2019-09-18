@@ -20,7 +20,7 @@ func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) e
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping success")
 	}
-	err = SaveChannel(km.GetMid())
+	err = saveChannel(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Channel err", err)
 	} else {
@@ -69,7 +69,7 @@ func getUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 	return upkeepingItem, nil
 }
 
-func SaveChannel(userID string) error {
+func saveChannel(userID string) error {
 	if pos.GetPosId() == userID {
 		return nil
 	}
@@ -122,11 +122,11 @@ func SaveChannel(userID string) error {
 	return nil
 }
 
-func GetChannel(userID string) (contracts.ChannelItem, error) {
+func getChannel(userID string) (contracts.ChannelItem, error) {
 	var channelItem contracts.ChannelItem
 	value, ok := ProContracts.channelBook.Load(userID)
 	if !ok {
-		SaveChannel(userID)
+		saveChannel(userID)
 
 		value, ok = ProContracts.channelBook.Load(userID)
 		if !ok {
@@ -138,7 +138,7 @@ func GetChannel(userID string) (contracts.ChannelItem, error) {
 	return channelItem, nil
 }
 
-func GetChannels() []contracts.ChannelItem {
+func getChannels() []contracts.ChannelItem {
 	var channels []contracts.ChannelItem
 	ProContracts.channelBook.Range(func(_, channnelItem interface{}) bool {
 		channel, ok := channnelItem.(contracts.ChannelItem)

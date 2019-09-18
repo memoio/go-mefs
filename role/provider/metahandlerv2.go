@@ -54,7 +54,7 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 	return metainfo.MetaHandlerComplete, nil
 }
 
-// 获取这个节点的角色信息，返回错误说明provider还没有启动好
+// GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
 func (provider *ProviderHandlerV2) GetRole() (string, error) {
 	return provider.Role, nil
 }

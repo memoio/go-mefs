@@ -28,7 +28,7 @@ func (cs *ContractService) SaveContracts() error {
 	if err != nil {
 		return err
 	}
-	err = cs.SaveChannel()
+	err = cs.saveChannel()
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (cs *ContractService) saveUpkeeping() error {
 	return nil
 }
 
-func (cs *ContractService) SaveChannel() error {
+func (cs *ContractService) saveChannel() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err

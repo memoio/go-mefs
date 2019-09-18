@@ -122,7 +122,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			return "", errors.New("Block is not found")
 		}
 		if key != "" {
-			channelItem, err := GetChannel(userID)
+			channelItem, err := getChannel(userID)
 			if err != nil {
 				return "", errors.New("Find channelItem in channelBook error")
 			}
