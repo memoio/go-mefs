@@ -28,10 +28,10 @@ var (
 )
 
 // ChannelABI is the input ABI used to generate the binding from.
-const ChannelABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"channelRecipient\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"channelSender\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"startDate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"hash\",\"type\":\"bytes32\"},{\"name\":\"value\",\"type\":\"uint256\"},{\"name\":\"sign\",\"type\":\"bytes\"}],\"name\":\"CloseChannel\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"ChannelTimeout\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"timeOut\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getStartDate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"name\":\"to\",\"type\":\"address\"},{\"name\":\"timeout\",\"type\":\"uint256\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"fallback\"}]"
+const ChannelABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"channelRecipient\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"channelSender\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"startDate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"hash\",\"type\":\"bytes32\"},{\"name\":\"value\",\"type\":\"uint256\"},{\"name\":\"sign\",\"type\":\"bytes\"}],\"name\":\"CloseChannel\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"ChannelTimeout\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getInfo\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"timeOut\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"name\":\"to\",\"type\":\"address\"},{\"name\":\"timeout\",\"type\":\"uint256\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"fallback\"}]"
 
 // ChannelBin is the compiled bytecode used for deploying new contracts.
-const ChannelBin = `0x608060405260405161047f38038061047f8339818101604052604081101561002657600080fd5b508051602090910151600180546001600160a01b039093166001600160a01b0319938416179055600080549092163317909155426002556003556104108061006f6000396000f3fe6080604052600436106100705760003560e01c80632b7fa6be1161004e5780632b7fa6be146100df578063396582451461019e578063614d85e1146101b357806378f305c6146101c857610070565b806304758e7914610072578063075aa0c4146100a35780630b97bc86146100b8575b005b34801561007e57600080fd5b506100876101dd565b604080516001600160a01b039092168252519081900360200190f35b3480156100af57600080fd5b506100876101ec565b3480156100c457600080fd5b506100cd6101fb565b60408051918252519081900360200190f35b3480156100eb57600080fd5b506100706004803603606081101561010257600080fd5b81359160208101359181019060608101604082013564010000000081111561012957600080fd5b82018360208201111561013b57600080fd5b8035906020019184600183028401116401000000008311171561015d57600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550610201945050505050565b3480156101aa57600080fd5b506100706102bd565b3480156101bf57600080fd5b506100cd6102d0565b3480156101d457600080fd5b506100cd6102d6565b6001546001600160a01b031681565b6000546001600160a01b031681565b60025481565b6001546001600160a01b0316331461021857600080fd5b604080513060601b6020808301919091526034808301869052835180840390910181526054909201909252805191012083811461025457600080fd5b600061026085846102dc565b6000549091506001600160a01b0380831691161461027d57600080fd5b6001546040516001600160a01b039091169085156108fc029086906000818181858888f193505050506102af57600080fd5b6000546001600160a01b0316ff5b426003546002540111156102af57600080fd5b60035481565b60025490565b600081516041146102ef575060006103d5565b60208201516040830151606084015160001a7f7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a082111561033557600093505050506103d5565b601b8160ff16101561034557601b015b8060ff16601b1415801561035d57508060ff16601c14155b1561036e57600093505050506103d5565b6040805160008152602080820180845289905260ff8416828401526060820186905260808201859052915160019260a0808401939192601f1981019281900390910190855afa1580156103c5573d6000803e3d6000fd5b5050506020604051035193505050505b9291505056fea265627a7a72305820c305b57bf9d2c6f1e842f0fcfc6da09af4e0c8ec7c16998c8fff81d23595b34464736f6c63430005090032`
+const ChannelBin = `0x60806040526040516104c73803806104c78339818101604052604081101561002657600080fd5b508051602090910151600180546001600160a01b039093166001600160a01b0319938416179055600080549092163317909155426002556003556104588061006f6000396000f3fe6080604052600436106100705760003560e01c80632b7fa6be1161004e5780632b7fa6be146100df578063396582451461019e5780635a9b0b89146101b3578063614d85e1146101f757610070565b806304758e7914610072578063075aa0c4146100a35780630b97bc86146100b8575b005b34801561007e57600080fd5b5061008761020c565b604080516001600160a01b039092168252519081900360200190f35b3480156100af57600080fd5b5061008761021b565b3480156100c457600080fd5b506100cd61022a565b60408051918252519081900360200190f35b3480156100eb57600080fd5b506100706004803603606081101561010257600080fd5b81359160208101359181019060608101604082013564010000000081111561012957600080fd5b82018360208201111561013b57600080fd5b8035906020019184600183028401116401000000008311171561015d57600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550610230945050505050565b3480156101aa57600080fd5b506100706102ec565b3480156101bf57600080fd5b506101c86102ff565b6040805194855260208501939093526001600160a01b0391821684840152166060830152519081900360800190f35b34801561020357600080fd5b506100cd61031e565b6001546001600160a01b031681565b6000546001600160a01b031681565b60025481565b6001546001600160a01b0316331461024757600080fd5b604080513060601b6020808301919091526034808301869052835180840390910181526054909201909252805191012083811461028357600080fd5b600061028f8584610324565b6000549091506001600160a01b038083169116146102ac57600080fd5b6001546040516001600160a01b039091169085156108fc029086906000818181858888f193505050506102de57600080fd5b6000546001600160a01b0316ff5b426003546002540111156102de57600080fd5b6002546003546000546001546001600160a01b03918216911690919293565b60035481565b600081516041146103375750600061041d565b60208201516040830151606084015160001a7f7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a082111561037d576000935050505061041d565b601b8160ff16101561038d57601b015b8060ff16601b141580156103a557508060ff16601c14155b156103b6576000935050505061041d565b6040805160008152602080820180845289905260ff8416828401526060820186905260808201859052915160019260a0808401939192601f1981019281900390910190855afa15801561040d573d6000803e3d6000fd5b5050506020604051035193505050505b9291505056fea265627a7a7230582035c9113e352d06f963777e5cbf46f7892eaffca8a045ff5dbe5e935cc72e939464736f6c63430005090032`
 
 // DeployChannel deploys a new Ethereum contract, binding an instance of Channel to it.
 func DeployChannel(auth *bind.TransactOpts, backend bind.ContractBackend, to common.Address, timeout *big.Int) (common.Address, *types.Transaction, *Channel, error) {
@@ -240,30 +240,38 @@ func (_Channel *ChannelCallerSession) ChannelSender() (common.Address, error) {
 	return _Channel.Contract.ChannelSender(&_Channel.CallOpts)
 }
 
-// GetStartDate is a free data retrieval call binding the contract method 0x78f305c6.
+// GetInfo is a free data retrieval call binding the contract method 0x5a9b0b89.
 //
-// Solidity: function getStartDate() constant returns(uint256)
-func (_Channel *ChannelCaller) GetStartDate(opts *bind.CallOpts) (*big.Int, error) {
+// Solidity: function getInfo() constant returns(uint256, uint256, address, address)
+func (_Channel *ChannelCaller) GetInfo(opts *bind.CallOpts) (*big.Int, *big.Int, common.Address, common.Address, error) {
 	var (
 		ret0 = new(*big.Int)
+		ret1 = new(*big.Int)
+		ret2 = new(common.Address)
+		ret3 = new(common.Address)
 	)
-	out := ret0
-	err := _Channel.contract.Call(opts, out, "getStartDate")
-	return *ret0, err
+	out := &[]interface{}{
+		ret0,
+		ret1,
+		ret2,
+		ret3,
+	}
+	err := _Channel.contract.Call(opts, out, "getInfo")
+	return *ret0, *ret1, *ret2, *ret3, err
 }
 
-// GetStartDate is a free data retrieval call binding the contract method 0x78f305c6.
+// GetInfo is a free data retrieval call binding the contract method 0x5a9b0b89.
 //
-// Solidity: function getStartDate() constant returns(uint256)
-func (_Channel *ChannelSession) GetStartDate() (*big.Int, error) {
-	return _Channel.Contract.GetStartDate(&_Channel.CallOpts)
+// Solidity: function getInfo() constant returns(uint256, uint256, address, address)
+func (_Channel *ChannelSession) GetInfo() (*big.Int, *big.Int, common.Address, common.Address, error) {
+	return _Channel.Contract.GetInfo(&_Channel.CallOpts)
 }
 
-// GetStartDate is a free data retrieval call binding the contract method 0x78f305c6.
+// GetInfo is a free data retrieval call binding the contract method 0x5a9b0b89.
 //
-// Solidity: function getStartDate() constant returns(uint256)
-func (_Channel *ChannelCallerSession) GetStartDate() (*big.Int, error) {
-	return _Channel.Contract.GetStartDate(&_Channel.CallOpts)
+// Solidity: function getInfo() constant returns(uint256, uint256, address, address)
+func (_Channel *ChannelCallerSession) GetInfo() (*big.Int, *big.Int, common.Address, common.Address, error) {
+	return _Channel.Contract.GetInfo(&_Channel.CallOpts)
 }
 
 // StartDate is a free data retrieval call binding the contract method 0x0b97bc86.

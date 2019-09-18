@@ -20,6 +20,7 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
+// ConstructGroupService Constructs GroupService
 func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int, redeploy bool) *GroupService {
 	if privKey == nil {
 		return nil
@@ -37,7 +38,8 @@ func ConstructGroupService(userid string, privKey []byte, duration int64, capaci
 	}
 }
 
-//TODO:在使用provider之前都应该检查一下连接性
+// StartGroupService starts gp
+// TODO:在使用provider之前都应该检查一下连接性
 func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isInit bool) error {
 	if gp == nil {
 		return ErrCannotConnectNetwork
@@ -91,7 +93,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 			// keeper数量、provider的数量应以合约约定为主
 			gp.keeperSLA = int(item.KeeperSLA)
 			gp.providerSLA = int(item.ProviderSLA)
-			err = gp.ConnectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
+			err = gp.connectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
 			if err != nil {
 				return err
 			}
@@ -108,7 +110,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	return nil
 }
 
-func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
+func (gp *GroupService) connectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
 	log.Println("Begin to connect user's keepers and providers:", gp.Userid)
 	waitTime := 0 //进行网络连接
 	for {
@@ -614,39 +616,42 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	timeOut := big.NewInt(int64(d * 24 * 60 * 60)) //秒，存储时间
 	var moneyToChannel = new(big.Int)
 	moneyToChannel = moneyToChannel.Mul(big.NewInt(s), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
-	for _, providerAddr := range providers {
-		channelAddr, err := contracts.DeployChannelContract(hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
-		if err == contracts.ErrNotDeployedResolver {
-			log.Println("the provider" + providerAddr.String() + "has not deployed resolver")
-			continue
-		} else if err != nil {
-			return err
-		}
-		//设置channel的value初始值为0
-		//存到本地
-		channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
-		if err != nil {
-			return err
-		}
-		key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-		//存到provider上
-		providerID, err := address.GetIDFromAddress(providerAddr.String())
-		if err != nil {
-			return err
-		}
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-	}
-	log.Println("user has deployed all channel-contract successfully!")
 
+	var wg sync.WaitGroup
+
+	for _, proAddr := range providers {
+		wg.Add(1)
+		providerAddr := proAddr
+		go func() {
+			defer wg.Done()
+			channelAddr, err := contracts.DeployChannelContract(hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
+			if err != nil {
+				return
+			}
+			//设置channel的value初始值为0
+			//存到本地
+			channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+			if err != nil {
+				return
+			}
+			key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
+			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
+			if err != nil {
+				return
+			}
+			//存到provider上
+			providerID, err := address.GetIDFromAddress(providerAddr.String())
+			if err != nil {
+				return
+			}
+			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
+			if err != nil {
+				return
+			}
+		}()
+	}
+	wg.Done()
+	log.Println("user has deployed all channel-contract successfully!")
 	return nil
 }
 

@@ -83,13 +83,15 @@ func saveChannel(userID string) error {
 	if err != nil {
 		return err
 	}
-	channelAddr, _, err := contracts.GetChannelAddr(proAddr, proAddr, userAddr)
+
+	chanItem, err := contracts.GetChannelInfo(proAddr, proAddr, userAddr)
 	if err != nil {
 		return err
 	}
+
 	// 先去本地查
 	var value = new(big.Int)
-	km, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+	km, err := metainfo.NewKeyMeta(chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
 	if err != nil {
 		return err
 	}
@@ -106,19 +108,13 @@ func saveChannel(userID string) error {
 			return errors.New("bigint setString error")
 		}
 	}
-	log.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
-	time, err := contracts.GetChannelStartDate(proAddr, proAddr, userAddr)
-	if err != nil {
-		return err
-	}
-	channel := contracts.ChannelItem{
-		UserID:      userID,
-		ChannelAddr: channelAddr.String(),
-		ProID:       proID,
-		Value:       value,
-		StartTime:   time,
-	}
-	ProContracts.channelBook.Store(userID, channel)
+	log.Println("保存在内存中的channel.value为:", chanItem.ChannelAddr, value.String())
+
+	chanItem.UserID = userID
+	chanItem.ProID = proID
+	chanItem.Value = value
+
+	ProContracts.channelBook.Store(userID, chanItem)
 	return nil
 }
 

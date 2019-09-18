@@ -23,6 +23,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
+// DeleteObject deletes a object in lfs
 func (lfs *LfsService) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -55,6 +56,7 @@ func (lfs *LfsService) DeleteObject(bucketName, objectName string) (*pb.ObjectIn
 	return &object.ObjectInfo, nil
 }
 
+// HeadObject get the info of an object
 func (lfs *LfsService) HeadObject(bucketName, objectName string) (*pb.ObjectInfo, string, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -86,6 +88,7 @@ func (lfs *LfsService) HeadObject(bucketName, objectName string) (*pb.ObjectInfo
 	return &object.ObjectInfo, AvailTime, nil
 }
 
+// ListObject lists all objects of a bucket
 func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -126,6 +129,7 @@ func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.Obj
 	return objects, availTimes, nil
 }
 
+// ShowStorageSpace show lfs used space
 func (lfs *LfsService) ShowStorageSpace(bucketName, pre string) (int, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -153,6 +157,7 @@ func (lfs *LfsService) ShowStorageSpace(bucketName, pre string) (int, error) {
 	return storageSpace, nil
 }
 
+// Upload has info for upload
 type Upload struct { //一个上传任务实例
 	LfsService  *LfsService
 	Object      *Object
@@ -166,6 +171,7 @@ type Upload struct { //一个上传任务实例
 	keepers     []string
 }
 
+// ConstructUpload constructs upload process
 func (lfs *LfsService) ConstructUpload(objectName, namePrefix, bucketName string, file files.Node) (Job, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -378,7 +384,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				err = localNode.Blocks.PutBlockTo(b, providers[i])
 				if err != nil {
 					log.Println("Put Block", ncid, "to", providers[i], "failed:", err)
-					err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, providers[i], offset)
+					err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, providers[i], offset)
 					if err != nil {
 						return err
 					}
@@ -386,7 +392,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				}
 				count++
 
-				err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, providers[i], offset)
+				err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, providers[i], offset)
 				if err != nil {
 					return err
 				}
@@ -397,7 +403,7 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 			for ; i < int(blockCount); i++ {
 				bm.SetBid(strconv.Itoa(i))
 				ncid := bm.ToString()
-				err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, ul.LfsService.UserID, offset)
+				err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, ul.LfsService.UserID, offset)
 				if err != nil {
 					return err
 				}
@@ -412,12 +418,12 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				if err != nil || provider == ul.LfsService.UserID {
 					log.Println("Append Block to", provider, "failed:", err)
 					if _, err := peer.IDB58Decode(provider); provider != "" && err == nil {
-						err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
+						err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, provider, offset)
 						if err != nil {
 							return err
 						}
 					} else {
-						err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, ul.LfsService.UserID, offset)
+						err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, ul.LfsService.UserID, offset)
 						if err != nil {
 							return err
 						}
@@ -435,14 +441,14 @@ func (ul *Upload) putObject(ctx context.Context, encoder *dataformat.DataEncoder
 				err = localNode.Blocks.PutBlockTo(b, provider)
 				if err != nil {
 					log.Println("Append Block", ncid, "to", provider, "failed:", err)
-					err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
+					err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, provider, offset)
 					if err != nil {
 						return err
 					}
 					continue
 				}
 				count++
-				err = GetGroupService(ul.LfsService.UserID).PutDataMetaToKeepers(ncid, provider, offset)
+				err = GetGroupService(ul.LfsService.UserID).putDataMetaToKeepers(ncid, provider, offset)
 				if err != nil {
 					return err
 				}
@@ -496,6 +502,7 @@ func (lfs *LfsService) getLastChalTime(blockID string) (time.Time, error) {
 	return latestTime, err
 }
 
+// GetObjectAvailTime get available time of objects
 func (lfs *LfsService) GetObjectAvailTime(object *Object) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := lfs.CurrentLog.BucketByID[object.BucketID]

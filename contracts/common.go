@@ -74,6 +74,7 @@ type ChannelItem struct {
 	ProID       string
 	ChannelAddr string
 	Value       *big.Int
+	Money       *big.Int
 	StartTime   string // 部署的时间
 	Duration    int64  // timeout
 }

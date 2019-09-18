@@ -18,7 +18,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-const MetaTagFlag = dataformat.BLS12
+const metaTagFlag = dataformat.BLS12
 
 //----------------------Flush SuperBlock---------------------------
 
@@ -57,7 +57,7 @@ func (lfs *LfsService) flushSuperBlockLocal(sb *SuperBlock) error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, _, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, 0, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+	dataEncoded, _, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, 0, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *SuperBlock) error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, offset, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, sb.MetaBackupCount-1, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+	dataEncoded, offset, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, sb.MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (lfs *LfsService) flushSuperBlockToProvider(sb *SuperBlock) error {
 		if err != nil {
 			return err
 		}
-		err = GetGroupService(lfs.UserID).PutDataMetaToKeepers(ncid, providers[j], int(offset))
+		err = GetGroupService(lfs.UserID).putDataMetaToKeepers(ncid, providers[j], int(offset))
 		if err != nil {
 			return err
 		}
@@ -163,7 +163,7 @@ func (lfs *LfsService) flushBucketInfoLocal(bucket *Bucket) error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, _, err := dataformat.DataEncodeToMul(BucketBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+	dataEncoded, _, err := dataformat.DataEncodeToMul(BucketBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 	if err != nil {
 		return err
 	}
@@ -209,7 +209,7 @@ func (lfs *LfsService) flushBucketInfoToProvider(bucket *Bucket) error {
 	}
 	ncidPrefix := bm.ToString(3)
 	BucketBytes := BucketBuffer.Bytes()
-	dataEncoded, offset, err := dataformat.DataEncodeToMul(BucketBytes, ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+	dataEncoded, offset, err := dataformat.DataEncodeToMul(BucketBytes, ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 	for j := 0; j < int(MetaBackupCount); j++ { //
 		bm.SetBid(strconv.Itoa(j))
 		ncid := bm.ToString()
@@ -227,7 +227,7 @@ func (lfs *LfsService) flushBucketInfoToProvider(bucket *Bucket) error {
 		if err != nil {
 			return err
 		}
-		err = GetGroupService(lfs.UserID).PutDataMetaToKeepers(ncid, providers[j], int(offset))
+		err = GetGroupService(lfs.UserID).putDataMetaToKeepers(ncid, providers[j], int(offset))
 		if err != nil {
 			return err
 		}
@@ -268,13 +268,13 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucket *Bucket) error {
 	for _, object := range bucket.Objects {
 		if objectsBuffer.Len() >= utils.BlockSize { //如果object的总长度大于规定的size，则分块
 			objectsBlockLength += objectsBuffer.Len()
-			// dataEncoded, _, err := dataformat.DataEncode(objectsBuffer.Bytes(), dataformat.DefaultSegmentSize, MetaTagFlag)
+			// dataEncoded, _, err := dataformat.DataEncode(objectsBuffer.Bytes(), dataformat.DefaultSegmentSize, metaTagFlag)
 			bm, err := metainfo.NewBlockMeta(lfs.UserID, strconv.Itoa(int(-bucketID)), strconv.Itoa(objectsStripeID), "0")
 			if err != nil {
 				return err
 			}
 			ncidPrefix := bm.ToString(3)
-			dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+			dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 			// dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, dataformat.BLS, AllUsers.GetGroupService(lfs.UserID).KeySet)
 			if err != nil {
 				return err
@@ -314,7 +314,7 @@ func (lfs *LfsService) flushObjectsInfoLocal(bucket *Bucket) error {
 			return err
 		}
 		ncidPrefix := bm.ToString(3)
-		dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+		dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 		if err != nil {
 			return err
 		}
@@ -366,7 +366,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucket *Bucket) error {
 				return err
 			}
 			ncidPrefix := bm.ToString(3)
-			dataEncoded, offset, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+			dataEncoded, offset, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 			if err != nil {
 				return err
 			}
@@ -385,7 +385,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucket *Bucket) error {
 					return err
 				}
 
-				err = GetGroupService(lfs.UserID).PutDataMetaToKeepers(ncid, providers[j], int(offset))
+				err = GetGroupService(lfs.UserID).putDataMetaToKeepers(ncid, providers[j], int(offset))
 				if err != nil {
 					return err
 				}
@@ -411,7 +411,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucket *Bucket) error {
 			return err
 		}
 		ncidPrefix := bm.ToString(3)
-		dataEncoded, offset, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, MetaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
+		dataEncoded, offset, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, GetGroupService(lfs.UserID).GetKeyset())
 		if err != nil {
 			return err
 		}
@@ -430,7 +430,7 @@ func (lfs *LfsService) flushObjectsInfoToProvider(bucket *Bucket) error {
 				return err
 			}
 
-			err = GetGroupService(lfs.UserID).PutDataMetaToKeepers(ncid, providers[j], int(offset))
+			err = GetGroupService(lfs.UserID).putDataMetaToKeepers(ncid, providers[j], int(offset))
 			if err != nil {
 				return err
 			}

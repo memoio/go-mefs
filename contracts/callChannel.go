@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -205,20 +206,55 @@ func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.In
 	return verify, nil
 }
 
-//GetChannelStartDate used to get the startDate of channel-contract
-func GetChannelStartDate(localAddr, providerAddr, userAddr common.Address) (string, error) {
-	_, channelContract, err := GetChannelAddr(localAddr, providerAddr, userAddr)
+//GetChannelInfo used to get the startDate of channel-contract
+func GetChannelInfo(localAddr, providerAddr, userAddr common.Address) (ChannelItem, error) {
+	var item ChannelItem
+	channelAddr, channelContract, err := GetChannelAddr(localAddr, providerAddr, userAddr)
 	if err != nil {
-		return "", err
+		return item, err
+	}
+	retryCount := 0
+	for {
+		retryCount++
+		startDate, timeOut, sender, receiver, err := channelContract.GetInfo(&bind.CallOpts{
+			From: localAddr,
+		})
+		if err != nil {
+			if retryCount > 10 {
+				fmt.Println("Get Channel Info:", err)
+				return item, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		if sender.String() != userAddr.String() || receiver.String() != providerAddr.String() {
+			return item, errors.New("sender and receiver is not compatabile")
+		}
+
+		item = ChannelItem{
+			StartTime:   utils.UnixToTime(startDate.Int64()).Format(utils.SHOWTIME),
+			Duration:    timeOut.Int64(),
+			ChannelAddr: channelAddr.String(),
+		}
+		break
 	}
 
-	startDate, err := channelContract.GetStartDate(&bind.CallOpts{
-		From: localAddr,
-	})
-	if err != nil {
-		fmt.Println("GetStartDateErr:", err)
-		return "", err
+	retryCount = 0
+	for {
+		retryCount++
+		balance, err := QueryBalance(channelAddr.String())
+		if err != nil {
+			if retryCount > 10 {
+				fmt.Println("Get Channel Balance: ", err)
+				return item, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		item.Money = balance
+		break
 	}
 
-	return utils.UnixToTime(startDate.Int64()).Format(utils.SHOWTIME), nil
+	return item, nil
 }
