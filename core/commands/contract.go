@@ -28,11 +28,12 @@ var ContractCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"deployKeeper":             deployKeeperCmd,             //deploy keeper contract
-		"setKeeper":                setKeeperCmd,                //将传入的账户设为keeper
-		"deployProvider":           deployProviderCmd,           //deploy keeper contract
-		"setProvider":              setProviderCmd,              //将传入的账户设为provider
-		"deployKeeperProviderMap":  deployKeeperProviderMapCmd,  //部署 KeeperProviderMap 合约
+		"deployKeeper":             deployKeeperCmd,            //deploy keeper contract
+		"setKeeper":                setKeeperCmd,               //将传入的账户设为keeper
+		"deployProvider":           deployProviderCmd,          //deploy keeper contract
+		"setProvider":              setProviderCmd,             //将传入的账户设为provider
+		"deployKeeperProviderMap":  deployKeeperProviderMapCmd, //部署 KeeperProviderMap 合约
+		"addMasterKeeper":          addMasterKeeperCmd,
 		"addKeeperProviderToKPMap": addKeeperProviderToKPMapCmd, //往KeeperProviderMap里添加keeper和provider
 		"deleteProviderInKPMap":    deleteProviderInKPMapCmd,    //删除KeeperProviderMap里的指定provider
 		"deleteKeeperInKPMap":      deleteKeeperInKPMapCmd,      //删除keeperProviderMap里的指定keeper
@@ -359,6 +360,63 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 		providerAddr := common.HexToAddress(paddr[2:])
 
 		err = contracts.AddKeeperProvidersToKPMap(localAddress, hexSk, keeperAddr, []common.Address{providerAddr})
+		if err != nil {
+			fmt.Println("addKeeperProviderToKPMapErr:", err)
+			return err
+		}
+
+		fmt.Println("Add keeper and provider map success")
+
+		list := &StringList{}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var addMasterKeeperCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "addMasterKeeperCmd",
+		ShortDescription: "add master Keeper to KeeperProviderMap contract",
+	},
+	Arguments: []cmds.Argument{ //参数列表
+		cmds.StringArg("kaddress", true, false, "keeper address, 0x...").EnableStdin(),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		contracts.EndPoint = cfg.Eth
+		sk, err := node.PrivateKey.Bytes()
+		if err != nil {
+			return err
+		}
+
+		hexSk := address.SkByteToString(sk)
+		localAddr, _ := address.GetAdressFromSk(hexSk)
+		localAddress := common.HexToAddress(localAddr[2:])
+
+		kaddr := req.Arguments[0]
+
+		keeperAddr := common.HexToAddress(kaddr[2:])
+
+		err = contracts.AddKeeperProvidersToKPMap(localAddress, hexSk, keeperAddr, []common.Address{localAddress})
 		if err != nil {
 			fmt.Println("addKeeperProviderToKPMapErr:", err)
 			return err
