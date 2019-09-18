@@ -14,18 +14,9 @@ import (
 )
 
 func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
-	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	keeperContractAddr, _, err := getResolverFromIndexer(localAddress, "keeper")
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
-		return keeperContract, err
-	}
-
-	_, keeperContractAddr, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, "keeper")
-	if err != nil {
-		fmt.Println("getkeeperContractErr:", err)
+		fmt.Println("get keeper Contract Err:", err)
 		return keeperContract, err
 	}
 
@@ -55,18 +46,9 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 }
 
 func getProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
-	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	providerContractAddr, _, err := getResolverFromIndexer(localAddress, "provider")
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
-		return providerContract, err
-	}
-
-	_, providerContractAddr, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, "provider")
-	if err != nil {
-		fmt.Println("getproviderContractErr:", err)
+		fmt.Println("get provider Contract Err:", err)
 		return providerContract, err
 	}
 
@@ -95,7 +77,7 @@ func IsProvider(localaddress common.Address) (bool, error) {
 	return isProvider, nil
 }
 
-//KeeperContract deploy a keeper contract
+// KeeperContract deploy a keeper contract
 func KeeperContract(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
