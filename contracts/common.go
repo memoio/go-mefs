@@ -286,8 +286,11 @@ func getResolverFromResolver(localAddress, ownerAddress common.Address, resolver
 }
 
 func deployResolverToResolver(localAddress common.Address, resolverInstance *resolver.Resolver, hexKey string) (common.Address, *resolver.Resolver, error) {
-	var resolverAddr common.Address
-	var secondInstance *resolver.Resolver
+	resolverAddr, secondInstance, err := getResolverFromResolver(localAddress, localAddress, resolverInstance)
+	if err == nil {
+		return resolverAddr, secondInstance, nil
+	}
+
 	client := GetClient(EndPoint)
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
