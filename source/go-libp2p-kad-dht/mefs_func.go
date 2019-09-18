@@ -380,6 +380,8 @@ func (dht *IpfsDHT) bootstrapRegular() {
 
 	ctx := dht.ctx
 
+	time.Sleep(30 * time.Second)
+	go dht.Bootstrap(ctx)
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -390,5 +392,4 @@ func (dht *IpfsDHT) bootstrapRegular() {
 			go dht.Bootstrap(ctx)
 		}
 	}
-
 }
