@@ -224,6 +224,7 @@ func saveProInfo() error {
 	if err != nil {
 		return err
 	}
+	proItem.ProviderID = proID
 	ProContracts.proInfo = proItem
 	return nil
 }
