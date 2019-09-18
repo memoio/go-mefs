@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -68,17 +67,10 @@ func testChannelTimeout() (err error) {
 		log.Fatal("create provider fails")
 	}
 
-	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		log.Fatal("newIndexerErr:", err)
-		return err
-	}
-
 	providerAddr := common.HexToAddress(proAddr[2:])
 
 	log.Println("test deploy channel resolver")
-	_, err = contracts.DeployResolverForChannel(proSk, providerAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(proSk, providerAddr)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
 		return err
@@ -169,17 +161,10 @@ func testCloseChannel() (err error) {
 		log.Fatal("create provider fails")
 	}
 
-	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		log.Fatal("newIndexerErr:", err)
-		return err
-	}
-
 	providerAddr := common.HexToAddress(proAddr[2:])
 
 	log.Println("test deploy channel resolver")
-	_, err = contracts.DeployResolverForChannel(userSk, providerAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(userSk, providerAddr)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
 		return err

@@ -30,6 +30,7 @@ func DeployQuery(userAddress common.Address, sk *ecdsa.PrivateKey, capacity int6
 	fmt.Println("begin to deploy query-contract...")
 
 	var queryAddr common.Address
+
 	//获得resolver
 	resolver, err := getResolverFromIndexer(userAddress, "query")
 	if err != nil {
@@ -291,8 +292,8 @@ func GetOfferInfo(localAddress common.Address, offerAddress common.Address) (Off
 }
 
 // GetMarketAddr get query/offer address by MarketType
-func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (common.Address, error) {
-	var marketAddr common.Address
+func getMarketAddrs(localAddr, ownerAddr common.Address, addrType MarketType) ([]common.Address, error) {
+	var marketAddr []common.Address
 	var resolverInstance *resolver.Resolver
 	var err error
 	switch addrType {
@@ -323,10 +324,22 @@ func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (co
 		fmt.Println("getMarketAddressesErr:", err)
 		return marketAddr, err
 	}
-	if len(Addresses) == 0 {
+
+	marketLen := len(Addresses)
+
+	if marketLen == 0 || Addresses[marketLen-1].String() == InvalidAddr {
 		return marketAddr, ErrNotDeployedMarket
 	}
-	// 返回最新的offer、query地址
-	marketAddr = Addresses[len(Addresses)-1]
+
 	return marketAddr, nil
+}
+
+func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (common.Address, error) {
+	var marketAddr common.Address
+	addrs, err := getMarketAddrs(localAddr, ownerAddr, addrType)
+	if err != nil {
+		return marketAddr, err
+	}
+
+	return addrs[len(addrs)-1], nil
 }

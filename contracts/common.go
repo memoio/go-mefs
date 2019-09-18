@@ -135,67 +135,128 @@ func QueryBalance(account string) (balance *big.Int, err error) {
 	return balance, nil
 }
 
-//DeployResolverForChannel provider deploys resolver to save mapper
-func DeployResolverForChannel(hexKey string, localAddress common.Address, indexer *indexer.Indexer) (common.Address, error) {
-	fmt.Println("begin deploy resolver...")
-	sk, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
+func getResolver(hexKey, key string, localAddress common.Address) (common.Address, error) {
+	var resolverAddr common.Address
+
 	client := GetClient(EndPoint)
-
-	auth.GasPrice = big.NewInt(100)
-	//查看是否已经部署过
-	_, resolverAddrGetted, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, localAddress.String())
+	indexerAddr := common.HexToAddress(IndexerHex)
+	indexer, err := indexer.NewIndexer(indexerAddr, client)
 	if err != nil {
-		fmt.Println("getResolverErr:", err)
-		return resolverAddrGetted, err
-	}
-	if resolverAddrGetted.String() != "" && resolverAddrGetted.String() != InvalidAddr { //说明部署过
-		log.Println("you have deployed resolver already")
-		return resolverAddrGetted, nil
-	}
-
-	//provider部署resolver
-	auth = bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	resolverAddr, _, _, err := resolver.DeployResolver(auth, client)
-	if err != nil {
-		fmt.Println("deployResolverErr:", err)
+		log.Println("new Indexer err: ", err)
 		return resolverAddr, err
 	}
-	log.Println("resolverAddr:", resolverAddr.String())
+
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return resolverAddr, err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		_, resolverAddr, err := indexer.Get(&bind.CallOpts{
+			From: localAddress,
+		}, key)
+		if err != nil {
+			if retryCount > 20 {
+				return resolverAddr, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if len(resolverAddr) > 0 && resolverAddr.String() != InvalidAddr {
+			return resolverAddr, nil
+		} else {
+			return resolverAddr, ErrNotDeployedResolver
+		}
+	}
+}
+
+func deployResolver(hexKey, key string, localAddress common.Address) (common.Address, error) {
+	resolverAddr, err := getResolver(hexKey, key, localAddress)
+	if err == nil {
+		return resolverAddr, nil
+	}
+
+	client := GetClient(EndPoint)
+
+	indexerAddr := common.HexToAddress(IndexerHex)
+	indexer, err := indexer.NewIndexer(indexerAddr, client)
+	if err != nil {
+		log.Println("new Indexer err: ", err)
+		return resolverAddr, err
+	}
+
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return resolverAddr, err
+	}
+
+	retryCount := 0
+	for {
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		resolverAddr, _, _, err = resolver.DeployResolver(auth, client)
+		if err != nil {
+			retryCount++
+			if retryCount > 20 {
+				fmt.Println("deploy Resolver Err:", err)
+				return resolverAddr, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		break
+	}
 
 	//将resolver地址放进indexer中,关键字key可以理解为resolverAddress的索引
 	//resolver-for-channel的key为providerAddr.string()
-	fmt.Print("wait for resolverAddr added into indexer...")
-	auth = bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	_, err = indexer.Add(auth, localAddress.String(), resolverAddr)
-	if err != nil {
-		fmt.Println("\naddResolverErr:", err)
-		return resolverAddr, err
-	}
-
-	//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
+	retryCount = 0
 	for {
-		time.Sleep(30 * time.Second)
-		_, resolverAddrGetted, err = indexer.Get(&bind.CallOpts{
-			From: localAddress,
-		}, localAddress.String())
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		_, err = indexer.Add(auth, key, resolverAddr)
 		if err != nil {
-			fmt.Println("\ngetContractsErr:", err)
-			return resolverAddr, err
+			retryCount++
+			if retryCount > 20 {
+				fmt.Println("\naddResolverErr:", err)
+				return resolverAddr, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
 		}
-		if resolverAddrGetted == resolverAddr { //放进去了
-			fmt.Println("done!")
-			break
-		}
-	}
 
-	fmt.Println("resolver have been successfully deployed!")
+		retryCount = 0
+		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
+		for {
+			retryCount++
+			time.Sleep(30 * time.Second)
+			_, resolverAddrGetted, err := indexer.Get(&bind.CallOpts{
+				From: localAddress,
+			}, key)
+			if err != nil {
+				if retryCount > 20 {
+					fmt.Println("add then get Resolver Err:", err)
+					return resolverAddr, err
+				}
+				continue
+			}
+			if resolverAddrGetted == resolverAddr { //放进去了
+				break
+			}
+		}
+		break
+	}
 	return resolverAddr, nil
+}
+
+//DeployResolverForChannel provider deploys resolver to save mapper
+func DeployResolverForChannel(hexKey string, localAddress common.Address) (common.Address, error) {
+	return deployResolver(hexKey, localAddress.String(), localAddress)
 }
 
 func getResolverFromIndexer(localAddress common.Address, key string) (*resolver.Resolver, error) {
@@ -250,23 +311,36 @@ func deployMapper(localAddress common.Address, resolver *resolver.Resolver, auth
 		log.Println("mapperAddr:", mapperAddr.String())
 
 		//把mapper放进resolver
-		_, err = resolver.Add(auth, mapperAddr)
-		if err != nil {
-			fmt.Println("addMapperErr:", err)
-			return mapperInstance, err
-		}
-		for { //验证是否放进resolver
-			mapperGetted, err := resolver.Get(&bind.CallOpts{
-				From: localAddress,
-			}, localAddress)
+		retryCount := 0
+		for {
+			_, err = resolver.Add(auth, mapperAddr)
 			if err != nil {
-				fmt.Println("getMapperErr:", err)
-				return mapperInstance, err
+				retryCount++
+				if retryCount > 20 {
+					return mapperInstance, err
+				}
+				time.Sleep(30 * time.Second)
+				continue
 			}
-			if mapperGetted == mapperAddr {
-				break
+
+			retryCount = 0
+			for { //验证是否放进resolver
+				retryCount++
+				time.Sleep(30 * time.Second)
+				mapperGetted, err := resolver.Get(&bind.CallOpts{
+					From: localAddress,
+				}, localAddress)
+				if err != nil {
+					if retryCount > 20 {
+						return mapperInstance, err
+					}
+					continue
+				}
+				if mapperGetted == mapperAddr {
+					break
+				}
 			}
-			time.Sleep(8 * time.Second)
+			break
 		}
 	} else { //部署过mapper，直接根据mapperAddr获得mapper
 		mapperInstance, err = mapper.NewMapper(mapperAddr, GetClient(EndPoint))
