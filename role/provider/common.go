@@ -116,8 +116,9 @@ func getDiskTotal() uint64 {
 	} else {
 		if proItem.Capacity == 0 {
 			maxSpaceInByte = 10 * 1024 * 1024 * 1024
+		} else {
+			maxSpaceInByte = uint64(proItem.Capacity) * 1024 * 1024
 		}
-		maxSpaceInByte = uint64(proItem.Capacity) * 1024 * 1024
 	}
 	return maxSpaceInByte
 }
