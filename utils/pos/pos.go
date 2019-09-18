@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	// addr: 0x164C1f79B17f2e5854690186770B214dd231Ed81
 	PosSkStr = "724c1e75ba94dd0305cf532cd6db95df0721c33dcdc323502eba067409e4842b"
 )
 
