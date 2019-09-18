@@ -650,7 +650,7 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 			}
 		}()
 	}
-	wg.Done()
+	wg.Wait()
 	log.Println("user has deployed all channel-contract successfully!")
 	return nil
 }
