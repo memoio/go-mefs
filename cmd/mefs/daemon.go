@@ -456,7 +456,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		if pos {
 			fmt.Println("Start pos Service")
-			go provider.PosSerivce(req.Context)
+			go provider.PosService(req.Context)
 		}
 	default:
 	}

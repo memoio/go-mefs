@@ -214,7 +214,7 @@ func getOffer() (contracts.OfferItem, error) {
 	return ProContracts.offer, nil
 }
 
-func saveProvider() error {
+func saveProInfo() error {
 	proID := localNode.Identity.Pretty()
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {

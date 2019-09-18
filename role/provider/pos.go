@@ -22,26 +22,22 @@ import (
 )
 
 const (
-	LowWater  = 0.8 // 数据生成为总量的80%
-	HighWater = 0.9 // 使用量达到90%后，删除10%的块
+	lowWater  = 0.8 // 数据生成为总量的80%
+	highWater = 0.9 // 使用量达到90%后，删除10%的块
+	mullen    = 100 * 1024 * 1024
+	offset    = 25599
 )
 
 // uid is defined in utils/pos
 
-var curGid int = -1024
-var curSid int = -1
+var curGid = -1024
+var curSid = -1
 var posID string
 var posAddr string
 var posCidPrefix string
 var inGenerate int
 var keeperIDs []string
 var posSkByte []byte
-
-// 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
-const (
-	mullen = 100 * 1024 * 1024
-	offset = 25599
-)
 
 var opt = &df.DataEncoder{
 	DataCount:   1,
@@ -50,7 +46,8 @@ var opt = &df.DataEncoder{
 	SegmentSize: df.DefaultSegmentSize,
 }
 
-func PosSerivce(ctx context.Context) {
+// PosService starts pos
+func PosService(ctx context.Context) {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
 	posID = pos.GetPosId()
@@ -156,14 +153,14 @@ func doGenerateOrDelete() {
 	ratio := float64(usedSpace / totalSpace)
 	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
-	if ratio <= LowWater {
-		generatePosBlocks(uint64(float64(totalSpace) * (LowWater - ratio)))
-	} else if ratio >= HighWater {
+	if ratio <= lowWater {
+		generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
+	} else if ratio >= highWater {
 		deletePosBlocks(uint64(usedSpace / 10))
 	}
 }
 
-func UploadMulpolicy(data []byte) ([][]byte, int, error) {
+func uploadMulpolicy(data []byte) ([][]byte, int, error) {
 	opt.Policy = df.MulPolicy
 	// 构建加密秘钥
 	buckid := localNode.Identity.Pretty() + strconv.Itoa(curGid)
@@ -209,7 +206,7 @@ func generatePosBlocks(increaseSpace uint64) {
 			curGid += 1024
 		}
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		data, _, err := UploadMulpolicy(tmpData)
+		data, _, err := uploadMulpolicy(tmpData)
 		if err != nil {
 			log.Println("UploadMulpolicy in generate Pos Blocks error :", err)
 			continue
