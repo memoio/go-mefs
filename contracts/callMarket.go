@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -37,91 +36,53 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 		return queryAddr, err
 	}
 
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return queryAddr, err
-	}
-
 	//获得mapper
-	auth := bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	client := GetClient(EndPoint)
-	mapper, err := deployMapper(userAddress, userAddress, resolver, hexKey)
+	mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return queryAddr, err
 	}
 
 	//尝试获取query合约地址，如果已经存在就不部署
-	queryLen := 0
 	if !reDeployQuery { //用户不想重新部署offer，那我们首先应该检查以前是否部署过，如果部署过，就直接返回，否则就部署
-		queryAddresses, err := mapper.Get(&bind.CallOpts{
-			From: userAddress,
-		})
+		queryAddr, err = getLatestAddrFromMapper(userAddress, mapperInstance)
 		if err != nil {
-			fmt.Println("getOfferAddressesErr:", err)
+			fmt.Println("get query addresses err:", err)
 			return queryAddr, err
 		}
-
-		queryLen = len(queryAddresses)
-		if queryLen > 0 && queryAddresses[queryLen-1].String() != InvalidAddr { //部署过
-			fmt.Println("you have already deployed query-contract, so we will not deploy again")
-			return queryAddresses[queryLen-1], nil
-		}
+		return queryAddr, nil
 	}
 
-	// 部署query
-	auth = bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	queryAddr, _, _, err = market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("deployQueryErr:", err)
+		log.Println("HexToECDSA err: ", err)
 		return queryAddr, err
 	}
-	//queryAddress放进mapper,多尝试几次，以免出现未知错误
-
+	client := GetClient(EndPoint)
+	// 部署query
 	retryCount := 0
 	for {
-		auth = bind.NewKeyedTransactor(sk)
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = mapper.Add(auth, queryAddr)
+		queryAddr, _, _, err = market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 		if err != nil {
-			retryCount++
-			if retryCount > 20 {
+			if retryCount > 5 {
+				fmt.Println("deployQueryErr:", err)
 				return queryAddr, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(time.Minute)
 			continue
-		}
-
-		retryCount = 0
-		//尝试从mapper中获取queryAddr，以检测queryAddr是否已放进mapper中，user可能部署过其他的query合约，检测方式是查看query合约地址有没有加1
-		for {
-			time.Sleep(30 * time.Second)
-			queryAddresses, err := mapper.Get(&bind.CallOpts{
-				From: userAddress,
-			})
-			if err != nil {
-				retryCount++
-				if retryCount > 20 {
-					return queryAddr, err
-				}
-				continue
-			}
-			if len(queryAddresses) > queryLen && queryAddresses[queryLen].String() == queryAddr.String() {
-				break
-			}
-
-			retryCount++
-			if retryCount > 20 {
-				return queryAddr, errors.New("add query addr to mapper error")
-			}
 		}
 		break
 	}
 
+	err = addToMapper(userAddress, mapperInstance, queryAddr, hexKey)
+	if err != nil {
+		return queryAddr, err
+	}
+
 	fmt.Println("query-contract have been successfully deployed!")
-	return queryAddr, err
+	return queryAddr, nil
 }
 
 //SetQueryCompleted when user has found providers and keepers needed, user call this function
@@ -136,13 +97,23 @@ func SetQueryCompleted(hexKey string, userAddress common.Address, queryAddress c
 		fmt.Println("HexToECDSAErr:", err)
 		return err
 	}
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	_, err = query.SetCompleted(auth)
-	if err != nil {
-		fmt.Println("setCompletedErr:", err)
-		return err
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		_, err = query.SetCompleted(auth)
+		if err != nil {
+			if retryCount > 5 {
+				fmt.Println("set query Completed Err:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+		break
 	}
+
 	return nil
 }
 
@@ -155,121 +126,95 @@ func GetQueryInfo(localAddress common.Address, queryAddress common.Address) (Que
 		fmt.Println("newQueryErr:", err)
 		return item, err
 	}
-	capacity, duration, price, ks, ps, completed, err := query.Get(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		fmt.Println("getQueryParamsErr:", err)
-		return item, err
+	retryCount := 0
+	for {
+		retryCount++
+		capacity, duration, price, ks, ps, completed, err := query.Get(&bind.CallOpts{
+			From: localAddress,
+		})
+		if err != nil {
+			if retryCount > 10 {
+				fmt.Println("getQueryParamsErr:", err)
+				return item, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		item = QueryItem{
+			Capacity:     capacity.Int64(),
+			Duration:     duration.Int64(),
+			Price:        price.Int64(),
+			KeeperNums:   int32(ks.Int64()),
+			ProviderNums: int32(ps.Int64()),
+			Completed:    completed,
+		}
+		break
 	}
-	item = QueryItem{
-		Capacity:     capacity.Int64(),
-		Duration:     duration.Int64(),
-		Price:        price.Int64(),
-		KeeperNums:   int32(ks.Int64()),
-		ProviderNums: int32(ps.Int64()),
-		Completed:    completed,
-	}
+
 	return item, nil
 }
 
 //DeployOffer provider use it to deploy offer-contract
-func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64, reDeployOffer bool) error {
+func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, duration int64, price int64, reDeployOffer bool) (common.Address, error) {
 	fmt.Println("begin to deploy offer-contract...")
-
+	var offerAddr common.Address
 	//获得resolver实例
 	_, resolverInstance, err := getResolverFromIndexer(providerAddress, "offer")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
-		return err
+		return offerAddr, err
 	}
 
 	//部署mapper，如果部署过就直接返回
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		fmt.Println("HexToECDSAErr:", err)
-		return err
+		return offerAddr, err
 	}
-	auth := bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
+
 	client := GetClient(EndPoint)
-	mapper, err := deployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
+	mapperInstance, err := deployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
 	if err != nil {
 		fmt.Println("deployMapperErr:", err)
-		return err
+		return offerAddr, err
 	}
 
-	offerLen := 0
 	if !reDeployOffer { //用户不想重新部署offer，那我们首先应该检查以前是否部署过，如果部署过，就直接返回，否则就部署
-		offerAddressesGetted, err := mapper.Get(&bind.CallOpts{
-			From: providerAddress,
-		})
+		offerAddr, err := getLatestAddrFromMapper(providerAddress, mapperInstance)
 		if err != nil {
-			fmt.Println("getOfferAddressesErr:", err)
-			return err
+			fmt.Println("get Offer Addresses Err:", err)
+			return offerAddr, err
 		}
 
-		offerLen = len(offerAddressesGetted)
-		if offerLen != 0 && offerAddressesGetted[0].String() != InvalidAddr { //代表用户之前就部署过offer
-			fmt.Println("you have deployed offer already")
-			return nil
-		}
+		return offerAddr, nil
 	}
 
 	//部署offer
-	auth = bind.NewKeyedTransactor(sk)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	offerAddr, _, _, err := market.DeployOffer(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price)) //提供存储容量 存储时段 存储单价
-	if err != nil {
-		fmt.Println("deployOfferErr:", err)
-		return err
-	}
-	log.Println("offerAddr:", offerAddr.String())
-
-	//offerAddress放进mapper,多尝试几次，以免出现未知错误
-	//尝试从mapper中获取offerAddr，以检测offerAddr是否已放进mapper中，provider可能部署过其他的offer合约，检测方式是查看offer合约地址有没有加1
 	retryCount := 0
 	for {
-		auth = bind.NewKeyedTransactor(sk)
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = mapper.Add(auth, offerAddr)
+		offerAddr, _, _, err = market.DeployOffer(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price)) //提供存储容量 存储时段 存储单价
 		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				return err
+			if retryCount > 5 {
+				fmt.Println("deploy Offer Err:", err)
+				return offerAddr, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(time.Minute)
 			continue
-		}
-
-		retryCount = 0
-		//尝试从mapper中获取queryAddr，以检测queryAddr是否已放进mapper中，user可能部署过其他的query合约，检测方式是查看query合约地址有没有加1
-		for {
-			time.Sleep(30 * time.Second)
-			offerAddresses, err := mapper.Get(&bind.CallOpts{
-				From: providerAddress,
-			})
-			if err != nil {
-				retryCount++
-				if retryCount > 20 {
-					return err
-				}
-				continue
-			}
-			if len(offerAddresses) > offerLen && offerAddresses[offerLen].String() == offerAddr.String() {
-				break
-			}
-
-			retryCount++
-			if retryCount > 20 {
-				return errors.New("add offer addr to mapper error")
-			}
 		}
 		break
 	}
 
+	//offerAddress放进mapper
+	err = addToMapper(providerAddress, mapperInstance, offerAddr, hexKey)
+	if err != nil {
+		return offerAddr, err
+	}
+
 	fmt.Println("offer-contract have been successfully deployed!")
-	return nil
+	return offerAddr, nil
 
 }
 
@@ -281,24 +226,35 @@ func GetOfferInfo(localAddress common.Address, offerAddress common.Address) (Off
 		fmt.Println("newOfferErr:", err)
 		return item, err
 	}
-	capacity, duration, price, err := offer.Get(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		fmt.Println("getOfferParamsErr:", err)
-		return item, err
+
+	retryCount := 0
+	for {
+		retryCount++
+		capacity, duration, price, err := offer.Get(&bind.CallOpts{
+			From: localAddress,
+		})
+		if err != nil {
+			if retryCount > 10 {
+				fmt.Println("getOfferParamsErr:", err)
+				return item, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		item = OfferItem{
+			Capacity: capacity.Int64(),
+			Duration: duration.Int64(),
+			Price:    price.Int64(),
+		}
+		break
 	}
-	item = OfferItem{
-		Capacity: capacity.Int64(),
-		Duration: duration.Int64(),
-		Price:    price.Int64(),
-	}
+
 	return item, nil
 }
 
 // GetMarketAddr get query/offer address by MarketType
-func getMarketAddrs(localAddr, ownerAddr common.Address, addrType MarketType) ([]common.Address, error) {
-	var marketAddr []common.Address
+func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (common.Address, error) {
+	var marketAddr common.Address
 	var resolverInstance *resolver.Resolver
 	var err error
 	switch addrType {
@@ -317,34 +273,17 @@ func getMarketAddrs(localAddr, ownerAddr common.Address, addrType MarketType) ([
 	default:
 		return marketAddr, ErrMarketType
 	}
-	mapper, err := getMapperInstance(localAddr, ownerAddr, resolverInstance)
+
+	mapperInstance, err := getMapperInstance(localAddr, ownerAddr, resolverInstance)
 	if err != nil {
 		fmt.Println("getMapperErr:", err)
 		return marketAddr, err
 	}
-	Addresses, err := mapper.Get(&bind.CallOpts{
-		From: ownerAddr,
-	})
+
+	marketAddr, err = getLatestAddrFromMapper(ownerAddr, mapperInstance)
 	if err != nil {
 		fmt.Println("getMarketAddressesErr:", err)
 		return marketAddr, err
 	}
-
-	marketLen := len(Addresses)
-
-	if marketLen == 0 || Addresses[marketLen-1].String() == InvalidAddr {
-		return marketAddr, ErrNotDeployedMarket
-	}
-
 	return marketAddr, nil
-}
-
-func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (common.Address, error) {
-	var marketAddr common.Address
-	addrs, err := getMarketAddrs(localAddr, ownerAddr, addrType)
-	if err != nil {
-		return marketAddr, err
-	}
-
-	return addrs[len(addrs)-1], nil
 }

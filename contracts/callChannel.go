@@ -38,7 +38,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 		auth.Value = moneyToChannel //放进合约里的钱
 		channelAddr, _, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
 		if err != nil {
-			if retryCount > 3 {
+			if retryCount > 5 {
 				fmt.Println("deploy Channel Err:", err)
 				return channelAddr, err
 			}
@@ -139,7 +139,7 @@ func CloseChannel(hexKey string, localAddress common.Address, ownerAddress commo
 // 当在CloseChannel()中被调用，则localAddress是providerAddr
 func getChannel(mapperInstance *mapper.Mapper, localAddress common.Address) (common.Address, *channel.Channel, error) {
 
-	channelAddr, err := getAddrFromMapper(localAddress, mapperInstance)
+	channelAddr, err := getLatestAddrFromMapper(localAddress, mapperInstance)
 	if err != nil {
 		return channelAddr, nil, err
 	}

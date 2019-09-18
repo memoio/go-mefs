@@ -398,8 +398,8 @@ func addToMapper(localAddress common.Address, mapperInstance *mapper.Mapper, add
 	return errors.New("add address to mapper fail")
 }
 
-func getAddrFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) (common.Address, error) {
-	var addr common.Address
+func getAllAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) ([]common.Address, error) {
+	var addr []common.Address
 	retryCount := 0
 	for {
 		retryCount++
@@ -415,11 +415,20 @@ func getAddrFromMapper(localAddress common.Address, mapperInstance *mapper.Mappe
 			continue
 		}
 		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
-			return channels[len(channels)-1], nil
+			return channels, nil
 		} else {
 			return addr, errors.New("get addr from mapper error")
 		}
 	}
+}
+
+func getLatestAddrFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) (common.Address, error) {
+	var addr common.Address
+	addrs, err := getAllAddrsFromMapper(localAddress, mapperInstance)
+	if err != nil {
+		return addr, err
+	}
+	return addrs[len(addrs)-1], nil
 }
 
 // SaveKpMap saves kpmap

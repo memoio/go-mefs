@@ -59,7 +59,7 @@ func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duratio
 	if reDeployOffer { //用户想要重新部署offer合约
 		log.Println("provider wants to redeploy offer-contract")
 	}
-	err = contracts.DeployOffer(localAddress, hexPK, capacity, duration, price, reDeployOffer)
+	_, err = contracts.DeployOffer(localAddress, hexPK, capacity, duration, price, reDeployOffer)
 	if err != nil {
 		return err
 	}
