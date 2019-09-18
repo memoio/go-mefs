@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -68,17 +67,10 @@ func testChannelTimeout() (err error) {
 		log.Fatal("create provider fails")
 	}
 
-	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		log.Fatal("newIndexerErr:", err)
-		return err
-	}
-
 	providerAddr := common.HexToAddress(proAddr[2:])
 
 	log.Println("test deploy channel resolver")
-	_, err = contracts.DeployResolverForChannel(proSk, providerAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(providerAddr, proSk)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
 		return err
@@ -114,6 +106,17 @@ func testChannelTimeout() (err error) {
 		break
 	}
 
+	log.Println("test query channel addr")
+	newChannel, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
+	if err != nil {
+		log.Println("Get Channel StartDate Err: ", err)
+		return err
+	}
+
+	if newChannel.String() != channelAddr.String() {
+		log.Println("Get Wrong Channel")
+	}
+
 	log.Println("test query channel start date")
 	_, err = contracts.GetChannelStartDate(localAddr, providerAddr, localAddr)
 	if err != nil {
@@ -123,7 +126,7 @@ func testChannelTimeout() (err error) {
 
 	log.Println("test channel timeout before enddate, should return err")
 	//触发channelTimeout()
-	err = contracts.ChannelTimeout(userSk, localAddr, providerAddr)
+	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
 	if err == nil {
 		log.Println("call channelTimeout success, but time is early")
 		return err
@@ -131,7 +134,7 @@ func testChannelTimeout() (err error) {
 
 	log.Println("test channel timeout after enddate")
 	time.Sleep(300 * time.Second)
-	err = contracts.ChannelTimeout(userSk, localAddr, providerAddr)
+	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
 	if err != nil {
 		log.Println("call channelTimeout err:", err)
 		return err
@@ -169,17 +172,10 @@ func testCloseChannel() (err error) {
 		log.Fatal("create provider fails")
 	}
 
-	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		log.Fatal("newIndexerErr:", err)
-		return err
-	}
-
 	providerAddr := common.HexToAddress(proAddr[2:])
 
 	log.Println("test deploy channel resolver")
-	_, err = contracts.DeployResolverForChannel(userSk, providerAddr, indexer)
+	_, err = contracts.DeployResolverForChannel(providerAddr, proSk)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
 		return err
@@ -215,7 +211,8 @@ func testCloseChannel() (err error) {
 		break
 	}
 
-	chanAddr, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
+	log.Println("test query channel contract")
+	chanAddr, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
 	if err != nil {
 		log.Fatal("GetChannelAddr fails:", err)
 		return err
@@ -225,6 +222,7 @@ func testCloseChannel() (err error) {
 		log.Fatal("Get Wrong ChannelAddr")
 	}
 
+	log.Println("test close channel contract")
 	balance := queryBalance(userAddr) //查看账户余额
 	//签名
 	value := big.NewInt(11111)
@@ -247,7 +245,7 @@ func testCloseChannel() (err error) {
 	}
 
 	//provider触发CloseChannel()
-	err = contracts.CloseChannel(proSk, providerAddr, localAddr, sig, value)
+	err = contracts.CloseChannel(providerAddr, localAddr, proSk, sig, value)
 	if err != nil {
 		log.Fatal("CloseChannelErr:", err)
 		return err

@@ -9,6 +9,7 @@ var (
 
 const (
 	MetaHandlerComplete = "complete"
+	MetaPutBlockErr     = "PutBlockErr"
 )
 
 const (

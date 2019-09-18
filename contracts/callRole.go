@@ -5,27 +5,20 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
+	"github.com/memoio/go-mefs/utils"
 )
 
 func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
-	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	keeperContractAddr, _, err := getResolverFromIndexer(localAddress, "keeper")
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
-		return keeperContract, err
-	}
-
-	_, keeperContractAddr, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, "keeper")
-	if err != nil {
-		fmt.Println("getkeeperContractErr:", err)
+		fmt.Println("get keeper Contract Err:", err)
 		return keeperContract, err
 	}
 
@@ -55,18 +48,9 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 }
 
 func getProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
-	indexerAddr := common.HexToAddress(IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	providerContractAddr, _, err := getResolverFromIndexer(localAddress, "provider")
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
-		return providerContract, err
-	}
-
-	_, providerContractAddr, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, "provider")
-	if err != nil {
-		fmt.Println("getproviderContractErr:", err)
+		fmt.Println("get provider Contract Err:", err)
 		return providerContract, err
 	}
 
@@ -95,7 +79,40 @@ func IsProvider(localaddress common.Address) (bool, error) {
 	return isProvider, nil
 }
 
-//KeeperContract deploy a keeper contract
+// GetProviderInfo returns provider info
+func GetProviderInfo(localAddress, proAddress common.Address) (ProviderItem, error) {
+	var item ProviderItem
+	proContract, err := getProviderContractFromIndexer(localAddress)
+	if err != nil {
+		return item, nil
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		isProvider, money, size, stime, err := proContract.Info(&bind.CallOpts{From: localAddress}, proAddress)
+		if err != nil {
+			if retryCount > 10 {
+				return item, nil
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if isProvider {
+			item = ProviderItem{
+				Money:     money,
+				StartTime: utils.UnixToTime(stime.Int64()).Format(utils.SHOWTIME),
+				Capacity:  size.Int64(),
+			}
+			return item, nil
+		}
+		break
+	}
+
+	return item, errors.New("is not a provider")
+}
+
+// KeeperContract deploy a keeper contract
 func KeeperContract(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
@@ -111,7 +128,7 @@ func KeeperContract(hexKey string) (err error) {
 	}
 	log.Println("keeperContractAddr:", keeperContractAddr.String())
 
-	indexerAddr := common.HexToAddress(IndexerHex)
+	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
@@ -158,7 +175,7 @@ func ProviderContract(hexKey string) (err error) {
 	}
 	log.Println("providerContractAddr:", providerContractAddr.String())
 
-	indexerAddr := common.HexToAddress(IndexerHex)
+	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
@@ -202,7 +219,7 @@ func DeployKeeperProviderMap(hexKey string) error {
 		return err
 	}
 
-	indexerAddr := common.HexToAddress(IndexerHex)
+	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)
@@ -218,7 +235,7 @@ func DeployKeeperProviderMap(hexKey string) error {
 func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role.KeeperProviderMap, error) {
 	var keeperProviderInstance *role.KeeperProviderMap
 
-	indexerAddr := common.HexToAddress(IndexerHex)
+	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newIndexerErr:", err)

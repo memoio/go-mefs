@@ -16,15 +16,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/memoio/go-mefs/utils"
-
 	btcec "github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
-	config "github.com/memoio/go-mefs/config"
 	ci "github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	config "github.com/memoio/go-mefs/config"
+	"github.com/memoio/go-mefs/utils"
 	"golang.org/x/crypto/scrypt"
 )
 

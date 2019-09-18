@@ -52,7 +52,7 @@ type UserService struct {
 	state           UserState
 }
 
-func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int) error {
+func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int, rdo bool) error {
 	err := SetUserState(us.UserID, Starting)
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 	if err != nil {
 		return err
 	}
-	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps)
+	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps, rdo)
 	err = SetGroupService(gp)
 	if err != nil {
 		log.Println("SetGroupService()err")

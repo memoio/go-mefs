@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
@@ -21,7 +20,7 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int) *GroupService {
+func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int, redeploy bool) *GroupService {
 	if privKey == nil {
 		return nil
 	}
@@ -34,6 +33,7 @@ func ConstructGroupService(userid string, privKey []byte, duration int64, capaci
 		storePrice:     price,
 		keeperSLA:      ks,
 		providerSLA:    ps,
+		reDeploy:       redeploy,
 	}
 }
 
@@ -251,12 +251,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			return ErrBalance
 		}
 
-		sk := crypto.ToECDSAUnsafe(gp.PrivateKey)
-		err = contracts.DeployQuery(addr, sk, gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA)
-		if err != nil {
-			return err
-		}
-		queryAddr, err = contracts.GetMarketAddr(addr, addr, contracts.Query) //获取query合约地址
+		queryAddr, err = contracts.DeployQuery(addr, address.SkByteToString(gp.PrivateKey), gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
 		if err != nil {
 			return err
 		}

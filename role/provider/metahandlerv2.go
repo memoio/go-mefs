@@ -47,14 +47,18 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 			return res, nil
 		}
 	case metainfo.PutBlock:
-		go handlePutBlock(km, metaValue, from)
+		err := handlePutBlock(km, metaValue, from)
+		if err != nil {
+			log.Println("put Blcok Error: ", err)
+			return metainfo.MetaPutBlockErr, nil
+		}
 	default: //没有匹配的信息，报错
 		return "", metainfo.ErrWrongType
 	}
 	return metainfo.MetaHandlerComplete, nil
 }
 
-// 获取这个节点的角色信息，返回错误说明provider还没有启动好
+// GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
 func (provider *ProviderHandlerV2) GetRole() (string, error) {
 	return provider.Role, nil
 }

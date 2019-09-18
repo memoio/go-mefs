@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	//ReDeployOffer redeploy offer-contract,default is false
-	ReDeployOffer = false
-
 	DefaultCapacity int64 = 100000 //单位：MB
 	DefaultDuration int64 = 365    //单位：天
 )
@@ -33,6 +30,7 @@ type ProviderContracts struct {
 	channelBook   sync.Map // K-user的id, V-Channel
 	queryBook     sync.Map // K-user的id, V-Query
 	offer         contracts.OfferItem
+	proInfo       contracts.ProviderItem
 }
 
 func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
@@ -112,14 +110,15 @@ func getDiskUsage() (uint64, error) {
 // getDiskTotal gets the disk total space which is set in config
 func getDiskTotal() uint64 {
 	var maxSpaceInByte uint64
-	offerItem, err := getOffer()
+	proItem, err := getProInfo()
 	if err != nil {
 		maxSpaceInByte = 10 * 1024 * 1024 * 1024
 	} else {
-		if offerItem.Capacity == 0 {
+		if proItem.Capacity == 0 {
 			maxSpaceInByte = 10 * 1024 * 1024 * 1024
+		} else {
+			maxSpaceInByte = uint64(proItem.Capacity) * 1024 * 1024
 		}
-		maxSpaceInByte = uint64(offerItem.Capacity) * 1024 * 1024
 	}
 	return maxSpaceInByte
 }

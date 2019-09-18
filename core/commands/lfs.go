@@ -289,6 +289,7 @@ var lfsStartUserCmd = &cmds.Command{
 		cmds.Int64Option("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(user.KeeperSLA),
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(user.ProviderSLA),
+		cmds.BoolOption("reDeployQuery", "rdo", "reDeploy query contract if user has not deploy upkeeping contract").WithDefault(false),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -373,12 +374,19 @@ var lfsStartUserCmd = &cmds.Command{
 			fmt.Println("input wrong provider nums.")
 			return errWrongInput
 		}
+
+		rdo, ok := req.Options["reDeployQuery"].(bool)
+		if !ok {
+			fmt.Println("input wrong value for redeploy.")
+			return errWrongInput
+		}
+
 		uService := user.ConstructUserService(uid)
 		err = user.AddUserBook(uService)
 		if err != nil {
 			return err
 		}
-		err = uService.StartUserService(uService.Context, false, pwd, capacity, duration, price, ks, ps)
+		err = uService.StartUserService(uService.Context, false, pwd, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			user.KillUser(uid)
 			return err

@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -81,4 +83,13 @@ func GetAdressFromSk(sk string) (string, error) {
 	}
 	address := ethcrypto.PubkeyToAddress(*publicKeyECDSA)
 	return address.Hex(), nil
+}
+
+func SkByteToString(sk []byte) string {
+	pk := crypto.ToECDSAUnsafe(sk)
+	pkByte := math.PaddedBigBytes(pk.D, pk.Params().BitSize/8)
+	enc := make([]byte, len(pkByte)*2)
+	//对私钥进行十六进制编码，此处不加上"0x"前缀
+	hex.Encode(enc, pkByte)
+	return string(enc)
 }
