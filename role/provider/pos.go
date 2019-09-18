@@ -162,7 +162,7 @@ func traversePath() {
 			continue
 		}
 
-		curSid = (curSid + 1023) % 1024
+		curSid = (sid + 1023) % 1024
 		if curSid == 1023 {
 			curGid = gid - 1024
 			if curGid < 0 {
