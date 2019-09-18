@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
+	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
@@ -75,6 +78,40 @@ func IsProvider(localaddress common.Address) (bool, error) {
 		return false, err
 	}
 	return isProvider, nil
+}
+
+func GetProviderInfo(localAddress, proAddress common.Address) (ProviderItem, error) {
+	var item ProviderItem
+	proContract, err := getProviderContractFromIndexer(localAddress)
+	if err != nil {
+		return item, nil
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		isProvider, money, size, stime, err := proContract.Info(&bind.CallOpts{From: localAddress}, proAddress)
+		if err != nil {
+			if retryCount > 10 {
+				return item, nil
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if isProvider {
+			pid, _ := address.GetIDFromAddress(proAddress.String())
+			item = ProviderItem{
+				ProviderID: pid,
+				Money:      money,
+				StartTime:  utils.UnixToTime(stime.Int64()).Format(utils.SHOWTIME),
+				Capacity:   size.Int64(),
+			}
+			return item, nil
+		}
+		break
+	}
+
+	return item, errors.New("is not a provider")
 }
 
 // KeeperContract deploy a keeper contract

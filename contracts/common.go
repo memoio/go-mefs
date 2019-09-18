@@ -99,6 +99,13 @@ type OfferItem struct {
 	Price      int64 // 合约给出的单价
 }
 
+type ProviderItem struct {
+	ProviderID string   // providerid
+	Capacity   int64    // MB
+	Money      *big.Int // pledge time
+	StartTime  string   // start time
+}
+
 type kpItem struct {
 	keeperIDs []string
 }
