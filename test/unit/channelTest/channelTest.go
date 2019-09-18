@@ -118,9 +118,9 @@ func testChannelTimeout() (err error) {
 	}
 
 	log.Println("test query channel start date")
-	_, err = contracts.GetChannelStartDate(localAddr, providerAddr, localAddr)
+	_, err = contracts.GetChannelInfo(localAddr, providerAddr, localAddr)
 	if err != nil {
-		log.Println("Get Channel StartDate Err: ", err)
+		log.Println("Get Channel Info Err: ", err)
 		return err
 	}
 

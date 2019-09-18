@@ -84,15 +84,15 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 		return err
 	}
 
-	cs := ConstructContractService(us.UserID)
+	cs := constructContractService(us.UserID)
 	err = SetContractService(us.UserID, cs)
 	if err != nil {
 		log.Println("SetContractService()err")
 		return err
 	}
-	err = cs.SaveContracts()
+	err = cs.saveContracts()
 	if err != nil {
-		log.Println("SaveContracts err:", err)
+		log.Println("saveContracts err:", err)
 	}
 
 	lfs := ConstructLfsService(us.UserID, userkey.PrivateKey)
@@ -404,9 +404,9 @@ func ShowInfo(userID string) map[string]string {
 		return outmap
 	}
 	//计算当前合约的花费(合约总金额-当前余额)
-	upkeeping, err := cs.GetUpkeepingItem()
+	upkeeping, err := cs.getUpkeepingItem()
 	if err != nil {
-		outmap["error: "] = "GetUpkeepingItem() err:" + err.Error()
+		outmap["error: "] = "getUpkeepingItem() err:" + err.Error()
 		return outmap
 	}
 	outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr

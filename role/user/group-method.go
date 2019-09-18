@@ -140,7 +140,7 @@ func (gp *GroupService) GetProviders(count int) ([]string, error) {
 	return providers, ErrNoEnoughProvider
 }
 
-//从provider获取数据块的元数据，传入数据块id号
+// GetBlockProviders 从provider获取数据块的元数据，传入数据块id号
 //返回值为保存数据块的pid，offset，错误信息
 func (gp *GroupService) GetBlockProviders(blockID string) (string, int, error) {
 	if gp == nil {
@@ -197,7 +197,7 @@ func (gp *GroupService) GetBlockProviders(blockID string) (string, int, error) {
 	return pidstr, offset, nil
 }
 
-func (gp *GroupService) PutDataMetaToKeepers(blockID string, provider string, offset int) error {
+func (gp *GroupService) putDataMetaToKeepers(blockID string, provider string, offset int) error {
 	if gp == nil {
 		return ErrGroupServiceNotReady
 	}
@@ -224,7 +224,7 @@ func (gp *GroupService) PutDataMetaToKeepers(blockID string, provider string, of
 }
 
 //删除块
-func (gp *GroupService) DeleteBlocksFromProvider(blockID string, updateMeta bool) error {
+func (gp *GroupService) deleteBlocksFromProvider(blockID string, updateMeta bool) error {
 	if gp == nil {
 		return ErrGroupServiceNotReady
 	}

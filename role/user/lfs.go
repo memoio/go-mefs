@@ -193,7 +193,7 @@ func (lfs *LfsService) Fsync(isForce bool) error {
 		return err
 	}
 	for _, provider := range providers {
-		channel, err := cs.GetChannelItem(provider)
+		channel, err := cs.getChannelItem(provider)
 		if err != nil {
 			continue
 		}

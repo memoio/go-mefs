@@ -9,7 +9,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 )
 
-//Create a bucket for a specified LFSservice
+// CreateBucket create a bucket for a specified LFSservice
 func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, parityCount int) (*pb.BucketInfo, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -66,7 +66,7 @@ func (lfs *LfsService) CreateBucket(bucketName string, policy int, dataCount, pa
 	return &bucket.BucketInfo, nil
 }
 
-//Delete a bucket from a specified LFSservice
+// DeleteBucket deletes a bucket from a specified LFSservice
 func (lfs *LfsService) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -92,7 +92,7 @@ func (lfs *LfsService) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 	return &bucket.BucketInfo, nil
 }
 
-//Get a Bucket's metainfo
+// HeadBucket get a Bucket's metainfo
 func (lfs *LfsService) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -113,7 +113,7 @@ func (lfs *LfsService) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 	return &bucket.BucketInfo, nil
 }
 
-//list all buckets in a lfsservice
+// ListBucket lists all buckets in a lfsservice
 func (lfs *LfsService) ListBucket(pre string) ([]*pb.BucketInfo, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {

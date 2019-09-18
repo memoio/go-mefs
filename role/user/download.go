@@ -21,9 +21,9 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-const DefaultBufSize = 1024 * 1024 * 4
+const defaultBufSize = 1024 * 1024 * 4
 
-const DefaultJobsCount = 1
+const defaultJobsCount = 1
 
 type writeFunc func([]byte, int32, error)
 
@@ -77,6 +77,7 @@ type downloadObject struct {
 	completeFunc []CompleteFunc //完成任务或出错的通知函数
 }
 
+// ConstructDownload constructs lfs download process
 func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (Job, io.Reader, error) {
 	err := isStart(lfs.UserID)
 	if err != nil {
@@ -100,7 +101,7 @@ func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (Job, io
 		return nil, nil, ErrObjectNotExist
 	}
 	piper, pipew := io.Pipe()
-	bufw := bufio.NewWriterSize(pipew, DefaultBufSize)
+	bufw := bufio.NewWriterSize(pipew, defaultBufSize)
 	checkErrAndClosePipe := func(err error) error {
 		if err != nil {
 			err = pipew.CloseWithError(err)
@@ -126,7 +127,7 @@ func (lfs *LfsService) ConstructDownload(bucketName, objectName string) (Job, io
 		completeFunc: complete,
 		decoder:      decoder,
 		State:        Pending,
-		jobsCount:    DefaultJobsCount,
+		jobsCount:    defaultJobsCount,
 		curJob:       0,
 		startTime:    time.Now().Unix(),
 	}, piper, nil
@@ -288,14 +289,14 @@ func (do *downloadObject) Info() (interface{}, error) {
 }
 
 type (
-	//日后用于区分是直接写到某路径，还是通过api的
+	// Destination 日后用于区分是直接写到某路径，还是通过api的
 	Destination struct {
 		typ    int
 		path   string
 		writer io.Writer
 	}
 
-	// a function type that is called when the download completed.
+	// CompleteFunc is a function type that is called when the download completed.
 	CompleteFunc func(error) error
 )
 
@@ -368,7 +369,7 @@ func (ds *downloadStripe) Run(ctx context.Context, stripeID, offsetStart, remain
 					ds.writeFunc(nil, ds.jobID, err)
 					return
 				}
-				channel, err := cs.GetChannelItem(provider)
+				channel, err := cs.getChannelItem(provider)
 				if err != nil {
 					ds.writeFunc(nil, ds.jobID, err)
 					return
@@ -450,7 +451,7 @@ func (ds *downloadStripe) getMessage(ncid string, provider string) ([]byte, *big
 		if cs == nil {
 			return nil, nil, ErrUserNotExist
 		}
-		Item, err := cs.GetChannelItem(provider)
+		Item, err := cs.getChannelItem(provider)
 		if err != nil {
 			return nil, nil, err
 		}

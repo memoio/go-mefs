@@ -39,12 +39,14 @@ type KeeperInfo struct {
 	KeeperID  string
 	Connected bool
 }
+
+// PeersInfo stores keepers and providers
 type PeersInfo struct {
 	Keepers   []*KeeperInfo
 	Providers []string
 }
 
-//------Contracts Type--------
+// ContractService save contract info
 type ContractService struct {
 	UserID        string
 	channelBook   map[string]contracts.ChannelItem // 保存该user所部署的channel合约，K-provider地址，V-合约结构体
@@ -53,6 +55,7 @@ type ContractService struct {
 	queryItem     contracts.QueryItem
 }
 
+// GroupService stores use's groupinfo
 type GroupService struct {
 	Userid         string
 	password       string
@@ -70,7 +73,7 @@ type GroupService struct {
 	reDeploy       bool  //是否重新部署offer
 }
 
-//------LFS Type--------
+// LfsService has lfs info
 type LfsService struct {
 	CurrentLog *Logs //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
 	InProcess  int   //表示此lfs上是否有操作，如上传下载，避免过程中user被Kill
@@ -78,12 +81,14 @@ type LfsService struct {
 	PrivateKey []byte
 }
 
+// Logs records lfs metainfo
 type Logs struct {
 	Sb             *SuperBlock
 	BucketNameToID map[string]int32  //通过BucketName找到Bucket信息
 	BucketByID     map[int32]*Bucket //通过BucketID知道到Bucket信息
 }
 
+// SuperBlock has lfs bucket info
 type SuperBlock struct {
 	pb.SuperBlockInfo
 	Bitset *bitset.BitSet
@@ -91,6 +96,7 @@ type SuperBlock struct {
 	Dirty  bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
 }
 
+// Bucket has lfs objects info
 type Bucket struct {
 	pb.BucketInfo
 	Objects map[string]*Object //通过BucketID检索Bucket下文件
@@ -98,6 +104,7 @@ type Bucket struct {
 	Lock    sync.RWMutex
 }
 
+// Object stores object meta info
 type Object struct {
 	pb.ObjectInfo
 	Lock sync.RWMutex
