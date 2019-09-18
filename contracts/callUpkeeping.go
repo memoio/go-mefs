@@ -32,7 +32,7 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 	}
 
 	//获得mapper
-	mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
+	_, mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return err
 	}
@@ -79,9 +79,9 @@ func GetUKFromResolver(ownerAddress common.Address) (ukaddr string, uk *upKeepin
 	}
 
 	//获得mapper
-	mapperInstance, err := getMapperInstance(ownerAddress, ownerAddress, resolver)
+	_, mapperInstance, err := getMapperInstance(ownerAddress, ownerAddress, resolver)
 	if err != nil {
-		fmt.Println("getMapperInstance err:", err)
+		fmt.Println("get Mapper Instance err:", err)
 		return InvalidAddr, uk, err
 	}
 
@@ -100,7 +100,7 @@ func GetUKFromResolver(ownerAddress common.Address) (ukaddr string, uk *upKeepin
 	return ukAddr.String(), uk, nil
 }
 
-//SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
+// SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
 func SpaceTimePay(uk *upKeeping.UpKeeping, userAddress common.Address, providerAddr common.Address, hexKey string, money *big.Int) error {
 	//构建auth,用keeper的私钥
 	key, _ := crypto.HexToECDSA(hexKey)

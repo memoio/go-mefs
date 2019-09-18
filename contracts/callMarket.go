@@ -37,7 +37,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	}
 
 	//获得mapper
-	mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
+	_, mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return queryAddr, err
 	}
@@ -173,7 +173,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 	}
 
 	client := GetClient(EndPoint)
-	mapperInstance, err := deployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
+	_, mapperInstance, err := deployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
 	if err != nil {
 		fmt.Println("deployMapperErr:", err)
 		return offerAddr, err
@@ -274,7 +274,7 @@ func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (co
 		return marketAddr, ErrMarketType
 	}
 
-	mapperInstance, err := getMapperInstance(localAddr, ownerAddr, resolverInstance)
+	_, mapperInstance, err := getMapperInstance(localAddr, ownerAddr, resolverInstance)
 	if err != nil {
 		fmt.Println("getMapperErr:", err)
 		return marketAddr, err

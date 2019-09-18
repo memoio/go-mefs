@@ -47,7 +47,7 @@ func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duratio
 	//先部署resolver-for-channel
 	//如果部署过resolver-for-channel，那接下来就可以直接检查是否部署过offer合约，没有的话就部署
 	//DeployResolver()函数内部会进行判断是否部署过
-	_, err = contracts.DeployResolverForChannel(hexPK, localAddress)
+	_, err = contracts.DeployResolverForChannel(localAddress, hexPK)
 	if err != nil {
 		return err
 	}

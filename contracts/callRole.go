@@ -80,6 +80,7 @@ func IsProvider(localaddress common.Address) (bool, error) {
 	return isProvider, nil
 }
 
+// GetProviderInfo returns provider info
 func GetProviderInfo(localAddress, proAddress common.Address) (ProviderItem, error) {
 	var item ProviderItem
 	proContract, err := getProviderContractFromIndexer(localAddress)
