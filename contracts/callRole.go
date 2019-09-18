@@ -13,7 +13,6 @@ import (
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
@@ -100,12 +99,10 @@ func GetProviderInfo(localAddress, proAddress common.Address) (ProviderItem, err
 			continue
 		}
 		if isProvider {
-			pid, _ := address.GetIDFromAddress(proAddress.String())
 			item = ProviderItem{
-				ProviderID: pid,
-				Money:      money,
-				StartTime:  utils.UnixToTime(stime.Int64()).Format(utils.SHOWTIME),
-				Capacity:   size.Int64(),
+				Money:     money,
+				StartTime: utils.UnixToTime(stime.Int64()).Format(utils.SHOWTIME),
+				Capacity:  size.Int64(),
 			}
 			return item, nil
 		}

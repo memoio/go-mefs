@@ -213,3 +213,25 @@ func getOffer() (contracts.OfferItem, error) {
 	}
 	return ProContracts.offer, nil
 }
+
+func saveProvider() error {
+	proID := localNode.Identity.Pretty()
+	proAddr, err := address.GetAddressFromID(proID)
+	if err != nil {
+		return err
+	}
+	proItem, err := contracts.GetProviderInfo(proAddr, proAddr)
+	if err != nil {
+		return err
+	}
+	ProContracts.proInfo = proItem
+	return nil
+}
+
+func getProInfo() (contracts.ProviderItem, error) {
+	if ProContracts.proInfo.ProviderID == "" {
+		log.Println("provider info hasn't set")
+		return ProContracts.proInfo, ErrGetContractItem
+	}
+	return ProContracts.proInfo, nil
+}

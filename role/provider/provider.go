@@ -36,12 +36,20 @@ func StartProviderService(ctx context.Context, node *core.MefsNode, capacity int
 			}
 		}
 
+		err = saveProvider()
+		if err != nil {
+			log.Println("Save ", localNode.Identity.Pretty(), "'s provider info err", err)
+			return err
+		}
+
+		log.Println("Save ", localNode.Identity.Pretty(), "'s provider info success")
+
 		err = saveOffer()
 		if err != nil {
 			log.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
-		} else {
-			log.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
+			return err
 		}
+		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
 	}
 
 	go getKpMapRegular(ctx)
