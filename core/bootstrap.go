@@ -103,8 +103,8 @@ func Bootstrap(n *MefsNode, cfg BootstrapConfig) (io.Closer, error) {
 	// kick off Routing.Bootstrap?
 	// run dht.Bootstrap, we need to reach out
 	if n.Routing != nil {
-		// ctx := procctx.OnClosingContext(proc)
-		if err := n.Routing.Bootstrap(n.ctx); err != nil {
+		ctx := procctx.OnClosingContext(proc)
+		if err := n.Routing.Bootstrap(ctx); err != nil {
 			proc.Close()
 			return nil, err
 		}
