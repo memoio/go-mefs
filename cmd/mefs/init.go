@@ -115,10 +115,6 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string
 
 	}
 
-	if _, err := fmt.Fprintf(out, "Your role is %s,\nif you want to change your Role:\nplease type `mefs config Role user/keeper/provider` and restart mefs daemon\n", conf.Role); err != nil {
-		return err
-	}
-
 	if err := fsrepo.Init(repoRoot, conf, prikey, password); err != nil {
 		return err
 	}
