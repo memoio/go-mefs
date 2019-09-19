@@ -2,12 +2,11 @@ package blockstore
 
 import (
 	"context"
-	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	metrics "github.com/ipfs/go-metrics-interface"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 )
 
 type cacheHave bool
@@ -136,7 +135,6 @@ func (b *arccache) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error
 
 	segment, tag, err := b.blockstore.GetSegAndTag(k, offset)
 	if err != nil {
-		fmt.Println("error:", err)
 		return nil, nil, err
 	}
 	return segment, tag, nil
