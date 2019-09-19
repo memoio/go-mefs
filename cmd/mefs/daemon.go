@@ -407,6 +407,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	switch value {
 	case metainfo.RoleKeeper:
+		fmt.Println("started as a keeper")
 		enableTendermint, _ := req.Options[enableTendermintKwd].(bool)
 		err = keeper.StartKeeperService(req.Context, node, enableTendermint)
 		if err != nil {
@@ -418,12 +419,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			return err
 		}
 	case metainfo.RoleUser:
+		fmt.Println("started as a user")
 		user.InitUserBook(node)
 
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.UserHandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 		if cfg.Test {
 			us := user.ConstructUserService(node.Identity.Pretty())
 			err := user.AddUserBook(us)
@@ -443,6 +447,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}()
 		}
 	case metainfo.RoleProvider: //provider和keeper同样
+		fmt.Println("started as a provider")
 		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
