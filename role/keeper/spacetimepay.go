@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"github.com/memoio/go-mefs/utils/pos"
 	"log"
 	"math/big"
 	"sort"
@@ -16,6 +15,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 //PayInfo 最近一次支付信息的记录

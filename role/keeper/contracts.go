@@ -37,6 +37,8 @@ func saveUpkeeping(gp *GroupsInfo, userID string) error {
 	item.UserID = userID
 	item.UpKeepingAddr = ukAddr
 	gp.upkeeping = item
+	gp.Providers = item.ProviderIDs
+
 	return nil
 }
 
