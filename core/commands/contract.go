@@ -13,6 +13,7 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
+	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -403,12 +404,13 @@ var addMasterKeeperCmd = &cmds.Command{
 		}
 
 		contracts.EndPoint = cfg.Eth
-		sk, err := node.PrivateKey.Bytes()
+
+		hexSk, err := fr.GetHexPrivKeyFromKS(node.Identity, node.Password)
 		if err != nil {
+			fmt.Println("get HexPK Err", err)
 			return err
 		}
 
-		hexSk := address.SkByteToString(sk)
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
 
