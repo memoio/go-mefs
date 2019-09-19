@@ -45,11 +45,9 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	//尝试获取query合约地址，如果已经存在就不部署
 	if !reDeployQuery { //用户不想重新部署offer，那我们首先应该检查以前是否部署过，如果部署过，就直接返回，否则就部署
 		queryAddr, err = getLatestAddrFromMapper(userAddress, mapperInstance)
-		if err != nil {
-			fmt.Println("get query addresses err:", err)
-			return queryAddr, err
+		if err == nil {
+			return queryAddr, nil
 		}
-		return queryAddr, nil
 	}
 
 	sk, err := crypto.HexToECDSA(hexKey)
@@ -181,12 +179,9 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 
 	if !reDeployOffer { //用户不想重新部署offer，那我们首先应该检查以前是否部署过，如果部署过，就直接返回，否则就部署
 		offerAddr, err := getLatestAddrFromMapper(providerAddress, mapperInstance)
-		if err != nil {
-			fmt.Println("get Offer Addresses Err:", err)
-			return offerAddr, err
+		if err == nil {
+			return offerAddr, nil
 		}
-
-		return offerAddr, nil
 	}
 
 	//部署offer
@@ -215,7 +210,6 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 
 	fmt.Println("offer-contract have been successfully deployed!")
 	return offerAddr, nil
-
 }
 
 //GetOfferInfo get provider's offer-info
