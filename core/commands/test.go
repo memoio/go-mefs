@@ -155,7 +155,7 @@ var showBalanceCmd = &cmds.Command{
 		Tagline: "show balance in the account",
 		ShortDescription: `
 	'
-	mefs lfs show_storage show balance in the account
+	mefs test showBalance show balance in the account
 	`,
 	},
 
