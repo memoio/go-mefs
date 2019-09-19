@@ -2,7 +2,6 @@ package blockstore
 
 import (
 	"context"
-	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
 	metrics "github.com/ipfs/go-metrics-interface"
