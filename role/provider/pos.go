@@ -188,7 +188,7 @@ func doGenerateOrDelete() {
 
 	totalSpace := getDiskTotal()
 
-	ratio := float64(usedSpace / totalSpace)
+	ratio := float64(usedSpace) / float64(totalSpace)
 	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
 	if ratio <= lowWater {
