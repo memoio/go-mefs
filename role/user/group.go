@@ -176,7 +176,7 @@ func (gp *GroupService) connectKeepersAndProviders(ctx context.Context, keepers,
 			}
 
 			// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
-			if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
+			if len(gp.localPeersInfo.Keepers) > 0 {
 				if gp.KeySet == nil {
 					err := gp.loadBLS12Config()
 					if err != nil {
@@ -222,9 +222,6 @@ func (gp *GroupService) connectKeepersAndProviders(ctx context.Context, keepers,
 			}
 		}
 		keepers = unsuccess
-	}
-	if len(gp.localPeersInfo.Keepers) < gp.keeperSLA {
-		return ErrNoEnoughKeeper
 	}
 	return nil
 }
@@ -446,6 +443,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	gp.localPeersInfo.Keepers = make([]*KeeperInfo, 0, gp.keeperSLA)
 	gp.localPeersInfo.Providers = make([]string, 0, gp.providerSLA)
 	//选择keeper
+	gp.tempKeepers = utils.DisorderArray(gp.tempKeepers)
 	for i := 0; i < len(gp.tempKeepers); {
 		if i >= gp.keeperSLA {
 			break
