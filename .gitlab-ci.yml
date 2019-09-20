@@ -8,7 +8,7 @@ stages:
   - upload-test
 
 variables:
-  UPCOUNNT: "100"
+  UPCOUNT: "50"
   NETKEY: "dev"
   ETHENDPOINT: "http://212.64.28.207:8101"
 
