@@ -131,7 +131,7 @@ func (gp *GroupService) connectKeepersAndProviders(ctx context.Context, keepers,
 		return nil
 	}
 
-	connectTryCount := 10
+	connectTryCount := 5
 	// 第一次对所有keeper进行连接，第二次对连接失败的keeper进行连接，依次类推
 	for i := 0; i < connectTryCount; i++ {
 		var unsuccess []string
@@ -174,58 +174,73 @@ func (gp *GroupService) connectKeepersAndProviders(ctx context.Context, keepers,
 			} else {
 				log.Println("Connect to keeper", tempKeeper.KeeperID, "use simple mode")
 			}
-
-			// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
-			if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
-				if gp.KeySet == nil {
-					err := gp.loadBLS12Config()
-					if err != nil {
-						log.Println("Load BLS12 Config error:", err)
-						return err
-					}
-				}
-				for _, pid := range providers {
-					if sc.ConnectTo(ctx, localNode, pid) {
-						log.Println("Connect to provider-", pid, "success.")
-					} else {
-						log.Println("Connect to provider-", pid, "failed.")
-					}
-					if utils.CheckDup(gp.localPeersInfo.Providers, pid) {
-						gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
-					}
-
-				}
-				// 构造key告诉keeper和provider自己已经启动
-				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
-				if err != nil {
-					log.Println("Construct Deployed key error", err)
-					return err
-				}
-				for _, keeper := range gp.localPeersInfo.Keepers {
-					_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
-					if err != nil {
-						log.Println("Send keeper", keeper.KeeperID, " err:", err)
-					}
-				}
-				for _, provider := range gp.localPeersInfo.Providers {
-					_, err = sendMetaRequest(kmPid, gp.Userid, provider)
-					if err != nil {
-						log.Println("Send provider", provider, " err:", err)
-					}
-				}
-				log.Println(gp.Userid + ":Group Service is ready")
-				err = SetUserState(gp.Userid, GroupStarted)
-				if err != nil {
-					return err
-				}
-				return nil
-			}
 		}
+
 		keepers = unsuccess
+		// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
+		if len(gp.localPeersInfo.Keepers) < KeeperSLA {
+			time.Sleep(time.Minute)
+		}
 	}
-	if len(gp.localPeersInfo.Keepers) < gp.keeperSLA {
+
+	if len(gp.localPeersInfo.Keepers) <= 0 {
 		return ErrNoEnoughKeeper
 	}
+
+	for i := 0; i < connectTryCount; i++ {
+		if gp.KeySet == nil {
+			err := gp.loadBLS12Config()
+			if err != nil {
+				log.Println("Load BLS12 Config error:", err)
+				return err
+			}
+		}
+		for _, pid := range providers {
+			if sc.ConnectTo(ctx, localNode, pid) {
+				log.Println("Connect to provider-", pid, "success.")
+			} else {
+				log.Println("Connect to provider-", pid, "failed.")
+			}
+			if utils.CheckDup(gp.localPeersInfo.Providers, pid) {
+				gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
+			}
+		}
+
+		if len(gp.localPeersInfo.Providers) <= 0 {
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		// 构造key告诉keeper和provider自己已经启动
+		kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
+		if err != nil {
+			log.Println("Construct Deployed key error", err)
+			return err
+		}
+		for _, keeper := range gp.localPeersInfo.Keepers {
+			_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
+			if err != nil {
+				log.Println("Send keeper", keeper.KeeperID, " err:", err)
+			}
+		}
+		for _, provider := range gp.localPeersInfo.Providers {
+			_, err = sendMetaRequest(kmPid, gp.Userid, provider)
+			if err != nil {
+				log.Println("Send provider", provider, " err:", err)
+			}
+		}
+		log.Println(gp.Userid + ":Group Service is ready")
+		err = SetUserState(gp.Userid, GroupStarted)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if len(gp.localPeersInfo.Providers) <= 0 {
+		return ErrNoEnoughProvider
+	}
+
 	return nil
 }
 
@@ -446,6 +461,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	gp.localPeersInfo.Keepers = make([]*KeeperInfo, 0, gp.keeperSLA)
 	gp.localPeersInfo.Providers = make([]string, 0, gp.providerSLA)
 	//选择keeper
+	gp.tempKeepers = utils.DisorderArray(gp.tempKeepers)
 	for i := 0; i < len(gp.tempKeepers); {
 		if i >= gp.keeperSLA {
 			break
