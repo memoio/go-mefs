@@ -145,6 +145,18 @@ role_test:
   only:
     - schedules
 
+pos_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - echo $ETHENDPOINT
+    - go run test/unit/posTest/posTest.go -eth=$ETHENDPOINT
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
 js_API_test:
   stage: short-test
   when: always
