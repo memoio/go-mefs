@@ -81,7 +81,7 @@ MetaDeleteBlock(metaKey, metaValue, to string) (string, error)     //通知provi
 
   启动keeper服务
 
-+ `func SearchAllKeepersAndProviders(ctx context.Context) error`
++ `func searchAllKeepersAndProviders(ctx context.Context) error`
 
   不断搜索全网的keeper和provider，并将其加入PeersInfo，全局搜索是用下面的协程
 

@@ -108,7 +108,6 @@ func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 			if kp == localNode.Identity.Pretty() {
 				flag = true
 				tempInfo.LocalKeeper = keeperG
-				continue
 			}
 
 			tempInfo.Keepers = append(tempInfo.Keepers, keeperG)
@@ -244,9 +243,9 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 		return err
 	}
 	log.Println("Keeper Service is ready")
-	err = SearchAllKeepersAndProviders(ctx) //连接节点
+	err = searchAllKeepersAndProviders(ctx) //连接节点
 	if err != nil {
-		log.Println("SearchAllKeepersAndProviders err:", err)
+		log.Println("searchAllKeepersAndProviders err:", err)
 		localNode = nil
 		localPeerInfo = nil
 		return err
@@ -568,33 +567,63 @@ func loadAllUser() error {
 
 			//填写peersinfo.keepers信息
 			//TODO:检查连接性，但由于还没写没连接上该怎么处理的逻辑，先不检查
-			if userKids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userkidsMeta, "local"); userKids != nil && err == nil {
-				if remain := len(userKids) % utils.IDLength; remain != 0 {
-					userKids = userKids[:len(userKids)-remain]
-				}
-				for i := 0; i < len(userKids)/utils.IDLength; i++ {
-					keeperid := string(userKids[i*utils.IDLength : (i+1)*utils.IDLength])
-					keeper := &KeeperInGroup{
-						KID: keeperid,
-					}
-					userPeersInfo.Keepers = append(userPeersInfo.Keepers, keeper)
-				}
-			}
-
-			//填写peersinfo.providers信息
-			if userPids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userpidsMeta, "local"); userPids != nil && err == nil {
-				if remain := len(userPids) % utils.IDLength; remain != 0 {
-					userPids = userPids[:len(userPids)-remain]
-				}
-				for i := 0; i < len(userPids)/utils.IDLength; i++ {
-					provider := string(userPids[i*utils.IDLength : (i+1)*utils.IDLength])
-					userPeersInfo.Providers = append(userPeersInfo.Providers, provider)
-				}
-			}
 			// 保存Upkeeping信息
 			err = saveUpkeeping(&userPeersInfo, userID)
 			if err != nil {
-				log.Println("Save ", userID, "'s Upkeeping error: ", err)
+				if userKids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userkidsMeta, "local"); userKids != nil && err == nil {
+					if remain := len(userKids) % utils.IDLength; remain != 0 {
+						userKids = userKids[:len(userKids)-remain]
+					}
+					flag := false
+					for i := 0; i < len(userKids)/utils.IDLength; i++ {
+						keeperid := string(userKids[i*utils.IDLength : (i+1)*utils.IDLength])
+						keeperG := &KeeperInGroup{
+							KID: keeperid,
+						}
+						if keeperid == localNode.Identity.Pretty() {
+							flag = true
+							userPeersInfo.LocalKeeper = keeperG
+						}
+						userPeersInfo.Keepers = append(userPeersInfo.Keepers, keeperG)
+					}
+
+					if !flag {
+						log.Println(userID, "is not my user")
+						continue
+					}
+				}
+
+				//填写peersinfo.providers信息
+				if userPids, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userpidsMeta, "local"); userPids != nil && err == nil {
+					if remain := len(userPids) % utils.IDLength; remain != 0 {
+						userPids = userPids[:len(userPids)-remain]
+					}
+					for i := 0; i < len(userPids)/utils.IDLength; i++ {
+						provider := string(userPids[i*utils.IDLength : (i+1)*utils.IDLength])
+						userPeersInfo.Providers = append(userPeersInfo.Providers, provider)
+					}
+				}
+				continue
+			} else {
+				flag := false
+				for _, kp := range userPeersInfo.upkeeping.KeeperIDs {
+					keeperG := &KeeperInGroup{
+						KID: kp,
+					}
+					if kp == localNode.Identity.Pretty() {
+						flag = true
+						userPeersInfo.LocalKeeper = keeperG
+					}
+
+					userPeersInfo.Keepers = append(userPeersInfo.Keepers, keeperG)
+				}
+
+				if !flag {
+					log.Println(userID, "is not my user")
+					continue
+				}
+
+				userPeersInfo.Providers = userPeersInfo.upkeeping.ProviderIDs
 			}
 			// 保存Query信息
 			err = saveQuery(userID)
@@ -677,7 +706,7 @@ func loadAllUser() error {
 	return nil
 }
 
-func SearchAllKeepersAndProviders(ctx context.Context) error {
+func searchAllKeepersAndProviders(ctx context.Context) error {
 	if !IsKeeperServiceRunning() {
 		return ErrKeeperServiceNotReady
 	} //只有角色为Keeper才传递
