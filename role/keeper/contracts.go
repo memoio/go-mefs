@@ -157,7 +157,7 @@ func ukAddProvider(uid, pid, sk string) error {
 		return err
 	}
 
-	if localKeeperIsMaster(uid) {
+	if isMasterKeeper(uid, pid) {
 		log.Println("add provider to: ", userAddr)
 
 		err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})

@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -198,6 +199,36 @@ func AddProvider(hexKey string, userAddress common.Address, providerAddress []co
 			continue
 		}
 		break
+	}
+
+	pid, _ := address.GetIDFromAddress(providerAddress[0].String())
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		upItem, err := GetUpkeepingInfo(userAddress, uk)
+		if err != nil {
+			if retryCount > 5 {
+				return err
+			}
+			continue
+		}
+
+		found := false
+		for _, proID := range upItem.ProviderIDs {
+			if proID == pid {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			break
+		} else {
+			if retryCount > 20 {
+				return errors.New("upkeeping add provider fails")
+			}
+		}
 	}
 	return nil
 }
