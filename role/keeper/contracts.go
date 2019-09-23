@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"errors"
 	"log"
 	"strings"
 
@@ -11,11 +10,7 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-type kpItem struct {
-	keeperIDs []string
-}
-
-func SaveUpkeeping(gp *GroupsInfo, userID string) error {
+func saveUpkeeping(gp *GroupsInfo, userID string) error {
 	if gp == nil {
 		return ErrIncorrectParams
 	}
@@ -26,7 +21,7 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	}
 	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
-		log.Println("get ", userID, "'s ukAddr err:", err)
+		log.Println(userID, "has not deployed upkeeping")
 		return err
 	}
 	// get upkkeeping params
@@ -42,18 +37,19 @@ func SaveUpkeeping(gp *GroupsInfo, userID string) error {
 	item.UserID = userID
 	item.UpKeepingAddr = ukAddr
 	gp.upkeeping = item
+	gp.Providers = item.ProviderIDs
+
 	return nil
 }
 
-func GetUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
+func getUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
 	if gp.upkeeping.UserID == "" || gp.upkeeping.UpKeepingAddr == "" {
-		log.Println("OfferItem hasn't set")
 		return gp.upkeeping, ErrGetContractItem
 	}
 	return gp.upkeeping, nil
 }
 
-func SaveQuery(userID string) error {
+func saveQuery(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -77,7 +73,7 @@ func SaveQuery(userID string) error {
 	return nil
 }
 
-func GetQuery(userID string) (contracts.QueryItem, error) {
+func getQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := localPeerInfo.queryBook.Load(userID)
 	if !ok {
@@ -88,7 +84,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 	return queryItem, nil
 }
 
-func SaveOffer(providerID string) error {
+func saveOffer(providerID string) error {
 	proAddr, err := address.GetAddressFromID(providerID)
 	if err != nil {
 		return err
@@ -112,7 +108,7 @@ func SaveOffer(providerID string) error {
 	return nil
 }
 
-func GetOffer(providerID string) (contracts.OfferItem, error) {
+func getOffer(providerID string) (contracts.OfferItem, error) {
 	var offerItem contracts.OfferItem
 	value, ok := localPeerInfo.offerBook.Load(providerID)
 	if !ok {
@@ -130,17 +126,17 @@ func ukAddProvider(uid, pid, sk string) error {
 		log.Println("ukAddProvider getGroupsInfo() error")
 		return ErrNoGroupsInfo
 	}
-	uk, err := GetUpkeeping(gp)
+	uk, err := getUpkeeping(gp)
 	if err != nil {
-		err := SaveUpkeeping(gp, uid)
+		err := saveUpkeeping(gp, uid)
 		if err != nil {
-			log.Println("ukAddProvider GetUpkeeping() error", err)
+			log.Println("ukAddProvider getUpkeeping() error", err)
 			return err
 		}
 
-		uk, err = GetUpkeeping(gp) //保存之后重试。还是出错就返回
+		uk, err = getUpkeeping(gp) //保存之后重试。还是出错就返回
 		if err != nil {
-			log.Println("ukAddProvider GetUpkeeping() error", err)
+			log.Println("ukAddProvider getUpkeeping() error", err)
 			return err
 		}
 	}
@@ -177,52 +173,4 @@ func ukAddProvider(uid, pid, sk string) error {
 	uk.ProviderIDs = append(uk.ProviderIDs, pid)
 
 	return nil
-}
-
-func saveKpMap() error {
-	localAddr, err := ad.GetAddressFromID(localNode.Identity.Pretty())
-	if err != nil {
-		log.Println("saveKpMap GetAddressFromID() error", err)
-		return err
-	}
-	kps, err := contracts.GetAllKeeperInKPMap(localAddr)
-	if err != nil {
-		log.Println("saveKpMap GetAllKeepers() error", err)
-		return err
-	}
-
-	for _, kpaddr := range kps {
-		pids, err := contracts.GetProviderInKPMap(localAddr, kpaddr)
-		if err != nil {
-			log.Println("get provider from kpmap err:", err)
-		}
-		if len(pids) > 0 {
-			keeperID, _ := ad.GetIDFromAddress(kpaddr.String())
-			var kidList []string
-			for _, paddr := range pids {
-				pid, _ := ad.GetIDFromAddress(paddr.String())
-				kidList = append(kidList, pid)
-			}
-
-			kidres := &kpItem{
-				keeperIDs: kidList,
-			}
-			res, ok := localPeerInfo.kpMapBook.LoadOrStore(keeperID, kidres)
-			if ok {
-				res.(*kpItem).keeperIDs = kidList
-			}
-		}
-	}
-	return nil
-}
-
-func getKpMap(keeperID string) ([]string, error) {
-	var ret []string
-	res, ok := localPeerInfo.kpMapBook.Load(keeperID)
-	if !ok {
-		//log.Println("get keeper from kpmap fails")
-		return ret, errors.New("No keeper in kpmap")
-	}
-
-	return res.(*kpItem).keeperIDs, nil
 }

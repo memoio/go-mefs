@@ -15,6 +15,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 //PayInfo 最近一次支付信息的记录
@@ -67,7 +68,7 @@ func spaceTimePay() {
 			return true
 		}
 		for _, pidString := range thisGroupsInfo.Providers { //循环当前user的provider
-			uk, err := GetUpkeeping(thisGroupsInfo)
+			uk, err := getUpkeeping(thisGroupsInfo)
 			if err != nil {
 				log.Println("getUpkeeping err: ", err)
 				continue
@@ -108,6 +109,10 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 			return
 		}
 		log.Printf("ukaddr:%s\nukbalance:%s\n", ukaddr, ukBalance.String())
+
+		if groupid == pos.GetPosId() {
+			price = pos.GetPosPrice()
+		}
 
 		startTime := checkLastPayTime(groupid, pidString)
 		spaceTime, lastTime := resultSummary(groupid, pidString, startTime, utils.GetUnixNow()) //根据时间段获取时空值

@@ -9,14 +9,14 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	oldcmds "github.com/memoio/go-mefs/commands"
+	config "github.com/memoio/go-mefs/config"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
-	config "github.com/memoio/go-mefs/config"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
 	nBitsForKeypairDefault = 2048
-	defaultPassword        = "123456"
 )
 
 var initCmd = &cmds.Command{
@@ -36,8 +36,9 @@ environment variable:
 		cmds.FileArg("default-config", false, false, "Initialize with the given configuration.").EnableStdin(),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the privateKey").WithDefault(defaultPassword),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the privateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
+		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 	},
 	PreRun: func(req *cmds.Request, env cmds.Environment) error {
 		cctx := env.(*oldcmds.Context)
@@ -63,6 +64,7 @@ environment variable:
 
 		hexsk, _ := req.Options[secretKeyKwd].(string)
 		password, _ := req.Options[passwordKwd].(string)
+		netKey, _ := req.Options[netKeyKwd].(string)
 
 		var conf *config.Config
 
@@ -79,15 +81,11 @@ environment variable:
 			}
 		}
 
-		return doInit(os.Stdout, cctx.ConfigRoot, nBitsForKeypairDefault, password, conf, hexsk)
+		return doInit(os.Stdout, cctx.ConfigRoot, nBitsForKeypairDefault, password, conf, hexsk, netKey)
 	},
 }
 
-func initWithDefaults(out io.Writer, repoRoot string) error {
-	return doInit(out, repoRoot, nBitsForKeypairDefault, defaultPassword, nil, "")
-}
-
-func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string, conf *config.Config, prikey string) error {
+func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string, conf *config.Config, prikey, netKey string) error {
 	if _, err := fmt.Fprintf(out, "initializing MEFS node at %s\n", repoRoot); err != nil {
 		return err
 	}
@@ -102,14 +100,19 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string
 
 	if conf == nil {
 		var err error
-		conf, prikey, err = config.Init(out, nBitsForKeypair, prikey)
-		if err != nil {
-			return err
+		switch netKey {
+		case "testnet":
+			conf, prikey, err = config.InitTestnet(out, nBitsForKeypair, prikey)
+			if err != nil {
+				return err
+			}
+		default:
+			conf, prikey, err = config.Init(out, nBitsForKeypair, prikey)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	if _, err := fmt.Fprintf(out, "Your role is %s,\nif you want to change your Role:\nplease type `mefs config Role user/keeper/provider` and restart mefs daemon\n", conf.Role); err != nil {
-		return err
 	}
 
 	if err := fsrepo.Init(repoRoot, conf, prikey, password); err != nil {

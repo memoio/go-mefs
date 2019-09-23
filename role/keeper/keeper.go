@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	lru "github.com/hashicorp/golang-lru"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/memoio/go-mefs/contracts"
@@ -35,12 +34,11 @@ const (
 const (
 	EXPIRETIME       = int64(30 * 60) //超过这个时间，触发修复，单位：秒
 	CHALTIME         = 5 * time.Minute
-	CHECKTIME        = 6 * time.Minute
+	CHECKTIME        = 7 * time.Minute
 	PERSISTTIME      = 3 * time.Minute
-	STORAGESYNCTIME  = 10 * time.Minute
-	SPACETIMEPAYTIME = time.Hour
+	SPACETIMEPAYTIME = 61 * time.Minute
 	CONPEERTIME      = 5 * time.Minute
-	KPMAPTIME        = 10 * time.Minute
+	KPMAPTIME        = 11 * time.Minute
 )
 
 //一个组中的keeper信息
@@ -70,17 +68,14 @@ type PeerInfo struct {
 	Providers        []string
 	Storage          sync.Map
 	Credit           sync.Map
-	UserCache        *lru.Cache //收到Init请求，但未确认的User先记录在这里,长时间不相应则删除user在本地的信息
 	enableTendermint bool
 	offerBook        sync.Map // 存储连接的provider部署的Offer条约，K-provider的id，V-Offer实例
 	queryBook        sync.Map // 存储连接的user部署的Query条约，K-user的id，V-Query实例
-	kpMapBook        sync.Map
 }
 
 type storageInfo struct {
-	maxSpace       string
-	actulDataSpace uint64
-	rawDataSpace   uint64
+	maxSpace  uint64
+	usedSpace uint64
 }
 
 var localPeerInfo *PeerInfo
@@ -100,9 +95,8 @@ func getGroupsInfo(groupid string) (*GroupsInfo, bool) {
 			GroupID: groupid,
 		}
 
-		err := SaveUpkeeping(tempInfo, groupid)
+		err := saveUpkeeping(tempInfo, groupid)
 		if err != nil {
-			log.Println("getGroupsInfo err, groupid:", groupid)
 			return nil, false
 		}
 
@@ -201,29 +195,27 @@ func isMasterKeeper(groupid string, pid string) bool {
 		return false
 	}
 	var mymaster []string
-	for _, keeper := range thisGroupsInfo.Keepers {
-		pids, err := getKpMap(keeper.KID)
-		if err != nil {
-			continue
+	mykids, ok := contracts.GetKeepersOfPro(pid)
+	if ok {
+		for _, keeper := range thisGroupsInfo.Keepers {
+			for _, nkid := range mykids {
+				if nkid == keeper.KID {
+					mymaster = append(mymaster, keeper.KID)
+					break
+				}
+			}
 		}
-		for _, npid := range pids {
-			if npid == pid {
-				mymaster = append(mymaster, keeper.KID)
-				break
+		if len(mymaster) > 0 {
+			masterID := getMasterID(mymaster)
+			if masterID == localNode.Identity.Pretty() {
+				return true
+			} else {
+				return false
 			}
 		}
 	}
 
-	if len(mymaster) > 0 {
-		masterID := getMasterID(mymaster)
-		if masterID == localNode.Identity.Pretty() {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return localKeeperIsMaster(groupid)
-	}
+	return localKeeperIsMaster(groupid)
 }
 
 //getMasterID  根据传入的keeper列表，选出一个master，返回其id
@@ -239,18 +231,13 @@ func getMasterID(kidlist []string) string {
 func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermint bool) error {
 	//初始化各类结构体
 	localNode = node
-	userCache, err := lru.New(100)
-	if err != nil {
-		return err
-	}
 	var credit, storage sync.Map
 	localPeerInfo = &PeerInfo{
-		UserCache: userCache,
-		Credit:    credit,
-		Storage:   storage,
+		Credit:  credit,
+		Storage: storage,
 	}
 
-	err = loadAllUser() //加载本地保存的数据
+	err := loadAllUser() //加载本地保存的数据
 	if err != nil {
 		localNode = nil
 		localPeerInfo = nil
@@ -276,7 +263,6 @@ func StartKeeperService(ctx context.Context, node *core.MefsNode, enableTendermi
 	go checkrepairlist(ctx)
 	go checkLedger(ctx)
 	go spaceTimePayRegular(ctx)
-	go checkStorage(ctx)
 	go checkPeers(ctx)
 	go getKpMapRegular(ctx)
 	return nil
@@ -606,18 +592,18 @@ func loadAllUser() error {
 				}
 			}
 			// 保存Upkeeping信息
-			err = SaveUpkeeping(&userPeersInfo, userID)
+			err = saveUpkeeping(&userPeersInfo, userID)
 			if err != nil {
 				log.Println("Save ", userID, "'s Upkeeping error: ", err)
 			}
 			// 保存Query信息
-			err = SaveQuery(userID)
+			err = saveQuery(userID)
 			if err != nil {
 				log.Println("Save ", userID, "'s Query error: ", err)
 			}
 			// 保存Offer信息
 			for _, provider := range userPeersInfo.Providers {
-				err = SaveOffer(provider)
+				err = saveOffer(provider)
 				if err != nil {
 					log.Println("Save ", provider, "'s Offer error: ", err)
 				}
@@ -698,7 +684,7 @@ func SearchAllKeepersAndProviders(ctx context.Context) error {
 
 	loadKnownKeepersAndProviders(ctx) //先加载持久化的keeper和Provider看看，有助于快速恢复
 	//go newConnPeerRole(PeerIDch, ctx) //此协程不断处理新连接的节点
-	err := checkConnectedPeer() //查看当前连接的节点的角色
+	err := checkConnectedPeer(ctx) //查看当前连接的节点的角色
 	if err != nil {
 		return err
 	}
@@ -765,7 +751,7 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 	return nil
 }
 
-func checkLocalPeers() {
+func checkLocalPeers(ctx context.Context) {
 	var tmpKeepers []string
 	for _, keeper := range localPeerInfo.Keepers {
 		kid, err := peer.IDB58Decode(keeper)
@@ -776,7 +762,7 @@ func checkLocalPeers() {
 		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 			tmpKeepers = append(tmpKeepers, keeper)
 		} else {
-			sc.ConnectTo(context.Background(), localNode, keeper)
+			sc.ConnectTo(ctx, localNode, keeper)
 			if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 				tmpKeepers = append(tmpKeepers, keeper)
 			}
@@ -794,7 +780,7 @@ func checkLocalPeers() {
 		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 			tmpProviders = append(tmpProviders, provider)
 		} else {
-			sc.ConnectTo(context.Background(), localNode, provider)
+			sc.ConnectTo(ctx, localNode, provider)
 			if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 				tmpProviders = append(tmpProviders, provider)
 			}
@@ -803,11 +789,11 @@ func checkLocalPeers() {
 	localPeerInfo.Providers = tmpProviders
 }
 
-func checkConnectedPeer() error {
+func checkConnectedPeer(ctx context.Context) error {
 	if !IsKeeperServiceRunning() {
 		return ErrKeeperServiceNotReady
 	}
-	checkLocalPeers()
+	checkLocalPeers(ctx)
 
 	localID := localNode.Identity.Pretty() //本地id
 
@@ -881,6 +867,7 @@ func checkConnectedPeer() error {
 			if isProvider {
 				log.Println("Connect to connected provider: ", id)
 				localPeerInfo.Providers = append(localPeerInfo.Providers, id)
+				saveOffer(id)
 				err := localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), id, "local") //把当前连接的所有providers信息存到本地的leveldb中
 				if err != nil {
 					return err
@@ -937,7 +924,7 @@ func newConnPeerRole(peerIDch chan string, ctx context.Context) error { //处理
 				}
 				if i == len(localPeerInfo.Providers) {
 					log.Println("Connect to new connect provider: ", id)
-					err := SaveOffer(id)
+					err := saveOffer(id)
 					if err != nil {
 						log.Println("Save ", id, "'s Offer err in newConnPeerRole", err)
 					} else {
@@ -960,37 +947,11 @@ func IsKeeperServiceRunning() bool {
 	return localNode != nil && localPeerInfo != nil
 }
 
-func checkStorage(ctx context.Context) {
-	log.Println("Check storage start!")
-	ticker := time.NewTicker(STORAGESYNCTIME)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go func() {
-				for _, pid := range localPeerInfo.Providers {
-					km, err := metainfo.NewKeyMeta(pid, metainfo.StorageSync)
-					if err != nil {
-						log.Println("construct Storage sync KV error :", err)
-						return
-					}
-					_, err = sendMetaRequest(km, "", pid)
-					if err != nil {
-						log.Println("sendMetaRequest error:", err)
-					}
-				}
-			}()
-		}
-	}
-}
-
 func checkPeers(ctx context.Context) {
 	log.Println("Check connected peer start!")
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
-	checkConnectedPeer()
+	checkConnectedPeer(ctx)
 	ticker := time.NewTicker(CONPEERTIME)
 	defer ticker.Stop()
 	for {
@@ -999,7 +960,7 @@ func checkPeers(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				checkConnectedPeer()
+				checkConnectedPeer(ctx)
 			}()
 		}
 	}
@@ -1008,6 +969,8 @@ func checkPeers(ctx context.Context) {
 func getKpMapRegular(ctx context.Context) {
 	log.Println("Get kpMap from chain start!")
 
+	peerID := localNode.Identity.Pretty()
+	contracts.SaveKpMap(peerID)
 	ticker := time.NewTicker(KPMAPTIME)
 	defer ticker.Stop()
 	for {
@@ -1016,7 +979,7 @@ func getKpMapRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				saveKpMap()
+				contracts.SaveKpMap(peerID)
 			}()
 		}
 	}

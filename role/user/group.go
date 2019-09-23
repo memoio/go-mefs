@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
@@ -21,7 +20,8 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int) *GroupService {
+// ConstructGroupService Constructs GroupService
+func ConstructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int, redeploy bool) *GroupService {
 	if privKey == nil {
 		return nil
 	}
@@ -34,10 +34,12 @@ func ConstructGroupService(userid string, privKey []byte, duration int64, capaci
 		storePrice:     price,
 		keeperSLA:      ks,
 		providerSLA:    ps,
+		reDeploy:       redeploy,
 	}
 }
 
-//TODO:在使用provider之前都应该检查一下连接性
+// StartGroupService starts gp
+// TODO:在使用provider之前都应该检查一下连接性
 func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isInit bool) error {
 	if gp == nil {
 		return ErrCannotConnectNetwork
@@ -91,7 +93,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 			// keeper数量、provider的数量应以合约约定为主
 			gp.keeperSLA = int(item.KeeperSLA)
 			gp.providerSLA = int(item.ProviderSLA)
-			err = gp.ConnectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
+			err = gp.connectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
 			if err != nil {
 				return err
 			}
@@ -108,7 +110,7 @@ func (gp *GroupService) StartGroupService(ctx context.Context, pwd string, isIni
 	return nil
 }
 
-func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
+func (gp *GroupService) connectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
 	log.Println("Begin to connect user's keepers and providers:", gp.Userid)
 	waitTime := 0 //进行网络连接
 	for {
@@ -129,7 +131,7 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 		return nil
 	}
 
-	connectTryCount := 10
+	connectTryCount := 5
 	// 第一次对所有keeper进行连接，第二次对连接失败的keeper进行连接，依次类推
 	for i := 0; i < connectTryCount; i++ {
 		var unsuccess []string
@@ -172,58 +174,73 @@ func (gp *GroupService) ConnectKeepersAndProviders(ctx context.Context, keepers,
 			} else {
 				log.Println("Connect to keeper", tempKeeper.KeeperID, "use simple mode")
 			}
-
-			// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
-			if len(gp.localPeersInfo.Keepers) >= gp.keeperSLA {
-				if gp.KeySet == nil {
-					err := gp.loadBLS12Config()
-					if err != nil {
-						log.Println("Load BLS12 Config error:", err)
-						return err
-					}
-				}
-				for _, pid := range providers {
-					if sc.ConnectTo(ctx, localNode, pid) {
-						log.Println("Connect to provider-", pid, "success.")
-					} else {
-						log.Println("Connect to provider-", pid, "failed.")
-					}
-					if utils.CheckDup(gp.localPeersInfo.Providers, pid) {
-						gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
-					}
-
-				}
-				// 构造key告诉keeper和provider自己已经启动
-				kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
-				if err != nil {
-					log.Println("Construct Deployed key error", err)
-					return err
-				}
-				for _, keeper := range gp.localPeersInfo.Keepers {
-					_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
-					if err != nil {
-						log.Println("Send keeper", keeper.KeeperID, " err:", err)
-					}
-				}
-				for _, provider := range gp.localPeersInfo.Providers {
-					_, err = sendMetaRequest(kmPid, gp.Userid, provider)
-					if err != nil {
-						log.Println("Send provider", provider, " err:", err)
-					}
-				}
-				log.Println(gp.Userid + ":Group Service is ready")
-				err = SetUserState(gp.Userid, GroupStarted)
-				if err != nil {
-					return err
-				}
-				return nil
-			}
 		}
+
 		keepers = unsuccess
+		// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
+		if len(gp.localPeersInfo.Keepers) < KeeperSLA {
+			time.Sleep(time.Minute)
+		}
 	}
-	if len(gp.localPeersInfo.Keepers) < gp.keeperSLA {
+
+	if len(gp.localPeersInfo.Keepers) <= 0 {
 		return ErrNoEnoughKeeper
 	}
+
+	for i := 0; i < connectTryCount; i++ {
+		if gp.KeySet == nil {
+			err := gp.loadBLS12Config()
+			if err != nil {
+				log.Println("Load BLS12 Config error:", err)
+				return err
+			}
+		}
+		for _, pid := range providers {
+			if sc.ConnectTo(ctx, localNode, pid) {
+				log.Println("Connect to provider-", pid, "success.")
+			} else {
+				log.Println("Connect to provider-", pid, "failed.")
+			}
+			if utils.CheckDup(gp.localPeersInfo.Providers, pid) {
+				gp.localPeersInfo.Providers = append(gp.localPeersInfo.Providers, pid) //将Provider加入内存缓冲
+			}
+		}
+
+		if len(gp.localPeersInfo.Providers) <= 0 {
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		// 构造key告诉keeper和provider自己已经启动
+		kmPid, err := metainfo.NewKeyMeta(gp.Userid, metainfo.UserDeployedContracts)
+		if err != nil {
+			log.Println("Construct Deployed key error", err)
+			return err
+		}
+		for _, keeper := range gp.localPeersInfo.Keepers {
+			_, err = sendMetaRequest(kmPid, gp.Userid, keeper.KeeperID)
+			if err != nil {
+				log.Println("Send keeper", keeper.KeeperID, " err:", err)
+			}
+		}
+		for _, provider := range gp.localPeersInfo.Providers {
+			_, err = sendMetaRequest(kmPid, gp.Userid, provider)
+			if err != nil {
+				log.Println("Send provider", provider, " err:", err)
+			}
+		}
+		log.Println(gp.Userid + ":Group Service is ready")
+		err = SetUserState(gp.Userid, GroupStarted)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if len(gp.localPeersInfo.Providers) <= 0 {
+		return ErrNoEnoughProvider
+	}
+
 	return nil
 }
 
@@ -251,12 +268,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			return ErrBalance
 		}
 
-		sk := crypto.ToECDSAUnsafe(gp.PrivateKey)
-		err = contracts.DeployQuery(addr, sk, gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA)
-		if err != nil {
-			return err
-		}
-		queryAddr, err = contracts.GetMarketAddr(addr, addr, contracts.Query) //获取query合约地址
+		queryAddr, err = contracts.DeployQuery(addr, address.SkByteToString(gp.PrivateKey), gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
 		if err != nil {
 			return err
 		}
@@ -449,6 +461,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	gp.localPeersInfo.Keepers = make([]*KeeperInfo, 0, gp.keeperSLA)
 	gp.localPeersInfo.Providers = make([]string, 0, gp.providerSLA)
 	//选择keeper
+	gp.tempKeepers = utils.DisorderArray(gp.tempKeepers)
 	for i := 0; i < len(gp.tempKeepers); {
 		if i >= gp.keeperSLA {
 			break
@@ -473,7 +486,7 @@ func (gp *GroupService) chooseKeepersAndProviders() error {
 	}
 
 	//选择provider
-	gp.tempProviders = disorderArray(gp.tempProviders)
+	gp.tempProviders = utils.DisorderArray(gp.tempProviders)
 	for i := 0; i < len(gp.tempProviders); {
 		if i >= gp.providerSLA {
 			break
@@ -619,39 +632,42 @@ func (gp *GroupService) deployUpKeepingAndChannel() error {
 	timeOut := big.NewInt(int64(d * 24 * 60 * 60)) //秒，存储时间
 	var moneyToChannel = new(big.Int)
 	moneyToChannel = moneyToChannel.Mul(big.NewInt(s), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
-	for _, providerAddr := range providers {
-		channelAddr, err := contracts.DeployChannelContract(hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
-		if err == contracts.ErrNotDeployedResolver {
-			log.Println("the provider" + providerAddr.String() + "has not deployed resolver")
-			continue
-		} else if err != nil {
-			return err
-		}
-		//设置channel的value初始值为0
-		//存到本地
-		channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
-		if err != nil {
-			return err
-		}
-		key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-		//存到provider上
-		providerID, err := address.GetIDFromAddress(providerAddr.String())
-		if err != nil {
-			return err
-		}
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-	}
-	log.Println("user has deployed all channel-contract successfully!")
 
+	var wg sync.WaitGroup
+
+	for _, proAddr := range providers {
+		wg.Add(1)
+		providerAddr := proAddr
+		go func() {
+			defer wg.Done()
+			channelAddr, err := contracts.DeployChannelContract(hexPK, localAddress, providerAddr, timeOut, moneyToChannel)
+			if err != nil {
+				return
+			}
+			//设置channel的value初始值为0
+			//存到本地
+			channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+			if err != nil {
+				return
+			}
+			key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
+			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), "local")
+			if err != nil {
+				return
+			}
+			//存到provider上
+			providerID, err := address.GetIDFromAddress(providerAddr.String())
+			if err != nil {
+				return
+			}
+			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, strconv.FormatInt(0, 10), providerID)
+			if err != nil {
+				return
+			}
+		}()
+	}
+	wg.Wait()
+	log.Println("user has deployed all channel-contract successfully!")
 	return nil
 }
 

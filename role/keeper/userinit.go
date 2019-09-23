@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"log"
 	"strings"
-	"time"
 
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
@@ -16,7 +15,6 @@ import (
 func userInitInMem(userID string, keeperCount, providerCount int) (string, error) {
 	thisGroupsInfo, ok := getGroupsInfo(userID)
 	if !ok { //内存中没有该节点信息
-		localPeerInfo.UserCache.Add(userID, time.Now().Unix()) //先只加入到WaitingList，等待其确认
 		return "", nil
 	}
 
@@ -97,10 +95,6 @@ func userInitInMem(userID string, keeperCount, providerCount int) (string, error
 }
 
 func userInitInLocal(userID string, keeperCount, providerCount int) (string, error) {
-	_, ok := localPeerInfo.UserCache.Get(userID)
-	if !ok { //看看再WaitingList里是不是有记录
-		localPeerInfo.UserCache.Add(userID, time.Now().Unix())
-	}
 	var flag int
 	kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
 	if err != nil {
@@ -223,7 +217,7 @@ func userInitInLocal(userID string, keeperCount, providerCount int) (string, err
 }
 
 // newUserInit 为新的user进行初始化操作，返回keeper和provider的信息
-func newUserInit(userID string, keeperCount, providerCount int) (string, error) {
+func newUserInit(userID string, keeperCount, providerCount int, price int64) (string, error) {
 	localID := localNode.Identity.Pretty()
 	kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
 	if err != nil {
@@ -232,10 +226,6 @@ func newUserInit(userID string, keeperCount, providerCount int) (string, error) 
 	kmPid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypePid)
 	if err != nil {
 		return "", err
-	}
-	_, ok := localPeerInfo.UserCache.Get(userID)
-	if !ok {
-		localPeerInfo.UserCache.Add(userID, time.Now().Unix())
 	}
 
 	var newResponse bytes.Buffer
@@ -276,14 +266,22 @@ func newUserInit(userID string, keeperCount, providerCount int) (string, error) 
 		if err != nil {
 			return "", err
 		}
+
 		result, _ := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(kmRole.ToString(), providerID) //确认这个节点的角色信息
 		if string(result) == metainfo.RoleProvider {
-			newResponse.WriteString(providerID)
-			err = localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), providerID, "local")
+			offerItem, err := getOffer(providerID)
 			if err != nil {
-				return "", err
+				continue
 			}
-			providerCount--
+
+			if offerItem.Price <= price {
+				newResponse.WriteString(providerID)
+				err = localNode.Routing.(*dht.IpfsDHT).CmdAppendTo(kmPid.ToString(), providerID, "local")
+				if err != nil {
+					return "", err
+				}
+				providerCount--
+			}
 		}
 	}
 

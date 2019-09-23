@@ -76,9 +76,8 @@ func ChallengeProviderBLS12() {
 			if thischalinfo.inChallenge == 1 {
 				go cleanLastChallenge(pu, thischalinfo, challengetime)
 				return true
-			} else {
-				thischalinfo.inChallenge = 1
 			}
+			thischalinfo.inChallenge = 1
 		}
 
 		var ret []string
@@ -175,6 +174,9 @@ func doChallengeBLS12(pu PU, blocks []string, chaltime int64) {
 			}
 		}
 	}()
+
+	// get user config once; in case provider cannot get it
+	getUserBLS12Config(pu.uid)
 
 	if thischalresult, ok := getChalresult(pu, chaltime); ok {
 		thischalresult.h = chal.C

@@ -31,6 +31,7 @@ import (
 	"github.com/memoio/go-mefs/plugin/loader"
 	"github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr-net"
@@ -124,7 +125,6 @@ func mainRet() int {
 			LoadConfig: loadConfig,
 			ReqLog:     &oldcmds.ReqLog{},
 			ConstructNode: func() (n *core.MefsNode, err error) {
-				defaultPassword := "123456"
 				if req == nil {
 					return nil, errors.New("constructing node without a request")
 				}
@@ -138,7 +138,7 @@ func mainRet() int {
 				// and return it.
 				n, err = core.NewNode(ctx, &core.BuildCfg{
 					Repo: r,
-				}, defaultPassword, "")
+				}, utils.DefaultPassword, "")
 				if err != nil {
 					return nil, err
 				}

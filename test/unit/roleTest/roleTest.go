@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"flag"
 	"log"
 	"math/big"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
@@ -23,20 +25,26 @@ const (
 	kpAddr  = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	kpSk    = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
 	adminSk = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
+	moneyTo = 1000000000000000
 )
 
-const ethEndPoint = "http://212.64.28.207:8101"
+var ethEndPoint string
 
 func main() {
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.Parse()
+	ethEndPoint = *eth
+
+	contracts.EndPoint = ethEndPoint
 	balance := queryBalance(kpAddr)
-	if balance.Cmp(big.NewInt(1000000000000)) <= 0 {
-		transferTo(big.NewInt(1000000000000), kpAddr)
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
+		transferTo(big.NewInt(moneyTo), kpAddr)
 	}
 
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(kpAddr)
-		if balance.Cmp(big.NewInt(1000000000000)) > 0 {
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
 
@@ -93,7 +101,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider")
-	proAddr, proSk, err := createAddr()
+	proAddr, _, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
 	}
@@ -194,11 +202,82 @@ func testRole() (err error) {
 		}
 		break
 	}
+
+	log.Println("test set provider second")
+	proAddr2, _, err := createAddr()
+	if err != nil {
+		log.Fatal("create provider fails")
+	}
+
+	providerAddr2 := common.HexToAddress(proAddr2[2:])
+
+	err = contracts.SetProvider(providerAddr2, adminSk, true)
+	if err != nil {
+		log.Println("setProvider2 err:", err)
+		return err
+	}
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		res, err := contracts.IsProvider(providerAddr2)
+		if err != nil || res == false {
+			if retryCount > 20 {
+				log.Fatal("set provider2 fails")
+			}
+			continue
+		}
+		log.Println("set provider2 success")
+		break
+	}
+
+	log.Println("test set add kp second")
+
+	err = contracts.AddKeeperProvidersToKPMap(keeperAddr, kpSk, keeperAddr, []common.Address{providerAddr2})
+	if err != nil {
+		log.Println("Add Keeper Providers To KPMap err:", err)
+		return err
+	}
+
+	log.Println("test get provider from kpmap second")
+	retryCount = 0
+	flag = false
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		pids, err := contracts.GetProviderInKPMap(providerAddr2, keeperAddr)
+		if err != nil {
+			if retryCount > 20 {
+				log.Fatal("Get Provider2 In KPMap fails")
+			}
+			continue
+		}
+
+		flag = false
+		for _, pidr := range pids {
+			if pidr.String() == providerAddr2.String() {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			log.Println("get provider from kpmap success")
+		} else {
+			if retryCount > 20 {
+				log.Fatal("Get Provider fails")
+			}
+			continue
+		}
+		break
+	}
+
 	log.Println("add kp to kpmap success")
 
 	log.Println("test delete provider from kpmap")
 
-	err = contracts.DeleteProviderFromKPMap(providerAddr, proSk, keeperAddr, providerAddr)
+	err = contracts.DeleteProviderFromKPMap(keeperAddr, adminSk, keeperAddr, providerAddr)
 	if err != nil {
 		log.Fatal("delete provider from kpmap err:", err)
 	}
@@ -237,7 +316,7 @@ func testRole() (err error) {
 
 	log.Println("test delete keeper from kpmap")
 
-	err = contracts.DeleteKeeperFromKPMap(providerAddr, proSk, keeperAddr)
+	err = contracts.DeleteKeeperFromKPMap(keeperAddr, kpSk, keeperAddr)
 	if err != nil {
 		log.Fatal("delete keeper from kpmap err:", err)
 	}
@@ -319,6 +398,28 @@ func testRole() (err error) {
 		break
 	}
 
+	log.Println("test set provider false second")
+	err = contracts.SetProvider(providerAddr2, adminSk, false)
+	if err != nil {
+		log.Println("setProvider err:", err)
+		return err
+	}
+
+	retryCount = 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		res, err := contracts.IsProvider(providerAddr2)
+		if err != nil || res == true {
+			if retryCount > 20 {
+				log.Fatal("set provider2 false fails")
+			}
+			continue
+		}
+		log.Println("set provider2 false success")
+		break
+	}
+
 	return nil
 }
 
@@ -341,14 +442,14 @@ func createAddr() (string, string, error) {
 	hex.Encode(enc, skByteEth)
 
 	balance := queryBalance(addressHex)
-	if balance.Cmp(big.NewInt(1000000000000)) < 0 {
-		transferTo(big.NewInt(1000000000000), addressHex)
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
+		transferTo(big.NewInt(moneyTo), addressHex)
 	}
 
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(addressHex)
-		if balance.Cmp(big.NewInt(1000000000000)) >= 0 {
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
 
@@ -418,15 +519,14 @@ func transferTo(value *big.Int, addr string) {
 }
 
 func queryBalance(addr string) *big.Int {
-	client, err := ethclient.Dial(ethEndPoint)
+	var result string
+	client, err := rpc.Dial(ethEndPoint)
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
+		log.Fatal("rpc.dial err:", err)
 	}
-	Address := common.HexToAddress(addr[2:])
-	balance, err := client.PendingBalanceAt(context.Background(), Address)
+	err = client.Call(&result, "eth_getBalance", addr, "latest")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.call err:", err)
 	}
-	return balance
+	return utils.HexToBigInt(result)
 }

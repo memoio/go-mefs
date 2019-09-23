@@ -31,13 +31,9 @@ DATA STRUCTURE COMMANDS
 
 ADVANCED COMMANDS
   daemon        Start a long-running daemon process
-  resolve       Resolve any type of name
-  dns           Resolve DNS links
-  pin           Pin objects to local storage
   repo          Manipulate the MEFS repository
   stats         Various operational stats
   p2p           Libp2p stream mounting
-  filestore     Manage the filestore (experimental)
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
@@ -50,9 +46,7 @@ NETWORK COMMANDS
 TOOL COMMANDS
   config        Manage configuration
   version       Show MEfs version information
-  update        Download and apply go-mefs updates
   commands      List all available commands
-  cid           Convert and discover properties of CIDs
 
 Use 'mefs <command> --help' to learn more about each command.
 
@@ -106,6 +100,7 @@ var rootSubcommands = map[string]*cmds.Command{
 	"create":    createCmd,
 	"diag":      sysDiagCmd,
 	"test":      TestCmd,
+	"contract":  ContractCmd,
 }
 
 // RootRO is the readonly version of Root

@@ -154,15 +154,45 @@ func checkLedger(ctx context.Context) {
 					}
 
 					thischalinfo := v.(*chalinfo)
+					var deletes []string
 					thischalinfo.Cid.Range(func(key, value interface{}) bool {
-						//log.Println("avaltime :", value.(*cidInfo).availtime)
-						if EXPIRETIME < (utils.GetUnixNow()-value.(*cidInfo).availtime) && value.(*cidInfo).repair < 3 {
-							log.Println("Need repair cid: ", key.(string))
-							value.(*cidInfo).repair++
-							repch <- key.(string)
+						eclasped := utils.GetUnixNow() - value.(*cidInfo).availtime
+						switch value.(*cidInfo).repair {
+						case 0:
+							if EXPIRETIME < eclasped {
+								log.Println("Need repair cid first: ", key.(string))
+								value.(*cidInfo).repair++
+								repch <- key.(string)
+							}
+						case 1:
+							if 3*EXPIRETIME < eclasped {
+								log.Println("Need repair cid second: ", key.(string))
+								value.(*cidInfo).repair++
+								repch <- key.(string)
+							}
+						case 2:
+							if 9*EXPIRETIME < eclasped {
+								log.Println("Need repair cid third: ", key.(string))
+								value.(*cidInfo).repair++
+								repch <- key.(string)
+							}
+						case 3:
+							if 10*EXPIRETIME < eclasped {
+								value.(*cidInfo).repair++
+							}
+						default:
+							if value.(*cidInfo).repair > 3 {
+								deletes = append(deletes, key.(string))
+							}
 						}
+
 						return true
 					})
+
+					for _, cid := range deletes {
+						thischalinfo.Cid.Delete(cid)
+					}
+
 					return true
 				})
 			}()

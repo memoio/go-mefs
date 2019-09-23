@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
@@ -15,7 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	shell "github.com/memoio/mefs-go-http-client"
 )
@@ -24,8 +27,15 @@ import (
 const randomDataSize = 1024 * 1024 * 10
 const dataCount = 2
 const parityCount = 3
+const moneyTo = 1000000000000000000
+
+var ethEndPoint string
 
 func main() {
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.Parse()
+	ethEndPoint = *eth
+
 	err := lfsTest()
 	if err != nil {
 		log.Fatal(err)
@@ -49,12 +59,12 @@ func lfsTest() error {
 		return err
 	}
 
-	transferTo(big.NewInt(1000000000000000000), addr)
+	transferTo(big.NewInt(moneyTo), addr)
 	time.Sleep(90 * time.Second)
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(addr)
-		if balance.Cmp(big.NewInt(10000000000)) > 0 {
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
 		log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
@@ -90,6 +100,8 @@ func lfsTest() error {
 	if err != nil {
 		log.Println("create bucket err: ", err)
 	}
+
+	fmt.Println(bk.Buckets)
 
 	if bk.Buckets[0].BucketName != bucketName {
 		log.Println("create bucket", bucketName, "fails")
@@ -148,14 +160,14 @@ func lfsTest() error {
 
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
+		log.Fatal("download file ", objectName, " err:", err)
 		return err
 	}
 
 	obuf := new(bytes.Buffer)
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
 	}
 
 	log.Println("6. test mul create bucket")
@@ -163,11 +175,11 @@ func lfsTest() error {
 	mbucketName := "Bucket1"
 	var mopts []func(*shell.RequestBuilder) error
 	mopts = append(mopts, shell.SetAddress(addr))
-	mopts = append(mopts, shell.SetDataCount(2))
+	mopts = append(mopts, shell.SetDataCount(dataCount))
 	mopts = append(mopts, shell.SetParityCount(parityCount))
 	mopts = append(mopts, shell.SetPolicy(df.MulPolicy))
 
-	_, errBucket := sh.CreateBucket(mbucketName, opts...)
+	_, errBucket := sh.CreateBucket(mbucketName, mopts...)
 	if errBucket != nil {
 		log.Println("create mbucket err: ", err)
 	}
@@ -176,6 +188,8 @@ func lfsTest() error {
 	if err != nil {
 		log.Println("create mbucket err: ", err)
 	}
+
+	fmt.Println(bk.Buckets)
 
 	if bk.Buckets[0].BucketName != mbucketName {
 		log.Println("create mbucket", mbucketName, "fails")
@@ -189,7 +203,7 @@ func lfsTest() error {
 		log.Println("create mbucket fails datacount")
 	}
 
-	if bk.Buckets[0].ParityCount != parityCount+1 {
+	if bk.Buckets[0].ParityCount != parityCount+dataCount-1 {
 		log.Println("create mbucket fails paritycount")
 	}
 
@@ -233,21 +247,21 @@ func lfsTest() error {
 
 	outer, err = sh.GetObject(objectName, mbucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
+		log.Fatal("download file ", objectName, " err:", err)
 		return err
 	}
 
 	obuf = new(bytes.Buffer)
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
 	}
 
 	log.Println("9. test showstorage")
 
 	res, err := sh.ShowStorage(shell.SetAddress(addr))
 	if err != nil {
-		log.Println(addr, " not start, waiting..., err : ", err)
+		log.Fatal("show storage err : ", err)
 	}
 
 	log.Println("storage: ", res)
@@ -279,8 +293,6 @@ func fillRandom(p []byte) {
 		}
 	}
 }
-
-const ethEndPoint = "http://212.64.28.207:8101"
 
 func transferTo(value *big.Int, addr string) {
 	client, err := ethclient.Dial(ethEndPoint)
@@ -341,15 +353,14 @@ func transferTo(value *big.Int, addr string) {
 }
 
 func queryBalance(addr string) *big.Int {
-	client, err := ethclient.Dial(ethEndPoint)
+	var result string
+	client, err := rpc.Dial(ethEndPoint)
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
+		log.Fatal("rpc.dial err:", err)
 	}
-	Address := common.HexToAddress(addr[2:])
-	balance, err := client.PendingBalanceAt(context.Background(), Address)
+	err = client.Call(&result, "eth_getBalance", addr, "latest")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.call err:", err)
 	}
-	return balance
+	return utils.HexToBigInt(result)
 }

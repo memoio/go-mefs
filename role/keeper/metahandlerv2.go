@@ -14,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
@@ -85,6 +86,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 	queryAddr := options[2]
 	log.Println("Query合约信息：", queryAddr)
 	var keeperCount, providerCount int
+	var price int64
 	if queryAddr == contracts.InvalidAddr {
 		log.Println("No query contracts，use k/p numbers in init request")
 		ks, err := strconv.Atoi(options[0])
@@ -99,6 +101,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		}
 		keeperCount = ks
 		providerCount = ps
+		price = int64(utils.STOREPRICEPEDOLLAR)
 	} else {
 		log.Println("Get k/p numbers from query contract of user: ", userID)
 		localAddr, _ := ad.GetAddressFromID(localNode.Identity.Pretty())
@@ -109,8 +112,12 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		}
 		keeperCount = int(item.KeeperNums)
 		providerCount = int(item.ProviderNums)
+		price = item.Price
+		if pos.GetPosId() == userID {
+			price = int64(utils.STOREPRICEPEDOLLAR)
+		}
 	}
-	log.Println(userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount)
+	log.Println(userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount, "price: ", price)
 	//查询出user的keeper和provider
 	//首先看看内存里是否有该节点
 	response, err := userInitInMem(userID, keeperCount, providerCount)
@@ -122,7 +129,7 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 		}
 	}
 	if response == "" { //没错，但是结果是空，为新user
-		response, err = newUserInit(userID, keeperCount, providerCount)
+		response, err = newUserInit(userID, keeperCount, providerCount, price)
 		if err != nil {
 			log.Println("handleUserInitReq err: ", err)
 			return
@@ -188,9 +195,6 @@ func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
 		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
-	if _, ok := localPeerInfo.UserCache.Get(userID); ok { //本地没有保存好的user信息 但是waitlist里有
-		localPeerInfo.UserCache.Remove(userID)
-	}
 
 	//如果ledgerinfo中有该user的信息，则清除。
 	LedgerInfo.Range(func(key, value interface{}) bool {
@@ -208,13 +212,13 @@ func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
 		log.Println("Can't find ", km.GetMid(), "'s GroupInfo")
 		return
 	}
-	err := SaveUpkeeping(tempInfo, km.GetMid())
+	err := saveUpkeeping(tempInfo, km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping success")
 	}
-	err = SaveQuery(km.GetMid())
+	err = saveQuery(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Query err", err)
 	} else {
@@ -286,25 +290,24 @@ func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 }
 
 func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
-	ops := strings.Split(value, metainfo.DELIMITER)
-	if len(ops) < 3 {
+	vals := strings.Split(value, metainfo.DELIMITER)
+	if len(vals) < 2 {
 		return
 	}
-	tmpmaxSpace := ops[0]
-	actulDataSpacestr, err := strconv.ParseUint(ops[1], 10, 64)
+
+	total, err := strconv.ParseUint(vals[0], 10, 64)
 	if err != nil {
 		log.Println("handleStorageSync err: ", err)
 		return
 	}
-	rawDataSpacestr, err := strconv.ParseUint(ops[2], 10, 64)
+	used, err := strconv.ParseUint(vals[1], 10, 64)
 	if err != nil {
 		log.Println("handleStorageSync err: ", err)
 		return
 	}
 	tmpStorageInfo := &storageInfo{
-		maxSpace:       tmpmaxSpace,
-		actulDataSpace: actulDataSpacestr,
-		rawDataSpace:   rawDataSpacestr,
+		maxSpace:  total,
+		usedSpace: used,
 	}
 	localPeerInfo.Storage.Store(pid, tmpStorageInfo)
 }

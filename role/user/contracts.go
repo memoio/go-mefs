@@ -11,7 +11,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func ConstructContractService(userID string) *ContractService {
+func constructContractService(userID string) *ContractService {
 	var upkeeping contracts.UpKeepingItem
 	var query contracts.QueryItem
 	return &ContractService{
@@ -23,27 +23,27 @@ func ConstructContractService(userID string) *ContractService {
 	}
 }
 
-func (cs *ContractService) SaveContracts() error {
-	err := cs.SaveUpkeeping()
+func (cs *ContractService) saveContracts() error {
+	err := cs.saveUpkeeping()
 	if err != nil {
 		return err
 	}
-	err = cs.SaveChannel()
+	err = cs.saveChannel()
 	if err != nil {
 		return err
 	}
-	err = cs.SaveQuery()
+	err = cs.saveQuery()
 	if err != nil {
 		return err
 	}
-	err = cs.SaveOffer()
+	err = cs.saveOffer()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (cs *ContractService) SaveUpkeeping() error {
+func (cs *ContractService) saveUpkeeping() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err
@@ -62,31 +62,33 @@ func (cs *ContractService) SaveUpkeeping() error {
 	return nil
 }
 
-func (cs *ContractService) SaveChannel() error {
+func (cs *ContractService) saveChannel() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err
 	}
-	uk, err := cs.GetUpkeepingItem()
+	uk, err := cs.getUpkeepingItem()
 	if err != nil {
 		return err
 	}
-	for _, proId := range uk.ProviderIDs {
-		if _, ok := cs.channelBook[proId]; ok {
+	for _, proID := range uk.ProviderIDs {
+		if _, ok := cs.channelBook[proID]; ok {
 			continue
 		}
 
-		proAddr, err := address.GetAddressFromID(proId)
+		proAddr, err := address.GetAddressFromID(proID)
 		if err != nil {
 			return err
 		}
-		chanAddr, err := contracts.GetChannelAddr(userAddr, proAddr, userAddr)
+
+		chanItem, err := contracts.GetChannelInfo(userAddr, proAddr, userAddr)
 		if err != nil {
 			return err
 		}
+
 		// 先从本地找value
 		var value = new(big.Int)
-		channelValueKeyMeta, err := metainfo.NewKeyMeta(chanAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+		channelValueKeyMeta, err := metainfo.NewKeyMeta(chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
 		if err != nil {
 			return err
 		}
@@ -94,11 +96,11 @@ func (cs *ContractService) SaveChannel() error {
 		valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
-			log.Println("Can't get channel value in local,err :", err, ", so try to get from ", proId)
-			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), proId)
+			log.Println("Can't get channel value in local,err :", err, ", so try to get from ", proID)
+			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), proID)
 			if err != nil {
 				// provider上也没找到，value设为0
-				log.Println("Can't get channel price from ", proId, ",err :", err, ", so set channel price to 0.")
+				log.Println("Can't get channel price from ", proID, ",err :", err, ", so set channel price to 0.")
 				value = big.NewInt(0)
 			} else {
 				//provider上找到了
@@ -116,24 +118,17 @@ func (cs *ContractService) SaveChannel() error {
 				return errors.New("bigInt.SetString err")
 			}
 		}
-		log.Println("保存在内存中的channel地址和value为:", chanAddr.String(), value.String())
-		time, err := contracts.GetChannelStartDate(userAddr, proAddr, userAddr)
-		if err != nil {
-			return err
-		}
-		channel := contracts.ChannelItem{
-			UserID:      cs.UserID,
-			ChannelAddr: chanAddr.String(),
-			ProID:       proId,
-			Value:       value,
-			StartTime:   time,
-		}
-		cs.channelBook[proId] = channel
+		log.Println("保存在内存中的channel地址和value为:", chanItem.ChannelAddr, value.String())
+
+		chanItem.UserID = cs.UserID
+		chanItem.ProID = proID
+		chanItem.Value = value
+		cs.channelBook[proID] = chanItem
 	}
 	return nil
 }
 
-func (cs *ContractService) SaveQuery() error {
+func (cs *ContractService) saveQuery() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err
@@ -152,21 +147,21 @@ func (cs *ContractService) SaveQuery() error {
 	return nil
 }
 
-func (cs *ContractService) SaveOffer() error {
+func (cs *ContractService) saveOffer() error {
 	userAddr, err := address.GetAddressFromID(cs.UserID)
 	if err != nil {
 		return err
 	}
-	uk, err := cs.GetUpkeepingItem()
+	uk, err := cs.getUpkeepingItem()
 	if err != nil {
 		return err
 	}
-	for _, proId := range uk.ProviderIDs {
-		if _, ok := cs.offerBook[proId]; ok {
+	for _, proID := range uk.ProviderIDs {
+		if _, ok := cs.offerBook[proID]; ok {
 			continue
 		}
 
-		proAddr, err := address.GetAddressFromID(proId)
+		proAddr, err := address.GetAddressFromID(proID)
 		if err != nil {
 			return err
 		}
@@ -181,14 +176,14 @@ func (cs *ContractService) SaveOffer() error {
 			log.Println("get", proAddr.String(), "'s offer params err ")
 			return err
 		}
-		offerItem.ProviderID = proId
+		offerItem.ProviderID = proID
 		offerItem.OfferAddr = offerAddr.String()
-		cs.offerBook[proId] = offerItem
+		cs.offerBook[proID] = offerItem
 	}
 	return nil
 }
 
-func (cs *ContractService) GetChannelItem(proid string) (contracts.ChannelItem, error) {
+func (cs *ContractService) getChannelItem(proid string) (contracts.ChannelItem, error) {
 	channelItem, ok := cs.channelBook[proid]
 	if !ok {
 		return channelItem, ErrGetContractItem
@@ -196,7 +191,7 @@ func (cs *ContractService) GetChannelItem(proid string) (contracts.ChannelItem, 
 	return channelItem, nil
 }
 
-func (cs *ContractService) GetOfferItem(proid string) (contracts.OfferItem, error) {
+func (cs *ContractService) getOfferItem(proid string) (contracts.OfferItem, error) {
 	offerItem, ok := cs.offerBook[proid]
 	if !ok {
 		return offerItem, ErrGetContractItem
@@ -204,7 +199,7 @@ func (cs *ContractService) GetOfferItem(proid string) (contracts.OfferItem, erro
 	return offerItem, nil
 }
 
-func (cs *ContractService) GetUpkeepingItem() (contracts.UpKeepingItem, error) {
+func (cs *ContractService) getUpkeepingItem() (contracts.UpKeepingItem, error) {
 	if cs.upKeepingItem.UpKeepingAddr == "" || cs.upKeepingItem.UserID == "" {
 		log.Println("UpKeepingItem hasn't set")
 		return cs.upKeepingItem, ErrGetContractItem
@@ -212,7 +207,7 @@ func (cs *ContractService) GetUpkeepingItem() (contracts.UpKeepingItem, error) {
 	return cs.upKeepingItem, nil
 }
 
-func (cs *ContractService) GetQueryItem() (contracts.QueryItem, error) {
+func (cs *ContractService) getQueryItem() (contracts.QueryItem, error) {
 	if cs.queryItem.QueryAddr == "" || cs.queryItem.UserID == "" {
 		log.Println("QueryItem hasn't set")
 		return cs.queryItem, ErrGetContractItem

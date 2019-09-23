@@ -135,11 +135,11 @@ MetaDeleteBlock(metaKey, metaValue, to string) (string, error)     //通知provi
 
   以`"/block/" + blockID + "/pids"`的格式去Keeper那里找到provider。
 
-+ `func PutDataMetaToKeepers(blockID string, providers []string, keepers []string) error`
++ `func putDataMetaToKeepers(blockID string, providers []string, keepers []string) error`
 
   以`"/metainfo/block/" + blockID + "/pids"`的格式通知keeper，自己将这个块存放在哪些provider上了。
 
-+ `func DeleteBlocksFromProvider(blockStart, blockCount int32, updateMeta bool) error`
++ `func deleteBlocksFromProvider(blockStart, blockCount int32, updateMeta bool) error`
 
   通知provider删除某些块，通知keeper自己删除了某些块。如果设置了updateMeta，证明是要更新metaBlock，那要返回DHT消息的返回值，看看是不是completed，再进行操作。
 

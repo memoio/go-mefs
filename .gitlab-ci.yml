@@ -8,8 +8,9 @@ stages:
   - upload-test
 
 variables:
-  UPCOUNNT: "100"
+  UPCOUNT: "50"
   NETKEY: "dev"
+  ETHENDPOINT: "http://212.64.28.207:8101"
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
@@ -113,7 +114,8 @@ upkeeping_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - go run test/unit/upkeepingTest/upkeepingTest.go
+    - echo $ETHENDPOINT
+    - go run test/unit/upkeepingTest/upkeepingTest.go -eth=$ETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -124,9 +126,8 @@ channel_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - go run test/unit/channelTest/channelTest.go
-  after_script:
-    - cat ~/daemon.stdout
+    - echo $ETHENDPOINT
+    - go run test/unit/channelTest/channelTest.go -eth=$ETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -137,9 +138,20 @@ role_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - go run test/unit/roleTest/roleTest.go
-  after_script:
-    - cat ~/daemon.stdout
+    - echo $ETHENDPOINT
+    - go run test/unit/roleTest/roleTest.go -eth=$ETHENDPOINT
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
+pos_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - echo $ETHENDPOINT
+    - go run test/unit/posTest/posTest.go -eth=$ETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -163,7 +175,7 @@ js_API_test:
     max: 1
     when: stuck_or_timeout_failure
   only:
-    - schedules
+    - dev
 
 lfs_test:
   stage: short-test
@@ -173,8 +185,9 @@ lfs_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 lfsTest.sh
+    - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./lfsTest.sh $NETKEY
+    - ./lfsTest.sh $ETHENDPOINT $NETKEY
   after_script:
     - cat ~/daemon.stdout
   tags:
@@ -190,8 +203,9 @@ challenge_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 challengeTest.sh
+    - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./challengeTest.sh $NETKEY
+    - ./challengeTest.sh $ETHENDPOINT $NETKEY
   after_script:
     - cat ~/daemon.stdout
   tags:
@@ -207,9 +221,10 @@ upload_test:
     - make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 uploadTest.sh
+    - echo $ETHENDPOINT
     - echo $NETKEY
     - echo $UPCOUNT
-    - ./uploadTest.sh $NETKEY $UPCOUNT
+    - ./uploadTest.sh $ETHENDPOINT $NETKEY $UPCOUNT
   after_script:
     - cat ~/daemon.stdout
   tags:

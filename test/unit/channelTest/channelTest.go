@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"flag"
 	"log"
 	"math/big"
 	"os"
@@ -13,9 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -23,20 +24,27 @@ import (
 const (
 	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
+	moneyTo  = 1000000000000000
 )
 
-const ethEndPoint = "http://212.64.28.207:8101"
+var ethEndPoint string
 
 func main() {
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.Parse()
+	ethEndPoint = *eth
+
+	contracts.EndPoint = ethEndPoint
+
 	balance := queryBalance(userAddr)
-	if balance.Cmp(big.NewInt(1000000000000)) <= 0 {
-		transferTo(big.NewInt(1000000000000), userAddr)
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
+		transferTo(big.NewInt(moneyTo), userAddr)
 	}
 
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(userAddr)
-		if balance.Cmp(big.NewInt(1000000000000)) > 0 {
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
 
@@ -53,24 +61,16 @@ func main() {
 }
 
 func testChannelTimeout() (err error) {
-	log.Println("==========channel timeout=========")
-
-	log.Println("test deploy channel resolver")
+	log.Println("==========test channel timeout=========")
 	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
 	}
 
-	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		log.Fatal("newIndexerErr:", err)
-		return err
-	}
-
 	providerAddr := common.HexToAddress(proAddr[2:])
 
-	_, err = contracts.DeployResolverForChannel(proSk, providerAddr, indexer)
+	log.Println("test deploy channel resolver")
+	_, err = contracts.DeployResolverForChannel(providerAddr, proSk)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
 		return err
@@ -87,7 +87,7 @@ func testChannelTimeout() (err error) {
 		return err
 	}
 
-	log.Println("test query channel balance")
+	log.Println("test query channel balance: ", channelAddr.String())
 	retryCount := 0
 	cbalance := queryBalance(channelAddr.String())
 	for {
@@ -106,16 +106,27 @@ func testChannelTimeout() (err error) {
 		break
 	}
 
-	log.Println("test query channel start date")
-	_, err = contracts.GetChannelStartDate(localAddr, providerAddr, localAddr)
+	log.Println("test query channel addr")
+	newChannel, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
 	if err != nil {
 		log.Println("Get Channel StartDate Err: ", err)
 		return err
 	}
 
+	if newChannel.String() != channelAddr.String() {
+		log.Println("Get Wrong Channel")
+	}
+
+	log.Println("test query channel start date")
+	_, err = contracts.GetChannelInfo(localAddr, providerAddr, localAddr)
+	if err != nil {
+		log.Println("Get Channel Info Err: ", err)
+		return err
+	}
+
 	log.Println("test channel timeout before enddate, should return err")
 	//触发channelTimeout()
-	err = contracts.ChannelTimeout(userSk, localAddr, providerAddr)
+	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
 	if err == nil {
 		log.Println("call channelTimeout success, but time is early")
 		return err
@@ -123,7 +134,7 @@ func testChannelTimeout() (err error) {
 
 	log.Println("test channel timeout after enddate")
 	time.Sleep(300 * time.Second)
-	err = contracts.ChannelTimeout(userSk, localAddr, providerAddr)
+	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
 	if err != nil {
 		log.Println("call channelTimeout err:", err)
 		return err
@@ -155,22 +166,16 @@ func testChannelTimeout() (err error) {
 }
 
 func testCloseChannel() (err error) {
-	log.Println("test deploy channel resolver")
+	log.Println("test close channel")
 	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
 	}
 
-	indexerAddr := common.HexToAddress(contracts.IndexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		log.Fatal("newIndexerErr:", err)
-		return err
-	}
-
 	providerAddr := common.HexToAddress(proAddr[2:])
 
-	_, err = contracts.DeployResolverForChannel(userSk, providerAddr, indexer)
+	log.Println("test deploy channel resolver")
+	_, err = contracts.DeployResolverForChannel(providerAddr, proSk)
 	if err != nil {
 		log.Fatal("deployResolverErr:", err)
 		return err
@@ -187,7 +192,7 @@ func testCloseChannel() (err error) {
 		return err
 	}
 
-	log.Println("test query channel balance")
+	log.Println("test query channel balance: ", channelAddr.String())
 	retryCount := 0
 	cbalance := queryBalance(channelAddr.String())
 	for {
@@ -206,7 +211,8 @@ func testCloseChannel() (err error) {
 		break
 	}
 
-	chanAddr, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
+	log.Println("test query channel contract")
+	chanAddr, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
 	if err != nil {
 		log.Fatal("GetChannelAddr fails:", err)
 		return err
@@ -216,6 +222,7 @@ func testCloseChannel() (err error) {
 		log.Fatal("Get Wrong ChannelAddr")
 	}
 
+	log.Println("test close channel contract")
 	balance := queryBalance(userAddr) //查看账户余额
 	//签名
 	value := big.NewInt(11111)
@@ -238,7 +245,7 @@ func testCloseChannel() (err error) {
 	}
 
 	//provider触发CloseChannel()
-	err = contracts.CloseChannel(proSk, providerAddr, localAddr, sig, value)
+	err = contracts.CloseChannel(providerAddr, localAddr, proSk, sig, value)
 	if err != nil {
 		log.Fatal("CloseChannelErr:", err)
 		return err
@@ -307,14 +314,14 @@ func createAddr() (string, string, error) {
 	hex.Encode(enc, skByteEth)
 
 	balance := queryBalance(addressHex)
-	if balance.Cmp(big.NewInt(1000000000000)) < 0 {
-		transferTo(big.NewInt(1000000000000), addressHex)
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
+		transferTo(big.NewInt(moneyTo), addressHex)
 	}
 
 	for {
 		time.Sleep(30 * time.Second)
 		balance := queryBalance(addressHex)
-		if balance.Cmp(big.NewInt(1000000000000)) >= 0 {
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
 
@@ -384,15 +391,14 @@ func transferTo(value *big.Int, addr string) {
 }
 
 func queryBalance(addr string) *big.Int {
-	client, err := ethclient.Dial(ethEndPoint)
+	var result string
+	client, err := rpc.Dial(ethEndPoint)
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
+		log.Fatal("rpc.dial err:", err)
 	}
-	Address := common.HexToAddress(addr[2:])
-	balance, err := client.PendingBalanceAt(context.Background(), Address)
+	err = client.Call(&result, "eth_getBalance", addr, "latest")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.call err:", err)
 	}
-	return balance
+	return utils.HexToBigInt(result)
 }

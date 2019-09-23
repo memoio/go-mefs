@@ -2,23 +2,21 @@ package provider
 
 import (
 	"errors"
+	"log"
 	"runtime"
 	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
+	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 const (
-	//ReDeployOffer redeploy offer-contract,default is false
-	ReDeployOffer = false
-
-	DefaultCapacity int64 = 2000   //单位：MB
-	DefaultDuration int64 = 200    //单位：天
-	DefaultPrice    int64 = 100000 //单位：wei
+	DefaultCapacity int64 = 100000 //单位：MB
+	DefaultDuration int64 = 365    //单位：天
 )
 
 var (
@@ -32,6 +30,7 @@ type ProviderContracts struct {
 	channelBook   sync.Map // K-user的id, V-Channel
 	queryBook     sync.Map // K-user的id, V-Query
 	offer         contracts.OfferItem
+	proInfo       contracts.ProviderItem
 }
 
 func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
@@ -95,4 +94,36 @@ func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
 	}
 
 	return mkey.Sk, nil
+}
+
+// getDiskUsage gets the disk usage
+func getDiskUsage() (uint64, error) {
+	dataStore := localNode.Repo.Datastore()
+	DataSpace, err := ds.DiskUsage(dataStore)
+	if err != nil {
+		log.Println("get disk usage failed :", err)
+		return 0, err
+	}
+	return DataSpace, nil
+}
+
+// getDiskTotal gets the disk total space which is set in config
+func getDiskTotal() uint64 {
+	var maxSpaceInByte uint64
+	proItem, err := getProInfo()
+	if err != nil {
+		maxSpaceInByte = 10 * 1024 * 1024 * 1024
+	} else {
+		if proItem.Capacity == 0 {
+			maxSpaceInByte = 10 * 1024 * 1024 * 1024
+		} else {
+			maxSpaceInByte = uint64(proItem.Capacity) * 1024 * 1024
+		}
+	}
+	return maxSpaceInByte
+}
+
+// getDiskUsage gets the disk total space which is set in config
+func getFreeSpace() {
+	return
 }

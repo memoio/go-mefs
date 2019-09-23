@@ -11,23 +11,43 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/channel"
-	"github.com/memoio/go-mefs/contracts/mapper"
 	"github.com/memoio/go-mefs/utils"
 )
+
+// DeployResolverForChannel provider deploys mapper to save user's mapper
+// provider owns second sesolverß
+func DeployResolverForChannel(localAddress common.Address, hexKey string) (common.Address, error) {
+	resolverAddr, resolverInstance, err := deployResolver(localAddress, hexKey, "channel")
+	if err != nil {
+		return resolverAddr, err
+	}
+
+	secondAddr, _, err := deployResolverToResolver(localAddress, resolverInstance, hexKey)
+	if err != nil {
+		log.Println("deploy resolver for Channel Err:", err)
+		return secondAddr, err
+	}
+
+	return secondAddr, nil
+}
 
 //DeployChannelContract deploy channel-contract, timeOut's unit is second
 func DeployChannelContract(hexKey string, localAddress common.Address, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int) (common.Address, error) {
 	var channelAddr common.Address
+
 	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
 
 	client := GetClient(EndPoint)
 
 	//根据key(provider的地址)从indexer中获得对应的resolver
-	resolver, err := getResolverFromIndexer(localAddress, providerAddress.String())
+	_, resolverInstance, err := getResolverFromIndexer(localAddress, "channel")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
+		return channelAddr, err
+	}
+
+	_, secondInstance, err := getResolverFromResolver(localAddress, providerAddress, resolverInstance)
+	if err != nil {
 		return channelAddr, err
 	}
 
@@ -35,12 +55,12 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 	retryCount := 0
 	for {
 		retryCount++
-		auth = bind.NewKeyedTransactor(key)
+		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = moneyToChannel //放进合约里的钱
 		channelAddr, _, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
 		if err != nil {
-			if retryCount > 3 {
+			if retryCount > 5 {
 				fmt.Println("deploy Channel Err:", err)
 				return channelAddr, err
 			}
@@ -51,78 +71,17 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 	}
 
 	//从上面的resolver中，获得本user的mapper，如果没有，则部署mapper
-	retryCount = 0
-	var mapperInstance *mapper.Mapper
-	for {
-		retryCount++
-		auth = bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-
-		mapperInstance, err = deployMapper(localAddress, resolver, auth, client)
-		if err != nil {
-			if retryCount > 3 {
-				log.Println("deploy Mapper for Channel Err:", err)
-				return channelAddr, err
-			}
-			time.Sleep(time.Minute)
-			continue
-		}
-		break
-
+	// user owns mapper
+	_, mapperInstance, err := deployMapper(localAddress, localAddress, secondInstance, hexKey)
+	if err != nil {
+		log.Println("deploy Mapper for Channel Err:", err)
+		return channelAddr, err
 	}
 
 	//将channel合约地址channelAddr放进上述的mapper中
-	retryCount = 0
-	retryGet := 0
-	addCount := 0
-	getFlag := false
-	for {
-		retryCount++
-		auth = bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = mapperInstance.Add(auth, channelAddr)
-		if err != nil {
-			if retryCount > 3 {
-				fmt.Println("add Channel to Mapper Err:", err)
-				return channelAddr, err
-			}
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		for {
-			retryGet++
-			channelGetted, err := mapperInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			})
-			if err != nil {
-				if retryGet > 30 {
-					fmt.Println("get Channel from Mapper Err:", err)
-					return channelAddr, err
-				}
-				time.Sleep(20 * time.Second)
-				continue
-			}
-			length := len(channelGetted)
-			if length != 0 && channelGetted[length-1] == channelAddr {
-				getFlag = true
-				break
-			}
-			if retryGet > 30 {
-				break
-			}
-			time.Sleep(10 * time.Second)
-		}
-
-		if getFlag {
-			break
-		} else {
-			if addCount > 5 {
-				return channelAddr, errors.New("add channel to mapper fails")
-			}
-			addCount++
-			continue
-		}
+	err = addToMapper(localAddress, mapperInstance, channelAddr, hexKey)
+	if err != nil {
+		return channelAddr, nil
 	}
 
 	fmt.Println("channel-contract with", providerAddress.String(), "have been successfully deployed!")
@@ -130,28 +89,16 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 }
 
 //ChannelTimeout called by user to discontinue the channel-contract
-func ChannelTimeout(hexKey string, localAddress common.Address, providerAddress common.Address) (err error) {
+func ChannelTimeout(localAddress common.Address, providerAddress common.Address, hexKey string) (err error) {
+	_, channelInstance, err := GetChannelAddr(localAddress, providerAddress, localAddress)
+	if err != nil {
+		return nil
+	}
+
 	key, _ := crypto.HexToECDSA(hexKey)
-
-	resolver, err := getResolverFromIndexer(localAddress, providerAddress.String())
-	if err != nil {
-		fmt.Println("getResolverErr:", err)
-		return err
-	}
-
-	mapper, err := getMapperInstance(localAddress, localAddress, resolver)
-	if err != nil {
-		return err
-	}
-
-	_, channelContract, err := getChannel(mapper, localAddress)
-	if err != nil {
-		return err
-	}
-
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
-	_, err = channelContract.ChannelTimeout(auth)
+	_, err = channelInstance.ChannelTimeout(auth)
 	if err != nil {
 		fmt.Println("channelTimeOutErr:", err)
 		return err
@@ -161,21 +108,11 @@ func ChannelTimeout(hexKey string, localAddress common.Address, providerAddress 
 	return nil
 }
 
-//CloseChannel called by provider to stop the channel-contract,the ownerAddress implements the deployer
-func CloseChannel(hexKey string, localAddress common.Address, ownerAddress common.Address, sig []byte, value *big.Int) (err error) {
-	//获得channel合约地址
-	resolver, err := getResolverFromIndexer(localAddress, localAddress.String())
+//CloseChannel called by provider to stop the channel-contract,the ownerAddress implements the mapper
+func CloseChannel(localAddress common.Address, userAddress common.Address, hexKey string, sig []byte, value *big.Int) (err error) {
+	channelAddr, channelInstance, err := GetChannelAddr(localAddress, localAddress, userAddress)
 	if err != nil {
-		fmt.Println("getResolverErr:", err)
-		return err
-	}
-	mapper, err := getMapperInstance(localAddress, ownerAddress, resolver)
-	if err != nil {
-		return err
-	}
-	channelAddr, channelContract, err := getChannel(mapper, localAddress)
-	if err != nil {
-		return err
+		return nil
 	}
 
 	//(channelAddress, value)的哈希值
@@ -189,7 +126,7 @@ func CloseChannel(hexKey string, localAddress common.Address, ownerAddress commo
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.GasLimit = 8000000
-	_, err = channelContract.CloseChannel(auth, hashNew, value, sig)
+	_, err = channelInstance.CloseChannel(auth, hashNew, value, sig)
 	if err != nil {
 		fmt.Println("closeChannelErr:", err)
 		return err
@@ -199,50 +136,41 @@ func CloseChannel(hexKey string, localAddress common.Address, ownerAddress commo
 	return nil
 }
 
-//getChannel()当在ChannelTimeOut()中被调用，则localAddress为userAddr；
+// getChannel()当在ChannelTimeOut()中被调用，则localAddress为userAddr；
 // 当在CloseChannel()中被调用，则localAddress是providerAddr
-func getChannel(mapper *mapper.Mapper, localAddress common.Address) (common.Address, *channel.Channel, error) {
-	var channelAddr common.Address
-	channels, err := mapper.Get(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		fmt.Println("getChannelsErr:", err)
-		return channelAddr, nil, err
-	}
-	if len(channels) == 0 {
-		fmt.Println("getChannelErr:", ErrNotDeployedChannel)
-		return channelAddr, nil, ErrNotDeployedChannel
-	}
-
-	//返回最新的channel地址
-	channelAddr = channels[len(channels)-1]
-	channelContract, err := channel.NewChannel(channelAddr, GetClient(EndPoint))
-	if err != nil {
-		fmt.Println("getChannelsErr:", err)
-		return channelAddr, nil, err
-	}
-	return channelAddr, channelContract, nil
-}
 
 //GetChannelAddr get the channel contract's address
-func GetChannelAddr(localAddr, providerAddr, ownerAddr common.Address) (common.Address, error) {
-	var ChannelAddr common.Address
-	resolver, err := getResolverFromIndexer(localAddr, providerAddr.String())
+func GetChannelAddr(localAddress, providerAddress, userAddress common.Address) (common.Address, *channel.Channel, error) {
+	var channelAddr common.Address
+
+	_, resolverInstance, err := getResolverFromIndexer(localAddress, "channel")
 	if err != nil {
-		return ChannelAddr, err
+		fmt.Println("get Resolver Err:", err)
+		return channelAddr, nil, err
 	}
 
-	mapper, err := getMapperInstance(localAddr, ownerAddr, resolver)
+	_, secondInstance, err := getResolverFromResolver(localAddress, providerAddress, resolverInstance)
 	if err != nil {
-		return ChannelAddr, err
+		fmt.Println("get second Resolver Err:", err)
+		return channelAddr, nil, err
 	}
 
-	channelAddr, _, err := getChannel(mapper, localAddr)
+	_, mapperInstance, err := getMapperInstance(localAddress, userAddress, secondInstance)
 	if err != nil {
-		return ChannelAddr, err
+		return channelAddr, nil, err
 	}
-	return channelAddr, nil
+
+	channelAddr, err = getLatestAddrFromMapper(localAddress, mapperInstance)
+	if err != nil {
+		return channelAddr, nil, err
+	}
+
+	channelInstance, err := channel.NewChannel(channelAddr, GetClient(EndPoint))
+	if err != nil {
+		fmt.Println("getChannelsErr:", err)
+		return channelAddr, nil, err
+	}
+	return channelAddr, channelInstance, nil
 }
 
 //SignForChannel user sends a private key signature to the provider
@@ -278,34 +206,55 @@ func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.In
 	return verify, nil
 }
 
-//GetChannelStartDate used to get the startDate of channel-contract
-func GetChannelStartDate(localAddr, providerAddr, ownerAddr common.Address) (string, error) {
-	resolver, err := getResolverFromIndexer(localAddr, providerAddr.String())
+//GetChannelInfo used to get the startDate of channel-contract
+func GetChannelInfo(localAddr, providerAddr, userAddr common.Address) (ChannelItem, error) {
+	var item ChannelItem
+	channelAddr, channelContract, err := GetChannelAddr(localAddr, providerAddr, userAddr)
 	if err != nil {
-		fmt.Println("getResolverErr:", err)
-		return "", err
+		return item, err
+	}
+	retryCount := 0
+	for {
+		retryCount++
+		startDate, timeOut, sender, receiver, err := channelContract.GetInfo(&bind.CallOpts{
+			From: localAddr,
+		})
+		if err != nil {
+			if retryCount > 10 {
+				fmt.Println("Get Channel Info:", err)
+				return item, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		if sender.String() != userAddr.String() || receiver.String() != providerAddr.String() {
+			return item, errors.New("sender and receiver is not compatabile")
+		}
+
+		item = ChannelItem{
+			StartTime:   utils.UnixToTime(startDate.Int64()).Format(utils.SHOWTIME),
+			Duration:    timeOut.Int64(),
+			ChannelAddr: channelAddr.String(),
+		}
+		break
 	}
 
-	mapper, err := getMapperInstance(localAddr, ownerAddr, resolver)
-	if err != nil {
-		return "", err
+	retryCount = 0
+	for {
+		retryCount++
+		balance, err := QueryBalance(channelAddr.String())
+		if err != nil {
+			if retryCount > 10 {
+				fmt.Println("Get Channel Balance: ", err)
+				return item, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		item.Money = balance
+		break
 	}
 
-	_, channelContract, err := getChannel(mapper, localAddr)
-	if err != nil {
-		return "", err
-	}
-
-	startDateBigInt, err := channelContract.GetStartDate(&bind.CallOpts{
-		From: localAddr,
-	})
-	if err != nil {
-		fmt.Println("GetStartDateErr:", err)
-		return "", err
-	}
-
-	startDate := utils.UnixToTime(startDateBigInt.Int64()).Format(utils.SHOWTIME)
-	fmt.Println(startDate)
-
-	return startDate, nil
+	return item, nil
 }

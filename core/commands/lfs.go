@@ -217,7 +217,7 @@ var lfsKillUserCmd = &cmds.Command{
 		cmds.StringArg("addr", false, false, "The practice user's addressid that you want to kill"),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(user.DefaultPassword),
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -283,12 +283,13 @@ var lfsStartUserCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(SecreteKey, "sk", "The practice user's private key that you want to exec").WithDefault(""),
-		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(user.DefaultPassword),
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
 		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(user.DefaultDuration),
 		cmds.Int64Option("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(user.DefaultCapacity),
-		cmds.Int64Option("price", "p", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(user.DefaultPrice),
+		cmds.Int64Option("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(user.KeeperSLA),
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(user.ProviderSLA),
+		cmds.BoolOption("reDeployQuery", "rdo", "reDeploy query contract if user has not deploy upkeeping contract").WithDefault(false),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -358,7 +359,7 @@ var lfsStartUserCmd = &cmds.Command{
 			fmt.Println("input wrong duration.")
 			return errWrongInput
 		}
-		price, ok := req.Options["price"].(int64) //user签署合约时指定的需求存储价格
+		price, ok := req.Options["storedPrice"].(int64) //user签署合约时指定的需求存储价格
 		if !ok || price <= 0 {
 			fmt.Println("input wrong price.")
 			return errWrongInput
@@ -373,12 +374,19 @@ var lfsStartUserCmd = &cmds.Command{
 			fmt.Println("input wrong provider nums.")
 			return errWrongInput
 		}
+
+		rdo, ok := req.Options["reDeployQuery"].(bool)
+		if !ok {
+			fmt.Println("input wrong value for redeploy.")
+			return errWrongInput
+		}
+
 		uService := user.ConstructUserService(uid)
 		err = user.AddUserBook(uService)
 		if err != nil {
 			return err
 		}
-		err = uService.StartUserService(uService.Context, false, pwd, capacity, duration, price, ks, ps)
+		err = uService.StartUserService(uService.Context, false, pwd, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			user.KillUser(uid)
 			return err

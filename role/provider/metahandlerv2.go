@@ -2,10 +2,8 @@ package provider
 
 import (
 	"log"
-	"strconv"
 
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -39,8 +37,6 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 		go handleChallengeBls12(km, metaValue, from)
 	case metainfo.Repair:
 		go handleRepair(km, metaValue, from)
-	case metainfo.StorageSync:
-		go hanldeStorageSync(from)
 	case metainfo.DeleteBlock:
 		go handleDeleteBlock(km, from)
 	case metainfo.GetBlock:
@@ -51,44 +47,20 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 			return res, nil
 		}
 	case metainfo.PutBlock:
-		go handlePutBlock(km, metaValue, from)
+		err := handlePutBlock(km, metaValue, from)
+		if err != nil {
+			log.Println("put Blcok Error: ", err)
+			return metainfo.MetaPutBlockErr, nil
+		}
 	default: //没有匹配的信息，报错
 		return "", metainfo.ErrWrongType
 	}
 	return metainfo.MetaHandlerComplete, nil
 }
 
-// 获取这个节点的角色信息，返回错误说明provider还没有启动好
+// GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
 func (provider *ProviderHandlerV2) GetRole() (string, error) {
 	return provider.Role, nil
-}
-
-func hanldeStorageSync(kid string) error {
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println("get config failed: ", err)
-		return err
-	}
-	maxSpace := cfg.Datastore.StorageMax
-	dataStore := localNode.Repo.Datastore()
-	actulDataSpace, err := ds.DiskUsage(dataStore)
-	if err != nil {
-		log.Println("get disk usage failed: ", err)
-		return err
-	}
-	rawDataSpace := actulDataSpace
-	km, err := metainfo.NewKeyMeta(kid, metainfo.StorageSync)
-	if err != nil {
-		log.Println("construct StorageSync KV error :", err)
-		return err
-	}
-	value := maxSpace + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(rawDataSpace, 10)
-	_, err = sendMetaRequest(km, value, kid)
-	if err != nil {
-		log.Println("send error :", err)
-		return err
-	}
-	return nil
 }
 
 func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {

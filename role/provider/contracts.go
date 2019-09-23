@@ -14,34 +14,28 @@ import (
 
 func handleUserDeployedContracts(km *metainfo.KeyMeta, metaValue, from string) error {
 	log.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
-	err := SaveUpkeeping(km.GetMid())
+	err := saveUpkeeping(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping err", err)
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Upkeeping success")
 	}
-	err = SaveChannel(km.GetMid())
+	err = saveChannel(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Channel err", err)
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Channel success")
 	}
-	err = SaveQuery(km.GetMid())
+	err = saveQuery(km.GetMid())
 	if err != nil {
 		log.Println("Save ", km.GetMid(), "'s Query err", err)
 	} else {
 		log.Println("Save ", km.GetMid(), "'s Query success")
 	}
-	err = SaveOffer()
-	if err != nil {
-		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer err", err)
-	} else {
-		log.Println("Save ", localNode.Identity.Pretty(), "'s Offer success")
-	}
 	return nil
 }
 
-func SaveUpkeeping(userID string) error {
+func saveUpkeeping(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -64,7 +58,7 @@ func SaveUpkeeping(userID string) error {
 	return nil
 }
 
-func GetUpkeeping(userID string) (contracts.UpKeepingItem, error) {
+func getUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 	var upkeepingItem contracts.UpKeepingItem
 	value, ok := ProContracts.upKeepingBook.Load(userID)
 	if !ok {
@@ -75,7 +69,7 @@ func GetUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 	return upkeepingItem, nil
 }
 
-func SaveChannel(userID string) error {
+func saveChannel(userID string) error {
 	if pos.GetPosId() == userID {
 		return nil
 	}
@@ -89,13 +83,15 @@ func SaveChannel(userID string) error {
 	if err != nil {
 		return err
 	}
-	channelAddr, err := contracts.GetChannelAddr(proAddr, proAddr, userAddr)
+
+	chanItem, err := contracts.GetChannelInfo(proAddr, proAddr, userAddr)
 	if err != nil {
 		return err
 	}
+
 	// 先去本地查
 	var value = new(big.Int)
-	km, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+	km, err := metainfo.NewKeyMeta(chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
 	if err != nil {
 		return err
 	}
@@ -112,27 +108,21 @@ func SaveChannel(userID string) error {
 			return errors.New("bigint setString error")
 		}
 	}
-	log.Println("保存在内存中的channel.value为:", channelAddr.String(), value.String())
-	time, err := contracts.GetChannelStartDate(proAddr, proAddr, userAddr)
-	if err != nil {
-		return err
-	}
-	channel := contracts.ChannelItem{
-		UserID:      userID,
-		ChannelAddr: channelAddr.String(),
-		ProID:       proID,
-		Value:       value,
-		StartTime:   time,
-	}
-	ProContracts.channelBook.Store(userID, channel)
+	log.Println("保存在内存中的channel.value为:", chanItem.ChannelAddr, value.String())
+
+	chanItem.UserID = userID
+	chanItem.ProID = proID
+	chanItem.Value = value
+
+	ProContracts.channelBook.Store(userID, chanItem)
 	return nil
 }
 
-func GetChannel(userID string) (contracts.ChannelItem, error) {
+func getChannel(userID string) (contracts.ChannelItem, error) {
 	var channelItem contracts.ChannelItem
 	value, ok := ProContracts.channelBook.Load(userID)
 	if !ok {
-		SaveChannel(userID)
+		saveChannel(userID)
 
 		value, ok = ProContracts.channelBook.Load(userID)
 		if !ok {
@@ -144,7 +134,7 @@ func GetChannel(userID string) (contracts.ChannelItem, error) {
 	return channelItem, nil
 }
 
-func GetChannels() []contracts.ChannelItem {
+func getChannels() []contracts.ChannelItem {
 	var channels []contracts.ChannelItem
 	ProContracts.channelBook.Range(func(_, channnelItem interface{}) bool {
 		channel, ok := channnelItem.(contracts.ChannelItem)
@@ -157,7 +147,7 @@ func GetChannels() []contracts.ChannelItem {
 	return channels
 }
 
-func SaveQuery(userID string) error {
+func saveQuery(userID string) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -181,7 +171,7 @@ func SaveQuery(userID string) error {
 	return nil
 }
 
-func GetQuery(userID string) (contracts.QueryItem, error) {
+func getQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
 	value, ok := ProContracts.queryBook.Load(userID)
 	if !ok {
@@ -192,7 +182,7 @@ func GetQuery(userID string) (contracts.QueryItem, error) {
 	return queryItem, nil
 }
 
-func SaveOffer() error {
+func saveOffer() error {
 	proID := localNode.Identity.Pretty()
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
@@ -212,10 +202,33 @@ func SaveOffer() error {
 	return nil
 }
 
-func GetOffer() (contracts.OfferItem, error) {
+func getOffer() (contracts.OfferItem, error) {
 	if ProContracts.offer.OfferAddr == "" || ProContracts.offer.ProviderID == "" {
 		log.Println("OfferItem hasn't set")
 		return ProContracts.offer, ErrGetContractItem
 	}
 	return ProContracts.offer, nil
+}
+
+func saveProInfo() error {
+	proID := localNode.Identity.Pretty()
+	proAddr, err := address.GetAddressFromID(proID)
+	if err != nil {
+		return err
+	}
+	proItem, err := contracts.GetProviderInfo(proAddr, proAddr)
+	if err != nil {
+		return err
+	}
+	proItem.ProviderID = proID
+	ProContracts.proInfo = proItem
+	return nil
+}
+
+func getProInfo() (contracts.ProviderItem, error) {
+	if ProContracts.proInfo.ProviderID == "" {
+		log.Println("provider info hasn't set")
+		return ProContracts.proInfo, ErrGetContractItem
+	}
+	return ProContracts.proInfo, nil
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,17 +23,19 @@ const (
 	IDLength = 30
 
 	//READPRICEPERMB 读支付中1MB内容需要支付的金额
-	READPRICEPERMB = 1000000
+	READPRICEPERMB int64 = 1000000
 
-	// Stored price 0.2$/TB*Month
+	// Stored price 3$/TB*Month
 	// 1 eth=0.01$
 	// wei/MB*hour
-	STOREPRICEPEDOLLAR = 26500000000
+	STOREPRICEPEDOLLAR int64 = 400000000000
 
 	//BlockSize 暂定一个块中纯data的大小，1k
 	BlockSize = 1024 * 1024
 
 	SegementCount = 256
+
+	DefaultPassword = "123456"
 )
 
 //false 意味着有，true表示无重复
@@ -132,4 +135,19 @@ func Writable(path string) error {
 		return errors.New("'" + path + "' is not writable")
 	}
 	return nil
+}
+
+// 对数组进行乱序操作，以便user随机选择providers
+func DisorderArray(array []string) []string {
+	var temp string
+	var num int
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(array) - 1; i >= 0; i-- {
+		num = r.Intn(i + 1)
+		temp = array[i]
+		array[i] = array[num]
+		array[num] = temp
+	}
+
+	return array
 }

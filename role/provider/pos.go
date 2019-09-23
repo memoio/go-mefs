@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"log"
 	"math/rand"
 	"strconv"
@@ -16,7 +15,6 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -24,26 +22,22 @@ import (
 )
 
 const (
-	LowWater  = 0.8 // 数据生成为总量的80%
-	HighWater = 0.9 // 使用量达到90%后，删除10%的块
+	lowWater  = 0.8 // 数据生成为总量的80%
+	highWater = 0.9 // 使用量达到90%后，删除10%的块
+	mullen    = 100 * 1024 * 1024
+	offset    = 25599
 )
 
 // uid is defined in utils/pos
 
-var curGid int = -1024
-var curSid int = -1
+var curGid = -1024
+var curSid = -1
 var posID string
 var posAddr string
 var posCidPrefix string
 var inGenerate int
 var keeperIDs []string
 var posSkByte []byte
-
-// 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
-const (
-	mullen = 100 * 1024 * 1024
-	offset = 25599
-)
 
 var opt = &df.DataEncoder{
 	DataCount:   1,
@@ -52,7 +46,8 @@ var opt = &df.DataEncoder{
 	SegmentSize: df.DefaultSegmentSize,
 }
 
-func PosSerivce() {
+// PosService starts pos
+func PosService(ctx context.Context) {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
 	posID = pos.GetPosId()
@@ -65,7 +60,7 @@ func PosSerivce() {
 			log.Println("Save upkeeping in posService error, exit from pos mode.")
 			return
 		}
-		err := SaveUpkeeping(posID)
+		err := saveUpkeeping(posID)
 		if err == nil {
 			break
 		}
@@ -119,46 +114,11 @@ func PosSerivce() {
 		}
 	}
 
+	traversePath()
+	log.Println("pos blocks reaches gid: ", curGid, ", sid: ", curSid)
+
 	//开始pos
-	posRegular(context.Background())
-}
-
-// getDiskUsage gets the disk usage
-func getDiskUsage() (uint64, error) {
-	dataStore := localNode.Repo.Datastore()
-	DataSpace, err := ds.DiskUsage(dataStore)
-	if err != nil {
-		log.Println("get disk usage failed :", err)
-		return 0, err
-	}
-	return DataSpace, nil
-}
-
-// getDiskTotal gets the disk total space which is set in config
-func getDiskTotal() (float64, error) {
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println("getDiskTotal error :", err)
-		return 0, err
-	}
-	maxSpaceStr := strings.Replace(cfg.Datastore.StorageMax, "GB", "", 1)
-	maxSpaceInGB, err := strconv.ParseFloat(maxSpaceStr, 64)
-	if err != nil {
-		log.Println("PraseUint maxSpaceStr to maxspace error :", err)
-		return 0, err
-	}
-
-	if maxSpaceInGB == 0 {
-		return 0, errors.New("max space is zero")
-	}
-
-	maxSpaceInByte := maxSpaceInGB * 1024 * 1024 * 1024
-	return maxSpaceInByte, nil
-}
-
-// getDiskUsage gets the disk total space which is set in config
-func getFreeSpace() {
-	return
+	posRegular(ctx)
 }
 
 // posRegular checks posBlocks and decide to add/delete
@@ -181,6 +141,41 @@ func posRegular(ctx context.Context) {
 	}
 }
 
+func traversePath() {
+	exist := false
+	gid := 0
+	for {
+		sid := 0
+		for sid = 0; sid < 1024; sid++ {
+			posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_0"
+			ncid := cid.NewCidV2([]byte(posCid))
+			exist, err := localNode.Blockstore.Has(ncid)
+			if err != nil {
+				continue
+			}
+			if !exist {
+				break
+			}
+		}
+		if exist && sid == 1024 {
+			gid += 1024
+			continue
+		}
+
+		curSid = (sid + 1023) % 1024
+		if curSid == 1023 {
+			curGid = gid - 1024
+			if curGid < 0 {
+				curSid = -1
+			}
+		}
+
+		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+
+		break
+	}
+}
+
 func doGenerateOrDelete() {
 	inGenerate = 1
 	defer func() {
@@ -190,21 +185,20 @@ func doGenerateOrDelete() {
 	if err != nil {
 		return
 	}
-	totalSpace, err := getDiskTotal()
-	if err != nil {
-		return
-	}
-	ratio := float64(usedSpace) / totalSpace
+
+	totalSpace := getDiskTotal()
+
+	ratio := float64(usedSpace) / float64(totalSpace)
 	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
-	if ratio <= LowWater {
-		generatePosBlocks(uint64(totalSpace * (LowWater - ratio)))
-	} else if ratio >= HighWater {
+	if ratio <= lowWater {
+		generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
+	} else if ratio >= highWater {
 		deletePosBlocks(uint64(usedSpace / 10))
 	}
 }
 
-func UploadMulpolicy(data []byte) ([][]byte, int, error) {
+func uploadMulpolicy(data []byte) ([][]byte, int, error) {
 	opt.Policy = df.MulPolicy
 	// 构建加密秘钥
 	buckid := localNode.Identity.Pretty() + strconv.Itoa(curGid)
@@ -244,13 +238,13 @@ func generatePosBlocks(increaseSpace uint64) {
 		rand.Seed(time.Now().UnixNano())
 		fillRandom(tmpData)
 		// 配置部分
-		//更新stripeID、bucketID
+		// 更新stripeID、bucketID
 		curSid = (curSid + 1) % 1024
 		if curSid == 0 {
 			curGid += 1024
 		}
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		data, _, err := UploadMulpolicy(tmpData)
+		data, _, err := uploadMulpolicy(tmpData)
 		if err != nil {
 			log.Println("UploadMulpolicy in generate Pos Blocks error :", err)
 			continue
@@ -326,6 +320,22 @@ func deletePosBlocks(decreseSpace uint64) {
 				deleteBlocks = append(deleteBlocks, blockID)
 			}
 		}
+
+		//更新Gid,Sid
+		curSid = (curSid + 1023) % 1024
+		if curSid == 1023 {
+			curGid -= 1024
+		}
+		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
+
+		posValue := posCidPrefix
+		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+		if err != nil {
+			log.Println("CmdPutTo posKM error :", err)
+			continue
+		}
+
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
 		if j < 5 {
@@ -339,22 +349,6 @@ func deletePosBlocks(decreseSpace uint64) {
 				sendMetaRequest(km, metavalue, keeper)
 			}
 		}
-
-		//更新Gid,Sid
-		curSid = (curSid + 1023) % 1024
-		if curSid == 1023 {
-			curGid -= 1024
-		}
-		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		log.Println("after delete ,Gid :", curGid, "\n sid :", curSid, "\ncid prefix :", posCidPrefix)
-
-		posValue := posCidPrefix
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
-		if err != nil {
-			log.Println("CmdPutTo posKM error :", err)
-			continue
-		}
-
 	}
 }
 

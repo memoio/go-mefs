@@ -27,6 +27,7 @@ import (
 	"github.com/memoio/go-mefs/role/provider"
 	"github.com/memoio/go-mefs/role/user"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
@@ -49,9 +50,9 @@ const (
 	writableKwd               = "writable"
 	enableMultiplexKwd        = "enable-mplex-experiment"
 	enableTendermintKwd       = "tendermint"
-	capacityKwd               = "storage-capacity"
-	durationKwd               = "storage-time"
-	priceKwd                  = "storage-price"
+	capacityKwd               = "storageCapacity"
+	durationKwd               = "storageDuration"
+	priceKwd                  = "storagePrice"
 	ksKwd                     = "keeperSla"
 	psKwd                     = "providerSla"
 	passwordKwd               = "password"
@@ -138,13 +139,13 @@ environment variable:
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(defaultPassword),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
-		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(provider.ReDeployOffer),
+		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
-		cmds.Int64Option(priceKwd, "p", "implement user needs or provider offers how much price of storage").WithDefault(provider.DefaultPrice),
+		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
@@ -201,6 +202,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	hexsk, _ := req.Options[secretKeyKwd].(string)
 	password, _ := req.Options[passwordKwd].(string)
+	nKey, _ := req.Options[netKeyKwd].(string)
 
 	// first, whether user has provided the initialization flag. we may be
 	// running in an uninitialized state.
@@ -209,7 +211,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		// cfg 为配置根路径
 		cfg := cctx.ConfigRoot
 		if !fsrepo.IsInitialized(cfg) {
-			err := doInit(os.Stdout, cfg, nBitsForKeypairDefault, password, nil, hexsk)
+			err := doInit(os.Stdout, cfg, nBitsForKeypairDefault, password, nil, hexsk, nKey)
 			if err != nil {
 				return err
 			}
@@ -260,8 +262,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	default:
 		return fmt.Errorf("unrecognized routing option: %s", routingOption)
 	}
-
-	nKey, _ := req.Options[netKeyKwd].(string)
 
 	node, err := core.NewNode(req.Context, ncfg, password, nKey) //根据配置信息获得本地mefs节点实例
 	if err != nil {
@@ -399,8 +399,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
+	rdo, ok := req.Options[reDeployOfferKwd].(bool)
+	if !ok {
+		fmt.Println("input wrong value for redeploy.")
+		return errRepoExists
+	}
+
 	switch value {
 	case metainfo.RoleKeeper:
+		fmt.Println("started as a keeper")
 		enableTendermint, _ := req.Options[enableTendermintKwd].(bool)
 		err = keeper.StartKeeperService(req.Context, node, enableTendermint)
 		if err != nil {
@@ -412,12 +419,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			return err
 		}
 	case metainfo.RoleUser:
+		fmt.Println("started as a user")
 		user.InitUserBook(node)
 
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.UserHandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 		if cfg.Test {
 			us := user.ConstructUserService(node.Identity.Pretty())
 			err := user.AddUserBook(us)
@@ -425,7 +435,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				return err
 			}
 			go func() {
-				err = us.StartUserService(us.Context, cfg.IsInit, defaultPassword, user.DefaultCapacity, user.DefaultDuration, user.DefaultPrice, user.KeeperSLA, user.ProviderSLA)
+				err = us.StartUserService(us.Context, cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
 				if err != nil {
 					fmt.Println("Start local user failed:", err)
 					err := user.KillUser(node.Identity.Pretty())
@@ -437,8 +447,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}()
 		}
 	case metainfo.RoleProvider: //provider和keeper同样
-		rdo, _ := req.Options[reDeployOfferKwd].(bool)
-		err = provider.StartProviderService(node, capacity, duration, price, rdo)
+		fmt.Println("started as a provider")
+		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err
@@ -451,7 +461,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		if pos {
 			fmt.Println("Start pos Service")
-			go provider.PosSerivce()
+			go provider.PosService(req.Context)
 		}
 	default:
 	}
