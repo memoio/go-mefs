@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -103,7 +104,38 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 			log.Println("contracts.GetUKFromResolver() err: ", err)
 			return
 		}
-		ukBalance, err := contracts.QueryBalance(ukaddr) //查询合约价格
+
+		item, err := contracts.GetUpkeepingInfo(scGroupid, uk)
+		if err != nil {
+			return
+		}
+
+		found := false
+		for _, ProID := range item.ProviderIDs {
+			if pidString == ProID {
+				found = true
+				break
+			}
+		}
+
+		if !found && groupid == pos.GetPosId() {
+			providerAddr, err := ad.GetAddressFromID(pidString)
+			if err != nil {
+				return
+			}
+
+			userAddr, err := ad.GetAddressFromID(pos.GetPosId())
+			if err != nil {
+				return
+			}
+			err = contracts.AddProvider(pos.PosSkStr, userAddr, []common.Address{providerAddr})
+			if err != nil {
+				log.Println("st AddProvider() error", err)
+				return
+			}
+		}
+
+		ukBalance, err := contracts.QueryBalance(ukaddr) //查询合约
 		if err != nil {
 			log.Println("contracts.QueryBalance() err: ", err)
 			return
