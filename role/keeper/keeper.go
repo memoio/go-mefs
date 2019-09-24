@@ -680,7 +680,7 @@ func loadAllUser() error {
 			}
 
 			if thischalinfoinProto.Maxlength != length {
-				log.Println("pid: ", newpu.pid, " length and stored length is: ", length, thischalinfoinProto.Maxlength)
+				log.Println(newpu.uid, "stores on pid: ", newpu.pid, " length and stored length is: ", length, thischalinfoinProto.Maxlength)
 			}
 
 			newchalinfo := &chalinfo{
