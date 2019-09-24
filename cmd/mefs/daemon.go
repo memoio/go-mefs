@@ -60,6 +60,7 @@ const (
 	reDeployOfferKwd          = "reDeployOffer"
 	netKeyKwd                 = "netKey"
 	posKwd                    = "pos"
+	gcKwd                     = "cleanPos"
 )
 
 var (
@@ -146,6 +147,7 @@ environment variable:
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.BoolOption("clean", "gc", "used for provider to clean pos data").WithDefault(false),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
@@ -459,9 +461,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 
 		pos, _ := req.Options[posKwd].(bool)
+		gc, _ := req.Options[gcKwd].(bool)
+
 		if pos {
 			fmt.Println("Start pos Service")
-			go provider.PosService(req.Context)
+			go provider.PosService(req.Context, gc)
 		}
 	default:
 	}

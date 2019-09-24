@@ -47,7 +47,7 @@ var opt = &df.DataEncoder{
 }
 
 // PosService starts pos
-func PosService(ctx context.Context) {
+func PosService(ctx context.Context, gc bool) {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
 	posID = pos.GetPosId()
@@ -114,7 +114,7 @@ func PosService(ctx context.Context) {
 		}
 	}
 
-	traversePath()
+	traversePath(gc)
 	log.Println("pos blocks reaches gid: ", curGid, ", sid: ", curSid)
 
 	//开始pos
@@ -141,7 +141,7 @@ func posRegular(ctx context.Context) {
 	}
 }
 
-func traversePath() {
+func traversePath(gc bool) {
 	exist := false
 	gid := 0
 	for {
@@ -153,7 +153,12 @@ func traversePath() {
 			if err != nil {
 				continue
 			}
-			if !exist {
+
+			if exist {
+				if gc {
+					localNode.Blockstore.DeleteBlock(ncid)
+				}
+			} else {
 				break
 			}
 		}
@@ -161,12 +166,16 @@ func traversePath() {
 			gid += 1024
 			continue
 		}
-
-		curSid = (sid + 1023) % 1024
-		if curSid == 1023 {
-			curGid = gid - 1024
-			if curGid < 0 {
-				curSid = -1
+		if gc {
+			curSid = -1024
+			curGid = -1
+		} else {
+			curSid = (sid + 1023) % 1024
+			if curSid == 1023 {
+				curGid = gid - 1024
+				if curGid < 0 {
+					curSid = -1
+				}
 			}
 		}
 
