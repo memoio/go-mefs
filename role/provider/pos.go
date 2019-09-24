@@ -142,23 +142,31 @@ func posRegular(ctx context.Context) {
 }
 
 func traversePath(gc bool) {
+	if gc {
+		log.Println("clean pos blocks first")
+	}
 	exist := false
 	gid := 0
 	for {
 		sid := 0
 		for sid = 0; sid < 1024; sid++ {
-			posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_0"
-			ncid := cid.NewCidV2([]byte(posCid))
-			exist, err := localNode.Blockstore.Has(ncid)
-			if err != nil {
-				continue
-			}
-
-			if exist {
-				if gc {
-					localNode.Blockstore.DeleteBlock(ncid)
+			for i := 0; i < 5; i++ {
+				posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
+				ncid := cid.NewCidV2([]byte(posCid))
+				exist, err := localNode.Blockstore.Has(ncid)
+				if err != nil {
+					continue
 				}
-			} else {
+
+				if exist {
+					if gc {
+						localNode.Blockstore.DeleteBlock(ncid)
+					}
+				} else {
+					break
+				}
+			}
+			if !exist {
 				break
 			}
 		}
