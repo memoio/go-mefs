@@ -260,6 +260,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		if curSid == 0 {
 			curGid += 1024
 		}
+
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		data, _, err := uploadMulpolicy(tmpData)
 		if err != nil {
@@ -318,6 +319,10 @@ func deletePosBlocks(decreseSpace uint64) {
 	// delete last blocks
 	var totalDecresed uint64
 	for {
+		if curGid == -1024 && curSid == -1 {
+			return
+		}
+
 		if totalDecresed >= decreseSpace {
 			break
 		}
@@ -343,6 +348,11 @@ func deletePosBlocks(decreseSpace uint64) {
 		if curSid == 1023 {
 			curGid -= 1024
 		}
+
+		if curGid == -1024 {
+			curSid = -1
+		}
+
 		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
