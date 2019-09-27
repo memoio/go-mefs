@@ -28,8 +28,8 @@ please run the daemon:
 `
 
 type IdOutput struct {
-	ID           string
-	PeerAddr     string
+	NetworkAddr  string
+	AccountAddr  string
 	PublicKey    string
 	Addresses    []string
 	AgentVersion string
@@ -122,12 +122,12 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 	}
 
 	info := new(IdOutput)
-	info.ID = p.Pretty()
+	info.NetworkAddr = p.Pretty()
 	tmpAddr, err := address.GetAddressFromID(p.Pretty())
 	if err != nil {
 		return nil, err
 	}
-	info.PeerAddr = tmpAddr.String()
+	info.AccountAddr = tmpAddr.String()
 
 	if pk := ps.PubKey(p); pk != nil {
 		pkb, err := ic.MarshalPublicKey(pk)
@@ -153,12 +153,12 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 // printing self is special cased as we get values differently.
 func printSelf(node *core.MefsNode) (interface{}, error) {
 	info := new(IdOutput)
-	info.ID = node.Identity.Pretty()
+	info.NetworkAddr = node.Identity.Pretty()
 	tmpAddr, err := address.GetAddressFromID(node.Identity.Pretty())
 	if err != nil {
 		return nil, err
 	}
-	info.PeerAddr = tmpAddr.String()
+	info.AccountAddr = tmpAddr.String()
 
 	if node.PrivateKey == nil {
 		if err := node.LoadPrivateKey(); err != nil {
@@ -175,7 +175,7 @@ func printSelf(node *core.MefsNode) (interface{}, error) {
 
 	if node.PeerHost != nil {
 		for _, a := range node.PeerHost.Addrs() {
-			s := a.String() + "/ipfs/" + info.ID
+			s := a.String() + "/ipfs/" + info.NetworkAddr
 			info.Addresses = append(info.Addresses, s)
 		}
 	}
