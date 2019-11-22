@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/crypto"
 	logging "github.com/ipfs/go-log"
 	goprocess "github.com/jbenet/goprocess"
@@ -50,7 +49,7 @@ import (
 	config "github.com/memoio/go-mefs/config"
 	p2p "github.com/memoio/go-mefs/p2p"
 	repo "github.com/memoio/go-mefs/repo"
-	fr "github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	bserv "github.com/memoio/go-mefs/source/go-blockservice"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	bstore "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
@@ -542,7 +541,7 @@ func (n *MefsNode) LoadPrivateKey() error {
 		return nil
 	}
 
-	sk, err := loadPrivateKey(n.Identity, n.Password)
+	sk, err := fsrepo.GetPrivKeyFromKS(n.Identity, n.Password)
 	if err != nil {
 		return err
 	}
@@ -564,30 +563,6 @@ func (n *MefsNode) loadBootstrapPeers() ([]peer.AddrInfo, error) {
 		return nil, err
 	}
 	return toPeerInfos(parsed), nil
-}
-
-func loadPrivateKey(id peer.ID, password string) (ic.PrivKey, error) {
-	//get privatekey's filepath, the dafault is "~/.mefs/keystore"
-	fsrepoPath, err := fr.BestKnownPath()
-	dir, err := config.Path(fsrepoPath, fr.Keystore)
-	filePath, err := config.Path(dir, id.Pretty())
-	if err != nil {
-		return nil, err
-	}
-	//get config.PeerID from MefsNode.Identity
-	peerID := peer.IDB58Encode(id)
-	key, err := fr.GetPrivateKeyFromKeystore(peerID, filePath, password)
-	if err != nil {
-		return nil, err
-	}
-
-	if key.PeerID != peerID {
-		return nil, fmt.Errorf("private key in config does not match id: %s != %s", id, key.PeerID)
-	}
-	pk := crypto.ToECDSAUnsafe(key.PrivateKey)
-	secpkey := (*ic.Secp256k1PrivateKey)((*btcec.PrivateKey)(pk))
-
-	return secpkey, nil
 }
 
 func listenAddresses(cfg *config.Config) ([]ma.Multiaddr, error) {

@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"encoding/base64"
 	"log"
 	"math/big"
 	"sort"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
-	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
@@ -150,15 +150,17 @@ func doSpaceTimePay(groupid string, pidString string, price int64) {
 		spaceTime, lastTime := resultSummary(groupid, pidString, startTime, utils.GetUnixNow()) //根据时间段获取时空值
 		amount := convertSpacetime(spaceTime, price)                                            //将时空值转换成支付金额
 		if amount.Sign() > 0 {
-			pAddr, _ := ad.GetAddressFromID(pidString)                                   //providerAddress
-			hexPk, err := fr.GetHexPrivKeyFromKS(localNode.Identity, localNode.Password) //得到本节点的私钥
+			pAddr, _ := ad.GetAddressFromID(pidString) //providerAddress
+			skByte, _ := localNode.PrivateKey.Bytes()
+			ipfsSk := base64.StdEncoding.EncodeToString(skByte)
+			hexSk, err := utils.IPFSskToEthsk(ipfsSk) //得到本节点的私钥
 			if err != nil {
-				log.Println("GetHexPrivKeyFromKS() failed: ", err)
+				log.Println("GetHexSk failed: ", err)
 				return
 			}
 			log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-			err = contracts.SpaceTimePay(uk, scGroupid, pAddr, hexPk, amount) //进行支付
+			err = contracts.SpaceTimePay(uk, scGroupid, pAddr, hexSk, amount) //进行支付
 			if err != nil {
 				log.Println("contracts.SpaceTimePay() failed: ", err)
 				return

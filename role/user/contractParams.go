@@ -5,18 +5,18 @@ import (
 	"log"
 	"math/big"
 
+	"github.com/memoio/go-mefs/utils"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 
-	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func buildUKParams(userID, passwd string, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
+func buildUKParams(userID string, ethPrivateKey []byte, localPeersInfo PeersInfo) (string, common.Address, []common.Address, []common.Address, error) {
 	var keepers, providers []common.Address
 	//得到参与部署智能合约的userID的正确格式
 	userAddress, err := ad.GetAddressFromID(userID)
@@ -40,16 +40,9 @@ func buildUKParams(userID, passwd string, localPeersInfo PeersInfo) (string, com
 		providers = append(providers, providerAddress)
 	}
 	//得到user的私钥
-	pid, err := peer.IDB58Decode(userID)
-	if err != nil {
-		return "", userAddress, keepers, providers, err
-	}
-	hexPK, err := fr.GetHexPrivKeyFromKS(pid, passwd)
-	if err != nil {
-		return "", userAddress, keepers, providers, err
-	}
+	hexSk := utils.EthSkByteToEthString(ethPrivateKey)
 
-	return hexPK, userAddress, keepers, providers, nil
+	return hexSk, userAddress, keepers, providers, nil
 }
 
 func buildSignParams(userID string, providerID string, privateKey []byte) (common.Address, common.Address, string, error) {
