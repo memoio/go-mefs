@@ -268,7 +268,7 @@ func (gp *GroupService) findKeeperAndProviderInit(ctx context.Context) error {
 			return ErrBalance
 		}
 
-		queryAddr, err = contracts.DeployQuery(addr, address.SkByteToString(gp.PrivateKey), gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
+		queryAddr, err = contracts.DeployQuery(addr, utils.EthSkByteToEthString(gp.PrivateKey), gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
 		if err != nil {
 			return err
 		}
@@ -575,7 +575,7 @@ func (gp *GroupService) keeperConfirm(keeper string, initRes string) error {
 }
 
 func (gp *GroupService) deployUpKeepingAndChannel() error {
-	hexPK, localAddress, keepers, providers, err := buildUKParams(gp.Userid, gp.password, gp.localPeersInfo)
+	hexPK, localAddress, keepers, providers, err := buildUKParams(gp.Userid, gp.PrivateKey, gp.localPeersInfo)
 	if err != nil {
 		log.Println("getParams:", err)
 		return err

@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/btcsuite/btcd/btcec"
 	cy "github.com/libp2p/go-libp2p-core/crypto"
 )
 
@@ -41,6 +41,25 @@ func IPFSskToEthskByte(sk string) ([]byte, error) {
 	skECDSA := (*(ecdsa.PrivateKey))(skBTCEC)
 	skByteEth := math.PaddedBigBytes(skECDSA.D, skECDSA.Params().BitSize/8)
 	return skByteEth, nil
+}
+
+//EthSkByteToEthString 将ethereum格式的私钥字节形式转为ethereum格式的string形式
+func EthSkByteToEthString(sk []byte) string {
+	enc := make([]byte, len(sk)*2)
+	//对私钥进行十六进制编码，此处不加上"0x"前缀
+	hex.Encode(enc, sk)
+	return string(enc)
+}
+
+//IPFSskToEthsk 是将mefs格式的私钥转换为ethereum格式的私钥
+func IPFSskToEthsk(sk string) (string, error) {
+	ethSkByte, err := IPFSskToEthskByte(sk)
+	if err != nil {
+		return "", err
+	}
+
+	ethSk := EthSkByteToEthString(ethSkByte)
+	return ethSk, nil
 }
 
 //HexskToIPFSsk transfer hexsk in Ethereum format to sk in mefs format
