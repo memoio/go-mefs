@@ -27,14 +27,15 @@ const (
 	moneyTo  = 1000000000000000
 )
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.String("testnet", "--eth=http://39.100.146.21:8101 --qeth=http://47.92.5.51:8101", "testnet commands")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
 	flag.Parse()
 	ethEndPoint = *eth
-
-	contracts.EndPoint = ethEndPoint
+	qethEndPoint = *qeth
 
 	balance := queryBalance(userAddr)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
@@ -62,6 +63,7 @@ func main() {
 
 func testChannelTimeout() (err error) {
 	log.Println("==========test channel timeout=========")
+	contracts.EndPoint = ethEndPoint
 	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -88,6 +90,7 @@ func testChannelTimeout() (err error) {
 	}
 
 	log.Println("test query channel balance: ", channelAddr.String())
+	contracts.EndPoint = qethEndPoint
 	retryCount := 0
 	cbalance := queryBalance(channelAddr.String())
 	for {
@@ -126,6 +129,7 @@ func testChannelTimeout() (err error) {
 
 	log.Println("test channel timeout before enddate, should return err")
 	//触发channelTimeout()
+	contracts.EndPoint = ethEndPoint
 	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
 	if err == nil {
 		log.Println("call channelTimeout success, but time is early")
@@ -167,6 +171,7 @@ func testChannelTimeout() (err error) {
 
 func testCloseChannel() (err error) {
 	log.Println("test close channel")
+	contracts.EndPoint = ethEndPoint
 	proAddr, proSk, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -212,6 +217,7 @@ func testCloseChannel() (err error) {
 	}
 
 	log.Println("test query channel contract")
+	contracts.EndPoint = qethEndPoint
 	chanAddr, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
 	if err != nil {
 		log.Fatal("GetChannelAddr fails:", err)
@@ -226,6 +232,7 @@ func testCloseChannel() (err error) {
 	balance := queryBalance(userAddr) //查看账户余额
 	//签名
 	value := big.NewInt(11111)
+	contracts.EndPoint = ethEndPoint
 	sig, err := contracts.SignForChannel(channelAddr, value, userSk)
 	if err != nil {
 		log.Fatal("SignForChannelErr:", err)
@@ -392,7 +399,7 @@ func transferTo(value *big.Int, addr string) {
 
 func queryBalance(addr string) *big.Int {
 	var result string
-	client, err := rpc.Dial(ethEndPoint)
+	client, err := rpc.Dial(qethEndPoint)
 	if err != nil {
 		log.Fatal("rpc.dial err:", err)
 	}

@@ -28,14 +28,16 @@ const (
 	moneyTo = 1000000000000000
 )
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.String("testnet", "--eth=http://39.100.146.21:8101 --qeth=http://47.92.5.51:8101", "testnet commands")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
 	flag.Parse()
 	ethEndPoint = *eth
+	qethEndPoint = *qeth
 
-	contracts.EndPoint = ethEndPoint
 	balance := queryBalance(kpAddr)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
 		transferTo(big.NewInt(moneyTo), kpAddr)
@@ -61,6 +63,7 @@ func main() {
 }
 
 func testDeploy() error {
+	contracts.EndPoint = ethEndPoint
 	err := contracts.DeployKeeperProviderMap(adminSk)
 	if err != nil {
 		log.Println("DeployKeeperProviderMap err:", err)
@@ -79,12 +82,14 @@ func testRole() (err error) {
 
 	keeperAddr := common.HexToAddress(kpAddr[2:])
 
+	contracts.EndPoint = ethEndPoint
 	err = contracts.SetKeeper(keeperAddr, adminSk, true)
 	if err != nil {
 		log.Println("setKeeper err:", err)
 		return err
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount := 0
 	for {
 		retryCount++
@@ -101,6 +106,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider")
+	contracts.EndPoint = ethEndPoint
 	proAddr, _, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -114,6 +120,8 @@ func testRole() (err error) {
 		return err
 	}
 
+	log.Println("test get result of set provider")
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
@@ -130,7 +138,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set add kp")
-
+	contracts.EndPoint = ethEndPoint
 	err = contracts.AddKeeperProvidersToKPMap(keeperAddr, kpSk, keeperAddr, []common.Address{providerAddr})
 	if err != nil {
 		log.Println("Add Keeper Providers To KPMap err:", err)
@@ -138,6 +146,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test get keeper from kpmap")
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	flag := false
 	for {
@@ -204,6 +213,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider second")
+	contracts.EndPoint = ethEndPoint
 	proAddr2, _, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -217,6 +227,7 @@ func testRole() (err error) {
 		return err
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
@@ -233,7 +244,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set add kp second")
-
+	contracts.EndPoint = ethEndPoint
 	err = contracts.AddKeeperProvidersToKPMap(keeperAddr, kpSk, keeperAddr, []common.Address{providerAddr2})
 	if err != nil {
 		log.Println("Add Keeper Providers To KPMap err:", err)
@@ -241,6 +252,7 @@ func testRole() (err error) {
 	}
 
 	log.Println("test get provider from kpmap second")
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	flag = false
 	for {
@@ -276,12 +288,13 @@ func testRole() (err error) {
 	log.Println("add kp to kpmap success")
 
 	log.Println("test delete provider from kpmap")
-
+	contracts.EndPoint = ethEndPoint
 	err = contracts.DeleteProviderFromKPMap(keeperAddr, adminSk, keeperAddr, providerAddr)
 	if err != nil {
 		log.Fatal("delete provider from kpmap err:", err)
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	flag = false
 	for {
@@ -316,11 +329,13 @@ func testRole() (err error) {
 
 	log.Println("test delete keeper from kpmap")
 
+	contracts.EndPoint = ethEndPoint
 	err = contracts.DeleteKeeperFromKPMap(keeperAddr, kpSk, keeperAddr)
 	if err != nil {
 		log.Fatal("delete keeper from kpmap err:", err)
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	flag = false
 	for {
@@ -354,13 +369,14 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set keeper false")
-
+	contracts.EndPoint = ethEndPoint
 	err = contracts.SetKeeper(keeperAddr, adminSk, false)
 	if err != nil {
 		log.Println("setKeeper err:", err)
 		return err
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
@@ -377,12 +393,14 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider false")
+	contracts.EndPoint = ethEndPoint
 	err = contracts.SetProvider(providerAddr, adminSk, false)
 	if err != nil {
 		log.Println("setProvider err:", err)
 		return err
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
@@ -399,12 +417,14 @@ func testRole() (err error) {
 	}
 
 	log.Println("test set provider false second")
+	contracts.EndPoint = ethEndPoint
 	err = contracts.SetProvider(providerAddr2, adminSk, false)
 	if err != nil {
 		log.Println("setProvider err:", err)
 		return err
 	}
 
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
@@ -520,7 +540,7 @@ func transferTo(value *big.Int, addr string) {
 
 func queryBalance(addr string) *big.Int {
 	var result string
-	client, err := rpc.Dial(ethEndPoint)
+	client, err := rpc.Dial(qethEndPoint)
 	if err != nil {
 		log.Fatal("rpc.dial err:", err)
 	}

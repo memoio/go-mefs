@@ -11,6 +11,7 @@ variables:
   UPCOUNT: "50"
   NETKEY: "dev"
   ETHENDPOINT: "http://212.64.28.207:8101"
+  QETHENDPOINT: "http://39.100.146.165:8101"
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
@@ -115,7 +116,7 @@ upkeeping_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/upkeepingTest/upkeepingTest.go -eth=$ETHENDPOINT
+    - go run test/unit/upkeepingTest/upkeepingTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -127,7 +128,7 @@ channel_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/channelTest/channelTest.go -eth=$ETHENDPOINT
+    - go run test/unit/channelTest/channelTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -139,7 +140,7 @@ role_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/roleTest/roleTest.go -eth=$ETHENDPOINT
+    - go run test/unit/roleTest/roleTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -151,7 +152,7 @@ pos_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/posTest/posTest.go -eth=$ETHENDPOINT
+    - go run test/unit/posTest/posTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:

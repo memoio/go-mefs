@@ -24,17 +24,19 @@ const (
 	moneyTo  = 1000000000000000
 )
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.String("testnet", "--eth=http://39.100.146.21:8101 --qeth=http://47.92.5.51:8101", "testnet commands")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
 	flag.Parse()
 	ethEndPoint = *eth
+	qethEndPoint = *qeth
 
 	contracts.EndPoint = ethEndPoint
-
 	userAddr := pos.GetPosAddr()
-	
+
 	localAddr := common.HexToAddress(userAddr[2:])
 
 	ukAddr, uk, err := contracts.GetUKFromResolver(localAddr)
@@ -67,10 +69,10 @@ func main() {
 	var tempPro []string
 	for _, pid := range item.ProviderIDs {
 		if utils.CheckDup(tempPro, pid) {
-			tempPro= append(tempPro,pid)
+			tempPro = append(tempPro, pid)
 		}
 	}
-	
+
 	log.Println(userAddr, "'s upkeeping addr: ", ukAddr, " has balance: ", balance)
 	log.Println(userAddr, "has keeper: ", item.KeeperIDs)
 	log.Println(userAddr, "has provider: ", item.ProviderIDs)
@@ -138,7 +140,7 @@ func transferTo(value *big.Int, addr string) {
 
 func queryBalance(addr string) *big.Int {
 	var result string
-	client, err := rpc.Dial(ethEndPoint)
+	client, err := rpc.Dial(qethEndPoint)
 	if err != nil {
 		log.Fatal("rpc.dial err:", err)
 	}
