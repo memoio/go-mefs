@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"encoding/base64"
 	"errors"
 	"log"
 
@@ -8,13 +9,13 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	fr "github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
 var errBalance = errors.New("your account's balance is insufficient, we will not deploy resolver")
 
-func getParamsForDeployContract(node *core.MefsNode) (hexPK string, localAddress common.Address, err error) {
+func getParamsForDeployContract(node *core.MefsNode) (hexSk string, localAddress common.Address, err error) {
 
 	//得到部署resolver的provider的地址
 	id := peer.IDB58Encode(node.Identity)
@@ -25,13 +26,15 @@ func getParamsForDeployContract(node *core.MefsNode) (hexPK string, localAddress
 	}
 
 	//得到部署resolver的provider的私钥
-	hexPK, err = fr.GetHexPrivKeyFromKS(node.Identity, node.Password)
+	skByte, _ := node.PrivateKey.Bytes()
+	ipfsSk := base64.StdEncoding.EncodeToString(skByte)
+	hexSk, err = utils.IPFSskToEthsk(ipfsSk)
 	if err != nil {
 		log.Println("getHexPK err: ", err)
 		return "", localAddress, err
 	}
 
-	return hexPK, localAddress, nil
+	return hexSk, localAddress, nil
 }
 
 func providerDeployResolverAndOffer(node *core.MefsNode, capacity int64, duration int64, price int64, reDeployOffer bool) error {

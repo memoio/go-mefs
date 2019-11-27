@@ -6,14 +6,16 @@
 package commands
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
+
+	"github.com/memoio/go-mefs/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	fr "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -406,7 +408,9 @@ var addMasterKeeperCmd = &cmds.Command{
 
 		contracts.EndPoint = cfg.Eth
 
-		hexSk, err := fr.GetHexPrivKeyFromKS(node.Identity, node.Password)
+		skByte, _ := node.PrivateKey.Bytes()
+		ipfsSk := base64.StdEncoding.EncodeToString(skByte)
+		hexSk, err := utils.IPFSskToEthsk(ipfsSk)
 		if err != nil {
 			fmt.Println("get HexPK Err", err)
 			return err
@@ -464,7 +468,9 @@ var addMyProviderCmd = &cmds.Command{
 
 		contracts.EndPoint = cfg.Eth
 
-		hexSk, err := fr.GetHexPrivKeyFromKS(node.Identity, node.Password)
+		skByte, _ := node.PrivateKey.Bytes()
+		ipfsSk := base64.StdEncoding.EncodeToString(skByte)
+		hexSk, err := utils.IPFSskToEthsk(ipfsSk)
 		if err != nil {
 			fmt.Println("get HexPK Err", err)
 			return err

@@ -3,44 +3,52 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"flag"
 	"log"
 	"math/big"
+	"os"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/upKeeping"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
 const (
-	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
-	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	moneyTo  = 1000000000000000
+	moneyTo = 1000000000000000
 )
 
 var serverKids = []string{"8MHS9fZzRaHNj4mP1kYDebwySmLzaw", "8MGRZbvn8caS431icB2P1uT74B3EHh", "8MJCzFbpXCvdfzmJy5L8jiw4w1qPdY", "8MKX58Ko5vBeJUkfgpkig53jZzwqoW", "8MHYzNkm6dF9SWU5u7Py8MJ31vJrzS", "8MK2saApPQMoNfVmnRDiApoAWFzo2K"}
 var serverPids = []string{"8MHXst83NnSfYHnyqWMVjwjt2GiutV", "8MGrkL5cUpPsPbePvCfwCx6HemwDvy", "8MJ71X96BcnUNkhSFjc6CCsemL6nSQ", "8MGZ5nYsYw3Kmt8zC44W4V1NYaTGcE", "8MGhVo1ib6C6PmFhfQK4Hr3hHwQjC9", "8MJcdk2cyQvZknpxYf2AmGKDHRSRJP", "8MG9ZMYoZrZxjc7bVMeqJkaxAdb3Wx", "8MGqojupxiCesALno7sA73NhJkcSY5", "8MKAiRexSQG4SpGrpEQb4s9wjxJimX", "8MKU1DT94SB3aHTrMqWcJa2oLRtTzv", "8MJaFY7yAyYAvnjnM5hTbTfpjXhTHx", "8MGUGzCk1RUvq1aTPd9uuorrZ7FRhx", "8MHSARkgxWkjx5hKPm9vhX2v1VZ6GT"}
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	flag.String("testnet", "--eth=http://39.100.146.21:8101 --qeth=http://47.92.5.51:8101", "testnet commands")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address;")
 	flag.Parse()
 	ethEndPoint = *eth
+	qethEndPoint = *qeth
 
 	kCount := 3
 	pCount := 5
 	amount := big.NewInt(1230)
 
 	contracts.EndPoint = ethEndPoint
+
+	userAddr, userSk, err := createAddr()
+	if err != nil {
+		log.Fatal("create user fails")
+	}
+
 	balance := queryBalance(userAddr)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
 		transferTo(big.NewInt(moneyTo), userAddr)
@@ -56,12 +64,12 @@ func main() {
 		log.Println(userAddr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 	}
 
-	if err := SmartContractTest(kCount, pCount, amount); err != nil {
+	if err := smartContractTest(kCount, pCount, amount, userAddr, userSk); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
+func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) error {
 	log.Println(">>>>>>>>>>>>>>>>>>>>>SmartContractTest>>>>>>>>>>>>>>>>>>>>>")
 	defer log.Println("===================SmartContractTestEnd============================")
 
@@ -91,29 +99,26 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		}
 	}
 
-	key, err := crypto.HexToECDSA(userSk)
-	if err != nil {
-		log.Fatal("HexToECDSAErr:", err)
-		return err
-	}
-	auth := bind.NewKeyedTransactor(key)
-	auth.Value = big.NewInt(234500)
-	auth.GasPrice = big.NewInt(100)
-
-	client := contracts.GetClient(ethEndPoint)
-	ukaddr, trans, uk, err := upKeeping.DeployUpKeeping(auth, client, localAddr, listKeeperAddr, listProviderAddr, big.NewInt(10), big.NewInt(1024), big.NewInt(111))
+	err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr, listProviderAddr, 10, 1024, 111, big.NewInt(234500))
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err
 	}
-	log.Println("depoly upkepping success, contract addr: ", ukaddr.Hex(), ", trans hash: ", trans.Hash().String())
+
+	log.Println("begin to reget upkeeping's addr")
+	contracts.EndPoint = ethEndPoint
+	ukaddr, uk, err := contracts.GetUKFromResolver(localAddr)
+	if err != nil {
+		log.Fatal("cannnot get upkeeping contract from resolver")
+		return err
+	}
 
 	log.Println("begin to query upkeeping's balance")
 	retryCount := 0
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr.String())
+		amountUk := queryBalance(ukaddr)
 		if amountUk.Cmp(big.NewInt(100)) > 0 {
 			log.Println("contract balance", amountUk)
 			if amountUk.Cmp(big.NewInt(234500)) != 0 {
@@ -130,6 +135,14 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 		if retryCount > 20 {
 			log.Fatal("Upkeeping has no balance")
 		}
+	}
+
+	log.Println("begin to reget upkeeping's addr from remote")
+	contracts.EndPoint = qethEndPoint
+	_, uk, err = contracts.GetUKFromResolver(localAddr)
+	if err != nil {
+		log.Fatal("cannnot get upkeeping contract from resolver")
+		return err
 	}
 
 	log.Println("begin to query upkeeping's information")
@@ -195,6 +208,7 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 	}
 
 	log.Println("begin to initiate spacetime pay")
+	contracts.EndPoint = ethEndPoint
 	err = contracts.SpaceTimePay(uk, localAddr, listProviderAddr[0], userSk, amount)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
@@ -203,12 +217,12 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 	log.Println("spacetime pay trigger")
 
 	log.Println("begin to query results of spacetime pay")
-
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr.String())
+		amountUk := queryBalance(ukaddr)
 		if amountUk.Cmp(big.NewInt(234500)) < 0 {
 			log.Println("keeper's balance change")
 			for kAddr, amount := range mapKeeperAddr {
@@ -243,23 +257,20 @@ func SmartContractTest(kCount int, pCount int, amount *big.Int) error {
 	}
 
 	log.Println("begin to test addProvider")
-
+	contracts.EndPoint = ethEndPoint
 	providerAddr, err := address.GetAddressFromID(serverPids[pCount])
 	if err != nil {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
-	auth = bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(100)
-	trans, err = uk.AddProvider(auth, []common.Address{providerAddr})
+	err = contracts.AddProvider(userSk, localAddr, []common.Address{providerAddr})
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
 	}
 
-	log.Println("AddProvider trans hash: ", trans.Hash().String())
-
+	contracts.EndPoint = qethEndPoint
 	retryCount = 0
 	for {
 		retryCount++
@@ -364,7 +375,7 @@ func transferTo(value *big.Int, addr string) {
 
 func queryBalance(addr string) *big.Int {
 	var result string
-	client, err := rpc.Dial(ethEndPoint)
+	client, err := rpc.Dial(qethEndPoint)
 	if err != nil {
 		log.Fatal("rpc.dial err:", err)
 	}
@@ -373,4 +384,40 @@ func queryBalance(addr string) *big.Int {
 		log.Fatal("client.call err:", err)
 	}
 	return utils.HexToBigInt(result)
+}
+
+func createAddr() (string, string, error) {
+	identity, err := config.CreateID(os.Stdout, 2048)
+	if err != nil {
+		return "", "", err
+	}
+	address, err := address.GetAddressFromID(identity.PeerID)
+	if err != nil {
+		return "", "", err
+	}
+	addressHex := address.Hex()
+	skByteEth, err := utils.IPFSskToEthskByte(identity.PrivKey)
+	if err != nil {
+		return "", "", err
+	}
+	enc := make([]byte, len(skByteEth)*2)
+	//对私钥进行十六进制编码，得到以太坊格式的私钥，此处不加上"0x"前缀
+	hex.Encode(enc, skByteEth)
+
+	balance := queryBalance(addressHex)
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
+		transferTo(big.NewInt(moneyTo), addressHex)
+	}
+
+	for {
+		time.Sleep(30 * time.Second)
+		balance := queryBalance(addressHex)
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
+			break
+		}
+
+		log.Println(addressHex, "'s Balance now:", balance.String(), ", waiting for transfer success")
+	}
+
+	return addressHex, string(enc), nil
 }

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	ci "github.com/libp2p/go-libp2p-core/crypto"
@@ -337,6 +336,7 @@ func ensureInt(x interface{}) int {
 	return res
 }
 
+//GetHexPrivKeyFromKS 是从keystore中获得ethereum格式的私钥，用于部署合约
 func GetHexPrivKeyFromKS(id peer.ID, password string) (privateKey string, err error) {
 	//get privatekey's filepath, the dafault is "~/.ipfs/keystore/peerPrivateKey"
 	fsrepoPath, err := BestKnownPath()
@@ -355,10 +355,33 @@ func GetHexPrivKeyFromKS(id peer.ID, password string) (privateKey string, err er
 	if key.PeerID != peerID {
 		return "", fmt.Errorf("private key in config does not match id: %s != %s", id, key.PeerID)
 	}
+
+	ethSk := utils.EthSkByteToEthString(key.PrivateKey)
+
+	return ethSk, nil
+}
+
+//GetPrivKeyFromKS 是从keystore获得mefs格式的私钥，用于ipfsNode里的privatekey字段
+func GetPrivKeyFromKS(id peer.ID, password string) (ci.PrivKey, error) {
+	//get privatekey's filepath, the dafault is "~/.mefs/keystore"
+	fsrepoPath, err := BestKnownPath()
+	dir, err := config.Path(fsrepoPath, Keystore)
+	filePath, err := config.Path(dir, id.Pretty())
+	if err != nil {
+		return nil, err
+	}
+	//get config.PeerID from MefsNode.Identity
+	peerID := peer.IDB58Encode(id)
+	key, err := GetPrivateKeyFromKeystore(peerID, filePath, password)
+	if err != nil {
+		return nil, err
+	}
+
+	if key.PeerID != peerID {
+		return nil, fmt.Errorf("private key in config does not match id: %s != %s", id, key.PeerID)
+	}
 	pk := crypto.ToECDSAUnsafe(key.PrivateKey)
-	pkByte := math.PaddedBigBytes(pk.D, pk.Params().BitSize/8)
-	enc := make([]byte, len(pkByte)*2)
-	//对私钥进行十六进制编码，此处不加上"0x"前缀
-	hex.Encode(enc, pkByte)
-	return string(enc), nil
+	secpkey := (*ci.Secp256k1PrivateKey)((*btcec.PrivateKey)(pk))
+
+	return secpkey, nil
 }
