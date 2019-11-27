@@ -1,4 +1,4 @@
-image: memoio/mefs-env:latest
+image: memoio/mefs-env:go12
 
 stages:
   - golangci-lint
