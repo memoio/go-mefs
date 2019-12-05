@@ -12,51 +12,27 @@ import (
 )
 
 var (
-	ErrKeeperServiceNotReady = errors.New("keeper service is not ready")
-	ErrUnmatchedPeerID       = errors.New("peer ID is not match")
-	ErrBlockNotExist         = errors.New("block does not exist")
-	ErrNoGroupsInfo          = errors.New("can not find groupsInfo")
-	ErrParaseMetaFailed      = errors.New("no enough data in metainfo")
-	ErrNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
-	ErrPInfoTypeAssert       = errors.New("type asserts err in PInfo")
-	ErrNoChalInfo            = errors.New("can not find this chalinfo")
-	ErrGetContractItem       = errors.New("Can't get contract Item")
-	ErrIncorrectParams       = errors.New("Input incorrect params.")
+	errKeeperServiceNotReady = errors.New("keeper service is not ready")
+	errUnmatchedPeerID       = errors.New("peer ID is not match")
+	errBlockNotExist         = errors.New("block does not exist")
+	errNoGroupsInfo          = errors.New("can not find groupsInfo")
+	errParaseMetaFailed      = errors.New("no enough data in metainfo")
+	errNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
+	errPInfoTypeAssert       = errors.New("type asserts err in ukpInfo")
+	errNoChalInfo            = errors.New("can not find this chalinfo")
+	errGetContractItem       = errors.New("Can't get contract Item")
+	errIncorrectParams       = errors.New("Input incorrect params")
 )
 
-func addCredit(provider string) {
-	val, ok := localPeerInfo.Credit.Load(provider)
-	if !ok {
-		localPeerInfo.Credit.Store(provider, 100)
-	} else {
-		cre := val.(int)
-		cre++
-		if cre >= 100 {
-			cre = 100
-		}
-		localPeerInfo.Credit.Store(provider, cre)
-	}
-}
-
-func reduceCredit(provider string) {
-	val, ok := localPeerInfo.Credit.Load(provider)
-	if !ok {
-		localPeerInfo.Credit.Store(provider, 100)
-	} else {
-		cre := val.(int)
-		cre--
-		if cre <= 0 {
-			cre = 0
-		}
-		localPeerInfo.Credit.Store(provider, cre)
-	}
-}
-
-//获得用于证明的user的公用参数
+//---config----
 func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
-	pubKeyI, ok := usersConfigs.Load(userID)
-	if ok {
-		return pubKeyI.(*mcl.PublicKey), nil
+	thisInfo, err := getUInfo(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if thisInfo.pubKey != nil {
+		return thisInfo.pubKey, nil
 	}
 
 	userconfigbyte, err := getUserBLS12ConfigByte(userID)
@@ -69,21 +45,18 @@ func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 
-	usersConfigs.Store(userID, mkey.Pk)
+	thisInfo.pubKey = mkey.Pk
 
 	return mkey.Pk, nil
 }
 
 func getUserBLS12ConfigByte(userID string) ([]byte, error) {
-	if !IsKeeperServiceRunning() {
-		return nil, ErrKeeperServiceNotReady
-	}
 	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
 	if err != nil {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, "local")
+	userconfigbyte, err := getKeyFrom(userconfigkey, "local")
 	if err == nil {
 		return userconfigbyte, nil
 	}
@@ -92,10 +65,10 @@ func getUserBLS12ConfigByte(userID string) ([]byte, error) {
 		return nil, errors.New("no groupinfo")
 	}
 
-	for _, gkeeper := range gp.Keepers {
-		userconfigbyte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, gkeeper.KID)
+	for _, keeperID := range gp.keepers {
+		userconfigbyte, err = getKeyFrom(userconfigkey, keeperID)
 		if err == nil {
-			localNode.Routing.(*dht.IpfsDHT).CmdPutTo(userconfigkey, string(userconfigbyte), "local")
+			putKeyTo(userconfigkey, string(userconfigbyte), "local")
 			return userconfigbyte, nil
 		}
 	}
@@ -103,7 +76,22 @@ func getUserBLS12ConfigByte(userID string) ([]byte, error) {
 	return nil, errors.New("no user configkey")
 }
 
-//=============v2版本信息结构,上面的信息修改后逐渐删除===============
+//---network---
+func putKeyTo(key, value, node string) error {
+	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
+}
+
+func getKeyFrom(key, node string) ([]byte, error) {
+	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
+}
+
+func deleteFrom(key, node string) error {
+	if node == "local" {
+		return localNode.Routing.(*dht.IpfsDHT).DeleteLocal(key)
+	}
+	return nil
+}
+
 func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
 	caller := ""
 	for _, i := range []int{0, 1, 2, 3, 4} {

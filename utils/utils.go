@@ -35,7 +35,7 @@ const (
 
 	SegementCount = 256
 
-	DefaultPassword = "123456"
+	DefaultPassword = "123456789"
 )
 
 //false 意味着有，true表示无重复
@@ -50,25 +50,33 @@ func CheckDup(strs []string, s string) bool {
 
 func SplitIndex(index string) (string, int, error) {
 	splitedIndex := strings.Split(index, "_")
-	if len(splitedIndex) < 5 {
+	if len(splitedIndex) < 4 {
 		return "", 0, errors.New("String is too short")
 	}
-
-	blockID := splitedIndex[0] + "_" + splitedIndex[1] + "_" + splitedIndex[2] + "_" + splitedIndex[3]
-	offset, err := strconv.Atoi(splitedIndex[4])
+	offset, err := strconv.Atoi(splitedIndex[3])
 	if err != nil {
 		return "", 0, err
 	}
 
-	return blockID, offset, nil
+	return strings.Join(splitedIndex[:3], "_"), offset, nil
 }
 
-//获取当前时间的函数，保证格式一致
+// JoinStrings is
+func JoinStrings(sep string, ops ...string) string {
+	var res strings.Builder
+	for _, op := range ops {
+		res.WriteString(sep)
+		res.WriteString(op)
+	}
+	return res.String()
+}
+
+//GetTimeNow 获取当前时间的函数，保证格式一致
 func GetTimeNow() time.Time {
 	return StringToTime(TimeToString(time.Now()))
 }
 
-//将记录中的时间变量转换为字符串的操作，保证格式一致
+//TimeToString 将记录中的时间变量转换为字符串的操作，保证格式一致
 func TimeToString(time time.Time) string {
 	return time.Format(BASETIME)
 }
@@ -137,7 +145,7 @@ func Writable(path string) error {
 	return nil
 }
 
-// 对数组进行乱序操作，以便user随机选择providers
+// DisorderArray 对数组进行乱序操作，以便user随机选择providers
 func DisorderArray(array []string) []string {
 	var temp string
 	var num int

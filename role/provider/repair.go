@@ -23,6 +23,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	if err != nil {
 		return err
 	}
+
 	blockID := km.GetMid()
 	userID := blockID[:utils.IDLength]
 
@@ -33,18 +34,19 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	}
 
 	cpids := strings.Split(rpids, metainfo.DELIMITER)
-	stripe := make([][]byte, len(cpids)-1)
+	stripe := make([][]byte, len(cpids)+1)
 	for _, cpid := range cpids {
 		if len(cpid) > 0 {
 			splitcpid := strings.Split(cpid, metainfo.REPAIR_DELIMETER)
-			cids = append(cids, splitcpid[0])
-			if strings.Compare(splitcpid[0], blockID) != 0 {
-				pid := splitcpid[1]
-				blk, err := localNode.Blocks.GetBlockFrom(localNode.Context(), pid, splitcpid[0], time.Minute, sig)
+			blkid := userID + metainfo.BLOCK_DELIMITER + splitcpid[0]
+			cids = append(cids, blkid)
+			pid := splitcpid[1]
+			if blkid != blockID {
+				blk, err := localNode.Blocks.GetBlockFrom(localNode.Context(), pid, blkid, time.Minute, sig)
 				if blk != nil && err == nil {
-					right := rs.VerifyBlock(blk.RawData(), splitcpid[0], pubKey)
+					right := rs.VerifyBlock(blk.RawData(), blkid, pubKey)
 					if right {
-						blkMeta, err := metainfo.GetBlockMeta(splitcpid[0])
+						blkMeta, err := metainfo.GetBlockMeta(blkid)
 						if err != nil {
 							log.Println("get block meta error :", err)
 							return err
@@ -54,6 +56,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 							log.Println("strconv.Atoi error :", err)
 							return err
 						}
+
 						if i >= len(stripe) {
 							for j := len(stripe); j <= i; j++ {
 								stripe = append(stripe, nil)
@@ -79,13 +82,15 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 					log.Println("strconv.Atoi error :", err)
 					return err
 				}
-				//ret = cid|pid|offset
-				ret = splitcpid[0] + metainfo.DELIMITER + splitcpid[1] + metainfo.DELIMITER + splitcpid[2]
+
 				if nbid >= len(stripe) {
 					for j := len(stripe); j <= nbid; j++ {
 						stripe = append(stripe, nil)
 					}
 				}
+
+				//ret = cid|pid|offset
+				ret = strings.Join(splitcpid[:2], metainfo.DELIMITER)
 			}
 		}
 	}
@@ -97,7 +102,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	newstripe, err := rs.Repair(stripe)
 	if err != nil {
 		log.Println("repair ", blockID, " failed, error: ", err)
-		retMetaValue := RepairFailed + metainfo.DELIMITER + ret
+		retMetaValue := "RepairFailed" + metainfo.DELIMITER + ret
 		log.Println("repair response metavalue :", retMetaValue)
 		_, err = sendMetaRequest(retKm, retMetaValue, keeper)
 		if err != nil {
@@ -139,7 +144,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 		log.Println("add block failed, error :", err)
 		return err
 	}
-	retMetaValue := RepairSuccess + metainfo.DELIMITER + ret
+	retMetaValue := "RepairSuccess" + metainfo.DELIMITER + ret
 	log.Println("repair response metavalue :", retMetaValue)
 	log.Println("repair success：", blockID)
 	_, err = sendMetaRequest(retKm, retMetaValue, keeper)

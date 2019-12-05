@@ -3,15 +3,18 @@ package user
 import (
 	"context"
 	"errors"
+	"log"
+	"math/big"
+	"regexp"
 	"runtime"
-	"sync"
+	"strings"
 	"time"
+	"unicode/utf8"
 
-	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
+	"github.com/golang/protobuf/proto"
+	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -29,86 +32,18 @@ const (
 	DefaultGetBlockDelay = 30 * time.Second
 
 	defaultMetaBackupCount int32 = 3
-	MAXLISTVALUE                 = 100
 	flushLocalBackup             = 1
 )
 
-//KeeperInfo 此结构体记录Keeper的信息，存储Tendermint地址，让user也能访问链上数据
-type KeeperInfo struct {
-	IsBFT     bool //标识Keeper组采取的同步方法
-	KeeperID  string
-	Connected bool
-}
+const DefaultBufSize = 1024 * 1024 * 4
 
-// PeersInfo stores keepers and providers
-type PeersInfo struct {
-	Keepers   []*KeeperInfo
-	Providers []string
-}
-
-// ContractService save contract info
-type ContractService struct {
-	UserID        string
-	channelBook   map[string]contracts.ChannelItem // 保存该user所部署的channel合约，K-provider地址，V-合约结构体
-	offerBook     map[string]contracts.OfferItem   // 保存keeper选择后的provider的offer合约，K-provider地址，V-合约结构体
-	upKeepingItem contracts.UpKeepingItem
-	queryItem     contracts.QueryItem
-}
-
-// GroupService stores use's groupinfo
-type GroupService struct {
-	Userid         string
-	password       string
-	initResMutex   sync.Mutex //目前同一时间只回复一个Keeper避免冲突
-	localPeersInfo PeersInfo
-	tempKeepers    []string //先收集Keeper和Provider暂存，然后到时间挑选（目前是随机，以后可让User自己选）
-	tempProviders  []string
-	PrivateKey     []byte
-	KeySet         *mcl.KeySet
-	storeDays      int64 //表示部署合约时的存储数据时间，单位是“天”
-	storeSize      int64 //表示部署合约时的存储数据大小，单位是“MB”
-	storePrice     int64 //表示部署合约时的存储价格大小，单位是“wei”
-	keeperSLA      int   //表示部署合约时的keeper参数，目前是keeper数量
-	providerSLA    int   //表示部署合约时的provider参数，目前是provider数量
-	reDeploy       bool  //是否重新部署offer
-}
-
-// LfsService has lfs info
-type LfsService struct {
-	CurrentLog *Logs //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
-	InProcess  int   //表示此lfs上是否有操作，如上传下载，避免过程中user被Kill
-	UserID     string
-	PrivateKey []byte
-}
-
-// Logs records lfs metainfo
-type Logs struct {
-	Sb             *SuperBlock
-	BucketNameToID map[string]int32  //通过BucketName找到Bucket信息
-	BucketByID     map[int32]*Bucket //通过BucketID知道到Bucket信息
-}
-
-// SuperBlock has lfs bucket info
-type SuperBlock struct {
-	pb.SuperBlockInfo
-	Bitset *bitset.BitSet
-	SbMux  sync.Mutex
-	Dirty  bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
-}
-
-// Bucket has lfs objects info
-type Bucket struct {
-	pb.BucketInfo
-	Objects map[string]*Object //通过BucketID检索Bucket下文件
-	Dirty   bool
-	Lock    sync.RWMutex
-}
-
-// Object stores object meta info
-type Object struct {
-	pb.ObjectInfo
-	Lock sync.RWMutex
-}
+// We support '.' with bucket names but we fallback to using path
+// style requests instead for such superBucket.
+var (
+	validBucketName       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9\.\-\_\:]{1,61}[A-Za-z0-9]$`)
+	validBucketNameStrict = regexp.MustCompile(`^[a-z0-9][a-z0-9\.\-]{1,61}[a-z0-9]$`)
+	ipAddress             = regexp.MustCompile(`^(\d+\.){3}\d+$`)
+)
 
 var (
 	ErrPolicy                    = errors.New("the policy is error")
@@ -117,7 +52,7 @@ var (
 	ErrUserNotExist              = errors.New("user not exist")
 	ErrUserBookIsNil             = errors.New("the User book is nil")
 	ErrCannotFindUserInUserBook  = errors.New("cannot find this user in userbook")
-	ErrGetContractItem           = errors.New("Can't get contract Item")
+	errGetContractItem           = errors.New("Can't get contract Item")
 	ErrContractServiceAlreadySet = errors.New("this contract Service already set")
 	ErrGroupServiceAlreadySet    = errors.New("this group Service already set")
 	ErrLfsServiceAlreadySet      = errors.New("this lfs Service already set")
@@ -127,8 +62,8 @@ var (
 	ErrNoKeepers             = errors.New("there is no keepers")
 	ErrCannotConnectKeeper   = errors.New("cannot connect Keeper")
 	ErrCannotConnectProvider = errors.New("cannot connect this provider")
-	ErrNoEnoughProvider      = errors.New("no Enough Providers")
-	ErrNoEnoughKeeper        = errors.New("no Enough Keepers")
+	ErrNoEnoughProvider      = errors.New("no Enough providers")
+	ErrNoEnoughKeeper        = errors.New("no Enough keepers")
 	ErrCannotConnectNetwork  = errors.New("cannot connect NetWork")
 	ErrCannotDeleteMetaBlock = errors.New("cannot delete metablock in provider,maybe it is not connected")
 	ErrGroupServiceNotReady  = errors.New("group service is not ready")
@@ -143,17 +78,27 @@ var (
 	ErrBucketNotExist     = errors.New("bucket is not exist")
 	ErrBucketAlreadyExist = errors.New("bucket Already Exist")
 	ErrBucketNotEmpty     = errors.New("bucket is Not empty")
+	ErrBucketNameInvalid  = errors.New("bucket name invalid")
 
 	ErrObjectNameToolong    = errors.New("the object's name is too long")
 	ErrObjectNameInvalid    = errors.New("object name invalid")
-	ErrCannotGetEnoughBlock = errors.New("cannot get enough Block")
+	ErrObjectOptionsInvalid = errors.New("object options invalid")
 
+	ErrCannotGetEnoughBlock = errors.New("cannot get enough Block")
 	ErrCannotLoadMetaBlock  = errors.New("cannot Load MetaBlock")
 	ErrCannotAddBlock       = errors.New("cannot Add this block")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
 	ErrWrongState           = errors.New("wrong userservice state")
 	ErrWrongInitState       = errors.New("wrong init state")
 )
+
+func putKeyTo(key, value, node string) error {
+	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
+}
+
+func getKeyFrom(key, node string) ([]byte, error) {
+	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
+}
 
 func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
 	caller := ""
@@ -184,4 +129,108 @@ func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
 	ctx = context.WithValue(ctx, "caller", caller)*/
 	_, err := localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
 	return err
+}
+
+func DefaultBucketOptions() *pb.BucketOptions {
+	return &pb.BucketOptions{
+		Policy:      dataformat.RsPolicy,
+		DataCount:   3,
+		ParityCount: 2,
+		SegmentSize: dataformat.DefaultSegmentSize,
+		TagFlag:     dataformat.BLS12,
+		Encryption:  true,
+	}
+}
+
+//检查文件名合法性，文件名中不能含有"/"
+func checkObjectName(objectName string) error {
+	if strings.TrimSpace(objectName) == "" {
+		return errors.New("objectInfo name cannot be empty")
+	}
+	if len(objectName) > maxObjectNameLen {
+		return ErrObjectNameToolong
+	}
+	if !utf8.ValidString(objectName) {
+		return errors.New("objectInfo name with non UTF-8 strings are not supported")
+	}
+	for i := 0; i < len(objectName); i++ {
+		if objectName[i] == '/' || objectName[i] == '\\' || objectName[i] == '\n' {
+			return ErrObjectNameInvalid
+		}
+	}
+	return nil
+}
+
+// CheckValidBucketName - checks if we have a valid input bucket name.
+func CheckValidBucketName(bucketName string) (err error) {
+	return checkBucketNameCommon(bucketName, false)
+}
+
+// CheckValidBucketNameStrict - checks if we have a valid input bucket name.
+// This is a stricter version.
+// - http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html
+func CheckValidBucketNameStrict(bucketName string) (err error) {
+	return checkBucketNameCommon(bucketName, true)
+}
+
+// Common checker for both stricter and basic validation.
+func checkBucketNameCommon(bucketName string, strict bool) (err error) {
+	if strings.TrimSpace(bucketName) == "" {
+		return errors.New("superBucket name cannot be empty")
+	}
+	if len(bucketName) < 3 {
+		return errors.New("superBucket name cannot be smaller than 3 characters")
+	}
+	if len(bucketName) > 63 {
+		return errors.New("superBucket name cannot be greater than 63 characters")
+	}
+	if ipAddress.MatchString(bucketName) {
+		return errors.New("superBucket name cannot be an ip address")
+	}
+	if strings.Contains(bucketName, "..") || strings.Contains(bucketName, ".-") || strings.Contains(bucketName, "-.") {
+		return errors.New("superBucket name contains invalid characters")
+	}
+	if strict {
+		if !validBucketNameStrict.MatchString(bucketName) {
+			err = errors.New("superBucket name contains invalid characters")
+		}
+		return err
+	}
+	if !validBucketName.MatchString(bucketName) {
+		err = errors.New("superBucket name contains invalid characters")
+	}
+	return err
+}
+
+func testConnect() error {
+	waitTime := 0 //进行网络连接
+	for {
+		if waitTime > 60 { //连不上网？
+			log.Println(ErrCannotConnectNetwork, "please restart and retry.")
+			return ErrCannotConnectNetwork
+		}
+		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
+			break //连上网了，退出
+		} else {
+			log.Println(ErrCannotConnectNetwork, "waiting...")
+			time.Sleep(10 * time.Second) //没联网，等联网
+		}
+		waitTime++
+	}
+	return nil
+}
+
+// BuildSignMessage builds sign message for test or repair
+func BuildSignMessage() ([]byte, error) {
+	money := big.NewInt(123)
+	moneyByte := money.Bytes()
+	message := &pb.SignForChannel{
+		Money: moneyByte,
+	}
+	mes, err := proto.Marshal(message)
+	if err != nil {
+		log.Println("protoMarshal failed err: ", err)
+		return nil, err
+	}
+	return mes, nil
 }

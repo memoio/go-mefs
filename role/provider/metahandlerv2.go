@@ -8,19 +8,14 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-const (
-	RepairFailed  = "Repair Failed"
-	RepairSuccess = "Repair Successes"
-)
-
-// ProviderHandlerV2 provider角色回调接口的实现，
-type ProviderHandlerV2 struct {
+// HandlerV2 provider角色回调接口的实现，
+type HandlerV2 struct {
 	Role string
 }
 
 // HandleMetaMessage provider角色层metainfo的回调函数,传入对方节点发来的kv，和对方节点的peerid
 //没有返回值时，返回complete，或者返回规定信息
-func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (string, error) {
+func (provider *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (string, error) {
 	km, err := metainfo.GetKeyMeta(metaKey)
 	if err != nil {
 		return "", err
@@ -59,7 +54,7 @@ func (provider *ProviderHandlerV2) HandleMetaMessage(metaKey, metaValue, from st
 }
 
 // GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
-func (provider *ProviderHandlerV2) GetRole() (string, error) {
+func (provider *HandlerV2) GetRole() (string, error) {
 	return provider.Role, nil
 }
 

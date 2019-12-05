@@ -20,17 +20,25 @@ const (
 )
 
 var (
-	ErrUnmatchedPeerID         = errors.New("Peer ID is not match")
-	ErrProviderServiceNotReady = errors.New("Provider service is not ready")
-	ErrGetContractItem         = errors.New("Can't get contract Item")
+	errUnmatchedPeerID         = errors.New("Peer ID is not match")
+	errProviderServiceNotReady = errors.New("Provider service is not ready")
+	errGetContractItem         = errors.New("Can't get contract Item")
 )
 
-type ProviderContracts struct {
+type providerContracts struct {
 	upKeepingBook sync.Map // K-user的id, V-upkeeping
 	channelBook   sync.Map // K-user的id, V-Channel
 	queryBook     sync.Map // K-user的id, V-Query
 	offer         contracts.OfferItem
 	proInfo       contracts.ProviderItem
+}
+
+func putKeyTo(key, value, node string) error {
+	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
+}
+
+func getKeyFrom(key, node string) ([]byte, error) {
+	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
 }
 
 func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
@@ -62,7 +70,7 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, keeperID)
+	userconfigbyte, err := getKeyFrom(userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +91,7 @@ func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(userconfigkey, keeperID)
+	userconfigbyte, err := getKeyFrom(userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}

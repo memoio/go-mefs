@@ -1,8 +1,8 @@
 package commands
 
 import (
+	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	files "github.com/ipfs/go-ipfs-files"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/core/commands/e"
@@ -25,8 +26,8 @@ import (
 )
 
 type ObjectStat struct {
-	ObjectName     string
-	ObjectSize     int32
+	Name           string
+	Size           int64
 	MD5            string
 	Ctime          string
 	Dir            bool
@@ -47,7 +48,7 @@ var (
 )
 
 func (ob ObjectStat) String() string {
-	FloatStorage := float64(ob.ObjectSize)
+	FloatStorage := float64(ob.Size)
 	var OutStorage string
 	if FloatStorage < 1024 && FloatStorage > 0 {
 		OutStorage = fmt.Sprintf("%.2f", FloatStorage) + "B"
@@ -60,7 +61,7 @@ func (ob ObjectStat) String() string {
 	}
 	return fmt.Sprintf(
 		"ObjectName: %s\n--ObjectSize: %s\n--MD5: %s\n--Ctime: %s\n--Dir: %t\n--LatestChalTime: %s\n",
-		ansi.Color(ob.ObjectName, "green"),
+		ansi.Color(ob.Name, "green"),
 		OutStorage,
 		ob.MD5,
 		ob.Ctime,
@@ -79,12 +80,13 @@ func (obs Objects) String() string {
 }
 
 type BucketStat struct {
-	BucketName  string
+	Name        string
 	BucketID    int32
 	Ctime       string
 	Policy      int32
 	DataCount   int32
 	ParityCount int32
+	Encryption  bool
 }
 
 type Buckets struct {
@@ -94,13 +96,14 @@ type Buckets struct {
 
 func (bk BucketStat) String() string {
 	return fmt.Sprintf(
-		"BucketName: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n",
-		ansi.Color(bk.BucketName, "green"),
+		"BucketName: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n--Encryption:%t\n",
+		ansi.Color(bk.Name, "green"),
 		bk.BucketID,
 		bk.Ctime,
 		bk.Policy,
 		bk.DataCount,
 		bk.ParityCount,
+		bk.Encryption,
 	)
 }
 
@@ -200,6 +203,7 @@ const (
 	ParityCount  = "paritycount"
 	ObjectName   = "objectname"
 	AddressID    = "address"
+	Encryption   = "encryption"
 	PrefixFilter = "prefix"
 	AvailTime    = "Avail"
 	OutputPath   = "output"
@@ -209,7 +213,7 @@ const (
 // 关闭代理节点上user的服务
 var lfsKillUserCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
-		Tagline:          "End GroupService and lfsService by user's address",
+		Tagline:          "End groupService and lfsService by user's address",
 		ShortDescription: ``,
 	},
 
@@ -274,7 +278,7 @@ var lfsKillUserCmd = &cmds.Command{
 var errTimeOut = errors.New("Time Out")
 var lfsStartUserCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
-		Tagline:          "Start GroupService and lfsService by userid",
+		Tagline:          "Start groupService and lfsService by userid",
 		ShortDescription: ``,
 	},
 
@@ -344,10 +348,6 @@ var lfsStartUserCmd = &cmds.Command{
 				addr = addre.Hex()
 			}
 		}
-		// 证明该user已经启动
-		if st, err := user.GetUserServiceState(uid); err == nil && st >= user.Starting {
-			return errors.New("The user is running.")
-		}
 
 		capacity, ok := req.Options["capacity"].(int64) //user签署合约时指定的需求存储空间
 		if !ok || capacity <= 0 {
@@ -381,12 +381,7 @@ var lfsStartUserCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		uService := user.ConstructUserService(uid)
-		err = user.AddUserBook(uService)
-		if err != nil {
-			return err
-		}
-		err = uService.StartUserService(uService.Context, false, pwd, capacity, duration, price, ks, ps, rdo)
+		err = user.StartUser(uid, false, pwd, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			user.KillUser(uid)
 			return err
@@ -395,8 +390,10 @@ var lfsStartUserCmd = &cmds.Command{
 		waitLimited := 160
 		waitCount := 0
 		tick := time.Tick(3 * time.Second)
-	Loop:
 		for {
+			if user.IsUserOnline(uid) == true {
+				break
+			}
 			select {
 			case <-tick:
 				waitCount++
@@ -404,16 +401,6 @@ var lfsStartUserCmd = &cmds.Command{
 					user.KillUser(uid)
 					return errTimeOut
 				}
-				state, err := user.GetUserServiceState(uService.UserID)
-				if err != nil {
-					return err
-				}
-				if state == user.BothStarted {
-					break Loop
-				}
-				continue Loop
-			case <-uService.Context.Done():
-				return context.Canceled
 			}
 
 		}
@@ -476,7 +463,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if lfsService == nil {
 			return errLfsServiceNotReady
 		}
-		object, availTime, err := lfsService.HeadObject(req.Arguments[0], req.Arguments[1])
+		object, availTime, err := lfsService.HeadObject(req.Arguments[0], req.Arguments[1], true)
 		if err != nil {
 			return err
 		}
@@ -486,8 +473,8 @@ var lfsHeadObjectCmd = &cmds.Command{
 		}
 		ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
 		objectStat := ObjectStat{
-			ObjectName:     object.GetObjectName(),
-			ObjectSize:     object.GetObjectSize(),
+			Name:           object.GetName(),
+			Size:           object.GetSize(),
 			MD5:            object.GetETag(),
 			Ctime:          ctime.Format(utils.SHOWTIME),
 			Dir:            false,
@@ -564,7 +551,15 @@ var lfsPutObjectCmd = &cmds.Command{
 			if objectName == "" {
 				objectName = f.Name()
 			}
-			upload, err = lfsService.ConstructUpload(objectName, "", BucketName, f.Node())
+			file := f.Node()
+			var fileNext files.File
+			switch fileType := file.(type) {
+			case files.Directory:
+				return errors.New("unsupported now")
+			case files.File:
+				fileNext = fileType
+			}
+			upload, err = lfsService.ConstructUpload(objectName, "", BucketName, fileNext)
 			if err != nil {
 				return err
 			}
@@ -576,19 +571,8 @@ var lfsPutObjectCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		ul := upload.(*user.Upload)
-		object := ul.Object
-		ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
-		objectStat := ObjectStat{
-			ObjectName: object.GetObjectName(),
-			ObjectSize: object.GetObjectSize(),
-			MD5:        object.GetETag(),
-			Ctime:      ctime.Format(utils.SHOWTIME),
-			Dir:        false,
-		}
 		return cmds.EmitOnce(res, &Objects{
-			Method:  "Put Object",
-			Objects: []ObjectStat{objectStat},
+			Method: "Put Object Success",
 		})
 	},
 	Type: Objects{},
@@ -652,7 +636,20 @@ var lfsGetObjectCmd = &cmds.Command{
 		if lfsService == nil {
 			return errLfsServiceNotReady
 		}
-		dl, reader, err := lfsService.ConstructDownload(req.Arguments[0], req.Arguments[1])
+		piper, pipew := io.Pipe()
+		bufw := bufio.NewWriterSize(pipew, user.DefaultBufSize)
+		checkErrAndClosePipe := func(err error) error {
+			if err != nil {
+				err = pipew.CloseWithError(err)
+				return err
+			}
+			err = pipew.Close()
+			return err
+		}
+		var complete []user.CompleteFunc
+		complete = append(complete, checkErrAndClosePipe)
+		options := user.DefaultDownloadOptions()
+		dl, err := lfsService.ConstructDownload(req.Arguments[0], req.Arguments[1], bufw, complete, options)
 		if err != nil {
 			return err
 		}
@@ -660,7 +657,7 @@ var lfsGetObjectCmd = &cmds.Command{
 		//此处Context是否应改为User的Context，否则在过程中kill user时，行为未定义
 		go dl.Start(req.Context)
 
-		return res.Emit(reader)
+		return res.Emit(piper)
 	},
 	PostRun: cmds.PostRunMap{
 		cmds.CLI: func(res cmds.Response, re cmds.ResponseEmitter) error {
@@ -800,8 +797,8 @@ var lfsListObjectsCmd = &cmds.Command{
 				availTimeShow = availTim.Format(utils.SHOWTIME)
 			}
 			tempObState := ObjectStat{
-				ObjectName:     object.GetObjectName(),
-				ObjectSize:     object.GetObjectSize(),
+				Name:           object.GetName(),
+				Size:           object.GetSize(),
 				MD5:            object.GetETag(),
 				Ctime:          ctime.Format(utils.SHOWTIME),
 				Dir:            false,
@@ -876,11 +873,11 @@ var lfsDeleteObjectCmd = &cmds.Command{
 			return err
 		}
 		objectStat := ObjectStat{
-			ObjectName: object.GetObjectName(),
-			ObjectSize: object.GetObjectSize(),
-			MD5:        object.GetETag(),
-			Ctime:      time.Format(utils.SHOWTIME),
-			Dir:        false,
+			Name:  object.GetName(),
+			Size:  object.GetSize(),
+			MD5:   object.GetETag(),
+			Ctime: time.Format(utils.SHOWTIME),
+			Dir:   false,
 		}
 		return cmds.EmitOnce(res, &Objects{
 			Method:  "Delete Object",
@@ -949,7 +946,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 		}
 		time, _ := time.Parse(utils.BASETIME, bucket.Ctime)
 		bucketStat := BucketStat{
-			BucketName:  bucket.BucketName,
+			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
 			Ctime:       time.Format(utils.SHOWTIME),
 			Policy:      bucket.Policy,
@@ -994,6 +991,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
 		cmds.IntOption(Policy, "pl", "Storage policy").WithDefault(dataformat.RsPolicy),
+		cmds.BoolOption(Encryption, "encryp", "Encrytion or not").WithDefault(true),
 		cmds.IntOption(DataCount, "dc", "data count").WithDefault(3),
 		cmds.IntOption(ParityCount, "pc", "parity count, we suggest parity_count >= 2").WithDefault(2),
 	},
@@ -1031,33 +1029,34 @@ var lfsCreateBucketCmd = &cmds.Command{
 			fmt.Println("input wrong parityCount.")
 			return errWrongInput
 		}
-		gp := user.GetGroupService(userid)
-		if gp == nil {
-			return errGroupServiceNotReady
+		encrytion, ok := req.Options[Encryption].(bool)
+		if !ok {
+			fmt.Println("input wrong encrytion.")
+			return errWrongInput
 		}
-		_, providers, err := gp.GetLocalProviders()
-		if err != nil {
-			return err
-		}
-		if len(providers) < dataCount+parityCount {
-			return errSumCountsBeyondProviders
-		}
+
 		lfsService := user.GetLfsService(userid)
 		if lfsService == nil {
 			return errLfsServiceNotReady
 		}
-		bucket, err := lfsService.CreateBucket(req.Arguments[0], policy, dataCount, parityCount)
+		bucketOptions := user.DefaultBucketOptions()
+		bucketOptions.Policy = int32(policy)
+		bucketOptions.DataCount = int32(dataCount)
+		bucketOptions.ParityCount = int32(parityCount)
+		bucketOptions.Encryption = encrytion
+		bucket, err := lfsService.CreateBucket(req.Arguments[0], bucketOptions)
 		if err != nil {
 			return err
 		}
 		time, err := time.Parse(utils.BASETIME, bucket.Ctime)
 		bucketStat := BucketStat{
-			BucketName:  bucket.BucketName,
+			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
 			Ctime:       time.Format(utils.SHOWTIME),
 			Policy:      bucket.Policy,
 			DataCount:   bucket.DataCount,
 			ParityCount: bucket.ParityCount,
+			Encryption:  bucket.Encryption,
 		}
 		return cmds.EmitOnce(res, &Buckets{
 			Method:  "Create Bucket",
@@ -1125,7 +1124,7 @@ It outputs the following to stdout:
 		for _, bucket := range buckets {
 			time, _ := time.Parse(utils.BASETIME, bucket.Ctime)
 			bucketStat := BucketStat{
-				BucketName:  bucket.BucketName,
+				Name:        bucket.Name,
 				BucketID:    bucket.BucketID,
 				Ctime:       time.Format(utils.SHOWTIME),
 				Policy:      bucket.Policy,
@@ -1198,7 +1197,7 @@ It outputs the following to stdout:
 		}
 		time, _ := time.Parse(utils.BASETIME, bucket.Ctime)
 		bucketStat := BucketStat{
-			BucketName:  bucket.BucketName,
+			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
 			Ctime:       time.Format(utils.SHOWTIME),
 			Policy:      bucket.Policy,
@@ -1250,11 +1249,8 @@ var lfsListKeepersCmd = &cmds.Command{
 				return err
 			}
 		}
-		GroupService := user.GetGroupService(userid)
-		if GroupService == nil {
-			return errGroupServiceNotReady
-		}
-		unconkeepers, conkeepers, _ := GroupService.GetKeepers(-1)
+
+		unconkeepers, conkeepers, _ := user.GetKeepers(userid, -1)
 		keepers := make([]PeerState, len(unconkeepers)+len(conkeepers))
 		for i := 0; i < len(conkeepers); i++ {
 			keepers[i].PeerID = conkeepers[i]
@@ -1309,11 +1305,7 @@ var lfsListProviderrsCmd = &cmds.Command{
 				return err
 			}
 		}
-		GroupService := user.GetGroupService(userid)
-		if GroupService == nil {
-			return errGroupServiceNotReady
-		}
-		unconpro, conpro, _ := GroupService.GetLocalProviders()
+		unconpro, conpro, _ := user.GetLocalProviders(userid)
 		providers := make([]PeerState, len(unconpro)+len(conpro))
 		for i := 0; i < len(conpro); i++ {
 			providers[i].PeerID = conpro[i]
@@ -1486,7 +1478,7 @@ mefs lfs show_storage show the storage space used(kb)
 		}
 		var StorageSize int
 		for _, bucket := range buckets {
-			storageSpace, err := lfsService.ShowStorageSpace(bucket.BucketName, prefix)
+			storageSpace, err := lfsService.ShowStorageSpace(bucket.Name, prefix)
 			if err != nil {
 				return err
 			}

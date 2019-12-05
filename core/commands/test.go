@@ -12,7 +12,6 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/role/keeper"
 	"github.com/memoio/go-mefs/role/user"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -26,11 +25,9 @@ var TestCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"helloworld":    helloWorldCmd, //命令行操作写法示例
-		"localinfo":     infoCmd,
-		"resultsummary": resultSummaryCmd,
-		"savePay":       savePayCmd,
-		"showBalance":   showBalanceCmd, //用于测试，查看自己的余额或者指定账户的余额
+		"helloworld":  helloWorldCmd, //命令行操作写法示例
+		"localinfo":   infoCmd,
+		"showBalance": showBalanceCmd, //用于测试，查看自己的余额或者指定账户的余额
 	},
 }
 
@@ -91,53 +88,6 @@ var infoCmd = &cmds.Command{
 		}
 		list := &StringList{
 			ChildLists: stringList,
-		}
-		return cmds.EmitOnce(res, list)
-	},
-	Type: StringList{},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
-			_, err := fmt.Fprintf(w, "%s", fl)
-			return err
-		}),
-	},
-}
-
-var resultSummaryCmd = &cmds.Command{
-	Helptext: cmds.HelpText{
-		Tagline:          "test resultSummary of keeper",
-		ShortDescription: "测试时空值的计算，对某个provider的挑战数据进行计算，返回算好的时空值",
-	},
-
-	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-
-		actual := keeper.ResultSummaryTest()
-		list := &StringList{
-			ChildLists: []string{actual},
-		}
-		return cmds.EmitOnce(res, list)
-	},
-	Type: StringList{},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *IntList) error {
-			_, err := fmt.Fprintf(w, "%s", fl)
-			return err
-		}),
-	},
-}
-
-var savePayCmd = &cmds.Command{
-	Helptext: cmds.HelpText{
-		Tagline:          "checkLastPay->saveChalPay->checkLastPay",
-		ShortDescription: "测试支付信息的存取",
-	},
-	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		list := &StringList{}
-		err := keeper.SaveChalPayTest()
-		if err != nil {
-			list.ChildLists = []string{err.Error()}
-		} else {
-			list.ChildLists = []string{"Complete!"}
 		}
 		return cmds.EmitOnce(res, list)
 	},

@@ -102,7 +102,13 @@ func GetUKFromResolver(localAddress common.Address) (ukaddr string, uk *upKeepin
 }
 
 // SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
-func SpaceTimePay(uk *upKeeping.UpKeeping, userAddress common.Address, providerAddr common.Address, hexKey string, money *big.Int) error {
+func SpaceTimePay(ukAddr, userAddress common.Address, providerAddr common.Address, hexKey string, money *big.Int) error {
+	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
+	if err != nil {
+		fmt.Println("newUkErr:", err)
+		return err
+	}
+
 	//构建auth,用keeper的私钥
 	key, _ := crypto.HexToECDSA(hexKey)
 	retryCount := 0

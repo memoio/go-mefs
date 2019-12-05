@@ -1,21 +1,21 @@
 #!/bin/sh
 
-test_description="iptb stop tests"
+test_description="metb stop tests"
 
 . lib/test-lib.sh
 
-IPTB_ROOT=.
+METB_ROOT=.
 
-test_expect_success "iptb init works" '
-	../bin/iptb init -n 3
+test_expect_success "metb init works" '
+	../bin/metb init -n 3
 '
 
-test_expect_success "iptb start works" '
-	../bin/iptb start --args --debug
+test_expect_success "metb start works" '
+	../bin/metb start --args --debug
 '
 
-test_expect_success "iptb stop works" '
-	../bin/iptb stop
+test_expect_success "metb stop works" '
+	../bin/metb stop
 '
 
 for i in {0..2}; do
