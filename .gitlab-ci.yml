@@ -1,4 +1,4 @@
-image: memoio/mefs-env:go12
+image: memoio/mefs-env:go13
 
 stages:
   - golangci-lint
@@ -97,7 +97,7 @@ compile:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make install
   tags:
     - "47.92.5.51"
 
@@ -106,7 +106,7 @@ unit_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make test
+    - GO111MODULE=off make test
   tags:
     - "47.92.5.51"
 
@@ -158,32 +158,12 @@ pos_test:
   only:
     - schedules
 
-js_API_test:
-  stage: short-test
-  when: always
-  script:
-    - ifconfig
-    - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
-    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
-    - ./LfsTest.sh
-  after_script:
-    - cat ~/daemon.stdout1
-    - cat ~/daemon.stdout2
-  tags:
-    - "47.92.5.51"
-  retry:
-    max: 1
-    when: stuck_or_timeout_failure
-  only:
-    - dev
-
 lfs_test:
   stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 lfsTest.sh
     - echo $ETHENDPOINT
@@ -201,7 +181,7 @@ challenge_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 challengeTest.sh
     - echo $ETHENDPOINT
@@ -219,7 +199,7 @@ upload_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make install
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 uploadTest.sh
     - echo $ETHENDPOINT

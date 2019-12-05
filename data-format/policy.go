@@ -107,7 +107,11 @@ func (dec *DataDecoder) Decode(datas [][]byte, offsetStart int, needRepair bool)
 	switch dec.Policy {
 	case RsPolicy:
 		if needRepair {
-			recoveredData, err := RecoverData(datas, int(dec.DataCount), int(dec.Policy), -1)
+			indice := make([]int, dec.DataCount)
+			for i := 0; i < int(dec.DataCount); i++ {
+				indice[i] = i
+			}
+			recoveredData, err := RecoverData(datas, int(dec.DataCount), int(dec.ParityCount), indice...)
 			if err != nil {
 				return nil, err
 			}

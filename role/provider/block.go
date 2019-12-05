@@ -13,7 +13,6 @@ import (
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -166,8 +165,8 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 
 			log.Println("Downlaod success，change channel.value and persist: ", value.String())
 			channelItem.Value = value
-			ProContracts.channelBook.Store(userID, channelItem)
-			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value.String(), "local")
+			proContracts.channelBook.Store(userID, channelItem)
+			err = putKeyTo(key, value.String(), "local")
 			if err != nil {
 				log.Println("cmdPutErr:", err)
 			}
@@ -205,7 +204,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	if err != nil {
 		return false, "", "", nil, err
 	}
-	item, ok := ProContracts.channelBook.Load(userID)
+	item, ok := proContracts.channelBook.Load(userID)
 	if !ok {
 		log.Println("Not find ", userID, "'s channelItem in channelBook.")
 		return false, "", "", nil, errors.New("Find channelItem in channelBook error")

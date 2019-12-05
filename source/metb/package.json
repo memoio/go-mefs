@@ -1,13 +1,12 @@
 {
   "author": "whyrusleeping",
   "bugs": {
-    "url": "https://github.com/ipfs/iptb"
+    "url": "https://github.com/memoio/go-mefs/source/metb"
   },
   "gx": {
-    "dvcsimport": "github.com/ipfs/iptb"
+    "dvcsimport": "github.com/memoio/go-mefs/source/metb"
   },
-  "gxDependencies": [
-    {
+  "gxDependencies": [{
       "author": "whyrusleeping",
       "hash": "QmYmsdtJ3HsodkePE3eU3TsCaP2YvPZJ4LoXnNkDE5Tpt7",
       "name": "go-multiaddr",
@@ -45,11 +44,10 @@
     }
   ],
   "gxVersion": "0.6.0",
-  "issues_url": "https://github.com/ipfs/iptb/issues",
+  "issues_url": "https://github.com/memoio/go-mefs/source/metb/issues",
   "language": "go",
   "license": "MIT",
-  "name": "iptb",
+  "name": "metb",
   "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
   "version": "1.3.16"
 }
-

@@ -18,9 +18,9 @@
 ### 具体操作以及信息汇总
   +  初始化流程
      +  keytype:`"init_req"`/`"init_res"`/`"init_notif"`/`user_init_notif_res`
-     +  user： key:`UserID/"init_req"/keepercount/providercount` value:无
-     +  keeper： key:`UserID/"init_res"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
-     +  user： key:`UserID/"init_notif"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
+     +  user： key:`userid/"init_req"/keepercount/providercount` value:无
+     +  keeper： key:`userid/"init_res"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
+     +  user： key:`userid/"init_notif"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
      +  keeper: key:`PeerID/"user_init_notif_res"/"bft"` value:`"simple"`或`IP:p2pport/IP:rpcport`
   + 元数据同步
     + keytype:`"sync"`，第一个操作数表示是哪一类数据

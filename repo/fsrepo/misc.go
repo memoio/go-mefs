@@ -3,21 +3,21 @@ package fsrepo
 import (
 	"os"
 
-	homedir "github.com/mitchellh/go-homedir"
 	config "github.com/memoio/go-mefs/config"
+	homedir "github.com/mitchellh/go-homedir"
 )
 
 // BestKnownPath returns the best known fsrepo path. If the ENV override is
 // present, this function returns that value. Otherwise, it returns the default
 // repo path.
 func BestKnownPath() (string, error) {
-	ipfsPath := config.DefaultPathRoot
+	mefsPath := config.DefaultPathRoot
 	if os.Getenv(config.EnvDir) != "" { //获取环境变量
-		ipfsPath = os.Getenv(config.EnvDir)
+		mefsPath = os.Getenv(config.EnvDir)
 	}
-	ipfsPath, err := homedir.Expand(ipfsPath)
+	mefsPath, err := homedir.Expand(mefsPath)
 	if err != nil {
 		return "", err
 	}
-	return ipfsPath, nil
+	return mefsPath, nil
 }

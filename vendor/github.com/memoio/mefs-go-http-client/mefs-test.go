@@ -16,7 +16,7 @@ const (
 )
 
 //测试时空值的计算，流程：没过一段时间，user发送一段数据，keeper进行一次计算，将实际值与理论值对比
-//目前使用iptb进行测试，传入进行测试的user和keeper端口
+//目前使用metb进行测试，传入进行测试的user和keeper端口
 func ReslultSumaryTest(userPort, keeperPort string) {
 	theory := int64(0)                //时空值的理论值
 	testLastSize := int64(0)          //上一次put文件的大小

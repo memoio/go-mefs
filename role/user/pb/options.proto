@@ -1,0 +1,11 @@
+syntax = "proto3";
+package user.pb;
+
+message BucketOptions {
+  int32 Policy = 3;     //错误(0)or存储策略-纠删(1)or多备份(2)
+  int32 DataCount = 4; //若为纠删，则为数据块数量，否则为为主块数量（目前为1）
+  int32 ParityCount = 5; //纠删下为校验块数量，多备份下为备份块数量
+  uint64 SegmentSize = 11;   //本Bucket的segment size
+  uint64 TagFlag = 12;       //本Bucket的TagFLag
+  bool Encryption = 14;       //Bucket是否采取加密
+}

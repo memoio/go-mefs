@@ -73,7 +73,7 @@ const (
 // 暂停的时候保存好状态（如已上传的index等），将Job释放，重新Start再构建Job运行
 type TaskInfo struct {
 	LfsService *LfsService
-	Object     *pb.ObjectInfo
+	objectInfo     *pb.ObjectInfo
 	BucketID   int32
 	Job        Job
 	Typ        TaskType  //任务类型

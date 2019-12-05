@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -38,7 +36,7 @@ func handlePosAdd(km *metainfo.KeyMeta, metaValue, from string) {
 			return
 		}
 		pidAndOffset := from + metainfo.DELIMITER + strconv.Itoa(off)
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBlock.ToString(), pidAndOffset, "local")
+		err = putKeyTo(kmBlock.ToString(), pidAndOffset, "local")
 		if err != nil {
 			log.Println(err)
 			return
@@ -50,7 +48,7 @@ func handlePosAdd(km *metainfo.KeyMeta, metaValue, from string) {
 			log.Println(err)
 			return
 		}
-		err = doAddBlocktoLedger(from, bm.GetUid(), blockID, off)
+		err = addBlocktoMem(bm.GetUid(), from, blockID, off)
 		if err != nil {
 			log.Println(err)
 			return
@@ -71,7 +69,7 @@ func handlePosDelete(km *metainfo.KeyMeta, metaValue, from string) {
 			log.Println(err)
 			return
 		}
-		err = localNode.Routing.(*dht.IpfsDHT).DeleteLocal(kmBlock.ToString())
+		err = deleteFrom(kmBlock.ToString(), "local")
 		if err != nil && err != ds.ErrNotFound {
 			log.Println(err)
 			return
@@ -82,6 +80,6 @@ func handlePosDelete(km *metainfo.KeyMeta, metaValue, from string) {
 			log.Println(err)
 			return
 		}
-		deleteBlockInLedger(from, bm)
+		deleteBlockInLedger(bm.GetUid(), from, blockID)
 	}
 }

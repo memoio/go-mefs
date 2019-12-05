@@ -1,20 +1,20 @@
-# IPTB
+# METB
 
-`iptb` is a program used to create and manage a cluster of sandboxed MEFS nodes locally on your computer. Spin up 1000s of nodes! It exposes various options, such as different bootstrapping patterns. `iptb` makes testing MEFS networks easy!
+`metb` is a program used to create and manage a cluster of sandboxed MEFS nodes locally on your computer. Spin up 1000s of nodes! It exposes various options, such as different bootstrapping patterns. `metb` makes testing MEFS networks easy!
 
 ### Example
 
 ```
-$ iptb init -n 5
+$ metb init -n 5
 
-$ iptb start
+$ metb start
 Started daemon 0, pid = 12396
 Started daemon 1, pid = 12406
 Started daemon 2, pid = 12415
 Started daemon 3, pid = 12424
 Started daemon 4, pid = 12434
 
-$ iptb shell 0
+$ metb shell 0
 $ echo $IPFS_PATH
 /home/noffle/testbed/0
 
@@ -23,22 +23,22 @@ QmNqugRcYjwh9pEQUK7MLuxvLjxDNZL1DH8PJJgWtQXxuF
 
 $ exit
 
-$ iptb connect 0 4
+$ metb connect 0 4
 
-$ iptb shell 4
+$ metb shell 4
 $ mefs cat QmNqugRcYjwh9pEQUK7MLuxvLjxDNZL1DH8PJJgWtQXxuF
 hey!
 ```
 
 ### Usage
 ```
-$ iptb --help
+$ metb --help
 
 NAME:
-	iptb - The MEFS TestBed
+	metb - The MEFS TestBed
 
 USAGE:
-	iptb [global options] command [command options] [arguments...]
+	metb [global options] command [command options] [arguments...]
 
 COMMANDS:
 	init			create and initialize testbed configuration
@@ -59,12 +59,12 @@ GLOBAL OPTIONS:
 ### Install
 
 ```
-go get github.com/ipfs/iptb
+go get github.com/memoio/go-mefs/source/metb
 ```
 
 ### Configuration
 
-By default, `iptb` uses `$HOME/testbed` to store created nodes. This path is configurable via the environment variables `IPTB_ROOT`.
+By default, `metb` uses `$HOME/testbed` to store created nodes. This path is configurable via the environment variables `METB_ROOT`.
 
 
 

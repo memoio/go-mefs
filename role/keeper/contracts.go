@@ -1,21 +1,34 @@
 package keeper
 
 import (
+	"context"
+	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/utils/address"
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func saveUpkeeping(gp *GroupsInfo, userID string) error {
-	if gp == nil {
-		return ErrIncorrectParams
+func saveUpkeeping(userID string, update bool) error {
+	gp, ok := getGroupsInfo(userID)
+	if !ok {
+		log.Println("saveUpkeeping getGroupsInfo() error")
+		return errNoGroupsInfo
 	}
+
+	if gp.upkeeping == nil || update {
+		return saveUpkeepingToGP(userID, gp)
+	}
+
+	return nil
+}
+
+func saveUpkeepingToGP(userID string, gp *groupsInfo) error {
 	// get upkkeeping addr
-	userAddr, err := address.GetAddressFromID(userID)
+	userAddr, err := ad.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
@@ -26,7 +39,7 @@ func saveUpkeeping(gp *GroupsInfo, userID string) error {
 	}
 	// get upkkeeping params
 	keeperID := localNode.Identity.Pretty()
-	keeperAddr, err := address.GetAddressFromID(keeperID)
+	keeperAddr, err := ad.GetAddressFromID(keeperID)
 	if err != nil {
 		return err
 	}
@@ -34,28 +47,68 @@ func saveUpkeeping(gp *GroupsInfo, userID string) error {
 	if err != nil {
 		return err
 	}
+
+	for _, kp := range item.KeeperIDs {
+		if kp == keeperID {
+			gp.localKeeper = kp
+		}
+	}
+
+	if gp.localKeeper == userID {
+		log.Println(userID, "is not my user")
+		return errors.New("not my user")
+	}
+
 	item.UserID = userID
 	item.UpKeepingAddr = ukAddr
-	gp.upkeeping = item
-	gp.Providers = item.ProviderIDs
+	gp.upkeeping = &item
+	gp.providers = item.ProviderIDs
+	gp.keepers = item.KeeperIDs
 
 	return nil
 }
 
-func getUpkeeping(gp *GroupsInfo) (contracts.UpKeepingItem, error) {
-	if gp.upkeeping.UserID == "" || gp.upkeeping.UpKeepingAddr == "" {
-		return gp.upkeeping, ErrGetContractItem
+func getUpkeeping(userID string) (*contracts.UpKeepingItem, error) {
+	gp, ok := getGroupsInfo(userID)
+	if !ok {
+		log.Println("saveUpkeeping getGroupsInfo() error")
+		return nil, errNoGroupsInfo
 	}
+
+	if gp.upkeeping == nil {
+		err := saveUpkeepingToGP(userID, gp)
+		if err != nil {
+			return nil, errGetContractItem
+		}
+	}
+
+	if gp.upkeeping == nil {
+		return nil, errGetContractItem
+	}
+
 	return gp.upkeeping, nil
 }
 
-func saveQuery(userID string) error {
-	userAddr, err := address.GetAddressFromID(userID)
+func saveQuery(userID string, update bool) error {
+	thisInfo, err := getUInfo(userID)
+	if err != nil {
+		return err
+	}
+
+	if thisInfo.queryItem == nil || update {
+		return saveQueryToUinfo(userID, thisInfo)
+	}
+
+	return nil
+}
+
+func saveQueryToUinfo(userID string, thisInfo *uInfo) error {
+	userAddr, err := ad.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
 	keeperID := localNode.Identity.Pretty()
-	keeperAddr, err := address.GetAddressFromID(keeperID)
+	keeperAddr, err := ad.GetAddressFromID(keeperID)
 	if err != nil {
 		return err
 	}
@@ -69,28 +122,53 @@ func saveQuery(userID string) error {
 	}
 	queryItem.UserID = userID
 	queryItem.QueryAddr = queryAddr.String()
-	localPeerInfo.queryBook.Store(userID, queryItem)
+
+	thisInfo.queryItem = &queryItem
+
 	return nil
 }
 
-func getQuery(userID string) (contracts.QueryItem, error) {
-	var queryItem contracts.QueryItem
-	value, ok := localPeerInfo.queryBook.Load(userID)
-	if !ok {
-		log.Println("Not find ", userID, "'s queryItem in querybook")
-		return queryItem, ErrGetContractItem
+func getQuery(userID string) (queryItem *contracts.QueryItem, err error) {
+	thisInfo, err := getUInfo(userID)
+	if err != nil {
+		return queryItem, err
 	}
-	queryItem = value.(contracts.QueryItem)
-	return queryItem, nil
+
+	if thisInfo.queryItem == nil {
+		err = saveQueryToUinfo(userID, thisInfo)
+		if err != nil {
+			return nil, errGetContractItem
+		}
+	}
+
+	if thisInfo.queryItem == nil {
+		log.Println("cannot get queryItem")
+		return nil, errGetContractItem
+	}
+
+	return thisInfo.queryItem, nil
 }
 
-func saveOffer(providerID string) error {
-	proAddr, err := address.GetAddressFromID(providerID)
+func saveOffer(providerID string, update bool) error {
+	thisInfo, err := getPInfo(providerID)
+	if err != nil {
+		return err
+	}
+
+	if thisInfo.offerItem == nil || update {
+		return saveOfferToPinfo(providerID, thisInfo)
+	}
+
+	return nil
+}
+
+func saveOfferToPinfo(providerID string, thisInfo *pInfo) error {
+	proAddr, err := ad.GetAddressFromID(providerID)
 	if err != nil {
 		return err
 	}
 	keeperID := localNode.Identity.Pretty()
-	keeperAddr, err := address.GetAddressFromID(keeperID)
+	keeperAddr, err := ad.GetAddressFromID(keeperID)
 	if err != nil {
 		return err
 	}
@@ -104,41 +182,39 @@ func saveOffer(providerID string) error {
 	}
 	offerItem.ProviderID = providerID
 	offerItem.OfferAddr = offerAddr.String()
-	localPeerInfo.offerBook.Store(providerID, offerItem)
+
+	thisInfo.offerItem = &offerItem
+
 	return nil
 }
 
-func getOffer(providerID string) (contracts.OfferItem, error) {
-	var offerItem contracts.OfferItem
-	value, ok := localPeerInfo.offerBook.Load(providerID)
-	if !ok {
-		log.Println("Not find ", providerID, "'s offerItem in offerBook")
-		return offerItem, ErrGetContractItem
+func getOffer(providerID string) (offerItem *contracts.OfferItem, err error) {
+	thisInfo, err := getPInfo(providerID)
+	if err != nil {
+		return offerItem, err
 	}
-	offerItem = value.(contracts.OfferItem)
-	return offerItem, nil
+
+	if thisInfo.offerItem == nil {
+		err = saveOfferToPinfo(providerID, thisInfo)
+		if err != nil {
+			return nil, errGetContractItem
+		}
+	}
+
+	if thisInfo.offerItem == nil {
+		log.Println("cannot get offerItem")
+		return nil, errGetContractItem
+	}
+
+	return thisInfo.offerItem, nil
 }
 
 // addProvider 将传入pid加入posuser的upkeeping合约
 func ukAddProvider(uid, pid, sk string) error {
-	gp, ok := getGroupsInfo(uid)
-	if !ok {
-		log.Println("ukAddProvider getGroupsInfo() error")
-		return ErrNoGroupsInfo
-	}
-	uk, err := getUpkeeping(gp)
+	uk, err := getUpkeeping(uid)
 	if err != nil {
-		err := saveUpkeeping(gp, uid)
-		if err != nil {
-			log.Println("ukAddProvider getUpkeeping() error", err)
-			return err
-		}
-
-		uk, err = getUpkeeping(gp) //保存之后重试。还是出错就返回
-		if err != nil {
-			log.Println("ukAddProvider getUpkeeping() error", err)
-			return err
-		}
+		log.Println("ukAddProvider getUpkeeping() error", err)
+		return err
 	}
 	providerAddr, err := ad.GetAddressFromID(pid)
 	if err != nil {
@@ -171,4 +247,23 @@ func ukAddProvider(uid, pid, sk string) error {
 	uk.ProviderIDs = append(uk.ProviderIDs, pid)
 
 	return nil
+}
+
+func getKpMapRegular(ctx context.Context) {
+	log.Println("Get kpMap from chain start!")
+
+	peerID := localNode.Identity.Pretty()
+	contracts.SaveKpMap(peerID)
+	ticker := time.NewTicker(KPMAPTIME)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			go func() {
+				contracts.SaveKpMap(peerID)
+			}()
+		}
+	}
 }

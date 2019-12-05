@@ -1,53 +1,145 @@
 package user
 
 import (
+	"encoding/hex"
 	"errors"
 	"log"
 	"math/big"
+	"strconv"
+	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func constructContractService(userID string) *ContractService {
-	var upkeeping contracts.UpKeepingItem
-	var query contracts.QueryItem
-	return &ContractService{
-		UserID:        userID,
-		channelBook:   make(map[string]contracts.ChannelItem),
-		upKeepingItem: upkeeping,
-		offerBook:     make(map[string]contracts.OfferItem),
-		queryItem:     query,
+func (gp *groupService) deployUpKeepingAndChannel() error {
+	hexSk := utils.EthSkByteToEthString(gp.privateKey)
+	localAddress, err := address.GetAddressFromID(gp.userid)
+	if err != nil {
+		return err
 	}
+
+	var keepers, providers []common.Address
+	for _, keeper := range gp.keepers {
+		keeperAddress, err := address.GetAddressFromID(keeper.keeperID)
+		if err != nil {
+			return err
+		}
+		keepers = append(keepers, keeperAddress)
+	}
+
+	for _, provider := range gp.providers {
+		providerAddress, err := address.GetAddressFromID(provider.providerID)
+		if err != nil {
+			return err
+		}
+		providers = append(providers, providerAddress)
+	}
+
+	d := gp.storeDays
+	s := gp.storePrice
+	price := gp.storePrice
+	var moneyPerDay = new(big.Int)
+	var moneyAccount = new(big.Int)
+	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
+	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
+
+	log.Println("Begin to dploy upkeeping contract...")
+
+	err = contracts.DeployUpkeeping(hexSk, localAddress, keepers, providers, d, s, price, moneyAccount)
+	if err != nil {
+		return err
+	}
+
+	//部署好upKeeping合约后，将user部署的query合约的completed参数设为true
+	queryAddr, err := contracts.GetMarketAddr(localAddress, localAddress, contracts.Query)
+	if err != nil {
+		return err
+	}
+	err = contracts.SetQueryCompleted(hexSk, localAddress, queryAddr)
+	if err != nil {
+		return err
+	}
+
+	//依次与各provider签署channel合约
+	timeOut := big.NewInt(int64(d * 24 * 60 * 60)) //秒，存储时间
+	var moneyToChannel = new(big.Int)
+	moneyToChannel = moneyToChannel.Mul(big.NewInt(s), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
+
+	log.Println("Begin to dploy channel contract...")
+
+	var wg sync.WaitGroup
+	for _, proAddr := range providers {
+		wg.Add(1)
+		providerAddr := proAddr
+		go func() {
+			defer wg.Done()
+			channelAddr, err := contracts.DeployChannelContract(hexSk, localAddress, providerAddr, timeOut, moneyToChannel)
+			if err != nil {
+				return
+			}
+			//设置channel的value初始值为0
+			//存到本地
+			channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+			if err != nil {
+				return
+			}
+			key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
+			err = putKeyTo(key, strconv.FormatInt(0, 10), "local")
+			if err != nil {
+				return
+			}
+			//存到provider上
+			providerID, err := address.GetIDFromAddress(providerAddr.String())
+			if err != nil {
+				return
+			}
+			err = putKeyTo(key, strconv.FormatInt(0, 10), providerID)
+			if err != nil {
+				return
+			}
+		}()
+	}
+	wg.Wait()
+	log.Println("user has deployed all contracts successfully!")
+	return nil
 }
 
-func (cs *ContractService) saveContracts() error {
-	err := cs.saveUpkeeping()
+func saveContracts(userID string) error {
+	gp := getGroupService(userID)
+	if gp == nil {
+		return errors.New("does not exist or has not started")
+	}
+	err := saveUpkeeping(userID, gp)
 	if err != nil {
 		return err
 	}
-	err = cs.saveChannel()
+	err = saveChannel(userID, gp)
 	if err != nil {
 		return err
 	}
-	err = cs.saveQuery()
+	err = saveQuery(userID, gp)
 	if err != nil {
 		return err
 	}
-	err = cs.saveOffer()
+	err = saveOffer(userID, gp)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (cs *ContractService) saveUpkeeping() error {
-	userAddr, err := address.GetAddressFromID(cs.UserID)
+func saveUpkeeping(userID string, gp *groupService) error {
+	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
+
 	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
 		return err
@@ -56,48 +148,50 @@ func (cs *ContractService) saveUpkeeping() error {
 	if err != nil {
 		return err
 	}
-	item.UserID = cs.UserID
+	item.UserID = userID
 	item.UpKeepingAddr = ukAddr
-	cs.upKeepingItem = item
+	gp.upKeepingItem = &item
 	return nil
 }
 
-func (cs *ContractService) saveChannel() error {
-	userAddr, err := address.GetAddressFromID(cs.UserID)
+func saveChannel(userID string, gp *groupService) error {
+	if gp.upKeepingItem == nil {
+		return errors.New("get upkeeing first")
+	}
+
+	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
-	uk, err := cs.getUpkeepingItem()
-	if err != nil {
-		return err
-	}
-	for _, proID := range uk.ProviderIDs {
-		if _, ok := cs.channelBook[proID]; ok {
+
+	for _, proInfo := range gp.providers {
+		if proInfo.chanItem != nil {
 			continue
 		}
+		proID := proInfo.providerID
 
 		proAddr, err := address.GetAddressFromID(proID)
 		if err != nil {
 			return err
 		}
 
-		chanItem, err := contracts.GetChannelInfo(userAddr, proAddr, userAddr)
+		item, err := contracts.GetChannelInfo(userAddr, proAddr, userAddr)
 		if err != nil {
 			return err
 		}
 
 		// 先从本地找value
 		var value = new(big.Int)
-		channelValueKeyMeta, err := metainfo.NewKeyMeta(chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
+		channelValueKeyMeta, err := metainfo.NewKeyMeta(item.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
 		if err != nil {
 			return err
 		}
 
-		valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), "local")
+		valueByte, err := getKeyFrom(channelValueKeyMeta.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
 			log.Println("Can't get channel value in local,err :", err, ", so try to get from ", proID)
-			valueByte, err = localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(channelValueKeyMeta.ToString(), proID)
+			valueByte, err = getKeyFrom(channelValueKeyMeta.ToString(), proID)
 			if err != nil {
 				// provider上也没找到，value设为0
 				log.Println("Can't get channel price from ", proID, ",err :", err, ", so set channel price to 0.")
@@ -118,49 +212,49 @@ func (cs *ContractService) saveChannel() error {
 				return errors.New("bigInt.SetString err")
 			}
 		}
-		log.Println("保存在内存中的channel地址和value为:", chanItem.ChannelAddr, value.String())
-
-		chanItem.UserID = cs.UserID
-		chanItem.ProID = proID
-		chanItem.Value = value
-		cs.channelBook[proID] = chanItem
+		log.Println("保存在内存中的channel地址和value为:", item.ChannelAddr, value.String())
+		item.UserID = userID
+		item.ProID = proID
+		item.Value = value
+		proInfo.chanItem = &item
 	}
 	return nil
 }
 
-func (cs *ContractService) saveQuery() error {
-	userAddr, err := address.GetAddressFromID(cs.UserID)
-	if err != nil {
-		return err
+func saveChannelValue(userID string) error {
+	gp := getGroupService(userID)
+	if gp == nil {
+		return errors.New("does not exist or has not started")
 	}
-	queryAddr, err := contracts.GetMarketAddr(userAddr, userAddr, contracts.Query)
-	if err != nil {
-		return err
-	}
-	item, err := contracts.GetQueryInfo(userAddr, queryAddr)
-	if err != nil {
-		return err
-	}
-	item.UserID = cs.UserID
-	item.QueryAddr = queryAddr.String()
-	cs.queryItem = item
-	return nil
-}
-
-func (cs *ContractService) saveOffer() error {
-	userAddr, err := address.GetAddressFromID(cs.UserID)
-	if err != nil {
-		return err
-	}
-	uk, err := cs.getUpkeepingItem()
-	if err != nil {
-		return err
-	}
-	for _, proID := range uk.ProviderIDs {
-		if _, ok := cs.offerBook[proID]; ok {
-			continue
+	for _, proInfo := range gp.providers {
+		if proInfo.chanItem != nil {
+			// 保存本地形式：K-provider，V-channel此时的value
+			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
+			if err != nil {
+				log.Println("NewKeyMeta err:", proInfo.providerID, err)
+				continue
+			}
+			err = putKeyTo(km.ToString(), proInfo.chanItem.Value.String(), "local")
+			if err != nil {
+				log.Println("CmdPutTo error", proInfo.providerID, err)
+				continue
+			}
 		}
 
+	}
+	return nil
+}
+
+func saveOffer(userID string, gp *groupService) error {
+	userAddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return err
+	}
+	for _, proInfo := range gp.providers {
+		if proInfo.offerItem != nil {
+			continue
+		}
+		proID := proInfo.providerID
 		proAddr, err := address.GetAddressFromID(proID)
 		if err != nil {
 			return err
@@ -171,46 +265,117 @@ func (cs *ContractService) saveOffer() error {
 			log.Println("get", proAddr.String(), "'s offer address err ")
 			return err
 		}
-		offerItem, err := contracts.GetOfferInfo(userAddr, offerAddr)
+		item, err := contracts.GetOfferInfo(userAddr, offerAddr)
 		if err != nil {
 			log.Println("get", proAddr.String(), "'s offer params err ")
 			return err
 		}
-		offerItem.ProviderID = proID
-		offerItem.OfferAddr = offerAddr.String()
-		cs.offerBook[proID] = offerItem
+		item.ProviderID = proID
+		proInfo.offerItem = &item
 	}
 	return nil
 }
 
-func (cs *ContractService) getChannelItem(proid string) (contracts.ChannelItem, error) {
-	channelItem, ok := cs.channelBook[proid]
-	if !ok {
-		return channelItem, ErrGetContractItem
+func saveQuery(userID string, gp *groupService) error {
+	userAddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return err
 	}
-	return channelItem, nil
+
+	queryAddr, err := contracts.GetMarketAddr(userAddr, userAddr, contracts.Query)
+	if err != nil {
+		return err
+	}
+	item, err := contracts.GetQueryInfo(userAddr, queryAddr)
+	if err != nil {
+		return err
+	}
+	item.QueryAddr = queryAddr.String()
+	gp.queryItem = &item
+	return nil
 }
 
-func (cs *ContractService) getOfferItem(proid string) (contracts.OfferItem, error) {
-	offerItem, ok := cs.offerBook[proid]
-	if !ok {
-		return offerItem, ErrGetContractItem
+func getUpkeepingItem(userID, proid string) (*contracts.UpKeepingItem, error) {
+	gp := getGroupService(userID)
+	if gp == nil {
+		return nil, errors.New("does not exist or has not started")
 	}
-	return offerItem, nil
+
+	if gp.upKeepingItem != nil {
+		return gp.upKeepingItem, nil
+	}
+	saveUpkeeping(userID, gp)
+	return gp.upKeepingItem, nil
 }
 
-func (cs *ContractService) getUpkeepingItem() (contracts.UpKeepingItem, error) {
-	if cs.upKeepingItem.UpKeepingAddr == "" || cs.upKeepingItem.UserID == "" {
-		log.Println("UpKeepingItem hasn't set")
-		return cs.upKeepingItem, ErrGetContractItem
+func getQueryItem(userID string) (*contracts.QueryItem, error) {
+	gp := getGroupService(userID)
+	if gp == nil {
+		return nil, errors.New("does not exist or has not started")
 	}
-	return cs.upKeepingItem, nil
+
+	if gp.queryItem != nil {
+		return gp.queryItem, nil
+	}
+
+	saveQuery(userID, gp)
+	return gp.queryItem, nil
 }
 
-func (cs *ContractService) getQueryItem() (contracts.QueryItem, error) {
-	if cs.queryItem.QueryAddr == "" || cs.queryItem.UserID == "" {
-		log.Println("QueryItem hasn't set")
-		return cs.queryItem, ErrGetContractItem
+func getChannelItem(userID, proid string) (*contracts.ChannelItem, error) {
+	gp := getGroupService(userID)
+	if gp == nil {
+		return nil, errors.New("does not exist or has not started")
 	}
-	return cs.queryItem, nil
+
+	for _, proInfo := range gp.providers {
+		if proInfo.providerID == proid {
+			if proInfo.chanItem == nil {
+				saveChannel(userID, gp)
+			}
+			return proInfo.chanItem, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func getOfferItem(userID, proid string) (*contracts.OfferItem, error) {
+	gp := getGroupService(userID)
+	if gp == nil {
+		return nil, errors.New("does not exist or has not started")
+	}
+
+	for _, proInfo := range gp.providers {
+		if proInfo.providerID == proid {
+			if proInfo.offerItem == nil {
+				saveOffer(userID, gp)
+			}
+			return proInfo.offerItem, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func buildSignParams(userID string, providerID string, privateKey []byte) (common.Address, common.Address, string, error) {
+	var userAddress, providerAddress common.Address
+	providerAddress, err := address.GetAddressFromID(providerID)
+	if err != nil {
+		log.Println("GetProAddr err: ", err)
+		return userAddress, providerAddress, "", err
+	}
+
+	userAddress, err = address.GetAddressFromID(userID)
+	if err != nil {
+		log.Println("GetLocalAddr err: ", err)
+		return userAddress, providerAddress, "", err
+	}
+
+	pk := crypto.ToECDSAUnsafe(privateKey)
+	pkByte := math.PaddedBigBytes(pk.D, pk.Params().BitSize/8)
+	enc := make([]byte, len(pkByte)*2)
+	hex.Encode(enc, pkByte)
+
+	return userAddress, providerAddress, string(enc), nil
 }

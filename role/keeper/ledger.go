@@ -1,72 +1,70 @@
 package keeper
 
 import (
-	"context"
 	"log"
+	"strconv"
 	"sync"
-	"time"
-
-	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/metainfo"
-	"github.com/memoio/go-mefs/utils/pos"
 
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-//LedgerInfo 存放挑战信息的内存结构体
-//key为结构体PU，value为结构体*chalinfo
-var LedgerInfo sync.Map //key为PU结构体，value为chalinfo结构体
-
-//PU 作为其他结构体的key，
+//puKey 作为其他结构体的key，
 //目前用PU做key的结构体有LedgerInfo，PayInfo,用pid和uid共同索引信息
-type PU struct {
+type puKey struct {
 	pid string
 	uid string
 }
 
 //chalinfo 作为LedgerInfo的value key是PU对
 type chalinfo struct {
-	Time        sync.Map //某provider下user数据在某时刻发起挑战的结果，key为挑战发起时间的时间戳，格式为int64,value为chalresult
-	Cid         sync.Map
-	tmpCid      sync.Map
-	chalCid     []string //当前挑战的块
-	inChallenge int
-	maxlength   int64
-	testuser    bool // 记录是否是test用户，用于不发起挑战
+	chalMap      sync.Map // key is challenge time(int64),value is *chalresult
+	cidMap       sync.Map // key is bucketid_stripeid_blockid, value is *cidInfo
+	chalCid      []string // value is []bucketid_stripeid_blockid
+	inChallenge  bool     // during challenge or not
+	maxlength    int64
+	lastChalTime int64
+	lastPay      *chalpay // stores result of last pay
 }
 
 type cidInfo struct {
 	res       bool
-	repair    int32
+	repair    int32 // need repair
 	availtime int64
-	offset    int
+	offset    int    // length of this cid
+	storedOn  string // stored on which provider
 }
 
-//getChalinfo 输入pid和uid 获取LedgerInfo中的chalinfo指针
-func getChalinfo(thisPU PU) (*chalinfo, bool) {
-	thischalinfo, ok := LedgerInfo.Load(thisPU)
-	if !ok {
-		isTestUser := false
-		addr, err := address.GetAddressFromID(thisPU.uid)
-		if err == nil {
-			_, _, err = contracts.GetUKFromResolver(addr)
-			if err != nil {
-				isTestUser = true
-			}
-		}
+//chalresult 挑战结果在内存中的结构
+//作为chalinfo.Time的value 记录单次挑战的各项信息
+type chalresult struct {
+	kid           string //挑战发起者
+	pid           string //挑战对象
+	uid           string //挑战的数据所属对象
+	challengeTime int64  //挑战发起时间 使用unix时间戳
+	totalSpace    int64  //the amount of this user's data on the provider
+	sum           int64  //挑战总空间
+	length        int64  //挑战成功空间
+	h             int    //挑战的随机数
+	res           bool   //挑战是否成功
+	proof         string //挑战结果的证据
+}
 
-		var newCid, newTime sync.Map
-		newchalinfo := &chalinfo{
-			Time:     newTime,
-			Cid:      newCid,
-			testuser: isTestUser,
+//key: PU，value: *chalinfo
+var ledgerInfo sync.Map
+
+func getChalinfo(thisPU puKey) (*chalinfo, bool) {
+	thischalinfo, ok := ledgerInfo.Load(thisPU)
+	if !ok {
+		gp, ok := getGroupsInfo(thisPU.uid)
+		if ok && gp != nil {
+			newchalinfo := &chalinfo{}
+			ledgerInfo.Store(thisPU, newchalinfo)
 		}
-		LedgerInfo.Store(thisPU, newchalinfo)
 	}
 
-	thischalinfo, ok = LedgerInfo.Load(thisPU)
+	thischalinfo, ok = ledgerInfo.Load(thisPU)
 	if !ok {
 		return nil, false
 	}
@@ -74,128 +72,158 @@ func getChalinfo(thisPU PU) (*chalinfo, bool) {
 	return thischalinfo.(*chalinfo), true
 }
 
-//doAddBlocktoLedger 将block信息加入本地LedgerInfo结构体里的Cid字段，用于挑战
-func doAddBlocktoLedger(pid string, uid string, blockid string, offset int) error {
-	pu := PU{
-		pid: pid,
-		uid: uid,
+func getChalresult(thisPU puKey, time int64) (*chalresult, bool) {
+	thischalinfo, ok := getChalinfo(thisPU)
+	if !ok || thischalinfo == nil {
+		return nil, false
 	}
 
+	thischalresult, ok := thischalinfo.chalMap.Load(time)
+	if !ok {
+		return nil, false
+	}
+	return thischalresult.(*chalresult), true
+}
+
+func addCidinfotoMem(uid, pid, blockid string, newCidinfo *cidInfo) error {
+	cidString, err := metainfo.GetCidFromBlock(blockid)
+	if err != nil {
+		return err
+	}
+
+	newCidInfo, err := doAddCidinfotoLedger(uid, pid, cidString, newCidinfo)
+	if err != nil {
+		return err
+	}
+	return doAddBlocktoBucket(uid, cidString, newCidInfo)
+}
+
+func addBlocktoMem(uid, pid, blockid string, offset int) error {
+	log.Println("add block: ", blockid, "to user: ", uid, " and provider: ", pid)
+	cidString, err := metainfo.GetCidFromBlock(blockid)
+	if err != nil {
+		return err
+	}
+
+	newCidInfo, err := doAddBlocktoLedger(uid, pid, cidString, offset)
+	if err != nil {
+		return err
+	}
+	return doAddBlocktoBucket(uid, cidString, newCidInfo)
+}
+
+func doAddBlocktoLedger(uid, pid, cidString string, offset int) (*cidInfo, error) {
 	newcidinfo := &cidInfo{
 		availtime: utils.GetUnixNow(),
 		offset:    offset,
 		repair:    0,
+		storedOn:  pid,
 	}
 
-	if thischalinfo, ok := getChalinfo(pu); ok {
-		if thischalinfo.inChallenge == 1 {
-			thischalinfo.tmpCid.Store(blockid, newcidinfo)
-		} else if thischalinfo.inChallenge == 0 {
-			thischalinfo.Cid.Store(blockid, newcidinfo)
-			thischalinfo.maxlength += int64(offset * df.DefaultSegmentSize)
+	return doAddCidinfotoLedger(uid, pid, cidString, newcidinfo)
+}
+
+func doAddCidinfotoLedger(uid, pid, cidString string, newCidinfo *cidInfo) (*cidInfo, error) {
+
+	pu := puKey{
+		pid: pid,
+		uid: uid,
+	}
+
+	thisinfo, ok := ledgerInfo.Load(pu)
+	oldOffset := 0
+	offset := newCidinfo.offset
+	if ok {
+		thechalinfo := thisinfo.(*chalinfo)
+
+		act, loaded := thechalinfo.cidMap.Load(cidString)
+		if loaded {
+			oldOffset = act.(*cidInfo).offset
+			if oldOffset < offset {
+				newCidinfo.offset = offset
+			} else {
+				// stored length is longer
+				return act.(*cidInfo), nil
+			}
+		} else {
+			oldOffset = -1
 		}
+		thechalinfo.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
+
+		thechalinfo.cidMap.Store(cidString, newCidinfo)
+	} else {
+		newchalinfo := &chalinfo{
+			maxlength: int64(offset+1) * df.DefaultSegmentSize,
+		}
+		newchalinfo.cidMap.Store(cidString, newCidinfo)
+		ledgerInfo.Store(pu, newchalinfo)
+	}
+
+	return newCidinfo, nil
+}
+
+func doAddBlocktoBucket(uid, cid string, newcidinfo *cidInfo) error {
+	bid, sid, err := metainfo.GetIDsFromBlock(cid)
+	if err != nil {
+		return err
+	}
+
+	thisBucketinfo, ok := getBucketInfo(uid, bid)
+	if !ok {
 		return nil
 	}
 
-	var Cid sync.Map
-	var Time sync.Map
-	Cid.Store(blockid, newcidinfo)
+	thisBucketinfo.stripes.Store(cid, newcidinfo)
 
-	isTestUser := false
-	addr, err := address.GetAddressFromID(pu.uid)
-	if err == nil {
-		_, _, err = contracts.GetUKFromResolver(addr)
-		if err != nil {
-			isTestUser = true
-		}
+	snum, err := strconv.Atoi(sid)
+	if err != nil {
+		return err
 	}
 
-	newchalinfo := &chalinfo{
-		Cid:      Cid,
-		Time:     Time,
-		testuser: isTestUser,
+	if int32(snum) > thisBucketinfo.largestStripes {
+		thisBucketinfo.largestStripes = int32(snum)
 	}
-	LedgerInfo.Store(pu, newchalinfo)
+
 	return nil
-
 }
 
-//deleteBlockInLedger 删除LedgerInfo中的块信息，传入保存这个块的pid和块信息结构体
-func deleteBlockInLedger(pid string, bm *metainfo.BlockMeta) {
-	pu := PU{
+func deleteBlockFromMem(uid, pid, cidString string) {
+	cidString, err := metainfo.GetCidFromBlock(cidString)
+	if err != nil {
+		return
+	}
+	deleteBlockInLedger(uid, pid, cidString)
+	deleteBlockFromBucket(uid, cidString)
+}
+
+func deleteBlockInLedger(uid, pid, cidString string) {
+	pu := puKey{
 		pid: pid,
-		uid: bm.GetUid(),
+		uid: uid,
 	}
+
 	if thischalinfo, ok := getChalinfo(pu); ok {
-		thischalinfo.Cid.Delete(bm.ToString())
-		thischalinfo.tmpCid.Delete(bm.ToString())
+		thiscid, ok := thischalinfo.cidMap.Load(cidString)
+		if ok {
+			thischalinfo.maxlength -= (int64(thiscid.(*cidInfo).offset+1) * df.DefaultSegmentSize)
+		}
+		thischalinfo.cidMap.Delete(cidString)
 	}
 }
 
-func checkLedger(ctx context.Context) {
-	log.Println("Check Ledger start!")
-	time.Sleep(2 * CHALTIME)
-	ticker := time.NewTicker(CHECKTIME)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go func() {
-				LedgerInfo.Range(func(k, v interface{}) bool {
-					pu := k.(PU)
-					if pu.uid == pos.GetPosId() {
-						return true
-					}
+func deleteBlockFromBucket(uid, cidString string) {
+	bid, _, err := metainfo.GetIDsFromBlock(cidString)
+	if err != nil {
+		return
+	}
 
-					if !isMasterKeeper(pu.uid, pu.pid) {
-						return true
-					}
+	thisgroup, ok := getGroupsInfo(uid)
+	if !ok {
+		return
+	}
 
-					thischalinfo := v.(*chalinfo)
-					var deletes []string
-					thischalinfo.Cid.Range(func(key, value interface{}) bool {
-						eclasped := utils.GetUnixNow() - value.(*cidInfo).availtime
-						switch value.(*cidInfo).repair {
-						case 0:
-							if EXPIRETIME < eclasped {
-								log.Println("Need repair cid first: ", key.(string))
-								value.(*cidInfo).repair++
-								repch <- key.(string)
-							}
-						case 1:
-							if 3*EXPIRETIME < eclasped {
-								log.Println("Need repair cid second: ", key.(string))
-								value.(*cidInfo).repair++
-								repch <- key.(string)
-							}
-						case 2:
-							if 9*EXPIRETIME < eclasped {
-								log.Println("Need repair cid third: ", key.(string))
-								value.(*cidInfo).repair++
-								repch <- key.(string)
-							}
-						case 3:
-							if 10*EXPIRETIME < eclasped {
-								value.(*cidInfo).repair++
-							}
-						default:
-							if value.(*cidInfo).repair > 3 {
-								deletes = append(deletes, key.(string))
-							}
-						}
-
-						return true
-					})
-
-					for _, cid := range deletes {
-						thischalinfo.Cid.Delete(cid)
-					}
-
-					return true
-				})
-			}()
-		}
+	thisbucket, ok := thisgroup.buckets.Load(bid)
+	if ok {
+		thisbucket.(*bucketInfo).stripes.Delete(cidString)
 	}
 }

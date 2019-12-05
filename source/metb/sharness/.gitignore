@@ -1,5 +1,5 @@
 lib/sharness/
 test-results/
 trash directory.*.sh/
-bin/iptb
+bin/metb
 BUILD-OPTIONS

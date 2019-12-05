@@ -193,10 +193,10 @@ func GenTag(keys *KeySet, segment []byte, index []byte) ([]byte, error) {
 	return r.Serialize(), nil
 }
 
-// 取消challenge随机数
-// 随机选取的待挑战segments由随机数c对各offset取模而得
-func GenChallenge(blocks []string) Challenge {
+// GenChallenge 根据时间随机选取的待挑战segments由随机数c对各offset取模而得
+func GenChallenge(src int64, blocks []string) Challenge {
 	// 在[1, N-numOfAtoms]间随机选出一个整数C
+	rand.Seed(src)
 	var c int
 	for {
 		c = rand.Intn(N - numOfAtoms)
@@ -206,6 +206,21 @@ func GenChallenge(blocks []string) Challenge {
 	}
 
 	return Challenge{c, blocks}
+}
+
+// VerifyChalNum 确认challenge num的正确性
+func VerifyChalNum(src int64, chalNum int) bool {
+	// 在[1, N-numOfAtoms]间随机选出一个整数C
+	rand.Seed(src)
+	var c int
+	for {
+		c = rand.Intn(N - numOfAtoms)
+		if c != 0 {
+			break
+		}
+	}
+
+	return chalNum == c
 }
 
 // 检查provider取到的segment和tag是否对应

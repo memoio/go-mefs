@@ -15,7 +15,6 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -67,7 +66,7 @@ func PosService(ctx context.Context, gc bool) {
 		retryCount++
 	}
 
-	if value, ok := ProContracts.upKeepingBook.Load(posID); ok {
+	if value, ok := proContracts.upKeepingBook.Load(posID); ok {
 		keeperIDs = value.(contracts.UpKeepingItem).KeeperIDs
 	}
 
@@ -92,7 +91,7 @@ func PosService(ctx context.Context, gc bool) {
 		log.Println("NewKeyMeta posKM error :", err)
 	} else {
 		log.Println("posKm :", posKM.ToString())
-		posValue, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(posKM.ToString(), "local")
+		posValue, err := getKeyFrom(posKM.ToString(), "local")
 		if err != nil {
 			log.Println("Get posKM from local error :", err)
 		} else {
@@ -300,7 +299,7 @@ func generatePosBlocks(increaseSpace uint64) {
 		// 本地更新
 		posValue := posCidPrefix
 		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+		err = putKeyTo(posKM.ToString(), posValue, "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -357,7 +356,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+		err = putKeyTo(posKM.ToString(), posValue, "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue

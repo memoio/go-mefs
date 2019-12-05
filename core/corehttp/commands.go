@@ -14,9 +14,9 @@ import (
 	path "github.com/ipfs/go-path"
 	version "github.com/memoio/go-mefs"
 	oldcmds "github.com/memoio/go-mefs/commands"
+	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core"
 	corecommands "github.com/memoio/go-mefs/core/commands"
-	config "github.com/memoio/go-mefs/config"
 )
 
 var (
@@ -148,7 +148,7 @@ func CommandsROOption(cctx oldcmds.Context) ServeOption {
 
 // CheckVersionOption returns a ServeOption that checks whether the client mefs version matches. Does nothing when the user agent string does not contain `/go-mefs/`
 func CheckVersionOption() ServeOption {
-	daemonVersion := version.ApiVersion
+	daemonVersion := version.APIVersion
 
 	return ServeOption(func(n *core.MefsNode, l net.Listener, parent *http.ServeMux) (*http.ServeMux, error) {
 		mux := http.NewServeMux()

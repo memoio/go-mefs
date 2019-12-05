@@ -139,7 +139,7 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 
 	log.Println("begin to reget upkeeping's addr from remote")
 	contracts.EndPoint = qethEndPoint
-	_, uk, err = contracts.GetUKFromResolver(localAddr)
+	ukAddr, uk, err := contracts.GetUKFromResolver(localAddr)
 	if err != nil {
 		log.Fatal("cannnot get upkeeping contract from resolver")
 		return err
@@ -209,7 +209,7 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 
 	log.Println("begin to initiate spacetime pay")
 	contracts.EndPoint = ethEndPoint
-	err = contracts.SpaceTimePay(uk, localAddr, listProviderAddr[0], userSk, amount)
+	err = contracts.SpaceTimePay(common.HexToAddress(ukAddr[2:]), localAddr, listProviderAddr[0], userSk, amount)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
