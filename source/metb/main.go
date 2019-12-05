@@ -394,7 +394,7 @@ var getCmd = cli.Command{
 You can get the list of valid attributes by passing no arguments.`,
 	Action: func(c *cli.Context) error {
 		showUsage := func(w io.Writer) {
-			fmt.Fprintln(w, "iptb get [attr] [node]")
+			fmt.Fprintln(w, "metb get [attr] [node]")
 			fmt.Fprintln(w, "Valid values of [attr] are:")
 			attr_list := util.GetListOfAttr()
 			for _, a := range attr_list {
@@ -420,7 +420,7 @@ You can get the list of valid attributes by passing no arguments.`,
 			handleErr("error getting attribute: ", err)
 			fmt.Println(val)
 		default:
-			fmt.Fprintln(os.Stderr, "'iptb get' accepts exactly 0 or 2 arguments")
+			fmt.Fprintln(os.Stderr, "'metb get' accepts exactly 0 or 2 arguments")
 			showUsage(os.Stderr)
 			os.Exit(1)
 		}
@@ -451,7 +451,7 @@ var setCmd = cli.Command{
 				}
 			}
 		default:
-			fmt.Fprintln(os.Stderr, "'iptb set' accepts exactly 3 arguments")
+			fmt.Fprintln(os.Stderr, "'metb set' accepts exactly 3 arguments")
 			os.Exit(1)
 		}
 		return nil

@@ -236,9 +236,10 @@ func GetOfferInfo(localAddress common.Address, offerAddress common.Address) (Off
 			continue
 		}
 		item = OfferItem{
-			Capacity: capacity.Int64(),
-			Duration: duration.Int64(),
-			Price:    price.Int64(),
+			Capacity:  capacity.Int64(),
+			Duration:  duration.Int64(),
+			Price:     price.Int64(),
+			OfferAddr: offerAddress.String(),
 		}
 		break
 	}

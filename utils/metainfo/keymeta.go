@@ -65,7 +65,7 @@ var KeyTypeMap = map[MetaKeyType]int{
 	Sync:                  3,
 	TendermintRestart:     2,
 	Challenge:             3,
-	Proof:                 4,
+	Proof:                 3,
 	Repair:                2,
 	RepairRes:             2,
 	DeleteBlock:           2,
@@ -159,11 +159,15 @@ func (km *KeyMeta) ToString() string {
 	if km.mid == "" {
 		return ""
 	}
-	res := strings.Join([]string{km.mid, strconv.Itoa(int(km.keytype))}, DELIMITER)
+	var res strings.Builder
+	res.WriteString(km.mid)
+	res.WriteString(DELIMITER)
+	res.WriteString(strconv.Itoa(int(km.keytype)))
 	for _, option := range km.options {
-		res += DELIMITER + option
+		res.WriteString(DELIMITER)
+		res.WriteString(option)
 	}
-	return res
+	return res.String()
 }
 
 //NewKeyMeta 获取新的keymeta结构体

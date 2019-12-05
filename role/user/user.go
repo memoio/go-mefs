@@ -2,9 +2,9 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"os"
 	"path"
 	"sync"
@@ -17,49 +17,59 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-type UserState int32
+type userState int32
 
 var localNode *core.MefsNode
 
 const (
-	Starting UserState = iota
-	Collecting
-	CollectCompleted
-	OnDeploy
-	GroupStarted
-	BothStarted
+	starting userState = iota
+	collecting
+	collectCompleted
+	onDeploy
+	groupStarted
+	bothStarted
 )
 
-var StateList = []string{
-	"Starting", "Collecting", "CollectComplited", "OnDeploy", "GroupStarted", "BothStarted",
+var stateList = []string{
+	"starting", "collecting", "CollectComplited", "onDeploy", "groupStarted", "bothStarted",
 }
 
-type UsersInfo struct {
-	UserBook     map[string]*UserService
+type usersInfo struct {
+	userBook     map[string]*userService
 	sync.RWMutex //防止映射并发写入的问题
-	Count        int
+	count        int
 }
 
-var allUsers *UsersInfo
+var allUsers *usersInfo
 
-type UserService struct {
-	UserID          string
-	GroupService    *GroupService
-	LfsService      *LfsService
-	ContractService *ContractService
-	Context         context.Context
-	CancelFunc      context.CancelFunc
-	state           UserState
+type userService struct {
+	userid       string
+	groupService *groupService
+	LfsService   *LfsService
+	context      context.Context
+	cancelFunc   context.CancelFunc
+	state        userState
 }
 
-func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int, rdo bool) error {
-	err := SetUserState(us.UserID, Starting)
+// StartUser starts user
+func StartUser(uid string, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int, rdo bool) error {
+	// 证明该user已经启动
+	if st, err := getUserState(uid); err == nil && st >= starting {
+		return errors.New("The user is running")
+	}
+
+	us := constructUserService(uid)
+	err := addUserBook(us)
+	if err != nil {
+		return err
+	}
+	err = setUserState(us.userid, starting)
 	if err != nil {
 		return err
 	}
 
 	// 读keystore下uid文件
-	keypath, err := config.Path("", path.Join("keystore", us.UserID))
+	keypath, err := config.Path("", path.Join("keystore", us.userid))
 	if err != nil {
 		return ErrDirNotExist
 	}
@@ -67,42 +77,31 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 	if os.IsNotExist(err) {
 		return ErrDirNotExist
 	}
-	userkey, err := fsrepo.GetPrivateKeyFromKeystore(us.UserID, keypath, pwd)
+	userkey, err := fsrepo.GetPrivateKeyFromKeystore(us.userid, keypath, pwd)
 	if err != nil {
 		return err
 	}
-	gp := ConstructGroupService(us.UserID, userkey.PrivateKey, duration, capacity, price, ks, ps, rdo)
-	err = SetGroupService(gp)
+	gp := constructGroupService(us.userid, userkey.PrivateKey, duration, capacity, price, ks, ps, rdo)
+	err = setGroupService(gp)
 	if err != nil {
-		log.Println("SetGroupService()err")
+		log.Println("setGroupService()err")
 		return err
 	}
 	// user联网
-	err = gp.StartGroupService(ctx, pwd, isInit)
+	err = gp.startGroupService(us.context, isInit)
 	if err != nil {
-		log.Println("StartGroupService(()err")
+		log.Println("startGroupService(()err")
 		return err
 	}
 
-	cs := constructContractService(us.UserID)
-	err = SetContractService(us.UserID, cs)
+	lfs := constructLfsService(us.userid, userkey.PrivateKey)
+
+	err = setLfsService(lfs)
 	if err != nil {
-		log.Println("SetContractService()err")
+		log.Println("setLfsService()err")
 		return err
 	}
-	err = cs.saveContracts()
-	if err != nil {
-		log.Println("saveContracts err:", err)
-	}
-
-	lfs := ConstructLfsService(us.UserID, userkey.PrivateKey)
-
-	err = SetLfsService(lfs)
-	if err != nil {
-		log.Println("SetLfsService()err")
-		return err
-	}
-	err = lfs.StartLfsService(ctx)
+	err = lfs.StartLfsService(us.context)
 	if err != nil {
 		log.Println("StartLfsService()err")
 		return err
@@ -111,103 +110,115 @@ func (us *UserService) StartUserService(ctx context.Context, isInit bool, pwd st
 	return nil
 }
 
-func InitUserBook(node *core.MefsNode) {
-	localNode = node
-	allUsers = &UsersInfo{
-		UserBook: make(map[string]*UserService),
-	}
-}
-
-// TODO:增加userbook的count判断，若大于上限则删除一些记录
-func AddUserBook(us *UserService) error {
-	if us == nil {
-		return nil
-	}
-	// 初始化流程放init里
-	if allUsers == nil || allUsers.UserBook == nil {
-		return ErrUserBookIsNil
-	}
-	allUsers.Lock()
-	defer allUsers.Unlock()
-	if _, ok := allUsers.UserBook[us.UserID]; !ok {
-		allUsers.UserBook[us.UserID] = us
-		allUsers.Count++
-	}
-	return nil
-}
-
-func SetUserState(userID string, state UserState) error {
-	if allUsers == nil || allUsers.UserBook == nil {
-		return ErrUserBookIsNil
-	}
-	allUsers.RLock()
-	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[userID]; ok && us != nil {
-		us.state = state
-	}
-	return nil
-}
-
-func GetUserServiceState(userID string) (UserState, error) {
-	if allUsers == nil || allUsers.UserBook == nil {
-		return 0, ErrUserBookIsNil
-	}
-	allUsers.RLock()
-	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[userID]; ok && us != nil {
-		return us.state, nil
-	}
-	return 0, ErrUserNotExist
-}
-
+// GetUsers gets
 func GetUsers() ([]string, []string, error) {
-	if allUsers == nil || allUsers.UserBook == nil {
+	if allUsers == nil || allUsers.userBook == nil {
 		return nil, nil, ErrUserBookIsNil
 	}
 	allUsers.RLock()
 	defer allUsers.RUnlock()
 	var users []string
 	var states []string
-	for id, user := range allUsers.UserBook {
+	for id, user := range allUsers.userBook {
 		users = append(users, id)
-		state, err := GetUserServiceState(user.UserID)
+		state, err := getUserState(user.userid)
 		if err != nil {
 			return nil, nil, err
 		}
-		if int(state)+1 > len(StateList) {
+		if int(state)+1 > len(stateList) {
 			return nil, nil, ErrWrongState
 		}
-		states = append(states, StateList[int(state)])
+		states = append(states, stateList[int(state)])
 	}
 	return users, states, nil
 }
 
+// KillUser kills
 func KillUser(userID string) error {
-	if allUsers == nil || allUsers.UserBook == nil {
+	if allUsers == nil || allUsers.userBook == nil {
 		return ErrUserBookIsNil
 	}
 	allUsers.Lock()
 	defer allUsers.Unlock()
-	if user, ok := allUsers.UserBook[userID]; ok {
-		user.GroupService = nil
+	if user, ok := allUsers.userBook[userID]; ok {
+		user.groupService = nil
 		user.LfsService = nil
-		user.ContractService = nil
 		//用于通知资源释放
-		user.CancelFunc()
-		delete(allUsers.UserBook, userID)
+		user.cancelFunc()
+		delete(allUsers.userBook, userID)
 		return nil
 	}
 
 	return ErrUserNotExist
 }
 
-func SetLfsService(lfs *LfsService) error {
-	if allUsers == nil || allUsers.UserBook == nil {
+// IsUserOnline judges
+func IsUserOnline(userID string) bool {
+	state, err := getUserState(userID)
+	if err != nil {
+		return false
+	}
+	return state == bothStarted
+}
+
+// InitUserBook inits
+func InitUserBook(node *core.MefsNode) {
+	localNode = node
+	allUsers = &usersInfo{
+		userBook: make(map[string]*userService),
+	}
+}
+
+// addUserBook adds
+// TODO:增加userbook的count判断，若大于上限则删除一些记录
+func addUserBook(us *userService) error {
+	if us == nil {
+		return nil
+	}
+	// 初始化流程放init里
+	if allUsers == nil || allUsers.userBook == nil {
+		return ErrUserBookIsNil
+	}
+	allUsers.Lock()
+	defer allUsers.Unlock()
+	if _, ok := allUsers.userBook[us.userid]; !ok {
+		allUsers.userBook[us.userid] = us
+		allUsers.count++
+	}
+	return nil
+}
+
+func setUserState(userID string, state userState) error {
+	if allUsers == nil || allUsers.userBook == nil {
 		return ErrUserBookIsNil
 	}
 	allUsers.RLock()
 	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[lfs.UserID]; ok && us != nil {
+	if us, ok := allUsers.userBook[userID]; ok && us != nil {
+		us.state = state
+	}
+	return nil
+}
+
+func getUserState(userID string) (userState, error) {
+	if allUsers == nil || allUsers.userBook == nil {
+		return 0, ErrUserBookIsNil
+	}
+	allUsers.RLock()
+	defer allUsers.RUnlock()
+	if us, ok := allUsers.userBook[userID]; ok && us != nil {
+		return us.state, nil
+	}
+	return 0, ErrUserNotExist
+}
+
+func setLfsService(lfs *LfsService) error {
+	if allUsers == nil || allUsers.userBook == nil {
+		return ErrUserBookIsNil
+	}
+	allUsers.RLock()
+	defer allUsers.RUnlock()
+	if us, ok := allUsers.userBook[lfs.userid]; ok && us != nil {
 		if us.LfsService != nil {
 			return ErrLfsServiceAlreadySet
 		}
@@ -217,13 +228,14 @@ func SetLfsService(lfs *LfsService) error {
 	return ErrCannotFindUserInUserBook
 }
 
+// GetLfsService gets
 func GetLfsService(userID string) *LfsService {
-	if allUsers == nil || allUsers.UserBook == nil {
+	if allUsers == nil || allUsers.userBook == nil {
 		return nil
 	}
 	allUsers.RLock()
 	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[userID]; ok && us != nil {
+	if us, ok := allUsers.userBook[userID]; ok && us != nil {
 		if us.LfsService != nil {
 			return us.LfsService
 		}
@@ -233,116 +245,87 @@ func GetLfsService(userID string) *LfsService {
 }
 
 // 把当前user加入代理的userbook中
-func SetGroupService(group *GroupService) error {
-	if allUsers == nil || allUsers.UserBook == nil {
+func setGroupService(group *groupService) error {
+	if allUsers == nil || allUsers.userBook == nil {
 		return ErrUserBookIsNil
 	}
 	allUsers.RLock()
 	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[group.Userid]; ok && us != nil {
-		if us.GroupService != nil {
+	if us, ok := allUsers.userBook[group.userid]; ok && us != nil {
+		if us.groupService != nil {
 			return ErrGroupServiceAlreadySet
 		}
-		us.GroupService = group
+		us.groupService = group
 		return nil
 	}
 	return ErrCannotFindUserInUserBook
 }
 
-//GetGroupService 根据uid获取该user的groupservice实例
-func GetGroupService(userID string) *GroupService {
-	if allUsers == nil || allUsers.UserBook == nil {
+//getGroupService 根据uid获取该user的groupservice实例
+func getGroupService(userID string) *groupService {
+	if allUsers == nil || allUsers.userBook == nil {
 		return nil
 	}
 	allUsers.RLock()
 	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[userID]; ok && us != nil {
-		if us.GroupService != nil {
-			return us.GroupService
+	if us, ok := allUsers.userBook[userID]; ok && us != nil {
+		if us.groupService != nil {
+			return us.groupService
 		}
 		return nil
 	}
 	return nil
 }
 
-func SetContractService(userID string, contract *ContractService) error {
-	if allUsers == nil || allUsers.UserBook == nil {
-		return ErrUserBookIsNil
-	}
-	allUsers.RLock()
-	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[userID]; ok && us != nil {
-		if us.ContractService != nil {
-			return ErrContractServiceAlreadySet
-		}
-		us.ContractService = contract
-		return nil
-	}
-	return ErrCannotFindUserInUserBook
-}
-
-func GetContractService(userID string) *ContractService {
-	if allUsers == nil || allUsers.UserBook == nil {
-		return nil
-	}
-	allUsers.RLock()
-	defer allUsers.RUnlock()
-	if us, ok := allUsers.UserBook[userID]; ok && us != nil {
-		if us.ContractService != nil {
-			return us.ContractService
-		}
-		return nil
-	}
-	return nil
-}
-
-func (gp *GroupService) GetKeyset() *mcl.KeySet {
+func (gp *groupService) getKeyset() *mcl.KeySet {
 	if gp == nil {
 		return nil
 	}
-	return gp.KeySet
+	return gp.keySet
 }
 
-func ConstructUserService(uid string) *UserService {
+// constructUserService new
+func constructUserService(uid string) *userService {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &UserService{
-		UserID:     uid,
-		Context:    ctx,
-		CancelFunc: cancel,
+	return &userService{
+		userid:     uid,
+		context:    ctx,
+		cancelFunc: cancel,
 	}
 }
 
+// PersistBeforeExit is
 func PersistBeforeExit() error {
-	if allUsers == nil || allUsers.UserBook == nil {
+	if allUsers == nil || allUsers.userBook == nil {
 		return ErrUserBookIsNil
 	}
-	for UserID, UserService := range allUsers.UserBook {
-		if UserService != nil {
-			state, err := GetUserServiceState(UserService.UserID)
+	for userid, userService := range allUsers.userBook {
+		if userService != nil {
+			state, err := getUserState(userService.userid)
 			if err != nil {
 				return err
 			}
-			if state != BothStarted {
+			if state != bothStarted {
 				continue
 			}
-			err = UserService.LfsService.Fsync(false)
+			err = userService.LfsService.Fsync(false)
 			if err != nil {
-				log.Printf("Sorry, something wrong in persisting for %s: %v\n", UserID, err)
+				log.Printf("Sorry, something wrong in persisting for %s: %v\n", userid, err)
 			} else {
-				log.Printf("User %s Persist completed\n", UserID)
+				log.Printf("User %s Persist completed\n", userid)
 			}
-			UserService.CancelFunc() //释放资源
+			userService.cancelFunc() //释放资源
 		}
 	}
 	return nil
 }
 
-//输出本节点的信息
+//ShowInfo 输出本节点的信息
 func ShowInfo(userID string) map[string]string {
 	outmap := map[string]string{}
 	log.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
 	defer log.Println("================================")
-	gp := GetGroupService(userID)
+	gp := getGroupService(userID)
 	if gp == nil {
 		outmap["error: "] = "groupService==nil"
 		return outmap
@@ -355,7 +338,7 @@ func ShowInfo(userID string) map[string]string {
 	}
 
 	//查keeper
-	unconKeepers, conKeepers, err := gp.GetKeepers(-1)
+	unconKeepers, conKeepers, err := gp.getKeepers(-1)
 	if err != nil {
 		outmap["error: "] = "GetKeepers(-1)err:" + err.Error()
 		return outmap
@@ -371,7 +354,7 @@ func ShowInfo(userID string) map[string]string {
 
 	//查provider
 
-	unconProviders, conProviders, err := gp.GetLocalProviders()
+	unconProviders, conProviders, err := gp.getLocalProviders()
 	if err != nil {
 		outmap["error: "] = "GetLocalProviders()err:" + err.Error()
 		return outmap
@@ -397,46 +380,47 @@ func ShowInfo(userID string) map[string]string {
 	}
 	outmap["user balance: "] = amountLocal.String()
 
-	//查upkeeping合约信息
-	cs := GetContractService(userID)
-	if cs == nil {
-		outmap["error: "] = "ContractService==nil"
-		return outmap
-	}
-	//计算当前合约的花费(合约总金额-当前余额)
-	upkeeping, err := cs.getUpkeepingItem()
-	if err != nil {
-		outmap["error: "] = "getUpkeepingItem() err:" + err.Error()
-		return outmap
-	}
-	outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr
-	amountUpkeeping, err := contracts.QueryBalance(upkeeping.UpKeepingAddr)
-	if err != nil {
-		outmap["error: "] = "QueryBalance()err:" + err.Error()
-		return outmap
-	}
-	outmap["ukeeping balance: "] = amountUpkeeping.String()
+	/*
+		//查upkeeping合约信息
+		cs := getContractService(userID)
+		if cs == nil {
+			outmap["error: "] = "contractService==nil"
+			return outmap
+		}
+		//计算当前合约的花费(合约总金额-当前余额)
+		upkeeping, err := cs.getUpkeepingItem()
+		if err != nil {
+			outmap["error: "] = "getUpkeepingItem() err:" + err.Error()
+			return outmap
+		}
+		outmap["upkeeping.UpKeepingAddr:"] = upkeeping.UpKeepingAddr
+		amountUpkeeping, err := contracts.QueryBalance(upkeeping.UpKeepingAddr)
+		if err != nil {
+			outmap["error: "] = "QueryBalance()err:" + err.Error()
+			return outmap
+		}
+		outmap["ukeeping balance: "] = amountUpkeeping.String()
 
-	d := upkeeping.Duration
-	s := upkeeping.Capacity
-	price := upkeeping.Price
-	var moneyPerDay = new(big.Int)
-	var moneyAccount = new(big.Int)
-	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
-	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
-	outmap["upkeeping cost:"] = big.NewInt(0).Sub(moneyAccount, amountUpkeeping).String()
-	outmap["upkeeping.Duration:"] = big.NewInt(upkeeping.Duration).String()
-	outmap["upkeeping.Capacity:"] = big.NewInt(upkeeping.Capacity).String()
-
+		d := upkeeping.Duration
+		s := upkeeping.Capacity
+		price := upkeeping.Price
+		var moneyPerDay = new(big.Int)
+		var moneyAccount = new(big.Int)
+		moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
+		moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
+		outmap["upkeeping cost:"] = big.NewInt(0).Sub(moneyAccount, amountUpkeeping).String()
+		outmap["upkeeping.Duration:"] = big.NewInt(upkeeping.Duration).String()
+		outmap["upkeeping.Capacity:"] = big.NewInt(upkeeping.Capacity).String()
+	*/
 	//查询当前使用的存储空间
-	buckets, err := lfs.ListBucket("")
+	superBucket, err := lfs.ListBucket("")
 	if err != nil {
 		outmap["error"] = "ListBucket() err:" + err.Error()
 		return outmap
 	}
 	var StorageSize int
-	for _, bucket := range buckets {
-		storageSpace, err := lfs.ShowStorageSpace(bucket.BucketName, "")
+	for _, bucket := range superBucket {
+		storageSpace, err := lfs.ShowStorageSpace(bucket.Name, "")
 		if err != nil {
 			outmap["error"] = "ShowStorageSpace() err" + err.Error()
 			return outmap

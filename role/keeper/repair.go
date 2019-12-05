@@ -5,19 +5,88 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 var repch chan string
 
-const (
-	// RepairFailed ...
-	RepairFailed = "Repair Failed"
-)
+func checkLedger(ctx context.Context) {
+	log.Println("Check Ledger start!")
+	time.Sleep(2 * CHALTIME)
+	ticker := time.NewTicker(CHECKTIME)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			doCheckLedgerForRepair()
+		}
+	}
+}
+
+func doCheckLedgerForRepair() {
+	pus := getPUKeysFromukpInfo()
+	for _, pu := range pus {
+		// not repair pos blocks
+		if pu.uid == pos.GetPosId() {
+			continue
+		}
+
+		// only master repair
+		if !isMasterKeeper(pu.uid, pu.pid) {
+			continue
+		}
+
+		thisInfo, ok := ledgerInfo.Load(pu)
+		if !ok {
+			continue
+		}
+
+		thischalinfo := thisInfo.(*chalinfo)
+
+		thischalinfo.cidMap.Range(func(key, value interface{}) bool {
+			eclasped := utils.GetUnixNow() - value.(*cidInfo).availtime
+			switch value.(*cidInfo).repair {
+			case 0:
+				if EXPIRETIME < eclasped {
+					log.Println("Need repair cid first time: ", key.(string))
+					value.(*cidInfo).repair++
+					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+				}
+			case 1:
+				if 4*EXPIRETIME < eclasped {
+					log.Println("Need repair cid second time: ", key.(string))
+					value.(*cidInfo).repair++
+					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+				}
+			case 2:
+				if 16*EXPIRETIME < eclasped {
+					log.Println("Need repair cid third time: ", key.(string))
+					value.(*cidInfo).repair++
+					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+				}
+			default:
+				// > 30 days; we donnot repair
+				if 480*EXPIRETIME >= eclasped {
+					// try every 32 hours
+					if int64(64*value.(*cidInfo).repair-2)*EXPIRETIME < eclasped {
+						repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+						value.(*cidInfo).repair++
+					}
+
+				}
+			}
+
+			return true
+		})
+	}
+}
 
 func checkrepairlist(ctx context.Context) {
 	log.Println("Check repairlist start!")
@@ -26,9 +95,8 @@ func checkrepairlist(ctx context.Context) {
 		for {
 			select {
 			case cid := <-repch:
-				uid := cid[:utils.IDLength]
 				log.Println("repairing cid: ", cid)
-				RepairBlock(ctx, uid, cid)
+				repairBlock(ctx, cid)
 			case <-ctx.Done():
 				return
 			}
@@ -36,47 +104,49 @@ func checkrepairlist(ctx context.Context) {
 	}()
 }
 
-//RepairBlock works in 3 steps 1.search a new provider,we do it in func SearchNewProvider
-//2.put chunk to this provider 3.change metainfo and sync
-func RepairBlock(ctx context.Context, userID string, blockID string) {
+// repairBlock works in 3 steps:
+// 1.search a new provider,we do it in func SearchNewProvider
+// 2.put chunk to this provider
+// 3.change metainfo and sync
+func repairBlock(ctx context.Context, blockID string) {
 	var cpids, ugid []string
-	var offset int
-	response := ""
-	blkinfo, err := metainfo.GetBlockMeta(blockID)
-	if err != nil {
-		log.Println("Get Block Meta error :", blockID, err)
+	var response string
+
+	blkinfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
+	if len(blkinfo) < 4 {
 		return
 	}
 
-	LedgerInfo.Range(func(k, v interface{}) bool {
-		pu := k.(PU)
-		thischalinfo := v.(*chalinfo)
-		if pu.uid == userID && thischalinfo != nil {
-			thischalinfo.Cid.Range(func(key, value interface{}) bool {
-				cid := key.(string)
-				blockMeta, err := metainfo.GetBlockMeta(cid)
-				if err != nil {
-					log.Println("GetBlockMeta error :", err)
-					return false
-				}
+	userID := blkinfo[0]
 
-				if strings.Compare(cid, blockID) == 0 {
-					offset = value.(*cidInfo).offset
-					cpids = append(cpids, cid+metainfo.REPAIR_DELIMETER+pu.pid+metainfo.REPAIR_DELIMETER+strconv.Itoa(offset))
-					ugid = append(ugid, pu.pid)
-					response = pu.pid
-				}
+	thisbucket, ok := getBucketInfo(userID, blkinfo[1])
+	if !ok {
+		return
+	}
 
-				if blkinfo.GetGid() == blockMeta.GetGid() && blkinfo.GetSid() == blockMeta.GetSid() && blkinfo.GetBid() != blockMeta.GetBid() {
-					cpids = append(cpids, cid+metainfo.REPAIR_DELIMETER+pu.pid)
-					ugid = append(ugid, pu.pid)
-				}
+	cidPrefix := strings.Join(blkinfo[1:2], metainfo.BLOCK_DELIMITER)
 
-				return true
-			})
+	for i := 0; i < int(thisbucket.dataCount+thisbucket.parityCount); i++ {
+		blockid := cidPrefix + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
+		thisinfo, ok := thisbucket.stripes.Load(blockid)
+		if !ok {
+			continue
 		}
-		return true
-	})
+
+		offset := thisinfo.(*cidInfo).offset
+		pid := thisinfo.(*cidInfo).storedOn
+
+		// recheck the status
+		if strconv.Itoa(i) == blkinfo[3] {
+			if thisinfo.(*cidInfo).repair == 0 {
+				return
+			}
+			response = pid
+		}
+
+		cpids = append(cpids, blockid+metainfo.REPAIR_DELIMETER+pid+metainfo.REPAIR_DELIMETER+strconv.Itoa(offset))
+		ugid = append(ugid, pid)
+	}
 
 	if len(response) > 0 {
 		if !sc.ConnectTo(ctx, localNode, response) {
@@ -92,18 +162,16 @@ func RepairBlock(ctx context.Context, userID string, blockID string) {
 		}
 	}
 
-	var rpids string
-	for _, cpid := range cpids {
-		rpids += cpid
-		rpids += metainfo.DELIMITER
-	}
+	// cid1/pid1/offset1|cid1/pid1/offset1
+	metaValue := strings.Join(cpids, metainfo.DELIMITER)
+
 	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair)
 	if err != nil {
 		log.Println("construct repair KV error: ", err)
 		return
 	}
-	metaValue := rpids
-	log.Println("cpids: ", cpids, "\nrpids: ", rpids, " \nrepairs on: ", response)
+
+	log.Println("cpids: ", cpids, "\nrpids: ", metaValue, " \nrepairs on: ", response)
 	_, err = sendMetaRequest(km, metaValue, response)
 	if err != nil {
 		log.Println("err: ", err)
@@ -124,91 +192,44 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 		log.Println("strconv.Atoi offset error: ", err)
 		return
 	}
+
 	uid := blockID[:utils.IDLength]
-	oldpu := PU{
+	oldpu := puKey{
 		pid: oldPid,
 		uid: uid,
 	}
-	if strings.Compare(splitedValue[0], RepairFailed) == 0 {
-		log.Println("repair failed, cid is: ", blockID)
-	} else {
-		log.Println("repair success, cid is: ", blockID)
-		newpu := PU{
-			pid: provider,
-			uid: uid,
-		}
 
+	if strings.Compare(splitedValue[0], "RepairSuccess") == 0 {
+		log.Println("repair success, cid is: ", blockID)
 		newcidinfo := &cidInfo{
 			repair:    0,
 			availtime: utils.GetUnixNow(),
 			offset:    offset,
+			storedOn:  provider,
 		}
 
-		if thischalinfo, ok := getChalinfo(newpu); ok {
-			if thischalinfo.inChallenge == 1 {
-				thischalinfo.tmpCid.Store(blockID, newcidinfo)
-			} else if thischalinfo.inChallenge == 0 {
-				thischalinfo.Cid.Store(blockID, newcidinfo)
-			}
-		}
+		addCidinfotoMem(uid, provider, blockID, newcidinfo)
+		deleteBlockFromMem(oldpu.uid, oldpu.pid, blockID)
 
-		oldchalinfo, isExist := getChalinfo(oldpu)
-		if isExist {
-			oldchalinfo.Cid.Delete(blockID)
-		}
-
-		addCredit(provider)
-
-		var NewPids string
-		var flag int
-		thisGroupsInfo, ok := getGroupsInfo(uid)
-		if !ok {
-			log.Println(ErrNoGroupsInfo)
+		//更新block的meta信息
+		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Sync, metainfo.SyncTypeBlock)
+		if err != nil {
+			log.Println("construct Syncblock KV error :", err)
 			return
 		}
-		for _, Pid := range thisGroupsInfo.Providers {
-			if strings.Compare(Pid, provider) == 0 {
-				break
-			} else {
-				flag++
-				NewPids += Pid
-			}
+		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
+		metaSyncTo(kmBlock, metaValue)
+		kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
+		err = putKeyTo(kmBlock.ToString(), metaValue, "local")
+		if err != nil {
+			log.Println("construct SyncPidsK error :", err)
+			return
 		}
-
-		// new provider, now there is no new provider
-		if flag == len(thisGroupsInfo.Providers) {
-			thisGroupsInfo.Providers = append(thisGroupsInfo.Providers, provider)
-			NewPids += provider
-
-			kmPid, err := metainfo.NewKeyMeta(uid, metainfo.Sync, metainfo.SyncTypePid)
-			if err != nil {
-				log.Println("construct SyncPidsK error :", err)
-				return
-			}
-			metaSyncTo(kmPid, NewPids)
-			kmPid.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
-			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmPid.ToString(), NewPids, "local")
-			if err != nil {
-				log.Println("construct SyncPidsK error :", err)
-				return
-			}
-			//更新block的meta信息
-			kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Sync, metainfo.SyncTypeBlock)
-			if err != nil {
-				log.Println("construct Syncblock KV error :", err)
-				return
-			}
-			metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
-			metaSyncTo(kmBlock, metaValue)
-			kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
-			err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(kmBlock.ToString(), metaValue, "local")
-			if err != nil {
-				log.Println("construct SyncPidsK error :", err)
-				return
-			}
-		}
-
+		return
 	}
+
+	log.Println("repair failed, cid is: ", blockID)
+
 	return
 
 }
@@ -224,13 +245,13 @@ func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
 		return response
 	}
 
-	lenp := len(gp.Providers)
+	lenp := len(gp.providers)
 
 	if lenp == 0 || lenp <= len(ugid) {
 		return response
 	}
 
-	tmpProvider := utils.DisorderArray(gp.Providers)
+	tmpProvider := utils.DisorderArray(gp.providers)
 	for _, tmpPro := range tmpProvider {
 		flag := 0
 		for j := 0; j < len(ugid); j++ { //this provider may belong to this stripe already

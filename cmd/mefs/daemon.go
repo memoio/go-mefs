@@ -366,7 +366,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	}
 
 	// construct api endpoint - every time
-	// iptb的req的端口为0
+	// metb的req的端口为0
 	apiErrc, err := serveHTTPApi(req, cctx)
 	if err != nil {
 		return err
@@ -416,7 +416,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			fmt.Println("Start keeperService failed:", err)
 			return err
 		}
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&keeper.KeeperHandlerV2{Role: metainfo.RoleKeeper})
+		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&keeper.HandlerV2{Role: metainfo.RoleKeeper})
 		if err != nil {
 			return err
 		}
@@ -424,20 +424,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("started as a user")
 		user.InitUserBook(node)
 
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.UserHandlerV2{Role: metainfo.RoleUser})
+		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
 			return err
 		}
 
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 		if cfg.Test {
-			us := user.ConstructUserService(node.Identity.Pretty())
-			err := user.AddUserBook(us)
-			if err != nil {
-				return err
-			}
 			go func() {
-				err = us.StartUserService(us.Context, cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
+				err = user.StartUser(node.Identity.Pretty(), cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
 				if err != nil {
 					fmt.Println("Start local user failed:", err)
 					err := user.KillUser(node.Identity.Pretty())
@@ -455,7 +450,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			fmt.Println("Start providerService failed:", err)
 			return err
 		}
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&provider.ProviderHandlerV2{Role: metainfo.RoleProvider})
+		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&provider.HandlerV2{Role: metainfo.RoleProvider})
 		if err != nil {
 			return err
 		}

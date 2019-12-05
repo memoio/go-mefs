@@ -1,4 +1,4 @@
-package iptbutil
+package metbutil
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 
 var ErrTimeout = errors.New("timeout")
 
-// LocalNode is a machine-local MEFS node controlled by IPTB
+// LocalNode is a machine-local MEFS node controlled by METB
 type LocalNode struct {
 	Dir    string
 	PeerID string

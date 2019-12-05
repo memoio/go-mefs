@@ -11,7 +11,7 @@ import (
 // 带有难度值的门限随机转换函数
 //trap door random funtion
 
-//GenParams:利用生成参数，返回一个阶N以及对应的phi(N)
+//GenParams 利用生成参数，返回一个阶N以及对应的phi(N)
 func GenParams() (*big.Int, *big.Int, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 256)
 	if err != nil {

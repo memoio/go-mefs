@@ -17,10 +17,36 @@ var KeeperCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
+		"info_user":      KeeperInfoUserCmd,
 		"list_users":     KeeperListUsersCmd,
 		"list_providers": KeeperListProvidersCmd,
 		"list_keepers":   KeeperListKeepersCmd,
 		"flush":          KeeperFlushCmd,
+	},
+}
+
+var KeeperInfoUserCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "List Users.",
+		ShortDescription: `
+'mefs keeper list_users' is a plumbing command for printing users for a keeper.
+`,
+	},
+
+	Arguments: []cmds.Argument{
+		cmds.StringArg("userid", true, false, "The userid.").EnableStdin(),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		keeper.GetUsersInfomation(req.Arguments[0])
+
+		return nil
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
 	},
 }
 

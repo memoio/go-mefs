@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/memoio/go-mefs/contracts"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -54,16 +53,16 @@ func saveUpkeeping(userID string) error {
 	}
 	item.UserID = userID
 	item.UpKeepingAddr = ukAddr
-	ProContracts.upKeepingBook.Store(userID, item)
+	proContracts.upKeepingBook.Store(userID, item)
 	return nil
 }
 
 func getUpkeeping(userID string) (contracts.UpKeepingItem, error) {
 	var upkeepingItem contracts.UpKeepingItem
-	value, ok := ProContracts.upKeepingBook.Load(userID)
+	value, ok := proContracts.upKeepingBook.Load(userID)
 	if !ok {
 		log.Println("Not find ", userID, "'s upkeepingItem in upKeepingBook")
-		return upkeepingItem, ErrGetContractItem
+		return upkeepingItem, errGetContractItem
 	}
 	upkeepingItem = value.(contracts.UpKeepingItem)
 	return upkeepingItem, nil
@@ -95,7 +94,7 @@ func saveChannel(userID string) error {
 	if err != nil {
 		return err
 	}
-	valueByte, err := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), "local")
+	valueByte, err := getKeyFrom(km.ToString(), "local")
 	if err != nil {
 		// 本地没查到，value设为0
 		log.Println("Can't get channel value in local,err :", err, ", so  set channel value to 0")
@@ -114,20 +113,20 @@ func saveChannel(userID string) error {
 	chanItem.ProID = proID
 	chanItem.Value = value
 
-	ProContracts.channelBook.Store(userID, chanItem)
+	proContracts.channelBook.Store(userID, chanItem)
 	return nil
 }
 
 func getChannel(userID string) (contracts.ChannelItem, error) {
 	var channelItem contracts.ChannelItem
-	value, ok := ProContracts.channelBook.Load(userID)
+	value, ok := proContracts.channelBook.Load(userID)
 	if !ok {
 		saveChannel(userID)
 
-		value, ok = ProContracts.channelBook.Load(userID)
+		value, ok = proContracts.channelBook.Load(userID)
 		if !ok {
 			log.Println("Not find ", userID, "'s channelItem in channelBook")
-			return channelItem, ErrGetContractItem
+			return channelItem, errGetContractItem
 		}
 	}
 	channelItem = value.(contracts.ChannelItem)
@@ -136,7 +135,7 @@ func getChannel(userID string) (contracts.ChannelItem, error) {
 
 func getChannels() []contracts.ChannelItem {
 	var channels []contracts.ChannelItem
-	ProContracts.channelBook.Range(func(_, channnelItem interface{}) bool {
+	proContracts.channelBook.Range(func(_, channnelItem interface{}) bool {
 		channel, ok := channnelItem.(contracts.ChannelItem)
 		if !ok {
 			return false
@@ -167,16 +166,16 @@ func saveQuery(userID string) error {
 	}
 	queryItem.UserID = userID
 	queryItem.QueryAddr = queryAddr.String()
-	ProContracts.queryBook.Store(userID, queryItem)
+	proContracts.queryBook.Store(userID, queryItem)
 	return nil
 }
 
 func getQuery(userID string) (contracts.QueryItem, error) {
 	var queryItem contracts.QueryItem
-	value, ok := ProContracts.queryBook.Load(userID)
+	value, ok := proContracts.queryBook.Load(userID)
 	if !ok {
 		log.Println("Not find ", userID, "'s queryItem in queryBook")
-		return queryItem, ErrGetContractItem
+		return queryItem, errGetContractItem
 	}
 	queryItem = value.(contracts.QueryItem)
 	return queryItem, nil
@@ -198,16 +197,16 @@ func saveOffer() error {
 	}
 	offerItem.ProviderID = proID
 	offerItem.OfferAddr = offerAddr.String()
-	ProContracts.offer = offerItem
+	proContracts.offer = offerItem
 	return nil
 }
 
 func getOffer() (contracts.OfferItem, error) {
-	if ProContracts.offer.OfferAddr == "" || ProContracts.offer.ProviderID == "" {
+	if proContracts.offer.OfferAddr == "" || proContracts.offer.ProviderID == "" {
 		log.Println("OfferItem hasn't set")
-		return ProContracts.offer, ErrGetContractItem
+		return proContracts.offer, errGetContractItem
 	}
-	return ProContracts.offer, nil
+	return proContracts.offer, nil
 }
 
 func saveProInfo() error {
@@ -221,14 +220,14 @@ func saveProInfo() error {
 		return err
 	}
 	proItem.ProviderID = proID
-	ProContracts.proInfo = proItem
+	proContracts.proInfo = proItem
 	return nil
 }
 
 func getProInfo() (contracts.ProviderItem, error) {
-	if ProContracts.proInfo.ProviderID == "" {
+	if proContracts.proInfo.ProviderID == "" {
 		log.Println("provider info hasn't set")
-		return ProContracts.proInfo, ErrGetContractItem
+		return proContracts.proInfo, errGetContractItem
 	}
-	return ProContracts.proInfo, nil
+	return proContracts.proInfo, nil
 }

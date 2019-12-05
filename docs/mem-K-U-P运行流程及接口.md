@@ -42,7 +42,7 @@ type keeperHandler struct {
 
 func (keeper *keeperHandler) HandleMetaMessage(typ meta.MetaMessageType, metaKey, metaValue, from string) (string, error) { //from即发来这个请求的节点ID，可以做一点最基本的检查
     if keeper == nil {
-		return meta.MetaHandleError, ErrKeeperServiceNotReady
+		return meta.MetaHandleError, errKeeperServiceNotReady
 	}
     switch typ {
         //根据不同类型操作
@@ -51,7 +51,7 @@ func (keeper *keeperHandler) HandleMetaMessage(typ meta.MetaMessageType, metaKey
 
 func (keeper *keeperHandler) GetRole() (string, error) {
 	if keeper == nil {
-		return "", ErrKeeperServiceNotReady
+		return "", errKeeperServiceNotReady
 	}
 	return keeper.Role, nil
 }

@@ -343,7 +343,7 @@ func (c Cid) Version() uint64 {
 	if len(c.str) > NEWCIDLENGTH && string(c.str[NEWCIDLENGTH]) == "_" {
 		return 2
 	}
-	return 1
+	return 2
 }
 
 // Type returns the multicodec-packed content type of a Cid.

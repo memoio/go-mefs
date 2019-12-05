@@ -19,7 +19,7 @@ test "$TEST_VERBOSE" = 1 && verbose=t && echo '# TEST_VERBOSE='"$TEST_VERBOSE"
 	exit 1
 }
 
-# Please put iptb specific shell functions and variables below
+# Please put metb specific shell functions and variables below
 
 # Echo the args, run the cmd, and then also fail,
 # making sure a test case fails.

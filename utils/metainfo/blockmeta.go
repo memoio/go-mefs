@@ -84,5 +84,35 @@ func GetBlockMeta(key string) (*BlockMeta, error) {
 		return nil, ErrIllegalKey
 	}
 	return NewBlockMeta(splitedKey[0], splitedKey[1], splitedKey[2], splitedKey[3])
+}
 
+//GetCidFromBlock retur cid:
+// if key == uid_bucketid_sid_blockid, returns bucketid_sid_blockid
+// if key == bucketid_sid_blockid, returns bucketid_sid_blockid
+func GetCidFromBlock(key string) (string, error) {
+	splitedKey := strings.Split(key, BLOCK_DELIMITER)
+
+	if len(splitedKey) == 3 {
+		return key, nil
+	}
+
+	if len(splitedKey) == 4 {
+		return strings.Join(splitedKey[1:], BLOCK_DELIMITER), nil
+	}
+
+	return "", ErrIllegalKey
+}
+
+// GetIDsFromBlock returns bucketid;
+// if key == uid_bucketid_sid_blockid, returns bucketid
+// if key == bucketid_sid_blockid, returns bucketid
+func GetIDsFromBlock(key string) (string, string, error) {
+	splitedKey := strings.Split(key, BLOCK_DELIMITER)
+	if len(splitedKey) == 3 {
+		return splitedKey[0], splitedKey[1], nil
+	}
+	if len(splitedKey) == 4 {
+		return splitedKey[1], splitedKey[2], nil
+	}
+	return "", "", ErrIllegalKey
 }

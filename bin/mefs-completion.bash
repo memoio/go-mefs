@@ -312,7 +312,7 @@ _ipfs_files_read()
 
 _ipfs_files_write()
 {
-    if [[ ${prev} == "--count" ]] || [[ ${prev} == "--offset" ]] ; then # Dirty check
+    if [[ ${prev} == "--count" ]] || [[ ${prev} == "--offset" ]] ; then # dirty check
         COMPREPLY=() # Numbers, just keep it empty
     elif [[ ${word} == -* ]] ; then
         _ipfs_comp "--offset --count --create --truncate --help"
@@ -540,7 +540,7 @@ _ipfs_object_patch()
             _ipfs_help_only
             ;;
         add-link)
-            if [[ ${word} == -* ]] && [[ ${prev} == "add-link" ]] ; then # Dirty check
+            if [[ ${word} == -* ]] && [[ ${prev} == "add-link" ]] ; then # dirty check
                 _ipfs_comp "--create"
             #else
                 # TODO: Hash path autocomplete. This is tricky, can be hash or a name.

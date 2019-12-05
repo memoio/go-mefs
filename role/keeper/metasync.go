@@ -7,15 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	df "github.com/memoio/go-mefs/data-format"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var (
-	ErrLocalKeeper     = errors.New("传入的user为本地节点，不同步")
-	ErrorWrongSyncType = errors.New("miss match synctype")
+	errLocalKeeper     = errors.New("Not send to self")
+	errorWrongSyncType = errors.New("miss match synctype")
 )
 
 // metaSyncTo 元数据同步调用函数
@@ -70,19 +68,19 @@ func getTarget(mainID, syncType string) ([]string, error) {
 	case metainfo.SyncTypePid:
 		user = mainID
 	default:
-		return nil, ErrorWrongSyncType
+		return nil, errorWrongSyncType
 	}
 	//target中去掉本节点
 	if strings.Compare(user, localNode.Identity.Pretty()) == 0 {
-		return nil, ErrLocalKeeper
+		return nil, errLocalKeeper
 	}
 	thisgroupInfo, ok := getGroupsInfo(user)
 	if !ok {
-		return nil, ErrNoGroupsInfo
+		return nil, errNoGroupsInfo
 	}
-	for _, keeper := range thisgroupInfo.Keepers {
-		if strings.Compare(keeper.KID, localNode.Identity.Pretty()) != 0 {
-			target = append(target, keeper.KID)
+	for _, keeperID := range thisgroupInfo.keepers {
+		if strings.Compare(keeperID, localNode.Identity.Pretty()) != 0 {
+			target = append(target, keeperID)
 		}
 	}
 	return target, nil
@@ -109,8 +107,13 @@ func handleSyncChalPay(km *metainfo.KeyMeta, metaValue string) error {
 		return metainfo.ErrIllegalValue
 	}
 
+	thisPU := puKey{
+		uid: groupid,
+		pid: pidString,
+	}
+
 	//保存此次的支付结果
-	_, _, err := saveLastPay(groupid, pidString, "signature", "proof", beginTime, endTime, st)
+	_, _, err := saveLastPay(thisPU, "signature", "proof", beginTime, endTime, st)
 	if err != nil {
 		return err
 	}
@@ -160,15 +163,15 @@ func handleSyncChalres(km *metainfo.KeyMeta, metaValue string) error {
 		length:        int64(l),
 	}
 
-	pu := PU{
+	pu := puKey{
 		pid: thischalresult.pid,
 		uid: thischalresult.uid,
 	}
 	thischalinfo, ok := getChalinfo(pu)
 	if !ok {
-		return ErrNoChalInfo
+		return errNoChalInfo
 	}
-	thischalinfo.Time.Store(timerec, thischalresult) //放到LedgerInfo里
+	thischalinfo.chalMap.Store(timerec, thischalresult) //放到LedgerInfo里
 	return nil
 }
 
@@ -180,7 +183,7 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 	if len(splitedMetaValue) < 2 {
 		return metainfo.ErrIllegalValue
 	}
-	localValueByte, _ := localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(km.ToString(), "local")
+	localValueByte, _ := getKeyFrom(km.ToString(), "local")
 	localValueString := string(localValueByte) //从本地取数据
 	if localValueString != "" {                //如果本地有同样数据，判断是否覆盖原有数据
 		splitedLocalValue := strings.Split(localValueString, metainfo.DELIMITER)
@@ -203,37 +206,10 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 	if err != nil {
 		return err
 	}
-	newpu := PU{
-		pid: pid,
-		uid: uid,
-	}
 
-	newcidinfo := &cidInfo{
-		availtime: utils.GetUnixNow(),
-		repair:    0,
-		offset:    offset,
-	}
+	addBlocktoMem(uid, pid, blockID, offset)
 
-	oldOffset := 0
-	if thechalinfo, ok := getChalinfo(newpu); ok {
-		if thechalinfo.inChallenge == 1 {
-			thechalinfo.tmpCid.Store(blockID, newcidinfo)
-		} else if thechalinfo.inChallenge == 0 {
-			act, loaded := thechalinfo.Cid.LoadOrStore(blockID, newcidinfo)
-			if loaded {
-				oldOffset = act.(*cidInfo).offset
-				if oldOffset < offset {
-					act.(*cidInfo).offset = offset
-				}
-			} else {
-				oldOffset = 0
-			}
-			thechalinfo.maxlength += int64(offset-oldOffset) * df.DefaultSegmentSize
-		}
-	}
-
-	addCredit(pid)
-	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), metaValue, "local") //最后，保存数据到本地
+	err = putKeyTo(km.ToString(), metaValue, "local") //最后，保存数据到本地
 	if err != nil {
 		return err
 	}
@@ -245,7 +221,7 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 func syncKUPIDs(km *metainfo.KeyMeta, pids string) error {
 	km.SetKeyType(metainfo.Local)
 	metaKey := km.ToString()
-	err := localNode.Routing.(*dht.IpfsDHT).CmdPutTo(metaKey, pids, "local")
+	err := putKeyTo(metaKey, pids, "local")
 	if err != nil {
 		return err
 	}

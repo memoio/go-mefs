@@ -9,7 +9,6 @@ import (
 
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
@@ -18,12 +17,12 @@ var localNode *core.MefsNode
 
 var usersConfigs sync.Map
 
-var ProContracts *ProviderContracts
+var proContracts *providerContracts
 
 //StartProviderService start provider service
 func StartProviderService(ctx context.Context, node *core.MefsNode, capacity int64, duration int64, price int64, reDeployOffer bool) (err error) {
 	localNode = node
-	ProContracts = &ProviderContracts{}
+	proContracts = &providerContracts{}
 	if cfg, _ := node.Repo.Config(); !cfg.Test {
 		//部署resolver和offer
 		for {
@@ -59,9 +58,10 @@ func StartProviderService(ctx context.Context, node *core.MefsNode, capacity int
 	return nil
 }
 
+// PersistBeforeExit is
 func PersistBeforeExit() error {
-	if localNode == nil || ProContracts == nil {
-		return ErrProviderServiceNotReady
+	if localNode == nil || proContracts == nil {
+		return errProviderServiceNotReady
 	}
 	channels := getChannels()
 	for _, channel := range channels {
@@ -70,7 +70,7 @@ func PersistBeforeExit() error {
 		if err != nil {
 			return err
 		}
-		err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(km.ToString(), channel.Value.String(), "local")
+		err = putKeyTo(km.ToString(), channel.Value.String(), "local")
 		if err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func PersistBeforeExit() error {
 	}
 	posValue := posCidPrefix
 	log.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
-	err = localNode.Routing.(*dht.IpfsDHT).CmdPutTo(posKM.ToString(), posValue, "local")
+	err = putKeyTo(posKM.ToString(), posValue, "local")
 	if err != nil {
 		log.Println("CmdPutTo posKM error :", err)
 		return err
