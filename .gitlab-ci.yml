@@ -116,7 +116,7 @@ upkeeping_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/upkeepingTest/upkeepingTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+    - GO111MODULE=off go run test/unit/upkeepingTest/upkeepingTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
