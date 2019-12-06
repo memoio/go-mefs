@@ -12,4 +12,4 @@ time sleep 60
 
 echo -e "\nstep 3,run challenge test\n"
 cd $GOPATH/src/github.com/memoio/go-mefs/test/unit/challengeTest
-go run challengeTest.go -eth=$1
+GO111MODULE=off go run challengeTest.go -eth=$1
