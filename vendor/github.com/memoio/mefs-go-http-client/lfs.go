@@ -3,7 +3,6 @@ package shell
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strconv"
 )
 
@@ -252,7 +251,6 @@ func (s *Shell) GetFrom(key, id string, options ...LfsOpts) (*queryEvent, error)
 }
 
 func (s *Shell) GetBlockFrom(key, id string, options ...LfsOpts) (string, error) {
-	fmt.Println("in GetBlockFrom")
 	var res string
 	rb := s.Request("block/getfrom", key, id)
 	for _, option := range options {
