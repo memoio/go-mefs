@@ -137,7 +137,7 @@ func ChallengeTest() error {
 			log.Println("List Objects failed :", err)
 			return err
 		}
-		log.Println("Object Name :", getOb.Objects[0].ObjectName, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
+		log.Println("Object Name :", getOb.Objects[0].Name, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
 		if check >= 2 && strings.Compare(LastChallengeTime, getOb.Objects[0].LatestChalTime) != 0 {
 			log.Println("Challenge success")
 			break
