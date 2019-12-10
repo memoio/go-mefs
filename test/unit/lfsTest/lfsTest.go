@@ -148,12 +148,12 @@ func lfsTest() error {
 		return err
 	}
 
-	if obj.Objects[0].ObjectName != objectName {
-		log.Println("head file ", objectName, "but got: ", obj.Objects[0].ObjectName)
+	if obj.Objects[0].Name != objectName {
+		log.Println("head file ", objectName, "but got: ", obj.Objects[0].Name)
 	}
 
-	if int64(obj.Objects[0].ObjectSize) != r {
-		log.Println("head file siez: ", r, "but got: ", obj.Objects[0].ObjectSize)
+	if int64(obj.Objects[0].Size) != r {
+		log.Println("head file siez: ", r, "but got: ", obj.Objects[0].Size)
 	}
 
 	log.Println("5. test rs get object")
@@ -166,8 +166,8 @@ func lfsTest() error {
 
 	obuf := new(bytes.Buffer)
 	obuf.ReadFrom(outer)
-	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
-		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
+	if obuf.Len() != int(obj.Objects[0].Size) {
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].Size)
 	}
 
 	log.Println("6. test mul create bucket")
@@ -235,12 +235,12 @@ func lfsTest() error {
 		return err
 	}
 
-	if obj.Objects[0].ObjectName != objectName {
-		log.Println("head file ", objectName, "but got: ", obj.Objects[0].ObjectName)
+	if obj.Objects[0].Name != objectName {
+		log.Println("head file ", objectName, "but got: ", obj.Objects[0].Name)
 	}
 
-	if int64(obj.Objects[0].ObjectSize) != r1 {
-		log.Println("head file siez: ", r1, "but got: ", obj.Objects[0].ObjectSize)
+	if int64(obj.Objects[0].Size) != r1 {
+		log.Println("head file siez: ", r1, "but got: ", obj.Objects[0].Size)
 	}
 
 	log.Println("8. test mul get object")
@@ -253,8 +253,8 @@ func lfsTest() error {
 
 	obuf = new(bytes.Buffer)
 	obuf.ReadFrom(outer)
-	if obuf.Len() != int(obj.Objects[0].ObjectSize) {
-		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].ObjectSize)
+	if obuf.Len() != int(obj.Objects[0].Size) {
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].Size)
 	}
 
 	log.Println("9. test showstorage")

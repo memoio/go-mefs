@@ -13,8 +13,8 @@ import (
 )
 
 type ObjectStat struct {
-	ObjectName     string
-	ObjectSize     int32
+	Name           string
+	Size           int64
 	MD5            string
 	Ctime          string
 	Dir            bool
@@ -32,7 +32,7 @@ var (
 )
 
 func (ob ObjectStat) String() string {
-	FloatStorage := float64(ob.ObjectSize)
+	FloatStorage := float64(ob.Size)
 	var OutStorage string
 	if FloatStorage < 1024 && FloatStorage > 0 {
 		OutStorage = fmt.Sprintf("%.2f", FloatStorage) + "B"
@@ -45,7 +45,7 @@ func (ob ObjectStat) String() string {
 	}
 	return fmt.Sprintf(
 		"ObjectName: %s\n--ObjectSize: %s\n--MD5: %s\n--Ctime: %s\n--Dir: %t\n--LatestChalTime: %s\n",
-		ob.ObjectName,
+		ob.Name,
 		OutStorage,
 		ob.MD5,
 		ob.Ctime,
