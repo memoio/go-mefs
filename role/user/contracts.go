@@ -42,7 +42,7 @@ func (gp *groupService) deployUpKeepingAndChannel() error {
 	}
 
 	d := gp.storeDays
-	s := gp.storePrice
+	s := gp.storeSize
 	price := gp.storePrice
 	var moneyPerDay = new(big.Int)
 	var moneyAccount = new(big.Int)

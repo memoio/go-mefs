@@ -12,10 +12,13 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
+	inet "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 //-------Group Type------
@@ -106,6 +109,15 @@ func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
 		pc, _, _, _ := runtime.Caller(i)
 		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
 	}
+
+	pid, err := peer.IDB58Decode(to)
+	if err != nil {
+		return err
+	}
+	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
+		sc.ConnectTo(context.Background(), localNode, to)
+	}
+
 	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
 }
 
@@ -114,6 +126,13 @@ func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error)
 	for _, i := range []int{0, 1, 2, 3, 4} {
 		pc, _, _, _ := runtime.Caller(i)
 		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
+	}
+	pid, err := peer.IDB58Decode(to)
+	if err != nil {
+		return "", err
+	}
+	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
+		sc.ConnectTo(context.Background(), localNode, to)
 	}
 	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
 }
