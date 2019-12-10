@@ -26,11 +26,8 @@ import (
 	shell "github.com/memoio/mefs-go-http-client"
 )
 
-//每个用户上传对象数目
-const ObjectCount = 1
-
 //随机文件最大大小
-const randomDataSize = 1024 * 1024 * 3
+const randomDataSize = 1024 * 1024 * 10
 const bucketName = "Bucket01"
 const dataCount = 3
 const parityCount = 2
@@ -103,26 +100,24 @@ func ChallengeTest() error {
 		break
 	}
 	//然后开始上传文件
-	for j := 0; j < ObjectCount; j++ {
-		r := rand.Int63n(randomDataSize)
-		data := make([]byte, r)
-		fillRandom(data)
-		buf := bytes.NewBuffer(data)
-		objectName := addr + "_" + strconv.Itoa(int(r))
-		log.Println("Begin to upload", objectName, "Size is", ToStorageSize(r), "addr", addr)
-		beginTime := time.Now().Unix()
-		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
-		if err != nil {
-			log.Println(addr, "Upload failed", err)
-			return err
-		}
-		storagekb := float64(r) / 1024.0
-		endTime := time.Now().Unix()
-		speed := storagekb / float64(endTime-beginTime)
-		log.Println("Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
-		log.Println(ob.String() + "address: " + addr)
-
+	r := rand.Int63n(randomDataSize)
+	data := make([]byte, r)
+	fillRandom(data)
+	buf := bytes.NewBuffer(data)
+	objectName := addr + "_" + strconv.Itoa(int(r))
+	log.Println("Begin to upload", objectName, "Size is", ToStorageSize(r), "addr", addr)
+	beginTime := time.Now().Unix()
+	ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
+	if err != nil {
+		log.Println(addr, "Upload failed", err)
+		return err
 	}
+	storagekb := float64(r) / 1024.0
+	endTime := time.Now().Unix()
+	speed := storagekb / float64(endTime-beginTime)
+	log.Println("Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
+	log.Println(ob.String() + "address: " + addr)
+
 	check := 0
 	var LastChallengeTime string
 	for {
@@ -203,7 +198,23 @@ func ChallengeTest() error {
 
 	log.Println("successfully delete block :", cid, " in provider", provider)
 
-	time.Sleep(40 * time.Minute)
+	time.Sleep(1 * time.Minute)
+	// read whole file again
+	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
+	if err != nil {
+		log.Fatal("download file ", objectName, " err:", err)
+		return err
+	}
+
+	obuf := new(bytes.Buffer)
+	obuf.ReadFrom(outer)
+	if obuf.Len() != int(r) {
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", r)
+	}
+
+	log.Println("successfully get object :", objectName, " in bucket:", bucketName)
+
+	time.Sleep(39 * time.Minute)
 	//获取新的provider，从新的provider上获得块的MD5
 	var newProvider string
 	res, err := sh.GetFrom(blockMeta, keeper)
