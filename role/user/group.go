@@ -73,6 +73,11 @@ func constructGroupService(userid string, privKey []byte, duration int64, capaci
 }
 
 // startGroupService starts group
+// step1: deploy query contract
+// step2: send init message(query address) to keeper
+// step3: handle init message from keeper
+// step4: sync send notify to keeper and hanle keeper's notify
+// step5: init userconfig, deploy upkeeping contract and channel contracts(need modify)
 func (gp *groupService) startGroupService(ctx context.Context, isInit bool) error {
 	if gp == nil {
 		return ErrCannotConnectNetwork
@@ -275,18 +280,19 @@ func (gp *groupService) userInitNotif(km *metainfo.KeyMeta) {
 	var wg sync.WaitGroup
 	for _, keeper := range gp.keepers { //循环发消息
 		wg.Add(1)
-		log.Println("Notify keeper:", keeper)
+		log.Println("Notify keeper:", keeper.keeperID)
 		go func(keeper string) {
 			defer wg.Done()
 			retry := 0
 			// retry
 			for retry < 10 {
-				_, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
+				res, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
 				if err != nil {
 					retry++
 					time.Sleep(30 * time.Second)
 				} else {
-					break
+					gp.handleUserInitNotifRes(res, keeper)
+					return
 				}
 			}
 

@@ -54,8 +54,8 @@ func (gp *groupService) putUserConfig() {
 				}
 				time.Sleep(30 * time.Second)
 			}
+			break
 		}
-
 	}
 
 }

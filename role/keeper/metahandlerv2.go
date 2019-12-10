@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
@@ -33,7 +32,7 @@ func (keeper *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (str
 	case metainfo.UserInitReq: //user初始化
 		go handleUserInitReq(km, from)
 	case metainfo.UserInitNotif: //user初始化确认
-		go handleNewUserNotif(km, metaValue, from)
+		return handleNewUserNotif(km, metaValue, from)
 	case metainfo.UserDeployedContracts: //user部署好合约
 		go handleUserDeloyedContracts(km, metaValue, from)
 	case metainfo.DeleteBlock: //user删除块
@@ -143,40 +142,30 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 	sendMetaRequest(km, response, from)
 }
 
-func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) {
+func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) (string, error) {
 	log.Println("NewUserNotif", km.ToString(), metaValue, "From:", from)
 	userID := km.GetMid()
 
-	var keepers []string
-	var providers []string
-	//将value切分，生成好对应的keepers和providers列表
-	splited := strings.Split(metaValue, metainfo.DELIMITER)
-	if len(splited) < 2 {
-		log.Println("handleNewUserNotif value is not correct: ", metaValue)
-		return
-	}
-	kids := splited[0]
-	for i := 0; i < len(kids)/utils.IDLength; i++ {
-		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
-		_, err := peer.IDB58Decode(keeper)
-		if err != nil {
-			continue
-		}
-		keepers = append(keepers, keeper)
-	}
-	pids := splited[1]
-	for i := 0; i < len(pids)/utils.IDLength; i++ {
-		providerID := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
-		_, err := peer.IDB58Decode(providerID)
-		if err != nil {
-			continue
-		}
-		providers = append(providers, providerID)
+	go fillPinfo(userID, metaValue, from)
+
+	kmRes, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeBft)
+	if err != nil {
+		log.Println(err)
+		return "", err
 	}
 
-	go fillPinfo(userID, keepers, providers, from)
+	if !localPeerInfo.enableBft {
+		resValue := "simple"
+		putKeyTo(kmRes.ToString(), resValue, "local")
+		log.Println("use simple mode，userID:", userID)
+		return resValue, nil
+	}
 
-	//如果ledgerinfo中有该user的信息，则清除。
+	// todo
+	resValue := "bft|ip"
+	putKeyTo(kmRes.ToString(), resValue, "local")
+	log.Println("use bft mode，userID:", userID)
+	return resValue, nil
 }
 
 func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
