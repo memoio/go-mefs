@@ -286,12 +286,13 @@ func (gp *groupService) userInitNotif(km *metainfo.KeyMeta) {
 			retry := 0
 			// retry
 			for retry < 10 {
-				_, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
+				res, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
 				if err != nil {
 					retry++
 					time.Sleep(30 * time.Second)
 				} else {
-					break
+					gp.handleUserInitNotifRes(res, keeper)
+					return
 				}
 			}
 

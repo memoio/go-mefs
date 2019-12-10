@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -157,7 +159,36 @@ func initUserInfo(groupid string, keepers, providers []string) (*groupsInfo, err
 
 // fillPinfo fill user's uInfo, groupsInfo in ukpMap
 // not get upkeeping contract
-func fillPinfo(groupid string, keepers, providers []string, from string) {
+func fillPinfo(groupid string, metaValue string, from string) {
+
+	var keepers []string
+	var providers []string
+	//将value切分，生成好对应的keepers和providers列表
+	splited := strings.Split(metaValue, metainfo.DELIMITER)
+	if len(splited) < 2 {
+		log.Println("handleNewUserNotif value is not correct: ", metaValue)
+		return
+	}
+	kids := splited[0]
+	for i := 0; i < len(kids)/utils.IDLength; i++ {
+		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+		_, err := peer.IDB58Decode(keeper)
+		if err != nil {
+			continue
+		}
+		keepers = append(keepers, keeper)
+	}
+
+	pids := splited[1]
+	for i := 0; i < len(pids)/utils.IDLength; i++ {
+		providerID := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
+		_, err := peer.IDB58Decode(providerID)
+		if err != nil {
+			continue
+		}
+		providers = append(providers, providerID)
+	}
+
 	tempInfo, err := initUserInfo(groupid, keepers, providers)
 	if err != nil {
 		return
@@ -175,16 +206,16 @@ func fillPinfo(groupid string, keepers, providers []string, from string) {
 		return
 	}
 
-	var pids strings.Builder
+	var pidstrings strings.Builder
 	for _, keeperID := range tempInfo.keepers {
-		pids.WriteString(keeperID)
+		pidstrings.WriteString(keeperID)
 	}
 
-	putKeyTo(kmKid.ToString(), pids.String(), "local")
+	putKeyTo(kmKid.ToString(), pidstrings.String(), "local")
 
-	pids.Reset()
+	pidstrings.Reset()
 	for _, proID := range tempInfo.providers {
-		pids.WriteString(proID)
+		pidstrings.WriteString(proID)
 		// replace ledgerinfo
 		thisPU := puKey{
 			uid: groupid,
@@ -194,23 +225,7 @@ func fillPinfo(groupid string, keepers, providers []string, from string) {
 		ledgerInfo.Store(thisPU, newChal)
 	}
 
-	putKeyTo(kmPid.ToString(), pids.String(), "local")
-
-	if !localPeerInfo.enableBft {
-		kmRes, err := metainfo.NewKeyMeta(groupid, metainfo.Local, metainfo.SyncTypeBft)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		resValue := "simple"
-		putKeyTo(kmRes.ToString(), resValue, "local")
-		kmRes.SetKeyType(metainfo.UserInitNotifRes)
-		_, err = sendMetaRequest(kmRes, resValue, from)
-		if err != nil {
-			log.Println(err)
-		}
-		log.Println("use simple mode，userID:", groupid)
-	}
+	putKeyTo(kmPid.ToString(), pidstrings.String(), "local")
 
 	return
 }
