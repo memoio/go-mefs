@@ -168,8 +168,6 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	chaltime := ops[0]
 	uid := km.GetMid()
 
-	log.Println("handle proof of ", uid, "from provider: ", pid)
-
 	pu := puKey{
 		pid: pid,
 		uid: uid,
@@ -218,7 +216,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 
 	set := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
-		log.Println("Fault or NotFound blocks :", splitedindex)
+		log.Println("Fault or NotFound blocks :", uid, metainfo.BLOCK_DELIMITER, splitedindex)
 		reduceCredit(pid)
 		for _, s := range splitedindex {
 			if len(s) == 0 {
@@ -275,13 +273,13 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 
 	res, err := mcl.VerifyProof(pubKey, chal, blsProof)
 	if err != nil {
-		log.Println("mcl.VerifyProof err: ", err)
+		log.Println("handle proof of ", uid, "from provider: ", pid, "verify err:", err)
 		return
 	}
 	if res {
-		log.Println("verify success: ", uid)
+		log.Println("handle proof of ", uid, "from provider: ", pid, " verify success.")
 
-		//update thischalinfo.cidMap;
+		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
 		thischalinfo.cidMap.Range(func(k, v interface{}) bool {
 			_, ok := set[k.(string)]
@@ -302,7 +300,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		// TODO: store in disk
 		addCredit(pid)
 	} else {
-		log.Println("verify failed cid: ", chal.Indices)
+		log.Println("handle proof of ", uid, "from provider: ", pid, " verify fail.")
 		reduceCredit(pid)
 	}
 

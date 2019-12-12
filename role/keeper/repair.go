@@ -31,6 +31,7 @@ func checkLedger(ctx context.Context) {
 }
 
 func doCheckLedgerForRepair() {
+	log.Println("Repair starts!")
 	pus := getPUKeysFromukpInfo()
 	for _, pu := range pus {
 		// not repair pos blocks
@@ -51,35 +52,40 @@ func doCheckLedgerForRepair() {
 		thischalinfo := thisInfo.(*chalinfo)
 
 		thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-			eclasped := utils.GetUnixNow() - value.(*cidInfo).availtime
-			switch value.(*cidInfo).repair {
+			thisinfo := value.(*cidInfo)
+			eclasped := utils.GetUnixNow() - thisinfo.availtime
+			switch thisinfo.repair {
 			case 0:
 				if EXPIRETIME < eclasped {
-					log.Println("Need repair cid first time: ", key.(string))
-					value.(*cidInfo).repair++
-					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+					log.Println("Need repair cid first time: ", cid)
+					thisinfo.repair++
+					repch <- cid
 				}
 			case 1:
 				if 4*EXPIRETIME < eclasped {
-					log.Println("Need repair cid second time: ", key.(string))
-					value.(*cidInfo).repair++
-					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+					log.Println("Need repair cid second time: ", cid)
+					thisinfo.repair++
+					repch <- cid
 				}
 			case 2:
 				if 16*EXPIRETIME < eclasped {
-					log.Println("Need repair cid third time: ", key.(string))
-					value.(*cidInfo).repair++
-					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+					log.Println("Need repair cid third time: ", cid)
+					thisinfo.repair++
+					repch <- cid
 				}
 			default:
 				// > 30 days; we donnot repair
 				if 480*EXPIRETIME >= eclasped {
 					// try every 32 hours
-					if int64(64*value.(*cidInfo).repair-2)*EXPIRETIME < eclasped {
-						repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
-						value.(*cidInfo).repair++
+					if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+						cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+						log.Println("Need repair cid tried: ", cid)
+						thisinfo.repair++
+						repch <- cid
 					}
-
 				}
 			}
 

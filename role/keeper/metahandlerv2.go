@@ -296,6 +296,7 @@ func handleDeleteBlockMeta(km *metainfo.KeyMeta) { //立即删除某些块的元
 		log.Println("handleDeleteBlockMeta err: ", err)
 		return
 	}
+
 	splitedValue := strings.Split(string(metavalueByte), metainfo.DELIMITER)
 	if len(splitedValue) < 2 {
 		log.Println("handleDeleteBlockMeta err: ", metainfo.ErrIllegalValue)
