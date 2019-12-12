@@ -214,7 +214,10 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 
 	chal.C = chalResult.h
 
+	// key: bucketid_stripeid_blockid_offset
 	set := make(map[string]struct{}, len(splitedindex))
+	// key: bucketid_stripeid_blockid
+	cset := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
 		log.Println("Fault or NotFound blocks :", uid, metainfo.BLOCK_DELIMITER, splitedindex)
 		reduceCredit(pid)
@@ -223,6 +226,12 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 				continue
 			}
 			set[s] = struct{}{}
+			chcid, _, err := utils.SplitIndex(s)
+			if err != nil {
+				log.Println("SplitIndex err:", err)
+				continue
+			}
+			cset[chcid] = struct{}{}
 		}
 	}
 
@@ -282,7 +291,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
 		thischalinfo.cidMap.Range(func(k, v interface{}) bool {
-			_, ok := set[k.(string)]
+			_, ok := cset[k.(string)]
 			if ok {
 				return true
 			}
