@@ -2,7 +2,7 @@ package main
 
 import (
 	plugin "github.com/memoio/go-mefs/source/metb-plugins/browser"
-	testbedi "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/testbed/interfaces"
+	testbedi "github.com/memoio/go-mefs/source/metb-plugins/cli/testbed/interfaces"
 )
 
 var PluginName string

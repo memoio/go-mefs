@@ -16,7 +16,7 @@ import (
 
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	client "github.com/libp2p/go-libp2p-daemon/p2pclient"
-	testbedi "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/testbed/interfaces"
+	testbedi "github.com/memoio/go-mefs/source/metb-plugins/cli/testbed/interfaces"
 	ma "github.com/multiformats/go-multiaddr"
 )
 

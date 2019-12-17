@@ -21,8 +21,8 @@ import (
 	cnet "github.com/whyrusleeping/go-ctrlnet"
 
 	ipfs "github.com/memoio/go-mefs/source/metb-plugins"
-	testbedi "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/testbed/interfaces"
-	metbutil "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/util"
+	testbedi "github.com/memoio/go-mefs/source/metb-plugins/cli/testbed/interfaces"
+	metbutil "github.com/memoio/go-mefs/source/metb-plugins/cli/util"
 )
 
 var ErrTimeout = errors.New("timeout")
