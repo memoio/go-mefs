@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	cli "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/cli"
-	testbed "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/testbed"
+	cli "github.com/memoio/go-mefs/source/metb-plugins/cli/cli"
+	testbed "github.com/memoio/go-mefs/source/metb-plugins/cli/testbed"
 
 	browser "github.com/memoio/go-mefs/source/metb-plugins/browser"
 	docker "github.com/memoio/go-mefs/source/metb-plugins/docker"

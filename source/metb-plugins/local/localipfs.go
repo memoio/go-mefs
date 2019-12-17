@@ -14,8 +14,8 @@ import (
 	"time"
 
 	ipfs "github.com/memoio/go-mefs/source/metb-plugins"
-	testbedi "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/testbed/interfaces"
-	metbutil "github.com/memoio/go-mefs/source/metb-plugins/metb-cli/util"
+	testbedi "github.com/memoio/go-mefs/source/metb-plugins/cli/testbed/interfaces"
+	metbutil "github.com/memoio/go-mefs/source/metb-plugins/cli/util"
 
 	config "github.com/memoio/go-mefs/config"
 	serial "github.com/memoio/go-mefs/config/serialize"
