@@ -118,6 +118,7 @@ func repairBlock(ctx context.Context, blockID string) {
 	var cpids, ugid []string
 	var response string
 
+	// uid_bid_sid_bid
 	blkinfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
 	if len(blkinfo) < 4 {
 		return
@@ -130,7 +131,7 @@ func repairBlock(ctx context.Context, blockID string) {
 		return
 	}
 
-	cidPrefix := strings.Join(blkinfo[1:2], metainfo.BLOCK_DELIMITER)
+	cidPrefix := strings.Join(blkinfo[1:3], metainfo.BLOCK_DELIMITER)
 
 	for i := 0; i < int(thisbucket.dataCount+thisbucket.parityCount); i++ {
 		blockid := cidPrefix + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
