@@ -157,15 +157,12 @@ func repairBlock(ctx context.Context, blockID string) {
 
 	if len(response) > 0 {
 		if !sc.ConnectTo(ctx, localNode, response) {
-			response = ""
-		}
-	}
-
-	if response == "" {
-		response = SearchNewProvider(ctx, userID, ugid)
-		if response == "" {
-			log.Println("Repair failed, no extra provider")
-			return
+			log.Println("Repair: need choose a new provider to replace old: ", response)
+			response = SearchNewProvider(ctx, userID, ugid)
+			if response == "" {
+				log.Println("Repair failed, no available provider")
+				return
+			}
 		}
 	}
 
@@ -178,7 +175,7 @@ func repairBlock(ctx context.Context, blockID string) {
 		return
 	}
 
-	log.Println("cpids: ", cpids, "\nrpids: ", metaValue, " \nrepairs on: ", response)
+	log.Println("cpids: ", cpids, " ,rpids: ", metaValue, ",repairs on: ", response)
 	_, err = sendMetaRequest(km, metaValue, response)
 	if err != nil {
 		log.Println("err: ", err)
@@ -268,7 +265,7 @@ func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
 		}
 
 		if flag == len(ugid) {
-			if sc.ConnectTo(ctx, localNode, response) {
+			if sc.ConnectTo(ctx, localNode, tmpPro) {
 				response = tmpPro
 				break
 			}
