@@ -106,13 +106,13 @@ func GetCidFromBlock(key string) (string, error) {
 // GetIDsFromBlock returns bucketid;
 // if key == uid_bucketid_sid_blockid, returns bucketid
 // if key == bucketid_sid_blockid, returns bucketid
-func GetIDsFromBlock(key string) (string, string, error) {
+func GetIDsFromBlock(key string) (string, string, string, error) {
 	splitedKey := strings.Split(key, BLOCK_DELIMITER)
 	if len(splitedKey) == 3 {
-		return splitedKey[0], splitedKey[1], nil
+		return splitedKey[0], splitedKey[1], splitedKey[2], nil
 	}
 	if len(splitedKey) == 4 {
-		return splitedKey[1], splitedKey[2], nil
+		return splitedKey[1], splitedKey[2], splitedKey[3], nil
 	}
-	return "", "", ErrIllegalKey
+	return "", "", "", ErrIllegalKey
 }

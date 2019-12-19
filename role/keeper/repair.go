@@ -133,7 +133,7 @@ func repairBlock(ctx context.Context, blockID string) {
 
 	cidPrefix := strings.Join(blkinfo[1:3], metainfo.BLOCK_DELIMITER)
 
-	for i := 0; i < int(thisbucket.dataCount+thisbucket.parityCount); i++ {
+	for i := 0; i < int(thisbucket.chunkNum); i++ {
 		blockid := cidPrefix + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
 		thisinfo, ok := thisbucket.stripes.Load(blockid)
 		if !ok {
@@ -155,14 +155,23 @@ func repairBlock(ctx context.Context, blockID string) {
 		ugid = append(ugid, pid)
 	}
 
+	if len(ugid) == 0 {
+		log.Println("Repair: no enough informations")
+		return
+	}
+
 	if len(response) > 0 {
 		if !sc.ConnectTo(ctx, localNode, response) {
 			log.Println("Repair: need choose a new provider to replace old: ", response)
-			response = SearchNewProvider(ctx, userID, ugid)
-			if response == "" {
-				log.Println("Repair failed, no available provider")
-				return
-			}
+			response = ""
+		}
+	}
+
+	if len(response) == 0 || response == "" {
+		response = SearchNewProvider(ctx, userID, ugid)
+		if response == "" {
+			log.Println("Repair failed, no available provider")
+			return
 		}
 	}
 

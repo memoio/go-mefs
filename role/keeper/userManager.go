@@ -23,6 +23,7 @@ type bucketInfo struct {
 	bucketID       int32
 	dataCount      int32
 	parityCount    int32
+	chunkNum       int32 // = dataCount+parityCount
 	largestStripes int32
 	stripes        sync.Map // key is cid, value is *cidInfo
 }
