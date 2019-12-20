@@ -31,6 +31,7 @@ func checkLedger(ctx context.Context) {
 }
 
 func doCheckLedgerForRepair() {
+	log.Println("Repair starts!")
 	pus := getPUKeysFromukpInfo()
 	for _, pu := range pus {
 		// not repair pos blocks
@@ -51,35 +52,40 @@ func doCheckLedgerForRepair() {
 		thischalinfo := thisInfo.(*chalinfo)
 
 		thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-			eclasped := utils.GetUnixNow() - value.(*cidInfo).availtime
-			switch value.(*cidInfo).repair {
+			thisinfo := value.(*cidInfo)
+			eclasped := utils.GetUnixNow() - thisinfo.availtime
+			switch thisinfo.repair {
 			case 0:
 				if EXPIRETIME < eclasped {
-					log.Println("Need repair cid first time: ", key.(string))
-					value.(*cidInfo).repair++
-					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+					log.Println("Need repair cid first time: ", cid)
+					thisinfo.repair++
+					repch <- cid
 				}
 			case 1:
 				if 4*EXPIRETIME < eclasped {
-					log.Println("Need repair cid second time: ", key.(string))
-					value.(*cidInfo).repair++
-					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+					log.Println("Need repair cid second time: ", cid)
+					thisinfo.repair++
+					repch <- cid
 				}
 			case 2:
 				if 16*EXPIRETIME < eclasped {
-					log.Println("Need repair cid third time: ", key.(string))
-					value.(*cidInfo).repair++
-					repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
+					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+					log.Println("Need repair cid third time: ", cid)
+					thisinfo.repair++
+					repch <- cid
 				}
 			default:
 				// > 30 days; we donnot repair
 				if 480*EXPIRETIME >= eclasped {
 					// try every 32 hours
-					if int64(64*value.(*cidInfo).repair-2)*EXPIRETIME < eclasped {
-						repch <- (pu.uid + metainfo.BLOCK_DELIMITER + key.(string))
-						value.(*cidInfo).repair++
+					if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+						cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+						log.Println("Need repair cid tried: ", cid)
+						thisinfo.repair++
+						repch <- cid
 					}
-
 				}
 			}
 
@@ -112,6 +118,7 @@ func repairBlock(ctx context.Context, blockID string) {
 	var cpids, ugid []string
 	var response string
 
+	// uid_bid_sid_bid
 	blkinfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
 	if len(blkinfo) < 4 {
 		return
@@ -124,9 +131,9 @@ func repairBlock(ctx context.Context, blockID string) {
 		return
 	}
 
-	cidPrefix := strings.Join(blkinfo[1:2], metainfo.BLOCK_DELIMITER)
+	cidPrefix := strings.Join(blkinfo[1:3], metainfo.BLOCK_DELIMITER)
 
-	for i := 0; i < int(thisbucket.dataCount+thisbucket.parityCount); i++ {
+	for i := 0; i < int(thisbucket.chunkNum); i++ {
 		blockid := cidPrefix + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
 		thisinfo, ok := thisbucket.stripes.Load(blockid)
 		if !ok {
@@ -148,16 +155,22 @@ func repairBlock(ctx context.Context, blockID string) {
 		ugid = append(ugid, pid)
 	}
 
+	if len(ugid) == 0 {
+		log.Println("Repair: no enough informations")
+		return
+	}
+
 	if len(response) > 0 {
 		if !sc.ConnectTo(ctx, localNode, response) {
+			log.Println("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
 	}
 
-	if response == "" {
+	if len(response) == 0 || response == "" {
 		response = SearchNewProvider(ctx, userID, ugid)
 		if response == "" {
-			log.Println("Repair failed, no extra provider")
+			log.Println("Repair failed, no available provider")
 			return
 		}
 	}
@@ -171,7 +184,7 @@ func repairBlock(ctx context.Context, blockID string) {
 		return
 	}
 
-	log.Println("cpids: ", cpids, "\nrpids: ", metaValue, " \nrepairs on: ", response)
+	log.Println("cpids: ", cpids, " ,rpids: ", metaValue, ",repairs on: ", response)
 	_, err = sendMetaRequest(km, metaValue, response)
 	if err != nil {
 		log.Println("err: ", err)
@@ -261,7 +274,7 @@ func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
 		}
 
 		if flag == len(ugid) {
-			if sc.ConnectTo(ctx, localNode, response) {
+			if sc.ConnectTo(ctx, localNode, tmpPro) {
 				response = tmpPro
 				break
 			}

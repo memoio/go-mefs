@@ -78,7 +78,7 @@ func (api *BlockAPI) GetFrom(ctx context.Context, p string, peerid string) (io.R
 		return nil, err
 	}
 	b, err := api.node.Blocks.GetBlockFrom(ctx, peerid, p, 2*time.Minute, sig)
-	if b == nil && err != nil {
+	if err != nil || b == nil {
 		return nil, err
 	}
 

@@ -96,10 +96,11 @@ func userNewInit(userID string, keeperCount, providerCount int, price int64) (st
 
 func fillUserInfo(groupid string, keepers, providers []string) (*groupsInfo, error) {
 	tempInfo := &groupsInfo{
-		keepers:     keepers,
-		providers:   providers,
-		userID:      groupid,
-		localKeeper: groupid,
+		keepers:      keepers,
+		providers:    providers,
+		userID:       groupid,
+		localKeeper:  groupid,
+		masterKeeper: groupid,
 	}
 
 	saveUpkeepingToGP(groupid, tempInfo)
@@ -134,10 +135,11 @@ func fillUserInfo(groupid string, keepers, providers []string) (*groupsInfo, err
 
 func initUserInfo(groupid string, keepers, providers []string) (*groupsInfo, error) {
 	tempInfo := &groupsInfo{
-		keepers:     keepers,
-		providers:   providers,
-		userID:      groupid,
-		localKeeper: groupid,
+		keepers:      keepers,
+		providers:    providers,
+		userID:       groupid,
+		localKeeper:  groupid,
+		masterKeeper: groupid,
 	}
 
 	localID := localNode.Identity.Pretty()

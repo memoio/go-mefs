@@ -43,97 +43,100 @@ func spaceTimePayRegular(ctx context.Context) {
 func spaceTimePay() {
 	pus := getPUKeysFromukpInfo()
 	for _, pu := range pus {
-		if isMasterKeeper(pu.uid, pu.pid) { //only master pay
-			log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
-			defer log.Println("========spacetimepay========")
-
-			log.Printf("userid:%s:\npid:%s\n", pu.uid, pu.pid)
-			ukItem, err := getUpkeeping(pu.uid)
-			if err != nil {
-				log.Println("contracts.GetUKItem err: ", err)
-				return
-			}
-
-			// TODO: exit when balance is too low
-			ukBalance, err := contracts.QueryBalance(ukItem.UpKeepingAddr)
-			if err != nil {
-				log.Println("contracts.QueryBalance() err: ", err)
-				return
-			}
-			log.Printf("ukaddr:%s has balance:%s\n", ukItem.UpKeepingAddr, ukBalance.String())
-
-			// check again
-			found := false
-			for _, ProID := range ukItem.ProviderIDs {
-				if pu.pid == ProID {
-					found = true
-					break
-				}
-			}
-
-			// PosAdd
-			if !found {
-				if pu.uid == pos.GetPosId() {
-					providerAddr, err := ad.GetAddressFromID(pu.pid)
-					if err != nil {
-						return
-					}
-
-					userAddr, err := ad.GetAddressFromID(pos.GetPosId())
-					if err != nil {
-						return
-					}
-					err = contracts.AddProvider(pos.PosSkStr, userAddr, []common.Address{providerAddr})
-					if err != nil {
-						log.Println("st AddProvider() error", err)
-						return
-					}
-
-					saveUpkeeping(pu.uid, true)
-				} else {
-					continue
-				}
-			}
-
-			price := ukItem.Price
-			if pu.uid == pos.GetPosId() {
-				price = pos.GetPosPrice()
-			}
-
-			startTime := checkLastPayTime(pu)
-			spaceTime, lastTime := resultSummary(pu, startTime, utils.GetUnixNow())
-			amount := convertSpacetime(spaceTime, price)
-			if amount.Sign() > 0 {
-				pAddr, _ := ad.GetAddressFromID(pu.pid) //providerAddress
-				scGroupid, _ := ad.GetAddressFromID(pu.uid)
-				ukAddr := common.HexToAddress(ukItem.UpKeepingAddr[2:])
-				skByte, _ := localNode.PrivateKey.Bytes()
-				ipfsSk := base64.StdEncoding.EncodeToString(skByte)
-				hexSk, err := utils.IPFSskToEthsk(ipfsSk)
-				if err != nil {
-					log.Println("GetHexSk failed: ", err)
-					return
-				}
-				log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
-
-				err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, hexSk, amount) //进行支付
-				if err != nil {
-					log.Println("contracts.SpaceTimePay() failed: ", err)
-					return
-				}
-			}
-
-			km, metaValue, err := saveLastPay(pu, "signature", "proof", startTime, lastTime, spaceTime)
-			if err != nil {
-				log.Println("saveLastPay() failed: ", err)
-				return
-			}
-			if amount.Sign() > 0 {
-				km.SetKeyType(metainfo.Sync)
-				metaSyncTo(km, metaValue) //send this value to other keepers
-			}
-			log.Println("spaceTimePay complete!")
+		//only master pay
+		if !isMasterKeeper(pu.uid, pu.pid) {
+			continue
 		}
+
+		log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
+		defer log.Println("========spacetimepay========")
+
+		log.Printf("userid:%s:\npid:%s\n", pu.uid, pu.pid)
+		ukItem, err := getUpkeeping(pu.uid)
+		if err != nil {
+			log.Println("contracts.GetUKItem err: ", err)
+			return
+		}
+
+		// TODO: exit when balance is too low
+		ukBalance, err := contracts.QueryBalance(ukItem.UpKeepingAddr)
+		if err != nil {
+			log.Println("contracts.QueryBalance() err: ", err)
+			return
+		}
+		log.Printf("ukaddr:%s has balance:%s\n", ukItem.UpKeepingAddr, ukBalance.String())
+
+		// check again
+		found := false
+		for _, ProID := range ukItem.ProviderIDs {
+			if pu.pid == ProID {
+				found = true
+				break
+			}
+		}
+
+		// PosAdd
+		if !found {
+			if pu.uid == pos.GetPosId() {
+				providerAddr, err := ad.GetAddressFromID(pu.pid)
+				if err != nil {
+					return
+				}
+
+				userAddr, err := ad.GetAddressFromID(pos.GetPosId())
+				if err != nil {
+					return
+				}
+				err = contracts.AddProvider(pos.PosSkStr, userAddr, []common.Address{providerAddr})
+				if err != nil {
+					log.Println("st AddProvider() error", err)
+					return
+				}
+
+				saveUpkeeping(pu.uid, true)
+			} else {
+				continue
+			}
+		}
+
+		price := ukItem.Price
+		if pu.uid == pos.GetPosId() {
+			price = pos.GetPosPrice()
+		}
+
+		startTime := checkLastPayTime(pu)
+		spaceTime, lastTime := resultSummary(pu, startTime, utils.GetUnixNow())
+		amount := convertSpacetime(spaceTime, price)
+		if amount.Sign() > 0 {
+			pAddr, _ := ad.GetAddressFromID(pu.pid) //providerAddress
+			scGroupid, _ := ad.GetAddressFromID(pu.uid)
+			ukAddr := common.HexToAddress(ukItem.UpKeepingAddr[2:])
+			skByte, _ := localNode.PrivateKey.Bytes()
+			ipfsSk := base64.StdEncoding.EncodeToString(skByte)
+			hexSk, err := utils.IPFSskToEthsk(ipfsSk)
+			if err != nil {
+				log.Println("GetHexSk failed: ", err)
+				return
+			}
+			log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
+
+			err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, hexSk, amount) //进行支付
+			if err != nil {
+				log.Println("contracts.SpaceTimePay() failed: ", err)
+				return
+			}
+		}
+
+		km, metaValue, err := saveLastPay(pu, "signature", "proof", startTime, lastTime, spaceTime)
+		if err != nil {
+			log.Println("saveLastPay() failed: ", err)
+			return
+		}
+		if amount.Sign() > 0 {
+			km.SetKeyType(metainfo.Sync)
+			metaSyncTo(km, metaValue) //send this value to other keepers
+		}
+		log.Println("spaceTimePay complete!")
 	}
 }
 

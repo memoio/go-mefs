@@ -192,7 +192,7 @@ func ChallengeTest() error {
 	time.Sleep(2 * time.Minute)
 	nret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if nret != "" && err == nil {
-		log.Println("get block from provider")
+		log.Println("get block from provider: ", provider, " expcted not")
 		return err
 	}
 
@@ -231,6 +231,7 @@ func ChallengeTest() error {
 		log.Println("get block from new provider error :", err)
 		return err
 	}
+
 	log.Println("md5 of repaired block`s rawdata :", newRet)
 	if ret == newRet {
 		log.Println("Repair success")
@@ -340,15 +341,13 @@ func queryBalance(addr string) *big.Int {
 
 func getBlock(sh *shell.Shell, cid, provider string) (string, error) {
 	i := 0
-	var err error
 	for i < 10 {
 		ret, err := sh.GetBlockFrom(cid, provider)
-		if err == nil {
+		if err == nil && ret != "" {
 			log.Println("Getblock success in ", i+1, " try")
 			return ret, nil
 		}
-		log.Println("get block failed, now try again")
 		i++
 	}
-	return "", err
+	return "", errors.New("Tried Too Many Times")
 }

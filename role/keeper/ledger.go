@@ -163,7 +163,7 @@ func doAddCidinfotoLedger(uid, pid, cidString string, newCidinfo *cidInfo) (*cid
 }
 
 func doAddBlocktoBucket(uid, cid string, newcidinfo *cidInfo) error {
-	bid, sid, err := metainfo.GetIDsFromBlock(cid)
+	bid, sid, chunkID, err := metainfo.GetIDsFromBlock(cid)
 	if err != nil {
 		return err
 	}
@@ -182,6 +182,15 @@ func doAddBlocktoBucket(uid, cid string, newcidinfo *cidInfo) error {
 
 	if int32(snum) > thisBucketinfo.largestStripes {
 		thisBucketinfo.largestStripes = int32(snum)
+	}
+
+	cnum, err := strconv.Atoi(chunkID)
+	if err != nil {
+		return err
+	}
+
+	if int32(cnum) > thisBucketinfo.chunkNum {
+		thisBucketinfo.chunkNum = int32(cnum)
 	}
 
 	return nil
@@ -212,7 +221,7 @@ func deleteBlockInLedger(uid, pid, cidString string) {
 }
 
 func deleteBlockFromBucket(uid, cidString string) {
-	bid, _, err := metainfo.GetIDsFromBlock(cidString)
+	bid, _, _, err := metainfo.GetIDsFromBlock(cidString)
 	if err != nil {
 		return
 	}
