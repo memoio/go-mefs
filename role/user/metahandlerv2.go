@@ -23,7 +23,7 @@ func (user *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (strin
 
 	gService := getGroup(km.GetMid())
 	if gService == nil {
-		return "", ErrGroupServiceNotReady
+		return "", ErrLfsServiceNotReady
 	}
 
 	switch keytype {

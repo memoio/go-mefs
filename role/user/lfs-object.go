@@ -12,7 +12,7 @@ import (
 )
 
 // DeleteObject deletes a object in lfs
-func (l *lfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
+func (l *LfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (l *lfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, e
 }
 
 // HeadObject get the info of an object
-func (l *lfsInfo) HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, string, error) {
+func (l *LfsInfo) HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, string, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, "", err
@@ -91,7 +91,7 @@ func (l *lfsInfo) HeadObject(bucketName, objectName string, avail bool) (*pb.Obj
 }
 
 // ListObject lists all objects of a bucket
-func (l *lfsInfo) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
+func (l *LfsInfo) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, nil, err
@@ -133,7 +133,7 @@ func (l *lfsInfo) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectIn
 }
 
 // ShowStorageSpaceAll show lfs used space without appointed bucket
-func (l *lfsInfo) ShowStorageSpaceAll() ([]uint64, error) {
+func (l *LfsInfo) ShowStorageSpaceAll() ([]uint64, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (l *lfsInfo) ShowStorageSpaceAll() ([]uint64, error) {
 }
 
 // ShowStorageSpace show lfs used space
-func (l *lfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
+func (l *LfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return 0, err
@@ -198,7 +198,7 @@ func (l *lfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
 	return storageSpace, nil
 }
 
-func (l *lfsInfo) getLastChalTime(blockID string) (time.Time, error) {
+func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
 	gp := getGroup(l.userid)
 	_, conkeepers, err := gp.getKeepers(-1)
@@ -230,7 +230,7 @@ func (l *lfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 }
 
 // GetObjectAvailTime get available time of objects
-func (l *lfsInfo) GetObjectAvailTime(object *objectInfo) (string, error) {
+func (l *LfsInfo) GetObjectAvailTime(object *objectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := l.meta.bucketByID[object.BucketID]
 	blockCount := bucket.DataCount + bucket.ParityCount

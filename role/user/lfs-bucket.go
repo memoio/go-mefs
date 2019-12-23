@@ -11,7 +11,7 @@ import (
 )
 
 // CreateBucket create a bucket for a specified LFSservice
-func (l *lfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
+func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
 	// TODO judge datacount + parity count <= providers
 
 	err := IsOnline(l.userid)
@@ -76,7 +76,7 @@ func (l *lfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 }
 
 // DeleteBucket deletes a bucket from a specified LFSservice
-func (l *lfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
+func (l *LfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (l *lfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 }
 
 // HeadBucket get a superBucket's metainfo
-func (l *lfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
+func (l *LfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (l *lfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 }
 
 // ListBucket lists all superBucket in a lfsservice
-func (l *lfsInfo) ListBucket(pre string) ([]*pb.BucketInfo, error) {
+func (l *LfsInfo) ListBucket(pre string) ([]*pb.BucketInfo, error) {
 	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err

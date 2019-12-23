@@ -24,7 +24,7 @@ const metaTagFlag = dataformat.BLS12
 //----------------------Flush superBlock---------------------------
 
 //刷新超级块
-func (l *lfsInfo) flushSuperBlock() error {
+func (l *LfsInfo) flushSuperBlock() error {
 	err := l.flushSuperBlockLocal()
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (l *lfsInfo) flushSuperBlock() error {
 }
 
 //保存超级块信息到本地，传入参数为超级快结构体
-func (l *lfsInfo) flushSuperBlockLocal() error {
+func (l *LfsInfo) flushSuperBlockLocal() error {
 	sb := l.meta.sb
 	sb.BucketsSet = sb.bitsetInfo.Bytes()
 	SbBuffer := bytes.NewBuffer(nil)
@@ -81,7 +81,7 @@ func (l *lfsInfo) flushSuperBlockLocal() error {
 	return nil
 }
 
-func (l *lfsInfo) flushSuperBlockToProvider() error {
+func (l *LfsInfo) flushSuperBlockToProvider() error {
 	sb := l.meta.sb
 	sb.BucketsSet = sb.bitsetInfo.Bytes()
 	SbBuffer := bytes.NewBuffer(nil)
@@ -133,7 +133,7 @@ func (l *lfsInfo) flushSuperBlockToProvider() error {
 		if err != nil {
 			return err
 		}
-		err = getGroup(l.userid).putDataMetaToKeepers(ncid, providers[j], int(offset))
+		err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (l *lfsInfo) flushSuperBlockToProvider() error {
 
 //-----------------------Flush BucketMeta----------------------------
 
-func (l *lfsInfo) flushBucketInfo(bucket *superBucket) error {
+func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 	err := l.flushBucketInfoLocal(bucket)
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func (l *lfsInfo) flushBucketInfo(bucket *superBucket) error {
 	return l.flushBucketInfoToProvider(bucket)
 }
 
-func (l *lfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
+func (l *LfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
 	BucketBuffer := bytes.NewBuffer(nil)
@@ -191,7 +191,7 @@ func (l *lfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
 	return nil
 }
 
-func (l *lfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
+func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
 	MetaBackupCount := l.meta.sb.MetaBackupCount
@@ -230,7 +230,7 @@ func (l *lfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 		if err != nil {
 			return err
 		}
-		err = getGroup(l.userid).putDataMetaToKeepers(ncid, providers[j], int(offset))
+		err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))
 		if err != nil {
 			return err
 		}
@@ -245,7 +245,7 @@ func (l *lfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 //---------------------Flush objects' Meta for given superBucket--------
 
 //刷新具体某一个Bucket的object数据
-func (l *lfsInfo) flushObjectsInfo(bucket *superBucket) error {
+func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 	if bucket == nil || bucket.objects == nil {
 		return nil
 	}
@@ -256,7 +256,7 @@ func (l *lfsInfo) flushObjectsInfo(bucket *superBucket) error {
 	return l.flushObjectsInfoToProvider(bucket)
 }
 
-func (l *lfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
+func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 	if bucket == nil || bucket.objects == nil {
 		return nil
 	}
@@ -348,7 +348,7 @@ func (l *lfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 	return nil
 }
 
-func (l *lfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
+func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 	if bucket == nil || bucket.objects == nil {
 		return nil
 	}
@@ -396,7 +396,7 @@ func (l *lfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 					return err
 				}
 
-				err = getGroup(l.userid).putDataMetaToKeepers(ncid, providers[j], int(offset))
+				err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))
 				if err != nil {
 					return err
 				}
@@ -441,7 +441,7 @@ func (l *lfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 				return err
 			}
 
-			err = getGroup(l.userid).putDataMetaToKeepers(ncid, providers[j], int(offset))
+			err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))
 			if err != nil {
 				return err
 			}
@@ -458,7 +458,7 @@ func (l *lfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 //--------------------Load superBlock--------------------------
 //lfs启动时加载超级块操作，返回结构体Meta,主要填充其中的superblock字段
 //先从本地查找超级快信息，若没找到，就找自己的provider获取
-func (l *lfsInfo) loadSuperBlock() (*lfsMeta, error) {
+func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 	log.Println("Begin to load superblock : ", l.userid)
 	var b blocks.Block
 	var err error
@@ -544,21 +544,10 @@ func (l *lfsInfo) loadSuperBlock() (*lfsMeta, error) {
 
 //----------------------------Load BucketInfo-----------------------------------
 //lfs启动进行元数据的加载，对Log中的字段进行初始化 填充除superblock、Entries字段之外的字段
-func (l *lfsInfo) loadBucketInfo() error {
+func (l *LfsInfo) loadBucketInfo() error {
 	sig, err := BuildSignMessage()
 	if err != nil {
 		return err
-	}
-
-	state, err := getState(l.userid)
-	if err != nil {
-		return err
-	}
-	if state < groupStarted {
-		return ErrGroupServiceNotReady
-	}
-	if getGroup(l.userid).getKeyset() == nil {
-		return ErrKeySetIsNil
 	}
 
 	for bucketID, ok := l.meta.sb.bitsetInfo.NextSet(0); ok; bucketID, ok = l.meta.sb.bitsetInfo.NextSet(bucketID + 1) {
@@ -631,20 +620,10 @@ func (l *lfsInfo) loadBucketInfo() error {
 
 //------------------------------Load Objectinfo---------------------------------------
 //填充Entries字段，传入参数为bucket,记录传入bucket的数据信息
-func (l *lfsInfo) loadObjectsInfo(bucket *superBucket) error {
+func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 	sig, err := BuildSignMessage()
 	if err != nil {
 		return err
-	}
-	state, err := getState(l.userid)
-	if err != nil {
-		return err
-	}
-	if state < groupStarted {
-		return ErrGroupServiceNotReady
-	}
-	if getGroup(l.userid).getKeyset() == nil {
-		return ErrKeySetIsNil
 	}
 	ObjectsBlockSize := bucket.ObjectsBlockSize
 	fullData := make([]byte, 0, ObjectsBlockSize)

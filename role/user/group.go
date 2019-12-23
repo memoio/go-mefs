@@ -18,6 +18,15 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
+const (
+	errState int8 = iota
+	starting
+	collecting
+	collectCompleted
+	onDeploy
+	groupStarted
+)
+
 //keeperInfo 此结构体记录Keeper的信息，存储Tendermint地址，让user也能访问链上数据
 type keeperInfo struct {
 	isBFT     bool //标识Keeper组采取的同步方法
@@ -46,27 +55,29 @@ type group interface {
 
 // group stores use's groupinfo
 type groupInfo struct {
-	userID        string
-	keepers       []*keeperInfo
-	providers     []*providerInfo
-	upKeepingItem *contracts.UpKeepingItem
-	queryItem     *contracts.QueryItem
+	userID    string
+	state     int8 // atomic?
+	keepers   []*keeperInfo
+	providers []*providerInfo
 
-	initResMutex sync.Mutex //目前同一时间只回复一个Keeper避免冲突
-	storeDays    int64      //表示部署合约时的存储数据时间，单位是“天”
-	storeSize    int64      //表示部署合约时的存储数据大小，单位是“MB”
-	storePrice   int64      //表示部署合约时的存储价格大小，单位是“wei”
-	keeperSLA    int        //表示部署合约时的keeper参数，目前是keeper数量
-	providerSLA  int        //表示部署合约时的provider参数，目前是provider数量
-	reDeploy     bool       //是否重新部署offer
-
+	storeDays     int64    //表示部署合约时的存储数据时间，单位是“天”
+	storeSize     int64    //表示部署合约时的存储数据大小，单位是“MB”
+	storePrice    int64    //表示部署合约时的存储价格大小，单位是“wei”
+	keeperSLA     int      //表示部署合约时的keeper参数，目前是keeper数量
+	providerSLA   int      //表示部署合约时的provider参数，目前是provider数量
+	reDeploy      bool     //是否重新部署offer
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
+
+	upKeepingItem *contracts.UpKeepingItem
+	queryItem     *contracts.QueryItem
+	initResMutex  sync.Mutex //目前同一时间只回复一个Keeper避免冲突
 }
 
 func newGroup(uid string, duration int64, capacity int64, price int64, ks int, ps int, redeploy bool) *groupInfo {
 	return &groupInfo{
 		userID:      uid,
+		state:       errState,
 		storeDays:   duration,
 		storeSize:   capacity,
 		storePrice:  price,
@@ -242,7 +253,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 	log.Println(g.userID + ":Group Service is ready")
 
-	err = setState(g.userID, groupStarted)
+	g.state = groupStarted
 	if err != nil {
 		return err
 	}
@@ -301,10 +312,8 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 		return err
 	}
 	go broadcastMetaMessage(kmInit, "")
-	err = setState(g.userID, collecting)
-	if err != nil {
-		return err
-	}
+	g.state = collecting
+
 	// wait 20 minutes for collecting
 	timeOutCount := 0
 	tick := time.Tick(30 * time.Second)
@@ -314,19 +323,12 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 			if timeOutCount >= 40 {
 				return ErrTimeOut
 			}
-			userState, err := getState(g.userID)
-			if err != nil {
-				return err
-			}
-			switch userState {
+			switch g.state {
 			case collecting:
 				timeOutCount++
 				if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
 					//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
-					err := setState(g.userID, collectCompleted)
-					if err != nil {
-						return err
-					}
+					g.state = collectCompleted
 					g.notify(kmInit)
 				} else {
 					log.Printf("Timeout, No enough keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(gp.tempKeepers), len(gp.tempProviders), gp.keeperSLA, gp.providerSLA)
@@ -354,11 +356,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 
 //userInitNotIf 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
 func (g *groupInfo) notify(km *metainfo.KeyMeta) {
-	userState, err := getState(g.userID)
-	if err != nil {
-		return err
-	}
-	if userState != collectCompleted {
+	if g.state != collectCompleted {
 		return ErrWrongInitState
 	}
 	log.Println("Has enough Keeper and Providers, choosing...")
@@ -387,10 +385,7 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 		g.keepers = append(g.keepers, tempK)
 	}
 	if len(g.keepers) < g.keeperSLA {
-		err := setState(g.userID, collecting)
-		if err != nil {
-			log.Println("userInitNotif()setState()err:", err)
-		}
+		g.state = collecting
 		return
 	}
 
@@ -420,10 +415,7 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 	}
 
 	if len(g.providers) < g.providerSLA {
-		err := setState(g.userID, collecting)
-		if err != nil {
-			log.Println("userInitNotif()setState()err:", err)
-		}
+		g.state = collecting
 		return
 	}
 
@@ -498,12 +490,7 @@ func (g *groupInfo) confirm(keeper string, initRes string) {
 		}
 
 		// 状态改为部署合约中
-		err = setState(gp.userid, onDeploy)
-		if err != nil {
-			log.Println("setState failed :", err)
-			return
-		}
-
+		g.state = onDeploy
 	}
 	return
 }
@@ -537,10 +524,6 @@ func (g *groupInfo) done() error {
 		}
 	}
 	log.Println(gp.userID + ": group is ready")
-	err = setState(gp.userID, groupStarted)
-	if err != nil {
-		log.Println("setState failed :", err)
-		return err
-	}
+	g.state = groupStarted
 	return nil
 }

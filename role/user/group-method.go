@@ -12,28 +12,82 @@ import (
 	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-//GetKeepers 返回本节点拥有的keeper信息，并且检查连接状况 传入参数为返回信息的数量，-1为全部
-func GetKeepers(userID string, count int) ([]string, []string, error) {
-	gp := getGroup(userID)
-	return gp.getKeepers(count)
+// GetBlockProviders 从provider获取数据块的元数据，传入数据块id号
+//返回值为保存数据块的pid，offset，错误信息
+func GetBlockProviders(userID, blockID string) (string, int, error) {
+	u := GetUser(userID)
+
+	return u.getBlockProviders(blockID)
 }
 
-func (gp *groupInfo) getKeepers(count int) ([]string, []string, error) {
-	var unconKeepers, conKeepers []string
-	state, err := getState(gp.userid)
-	if err != nil {
-		return nil, nil, err
-	}
-	if state < groupStarted {
-		return nil, nil, ErrGroupServiceNotReady
+func (l *LfsInfo) getBlockProviders(blockID string) (string, int, error) {
+	var pidstr string
+	var offset int
+	if !l.online {
+		return "", 0, ErrLfsServiceNotReady
 	}
 
-	// count为-1则输出本地的所有keepers
-	if count < 0 {
-		count = len(gp.keepers)
+	gp := l.gInfo
+
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
+	if err != nil {
+		return "", 0, err
 	}
+	blockMeta := kmBlock.ToString()
 	for i, kp := range gp.keepers {
-		if i >= count {
+
+		pidAndOffset, err := getKeyFrom(blockMeta, kp.keeperID)
+		if err != nil || pidAndOffset == nil {
+			continue
+		}
+		//成功收到
+		splitedValue := strings.Split(string(pidAndOffset), metainfo.DELIMITER)
+		if len(splitedValue) < 2 {
+			continues
+		}
+		pidstr = splitedValue[0]
+		offset, err = strconv.Atoi(splitedValue[1])
+		if err != nil {
+			log.Println("Offset decode error-", pidstr, err)
+			continue
+		}
+		pid, err := peer.IDB58Decode(pidstr)
+		if err != nil {
+			log.Println("Wrong format providerID-", pidstr, err)
+			continue
+		}
+		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
+			if !sc.ConnectTo(context.Background(), localNode, pidstr) { //连接不上此provider
+				log.Println("Cannot connect to blockprovider-", pidstr)
+				return pidstr, offset, ErrCannotConnectProvider
+			}
+		}
+		return pidstr, offset, nil
+	}
+	return "", 0, ErrNoProviders
+}
+
+//GetKeepers 返回本节点拥有的keeper信息，并且检查连接状况 传入参数为返回信息的数量，-1为全部
+func GetKeepers(userID string, count int) ([]string, []string, error) {
+	u := GetUser(userID)
+	if !l.online {
+		return nil, nil, ErrLfsServiceNotReady
+	}
+	return u.gInfo.getKeepers(count)
+}
+
+func (g *groupInfo) getKeepers(count int) ([]string, []string, error) {
+	num := count
+	if count < 0 {
+		num = len(gp.keepers)
+	}
+
+	unconKeepers := make([]string, 0, num)
+	conKeepers := make([]string, 0, num)
+
+	i := 0
+	for _, kp := range g.keepers {
+		if i >= num {
 			break
 		}
 		kid, err := peer.IDB58Decode(kp.keeperID)
@@ -42,184 +96,113 @@ func (gp *groupInfo) getKeepers(count int) ([]string, []string, error) {
 		}
 		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
 			conKeepers = append(conKeepers, kp.keeperID)
+			i++
 		} else {
 			if !sc.ConnectTo(context.Background(), localNode, kp.keeperID) { //连接不上此keeper
 				unconKeepers = append(unconKeepers, kp.keeperID)
 				continue
 			}
 			conKeepers = append(conKeepers, kp.keeperID)
+			i++
 		}
 	}
-	if len(gp.keepers) < count {
+
+	if len(conKeepers) < num && count > 0 {
 		return unconKeepers, conKeepers, ErrNoEnoughKeeper
 	}
+
 	return unconKeepers, conKeepers, nil
 }
 
-//GetLocalProviders 从本地PeersInfo中 返回本节点provider信息,并且检查连接状况
-func GetLocalProviders(userID string) ([]string, []string, error) {
-	gp := getGroup(userID)
-	return gp.getLocalProviders()
+//GetProviders 返回provider信息，
+func GetProviders(userID string, count int) ([]string, []string, error) {
+	u := GetUser(userID)
+	if !l.online {
+		return nil, nil, ErrLfsServiceNotReady
+	}
+	return u.gInfo.getProviders(count)
 }
 
-func (gp *groupInfo) getLocalProviders() ([]string, []string, error) {
-	if gp == nil {
-		return nil, nil, ErrGroupServiceNotReady
+func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
+	num := count
+	if count < 0 {
+		num = len(g.providers)
 	}
-	state, err := getState(gp.userid)
-	if err != nil {
-		return nil, nil, err
-	}
-	if state < groupStarted {
-		return nil, nil, ErrGroupServiceNotReady
-	}
-	count := len(gp.providers)
-	unconPro := make([]string, 0, count)
-	conPro := make([]string, 0, count)
-	for _, provider := range gp.providers {
+
+	i := 0
+
+	unconPro := make([]string, 0, num)
+	conPro := make([]string, 0, num)
+
+	for _, provider := range g.providers {
+		if i >= num {
+			break
+		}
 		pid, err := peer.IDB58Decode(provider.providerID)
 		if err != nil {
 			continue
 		}
 		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
 			conPro = append(conPro, provider.providerID)
+			i++
 		} else {
 			if !sc.ConnectTo(context.Background(), localNode, provider.providerID) { //连接不上此provider
 				unconPro = append(unconPro, provider.providerID)
 				continue
 			}
 			conPro = append(conPro, provider.providerID)
+			i++
 		}
 	}
-	return unconPro, conPro, nil
+
+	if len(conPro) < num && count > 0 {
+		return unconPro, conPro, ErrNoEnoughProvider
+	}
+
+	return unconPro, conPro, ErrNoEnoughProvider
 }
 
-//GetProviders 返回provider信息，
-func GetProviders(userID string, count int) ([]string, error) {
-	gp := getGroup(userID)
-	return gp.getProviders(count)
-}
-
-func (gp *groupInfo) getProviders(count int) ([]string, error) {
-	if gp == nil {
-		return nil, ErrGroupServiceNotReady
-	}
-	state, err := getState(gp.userid)
-	if err != nil {
-		return nil, err
-	}
-	if state < groupStarted {
-		return nil, ErrGroupServiceNotReady
-	}
-	var providers []string
-	//小于零，则返回内存暂存所有即可
-	if count < 0 {
-		for _, provider := range gp.providers {
-			_, err := peer.IDB58Decode(provider.providerID)
-			if err != nil {
-				continue
-			}
-			providers = append(providers, provider.providerID)
-		}
-		return providers, nil
+func (g *groupInfo) putDataToKeepers(key meta.Keymeta, value string) error {
+	if g.state < groupStarted {
+		return ErrLfsServiceNotReady
 	}
 
-	for _, provider := range gp.providers {
-		pid, err := peer.IDB58Decode(provider.providerID)
+	var count int
+	for _, keeper := range g.keepers {
+		_, err = sendMetaRequest(key, value, keeper.keeperID)
 		if err != nil {
-			continue
-		}
-		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), localNode, provider.providerID) { //连接不上此provider
-				log.Println("Cannot connect this provider:", provider.providerID)
-				continue
-			}
-		}
-		providers = append(providers, provider.providerID)
-	}
-	if count < 0 {
-		return providers, nil
-	}
-
-	if len(providers) >= count {
-		return providers[0:count], nil
-	}
-
-	return providers, ErrNoEnoughProvider
-}
-
-// GetBlockProviders 从provider获取数据块的元数据，传入数据块id号
-//返回值为保存数据块的pid，offset，错误信息
-func GetBlockProviders(userID, blockID string) (string, int, error) {
-	gp := getGroup(userID)
-	return gp.getBlockProviders(blockID)
-}
-
-func (gp *groupInfo) getBlockProviders(blockID string) (string, int, error) {
-	if gp == nil {
-		return "", 0, ErrGroupServiceNotReady
-	}
-	var pidstr string
-	var offset int
-	state, err := getState(gp.userid)
-	if err != nil {
-		return "", 0, err
-	}
-	if state < groupStarted {
-		return "", 0, ErrGroupServiceNotReady
-	}
-	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
-	if err != nil {
-		return "", 0, err
-	}
-	blockMeta := kmBlock.ToString()
-	for i, kp := range gp.keepers {
-		if sc.ConnectTo(context.Background(), localNode, kp.keeperID) {
-			pidAndOffset, err := getKeyFrom(blockMeta, kp.keeperID)
-			if err == nil && pidAndOffset != nil { //成功收到
-				splitedValue := strings.Split(string(pidAndOffset), metainfo.DELIMITER)
-				if len(splitedValue) < 2 {
-					return "", 0, ErrNoProviders
-				}
-				pidstr = splitedValue[0]
-				offset, err = strconv.Atoi(splitedValue[1])
-				if err != nil {
-					log.Println("Offset decode error-", pidstr, err)
-					return "", 0, err
-				}
-				pid, err := peer.IDB58Decode(pidstr)
-				if err != nil {
-					log.Println("Wrong format providerID-", pidstr, err)
-					return "", 0, err
-				}
-				if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-					if !sc.ConnectTo(context.Background(), localNode, pidstr) { //连接不上此provider
-						log.Println("Cannot connect to blockprovider-", pidstr)
-						return pidstr, offset, ErrCannotConnectProvider
-					}
-
-				}
-				break
-			} else if err != nil && i >= len(gp.keepers)-1 {
-				return "", 0, ErrNoProviders
-			}
-		} else if i >= len(gp.keepers)-1 {
-			return "", 0, ErrNoProviders
+			log.Println("send metaMessage to ", keeper.keeperID, " error :", err)
+			count++
 		}
 	}
-	return pidstr, offset, nil
+	if count == len(g.keepers) {
+		return ErrNoKeepers
+	}
+	return nil
 }
 
-func (gp *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset int) error {
-	if gp == nil {
-		return ErrGroupServiceNotReady
+func (g *groupInfo) putDataToProviders(key meta.Keymeta, value string) error {
+	if g.state < groupStarted {
+		return ErrLfsServiceNotReady
 	}
-	state, err := getState(gp.userid)
-	if err != nil {
-		return err
+
+	var count int
+	for _, provider := range g.provider {
+		_, err = sendMetaRequest(key, value, provider.providerID)
+		if err != nil {
+			log.Println("send metaMessage to ", provider.providerID, " error :", err)
+			count++
+		}
 	}
-	if state < groupStarted {
-		return ErrGroupServiceNotReady
+	if count == len(g.provider) {
+		return ErrNoProviders
+	}
+	return nil
+}
+
+func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset int) error {
+	if g.state < groupStarted {
+		return ErrLfsServiceNotReady
 	}
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockMetaInfo, metainfo.SyncTypeBlock)
 	if err != nil {
@@ -227,31 +210,13 @@ func (gp *groupInfo) putDataMetaToKeepers(blockID string, provider string, offse
 		return err
 	}
 	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
-	var count int
-	for _, keeper := range gp.keepers {
-		_, err = sendMetaRequest(kmBlock, metaValue, keeper.keeperID)
-		if err != nil {
-			log.Println("send metaMessage to ", keeper.keeperID, " error :", err)
-			count++
-		}
-	}
-	if count == len(gp.keepers) {
-		return ErrNoKeepers
-	}
-	return nil
+	return g.putDataToKeepers(kmBlock, metaValue)
 }
 
 //删除块
 func (gp *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) error {
-	if gp == nil {
-		return ErrGroupServiceNotReady
-	}
-	state, err := getState(gp.userid)
-	if err != nil {
-		return err
-	}
-	if state < groupStarted {
-		return ErrGroupServiceNotReady
+	if gp.state < groupStarted {
+		return ErrLfsServiceNotReady
 	}
 	provider, _, err := gp.getBlockProviders(blockID)
 	if err == ErrNoProviders { //Noprovider说明此块还不存在，不用删除

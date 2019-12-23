@@ -29,7 +29,7 @@ type UploadOptions struct {
 
 // uploadTask has info for upload
 type uploadTask struct { //一个上传任务实例
-	lService    *lfsInfo
+	lService    *LfsInfo
 	superBucket *superBucket
 	objectInfo  *objectInfo
 	BucketID    int32
@@ -47,7 +47,7 @@ type uploadTask struct { //一个上传任务实例
 }
 
 // ConstructUpload constructs upload process
-func (l *lfsInfo) ConstructUpload(objectName, prefix, bucketName string, reader io.Reader) (Job, error) {
+func (l *LfsInfo) ConstructUpload(objectName, prefix, bucketName string, reader io.Reader) (Job, error) {
 	ok := IsOnline(l.userid)
 	if !ok {
 		return nil, errors.New("user is not running")
@@ -139,7 +139,7 @@ func (u *uploadTask) Info() (interface{}, error) {
 //Start 上传文件
 func (u *uploadTask) Start(ctx context.Context) error {
 	if u == nil {
-		return ErrLfsIsNotRunning
+		return ErrLfsServiceNotReady
 	}
 	err := u.putObject(ctx)
 	if err != nil {
@@ -314,7 +314,7 @@ Loop:
 			}
 
 			for _, v := range blockMetas {
-				err = getGroup(u.lService.userid).putDataMetaToKeepers(v.cid, v.provider, v.offset)
+				err = l.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
 				if err != nil {
 					log.Println("putobject", err)
 					return err

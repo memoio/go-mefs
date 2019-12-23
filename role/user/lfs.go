@@ -11,13 +11,34 @@ import (
 	"github.com/memoio/go-mefs/utils/bitset"
 )
 
-var persistMetaInterval time.Duration //持久化检查间隔
+var persistMetaInterval time.Duration //持久化s检查间隔
 
-// lfsInfo has lfs info
-type lfsInfo struct {
-	userID    string
-	meta      *lfsMeta //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
-	inProcess int      //表示此lfs上是否有操作，如上传下载，避免过程中user被Kill
+// LfsInfo has lfs info
+type LfsInfo struct {
+	userID     string
+	privateKey []byte
+	gInfo      *groupInfo
+	keySet     *mcl.KeySet
+	meta       *lfsMeta //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
+	online     bool
+	inProcess  int //atomic
+	context    context.Context
+	cancelFunc context.CancelFunc
+}
+
+// Service defines user's function
+type Service interface {
+	Start() error
+	Stop()
+	Flush() error
+	ListBucket(prefix string) ([]*pb.BucketInfo, error)
+	CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
+	HeadBucket(bucketName string) (*pb.BucketInfo, error)
+	DeleteBucket(bucketName string) (*pb.BucketInfo, error)
+	PutObject()
+	GetObjectInfo()
+	GetObject()
+	IsOnline() bool
 }
 
 // Logs records lfs metainfo
@@ -53,15 +74,54 @@ type objectInfo struct {
 	state int
 }
 
-func newLfs(userID string, privKey []byte) *lfsInfo {
-	return &lfsInfo{
-		userid: userID,
+// Start starts user's info
+func (l *LfsInfo) Start() error {
+	// 证明该user已经启动
+	if l.online || (l.gInfo != nil && l.gInfo.state >= starting) {
+		return errors.New("The user is running")
 	}
+
+	l.state = false
+
+	has, err = u.gInfo.start(l.context)
+	if err != nil {
+		log.Println("start group err: ", err)
+		return err
+	}
+
+	if has {
+		// init or send bls config
+		mkey, err := loadBLS12Config(userID, l.gInfo.tempKeepers, l.privateKey)
+
+		if err != nil || mkey == nil {
+			log.Println("no bls config err: ", err)
+			return err
+		}
+		l.keySet = mkey
+	} else {
+		mkey, err := userBLS12ConfigInit()
+		if err != nil {
+			log.Println("init bls config err: ", err)
+			return err
+		}
+
+		putUserConfig(userID, l.gInfo.tempKeepers, l.privateKey, mkey)
+
+		l.keySet = mkey
+	}
+
+	err = l.startLfs(l.context)
+	if err != nil {
+		log.Println("StartLfsService()err")
+		return err
+	}
+	l.online = true
+	return nil
 }
 
 // lfs启动，从本地或者本节点provider处获取LfsMeta信息进行填充，填充不了才进行LfsMeta的初始化操作
 //填充顺序：超级块-Bucket数据-Bucket中Object数据
-func (l *lfsInfo) start(ctx context.Context) error {
+func (l *LfsInfo) startLfs(ctx context.Context) error {
 	var err error
 	l.meta, err = l.loadSuperBlock() //先加载超级块
 	if err != nil || l.meta == nil {
@@ -71,12 +131,6 @@ func (l *lfsInfo) start(ctx context.Context) error {
 		if err != nil {
 			log.Println(ErrCannotStartLfsService)
 			return ErrCannotStartLfsService
-		}
-		log.Println(l.userID, " : Lfs Service is ready")
-		err = setState(l.userID, bothStarted)
-		if err != nil {
-			log.Println("setState failed")
-			return err
 		}
 	} else {
 		err = l.loadBucketInfo() //再加载Group元数据
@@ -91,14 +145,9 @@ func (l *lfsInfo) start(ctx context.Context) error {
 			}
 			log.Println("objects in bucket-", bucket.Name, "is loaded")
 		}
-		log.Println(l.userID + " : Lfs Service is ready")
-		err = setState(l.userID, bothStarted)
-		if err != nil {
-			log.Println("setState failed")
-			return err
-		}
 	}
-
+	log.Println(l.userID, " : Lfs Service is ready")
+	l.online = true
 	go l.persistMetaBlock(ctx)
 	return nil
 }
@@ -136,31 +185,29 @@ func newSuperBlock() *superBlock {
 	}
 }
 
+// Start starts user's info
+func (l *LfsInfo) Stop() error {
+	//用于通知资源释放
+	l.cancelFunc()
+}
+
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
-func (l *lfsInfo) persistMetaBlock(ctx context.Context) error {
+func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 	persistMetaInterval = 10 * time.Second
 	tick := time.NewTicker(persistMetaInterval)
 	defer tick.Stop()
 	for {
 		select {
 		case <-tick.C:
-			state, err := getState(l.userID)
-			if err != nil {
-				return err
-			}
-			if state == bothStarted { //LFS没启动不刷新
+			if l.online { //LFS没启动不刷新
 				err := l.Fsync(false)
 				if err != nil {
 					log.Println("Cannot Persist MetaBlock : ", err)
 				}
 			}
 		case <-ctx.Done():
-			state, err := getState(l.userID)
-			if err != nil {
-				return err
-			}
-			if state == bothStarted { //LFS没启动不刷新
-				err := l.fsync(false)
+			if l.online { //LFS没启动不刷新
+				err := l.Fsync(false)
 				if err != nil {
 					log.Println("Cannot Persist MetaBlock : ", err)
 				}
@@ -171,14 +218,9 @@ func (l *lfsInfo) persistMetaBlock(ctx context.Context) error {
 }
 
 //Fsync 现在只刷新metaBlock，以后可以删除数据块的时候先只标记，然后再在Fsync统一刷新
-func (l *lfsInfo) fsync(isForce bool) error {
-	state, err := getState(l.userID)
-	if err != nil {
-		return err
-	}
-
-	if state < bothStarted {
-		return ErrLfsIsNotRunning
+func (l *LfsInfo) Fsync(isForce bool) error {
+	if !l.online {
+		return ErrLfsServiceNotReady
 	}
 
 	l.meta.sb.RLock()

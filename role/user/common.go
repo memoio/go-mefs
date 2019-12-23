@@ -49,57 +49,53 @@ var (
 )
 
 var (
-	ErrPolicy                    = errors.New("the policy is error")
-	ErrBalance                   = errors.New("your account's balance is insufficient, we will not deploy contract")
-	ErrKeySetIsNil               = errors.New("user's Keyset is nil")
-	ErrUserNotExist              = errors.New("user not exist")
-	ErrUserBookIsNil             = errors.New("the User book is nil")
-	ErrCannotFindUserInUserBook  = errors.New("cannot find this user in userbook")
-	errGetContractItem           = errors.New("Can't get contract Item")
-	ErrContractServiceAlreadySet = errors.New("this contract Service already set")
-	ErrGroupServiceAlreadySet    = errors.New("this group Service already set")
-	ErrLfsServiceAlreadySet      = errors.New("this lfs Service already set")
-	ErrTimeOut                   = errors.New("Time out")
+	ErrPolicy                = errors.New("policy is error")
+	ErrBalance               = errors.New("balance is insufficient")
+	ErrKeySetIsNil           = errors.New("bls keyset is nil")
+	ErrUserNotExist          = errors.New("user does not exist")
+	ErrLfsServiceNotReady    = errors.New("lfs service is not ready")
+	ErrCannotStartLfsService = errors.New("cannot start lfs service")
+
+	errGetContractItem = errors.New("cannot get contract Item")
+	ErrTimeOut         = errors.New("Time out")
 
 	ErrNoProviders           = errors.New("there is no providers")
 	ErrNoKeepers             = errors.New("there is no keepers")
-	ErrCannotConnectKeeper   = errors.New("cannot connect Keeper")
-	ErrCannotConnectProvider = errors.New("cannot connect this provider")
-	ErrNoEnoughProvider      = errors.New("no Enough providers")
-	ErrNoEnoughKeeper        = errors.New("no Enough keepers")
-	ErrCannotConnectNetwork  = errors.New("cannot connect NetWork")
-	ErrCannotDeleteMetaBlock = errors.New("cannot delete metablock in provider,maybe it is not connected")
-	ErrGroupServiceNotReady  = errors.New("group service is not ready")
+	ErrNoEnoughProvider      = errors.New("no enough providers")
+	ErrNoEnoughKeeper        = errors.New("no enough keepers")
+	ErrCannotConnectNetwork  = errors.New("cannot connect network")
+	ErrCannotDeleteMetaBlock = errors.New("cannot delete metablock in provider")
 
-	ErrCannotStartLfsService = errors.New("cannot start lfs service")
-	ErrLfsIsNotRunning       = errors.New("lfs is not running")
+	ErrBucketNotExist     = errors.New("bucket not exist")
+	ErrBucketAlreadyExist = errors.New("bucket already exists")
+	ErrBucketNotEmpty     = errors.New("bucket is not empty")
+	ErrBucketNameInvalid  = errors.New("bucket name is invalid")
 
-	ErrObjectNotExist     = errors.New("object is not exist")
-	ErrDirNotExist        = errors.New("directory is not exist")
-	ErrObjectAlreadyExist = errors.New("file already exist")
-
-	ErrBucketNotExist     = errors.New("bucket is not exist")
-	ErrBucketAlreadyExist = errors.New("bucket Already Exist")
-	ErrBucketNotEmpty     = errors.New("bucket is Not empty")
-	ErrBucketNameInvalid  = errors.New("bucket name invalid")
-
-	ErrObjectNameToolong    = errors.New("the object's name is too long")
-	ErrObjectNameInvalid    = errors.New("object name invalid")
-	ErrObjectOptionsInvalid = errors.New("object options invalid")
+	ErrObjectNotExist       = errors.New("object not exist")
+	ErrDirNotExist          = errors.New("directory not exist")
+	ErrObjectAlreadyExist   = errors.New("object already exist")
+	ErrObjectNameToolong    = errors.New("object name is too long")
+	ErrObjectNameInvalid    = errors.New("object name is invalid")
+	ErrObjectOptionsInvalid = errors.New("object option is invalid")
 
 	ErrCannotGetEnoughBlock = errors.New("cannot get enough Block")
-	ErrCannotLoadMetaBlock  = errors.New("cannot Load MetaBlock")
-	ErrCannotAddBlock       = errors.New("cannot Add this block")
+	ErrCannotLoadMetaBlock  = errors.New("cannot load MetaBlock")
+	ErrCannotAddBlock       = errors.New("cannot put this block")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
-	ErrWrongState           = errors.New("wrong userservice state")
-	ErrWrongInitState       = errors.New("wrong init state")
 )
 
 func putKeyTo(key, value, node string) error {
+	if node != "local" && localNode.PeerHost.Network().Connectedness(node) != inet.Connected {
+		sc.ConnectTo(context.Background(), localNode, node)
+	}
 	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
 }
 
 func getKeyFrom(key, node string) ([]byte, error) {
+	if node != "local" && localNode.PeerHost.Network().Connectedness(node) != inet.Connected {
+		sc.ConnectTo(context.Background(), localNode, node)
+	}
+
 	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
 }
 

@@ -49,14 +49,14 @@ type notif struct {
 type downloadJob struct {
 	bucket         *superBucket
 	decoder        *dataformat.DataDecoder //用于解码数据
-	lfs            *lfsInfo                //lfsservice
+	lfs            *LfsInfo                //lfsservice
 	group          *groupInfo              //groupInfo
 	buffer         [][]byte
 	blockCompleted int       //下载成功了几个块
 	writer         io.Writer //用于调度下载，以及返回是否出错
 }
 
-func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *lfsInfo, group *groupInfo, writer io.Writer) (*downloadJob, error) {
+func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *LfsInfo, group *groupInfo, writer io.Writer) (*downloadJob, error) {
 	return &downloadJob{
 		bucket:  bucket,
 		decoder: decoder,
@@ -69,7 +69,7 @@ func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *l
 //下载一整个对象的下载任务
 type downloadTask struct {
 	superBucket  *superBucket
-	lService     *lfsInfo   //lfsService
+	lService     *LfsInfo   //lfsService
 	group        *groupInfo //groupInfo
 	object       *objectInfo
 	decoder      *dataformat.DataDecoder //用于解码数据
@@ -85,7 +85,7 @@ type downloadTask struct {
 }
 
 // ConstructDownload constructs lfs download process
-func (l *lfsInfo) ConstructDownload(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, options *DownloadOptions) (Job, error) {
+func (l *LfsInfo) ConstructDownload(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, options *DownloadOptions) (Job, error) {
 	ok := IsOnline(l.userID)
 	if !ok {
 		return nil, err
