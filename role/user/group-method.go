@@ -108,10 +108,10 @@ func (g *groupInfo) getKeepers(count int) ([]string, []string, error) {
 	}
 
 	if len(conKeepers) < num && count > 0 {
-		return unconKeepers, conKeepers, ErrNoEnoughKeeper
+		return conKeepers, unconKeepers, ErrNoEnoughKeeper
 	}
 
-	return unconKeepers, conKeepers, nil
+	return conKeepers, unconKeepers, nil
 }
 
 //GetProviders 返回provider信息，
@@ -156,10 +156,10 @@ func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
 	}
 
 	if len(conPro) < num && count > 0 {
-		return unconPro, conPro, ErrNoEnoughProvider
+		return conPro, unconPro, ErrNoEnoughProvider
 	}
 
-	return unconPro, conPro, ErrNoEnoughProvider
+	return conPro, unconPro, ErrNoEnoughProvider
 }
 
 func (g *groupInfo) putDataToKeepers(key meta.Keymeta, value string) error {

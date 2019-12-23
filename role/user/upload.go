@@ -29,31 +29,23 @@ type UploadOptions struct {
 
 // uploadTask has info for upload
 type uploadTask struct { //一个上传任务实例
-	lService    *LfsInfo
-	superBucket *superBucket
-	objectInfo  *objectInfo
-	BucketID    int32
-	Prefix      string
-	ObjectName  string
-	Reader      io.Reader
+	gInfo       *groupInfo
+	sKey        []byte
+	bucketID    int32
+	curStripe   int64
+	offset      int64
+	length      int64
+	segmentSize int32
+	tagFlag     int32
+	reader      io.Reader
 	startTime   time.Time
 	encoder     *dataformat.DataEncoder
-	CurStripe   int64
-	OffsetStart int64
-	Length      int64
-	segmentSize int32
-	TagFlag     int32
-	keepers     []string
 }
 
 // ConstructUpload constructs upload process
 func (l *LfsInfo) ConstructUpload(objectName, prefix, bucketName string, reader io.Reader) (Job, error) {
-	ok := IsOnline(l.userid)
-	if !ok {
+	if !l.online {
 		return nil, errors.New("user is not running")
-	}
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -71,11 +63,8 @@ func (l *LfsInfo) ConstructUpload(objectName, prefix, bucketName string, reader 
 	if objectElement, ok := bucket.objects[prefix+objectName]; ok || objectElement != nil {
 		return nil, ErrObjectAlreadyExist
 	}
-	gp := getGroup(l.userid)
-	_, conkeepers, err := gp.getKeepers(gp.keeperSLA)
-	if err != nil {
-		return nil, err
-	}
+	gp := l.gInfo
+
 	objectName = prefix + objectName
 	if bucket.Policy != dataformat.RsPolicy && bucket.Policy != dataformat.MulPolicy {
 		return nil, ErrPolicy
@@ -96,10 +85,20 @@ func (l *LfsInfo) ConstructUpload(objectName, prefix, bucketName string, reader 
 	bucket.objects[objectName] = objectElement
 	encoder := dataformat.NewDataEncoder(bucket.Policy, bucket.DataCount, bucket.ParityCount,
 		int32(bucket.TagFlag), bucket.SegmentSize, getGroup(l.userid).getKeyset())
+
+	skey := make([]byte, 0)
+	if l.superBucket.Encryption {
+		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
+		tmpkey := l.privateKey
+		tmpkey = append(tmpkey, byte(bucket.BucketID))
+		skey := sha256.Sum256(tmpkey)
+	}
+
 	ul := &uploadTask{
 		lService:    lfs,
 		superBucket: bucket,
 		objectInfo:  object,
+		sKey:        skey,
 		TagFlag:     int32(bucket.GetTagFlag()),
 		segmentSize: int32(bucket.GetSegmentSize()),
 		startTime:   time.Now(),
@@ -138,9 +137,6 @@ func (u *uploadTask) Info() (interface{}, error) {
 
 //Start 上传文件
 func (u *uploadTask) Start(ctx context.Context) error {
-	if u == nil {
-		return ErrLfsServiceNotReady
-	}
 	err := u.putObject(ctx)
 	if err != nil {
 		if u.objectInfo.Size > 0 {
@@ -211,26 +207,21 @@ Loop:
 			tempSize := n
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
-			if u.superBucket.Encryption {
-				// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-				tmpkey := u.lService.privateKey
-				// u.Lfs.Meta.node.PrivateKey.Bytes()
-				tmpkey = append(tmpkey, byte(u.BucketID))
-				skey := sha256.Sum256(tmpkey)
-
-				if len(data)%aes.BlockSize != 0 {
-					data = aes.PKCS5Padding(data)
-				}
-				data, err = aes.AesEncrypt(data, skey[:])
-				if err != nil {
-					return err
-				}
-			}
 
 			//这里只输入BucketID和StripeID，blockID后面动态改变
 			bm, err := metainfo.NewBlockMeta(u.lService.userid, strconv.Itoa(int(u.BucketID)), strconv.Itoa(int(u.superBucket.CurStripe)), "0")
 			if err != nil {
 				return err
+			}
+
+			if len(u.skey) > 0 {
+				if len(data)%aes.BlockSize != 0 {
+					data = aes.PKCS5Padding(data)
+				}
+				data, err = aes.AesEncrypt(data, u.skey[:])
+				if err != nil {
+					return err
+				}
 			}
 
 			//在这里先将数据编码

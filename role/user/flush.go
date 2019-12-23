@@ -54,12 +54,12 @@ func (l *LfsInfo) flushSuperBlockLocal() error {
 		return nil
 	}
 
-	bm, err := metainfo.NewBlockMeta(l.userid, "0", "0", "0")
+	bm, err := metainfo.NewBlockMeta(l.userID, "0", "0", "0")
 	if err != nil {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, _, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, 0, dataformat.DefaultSegmentSize, metaTagFlag, getGroup(l.userid).getKeyset())
+	dataEncoded, _, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, 0, dataformat.DefaultSegmentSize, metaTagFlag, l.keyset)
 	if err != nil {
 		return err
 	}
@@ -107,11 +107,11 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, offset, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, sb.MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, getGroup(l.userid).getKeyset())
+	dataEncoded, offset, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, sb.MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
 	if err != nil {
 		return err
 	}
-	providers, err := getGroup(l.userid).getProviders(int(sb.MetaBackupCount))
+	providers, _, err := l.gInfo.getProviders(int(sb.MetaBackupCount))
 	if err != nil {
 		return err
 	}

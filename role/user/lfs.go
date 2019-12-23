@@ -35,9 +35,10 @@ type Service interface {
 	CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
 	HeadBucket(bucketName string) (*pb.BucketInfo, error)
 	DeleteBucket(bucketName string) (*pb.BucketInfo, error)
-	PutObject()
-	GetObjectInfo()
-	GetObject()
+	DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error)
+	HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, error)
+	PutObject(bucketName, objectName string, reader io.Reader) error
+	GetObject(bucketName, objectName string)
 	IsOnline() bool
 }
 

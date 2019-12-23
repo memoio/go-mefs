@@ -132,7 +132,7 @@ func (l *LfsInfo) ConstructDownload(bucketName, objectName string, writer io.Wri
 	offsetStart = ((options.Start + extraDataSize) % stripeSize) / stripeSegmentSize
 	indexStart = options.Start % stripeSegmentSize
 
-	group := getGroup(l.userid)
+	group := l.gInfo
 
 	decoder, _ := dataformat.NewDataDecoder(bucket.Policy, bucket.DataCount, bucket.ParityCount)
 	return &downloadTask{
