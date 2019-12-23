@@ -11,14 +11,14 @@ import (
 )
 
 // CreateBucket create a bucket for a specified LFSservice
-func (lfs *LfsService) CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
+func (l *lfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
 	// TODO judge datacount + parity count <= providers
 
-	err := isStart(lfs.userid)
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
@@ -27,11 +27,11 @@ func (lfs *LfsService) CreateBucket(bucketName string, options *pb.BucketOptions
 		return nil, ErrBucketNameInvalid
 	}
 
-	if _, ok := lfs.meta.bucketNameToID[bucketName]; ok {
+	if _, ok := l.meta.bucketNameToID[bucketName]; ok {
 		return nil, ErrBucketAlreadyExist
 	}
-	lfs.meta.sb.Lock()
-	defer lfs.meta.sb.Unlock()
+	l.meta.sb.Lock()
+	defer l.meta.sb.Unlock()
 	// 多副本策略
 	switch options.Policy {
 	case dataformat.MulPolicy:
@@ -43,7 +43,7 @@ func (lfs *LfsService) CreateBucket(bucketName string, options *pb.BucketOptions
 		return nil, dataformat.ErrWrongPolicy
 	}
 
-	bucketID := lfs.meta.sb.NextBucketID
+	bucketID := l.meta.sb.NextBucketID
 
 	objects := make(map[string]*list.Element)
 	bucket := &superBucket{
@@ -66,30 +66,30 @@ func (lfs *LfsService) CreateBucket(bucketName string, options *pb.BucketOptions
 		orderedObjects: list.New(),
 	}
 	//将此Bucket信息添加到LFS中
-	lfs.meta.sb.NextBucketID++
-	lfs.meta.sb.bitsetInfo.Set(uint(bucketID))
-	lfs.meta.sb.dirty = true
+	l.meta.sb.NextBucketID++
+	l.meta.sb.bitsetInfo.Set(uint(bucketID))
+	l.meta.sb.dirty = true
 
-	lfs.meta.bucketByID[bucket.BucketID] = bucket
-	lfs.meta.bucketNameToID[bucket.Name] = bucket.BucketID
+	l.meta.bucketByID[bucket.BucketID] = bucket
+	l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
 	return &bucket.BucketInfo, nil
 }
 
 // DeleteBucket deletes a bucket from a specified LFSservice
-func (lfs *LfsService) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -102,20 +102,20 @@ func (lfs *LfsService) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 }
 
 // HeadBucket get a superBucket's metainfo
-func (lfs *LfsService) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -123,16 +123,16 @@ func (lfs *LfsService) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 }
 
 // ListBucket lists all superBucket in a lfsservice
-func (lfs *LfsService) ListBucket(pre string) ([]*pb.BucketInfo, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) ListBucket(pre string) ([]*pb.BucketInfo, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
 	}
-	if lfs.meta.bucketByID == nil {
+	if l.meta.bucketByID == nil {
 		return nil, ErrBucketNotExist
 	}
 	var lsuperBucket []*pb.BucketInfo
-	for _, bs := range lfs.meta.bucketByID {
+	for _, bs := range l.meta.bucketByID {
 		if bs.Deletion {
 			continue
 		}

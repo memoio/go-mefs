@@ -21,7 +21,7 @@ func (user *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (strin
 	}
 	keytype := km.GetKeyType()
 
-	gService := getGroupService(km.GetMid())
+	gService := getGroup(km.GetMid())
 	if gService == nil {
 		return "", ErrGroupServiceNotReady
 	}
@@ -30,9 +30,7 @@ func (user *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (strin
 	case metainfo.UserInitReq:
 		log.Println("keytype：UserInitReq 不处理")
 	case metainfo.UserInitRes: //handle init response from keeper
-		go gService.handleUserInitRes(km, metaValue, from)
-	case metainfo.UserInitNotifRes: //user init response
-		go gService.handleUserInitNotifRes(metaValue, from)
+		go handleUserInitRes(km, metaValue, from)
 	case metainfo.Test:
 		handleTest(km)
 	case metainfo.GetBlock:
@@ -48,34 +46,53 @@ func (user *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (strin
 // handleUserInitRes 收到keeper回应的初始化信息，将value中的keeper provider信息整理到备选信息中
 // key: userID/"User_Init_Res"/keepercount/providercount,
 // value: kid1kid2..../pid1pid2
-func (gp *groupService) handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
+func handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
+	gp := getGroup(km.GetMid())
+	if gService == nil {
+		return
+	}
+
 	gp.initResMutex.Lock()
 	defer gp.initResMutex.Unlock()
-	userState, err := getUserState(gp.userid)
+	userState, err := getState(gp.userid)
 	if err != nil {
-		log.Println("handleUserInitRes()getUserState()err:", err, "userid:", gp.userid)
+		log.Println("handleUserInitRes()getState()err:", err, "userid:", gp.userID)
+		return
 	}
 	if userState == collecting { //收集信息阶段，才继续
 		log.Println("Receive: InitResponse，from：", from, ", value is：", metaValue)
 		splitedMeta := strings.Split(metaValue, metainfo.DELIMITER)
-		if len(splitedMeta) == 2 {
-			gp.addKeepersAndProviders(splitedMeta[0], splitedMeta[1]) //把keeper信息和provider信息加入到备选中
+		if len(splitedMeta) != 2 {
+			return
 		}
-	}
-}
-
-//handleUserInitNotifRes 初始化第四次握手的回调，收到的信息是keeper发来的bft信息
-func (gp *groupService) handleUserInitNotifRes(metaValue, from string) {
-	gp.initResMutex.Lock()
-	defer gp.initResMutex.Unlock()
-	userState, err := getUserState(gp.userid)
-	if err != nil {
-		log.Println("handleUserInitNotifRes()getUserState()err:", err, "userid:", gp.userid)
-	}
-	if userState == collectCompleted && len(gp.keepers) == gp.keeperSLA { //收集信息完成阶段，继续
-		err := gp.keeperConfirm(from, metaValue)
-		if err != nil {
-			log.Println("handleUserInitNotifRes()error", err)
+		//把keeper信息和provider信息加入到备选中
+		keepers := splitedMeta[0]
+		for i := 0; i < len(keepers)/utils.IDLength; i++ {
+			kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
+			_, err := peer.IDB58Decode(kid)
+			if err != nil {
+				continue
+			}
+			if !utils.CheckDup(gp.tempKeepers, kid) {
+				continue
+			}
+			if sc.ConnectTo(context.Background(), localNode, kid) {
+				gp.tempKeepers = append(gp.tempKeepers, kid)
+			}
+		}
+		providers := splitedMeta[1]
+		for i := 0; i < len(providers)/utils.IDLength; i++ {
+			pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
+			_, err := peer.IDB58Decode(pid)
+			if err != nil {
+				continue
+			}
+			if !utils.CheckDup(gp.tempProviders, pid) {
+				continue
+			}
+			if sc.ConnectTo(context.Background(), localNode, pid) {
+				gp.tempProviders = append(gp.tempProviders, pid)
+			}
 		}
 	}
 }

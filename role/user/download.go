@@ -49,14 +49,14 @@ type notif struct {
 type downloadJob struct {
 	bucket         *superBucket
 	decoder        *dataformat.DataDecoder //用于解码数据
-	lfs            *LfsService             //lfsservice
-	group          *groupService           //groupService
+	lfs            *lfsInfo                //lfsservice
+	group          *groupInfo              //groupInfo
 	buffer         [][]byte
 	blockCompleted int       //下载成功了几个块
 	writer         io.Writer //用于调度下载，以及返回是否出错
 }
 
-func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *LfsService, group *groupService, writer io.Writer) (*downloadJob, error) {
+func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *lfsInfo, group *groupInfo, writer io.Writer) (*downloadJob, error) {
 	return &downloadJob{
 		bucket:  bucket,
 		decoder: decoder,
@@ -69,8 +69,8 @@ func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *L
 //下载一整个对象的下载任务
 type downloadTask struct {
 	superBucket  *superBucket
-	lService     *LfsService   //lfsService
-	group        *groupService //groupService
+	lService     *lfsInfo   //lfsService
+	group        *groupInfo //groupInfo
 	object       *objectInfo
 	decoder      *dataformat.DataDecoder //用于解码数据
 	State        TaskState
@@ -85,20 +85,20 @@ type downloadTask struct {
 }
 
 // ConstructDownload constructs lfs download process
-func (lfs *LfsService) ConstructDownload(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, options *DownloadOptions) (Job, error) {
-	err := isStart(lfs.userid)
-	if err != nil {
+func (l *lfsInfo) ConstructDownload(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, options *DownloadOptions) (Job, error) {
+	ok := IsOnline(l.userID)
+	if !ok {
 		return nil, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -132,7 +132,7 @@ func (lfs *LfsService) ConstructDownload(bucketName, objectName string, writer i
 	offsetStart = ((options.Start + extraDataSize) % stripeSize) / stripeSegmentSize
 	indexStart = options.Start % stripeSegmentSize
 
-	group := getGroupService(lfs.userid)
+	group := getGroup(l.userid)
 
 	decoder, _ := dataformat.NewDataDecoder(bucket.Policy, bucket.DataCount, bucket.ParityCount)
 	return &downloadTask{
@@ -242,13 +242,13 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, offsetStart, ind
 	dataCount := ds.bucket.DataCount
 	parityCount := ds.bucket.ParityCount
 	blockCount := dataCount + parityCount
-	bm, err := metainfo.NewBlockMeta(ds.lfs.userid, strconv.Itoa(int(ds.bucket.BucketID)), strconv.Itoa(int(stripeID)), "")
+	bm, err := metainfo.NewBlockMeta(ds.l.userid, strconv.Itoa(int(ds.bucket.BucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
 		log.Println("Download failed-", err)
 		return 0, err
 	}
 	// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-	tmpkey := ds.lfs.privateKey
+	tmpkey := ds.l.privateKey
 	tmpkey = append(tmpkey, byte(ds.bucket.BucketID))
 	skey := sha256.Sum256(tmpkey)
 
@@ -276,7 +276,7 @@ Loop:
 			bm.SetBid(strconv.Itoa(i))
 			ncid := bm.ToString()
 			provider, _, err := ds.group.getBlockProviders(ncid)
-			if err != nil || provider == ds.lfs.userid {
+			if err != nil || provider == ds.l.userid {
 				log.Printf("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
 				continue Loop
 			}
@@ -308,7 +308,7 @@ Loop:
 
 			if !cfg.Test {
 				//下载数据成功，将内存的channel的value更改
-				cItem, err := getChannelItem(ds.lfs.userid, provider)
+				cItem, err := getChannelItem(ds.l.userid, provider)
 				if err == nil && cItem != nil {
 					log.Println("下载成功，更改内存中channel.value", cItem.ChannelAddr, money.String())
 					cItem.Value = money
@@ -387,8 +387,8 @@ Loop:
 func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.Int, error) {
 	money := big.NewInt(0)
 	//user给channel合约签名，发给provider
-	userID := ds.lfs.userid
-	privateKey := ds.lfs.privateKey
+	userID := ds.l.userid
+	privateKey := ds.l.privateKey
 	localAddress, providerAddress, hexSK, err := buildSignParams(userID, provider, privateKey)
 	if err != nil {
 		log.Printf("buildSignParams about Block %s from %s failed.\n", ncid, provider)

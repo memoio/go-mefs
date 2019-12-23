@@ -14,17 +14,13 @@ import (
 
 //GetKeepers 返回本节点拥有的keeper信息，并且检查连接状况 传入参数为返回信息的数量，-1为全部
 func GetKeepers(userID string, count int) ([]string, []string, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	return gp.getKeepers(count)
 }
 
-func (gp *groupService) getKeepers(count int) ([]string, []string, error) {
-	if gp == nil {
-		return nil, nil, ErrGroupServiceNotReady
-	}
-
+func (gp *groupInfo) getKeepers(count int) ([]string, []string, error) {
 	var unconKeepers, conKeepers []string
-	state, err := getUserState(gp.userid)
+	state, err := getState(gp.userid)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,15 +58,15 @@ func (gp *groupService) getKeepers(count int) ([]string, []string, error) {
 
 //GetLocalProviders 从本地PeersInfo中 返回本节点provider信息,并且检查连接状况
 func GetLocalProviders(userID string) ([]string, []string, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	return gp.getLocalProviders()
 }
 
-func (gp *groupService) getLocalProviders() ([]string, []string, error) {
+func (gp *groupInfo) getLocalProviders() ([]string, []string, error) {
 	if gp == nil {
 		return nil, nil, ErrGroupServiceNotReady
 	}
-	state, err := getUserState(gp.userid)
+	state, err := getState(gp.userid)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -100,15 +96,15 @@ func (gp *groupService) getLocalProviders() ([]string, []string, error) {
 
 //GetProviders 返回provider信息，
 func GetProviders(userID string, count int) ([]string, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	return gp.getProviders(count)
 }
 
-func (gp *groupService) getProviders(count int) ([]string, error) {
+func (gp *groupInfo) getProviders(count int) ([]string, error) {
 	if gp == nil {
 		return nil, ErrGroupServiceNotReady
 	}
-	state, err := getUserState(gp.userid)
+	state, err := getState(gp.userid)
 	if err != nil {
 		return nil, err
 	}
@@ -155,17 +151,17 @@ func (gp *groupService) getProviders(count int) ([]string, error) {
 // GetBlockProviders 从provider获取数据块的元数据，传入数据块id号
 //返回值为保存数据块的pid，offset，错误信息
 func GetBlockProviders(userID, blockID string) (string, int, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	return gp.getBlockProviders(blockID)
 }
 
-func (gp *groupService) getBlockProviders(blockID string) (string, int, error) {
+func (gp *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 	if gp == nil {
 		return "", 0, ErrGroupServiceNotReady
 	}
 	var pidstr string
 	var offset int
-	state, err := getUserState(gp.userid)
+	state, err := getState(gp.userid)
 	if err != nil {
 		return "", 0, err
 	}
@@ -214,11 +210,11 @@ func (gp *groupService) getBlockProviders(blockID string) (string, int, error) {
 	return pidstr, offset, nil
 }
 
-func (gp *groupService) putDataMetaToKeepers(blockID string, provider string, offset int) error {
+func (gp *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset int) error {
 	if gp == nil {
 		return ErrGroupServiceNotReady
 	}
-	state, err := getUserState(gp.userid)
+	state, err := getState(gp.userid)
 	if err != nil {
 		return err
 	}
@@ -246,11 +242,11 @@ func (gp *groupService) putDataMetaToKeepers(blockID string, provider string, of
 }
 
 //删除块
-func (gp *groupService) deleteBlocksFromProvider(blockID string, updateMeta bool) error {
+func (gp *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) error {
 	if gp == nil {
 		return ErrGroupServiceNotReady
 	}
-	state, err := getUserState(gp.userid)
+	state, err := getState(gp.userid)
 	if err != nil {
 		return err
 	}

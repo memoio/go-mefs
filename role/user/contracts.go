@@ -17,15 +17,15 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func (gp *groupService) deployUpKeepingAndChannel() error {
-	hexSk := utils.EthSkByteToEthString(gp.privateKey)
-	localAddress, err := address.GetAddressFromID(gp.userid)
+func deployUpKeepingAndChannel(userID string, sk []byte, ks []keeperInfo, ps []providerInfo, storeDays int64, storeSize int64, storePrice int64) error {
+	hexSk := utils.EthSkByteToEthString(sk)
+	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
 	}
 
 	var keepers, providers []common.Address
-	for _, keeper := range gp.keepers {
+	for _, keeper := range ks {
 		keeperAddress, err := address.GetAddressFromID(keeper.keeperID)
 		if err != nil {
 			return err
@@ -33,7 +33,7 @@ func (gp *groupService) deployUpKeepingAndChannel() error {
 		keepers = append(keepers, keeperAddress)
 	}
 
-	for _, provider := range gp.providers {
+	for _, provider := range ps {
 		providerAddress, err := address.GetAddressFromID(provider.providerID)
 		if err != nil {
 			return err
@@ -41,17 +41,14 @@ func (gp *groupService) deployUpKeepingAndChannel() error {
 		providers = append(providers, providerAddress)
 	}
 
-	d := gp.storeDays
-	s := gp.storeSize
-	price := gp.storePrice
 	var moneyPerDay = new(big.Int)
 	var moneyAccount = new(big.Int)
-	moneyPerDay = moneyPerDay.Mul(big.NewInt(price), big.NewInt(s))
-	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(d))
+	moneyPerDay = moneyPerDay.Mul(big.NewInt(storePrice), big.NewInt(storeSize))
+	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(storeDays))
 
 	log.Println("Begin to dploy upkeeping contract...")
 
-	err = contracts.DeployUpkeeping(hexSk, localAddress, keepers, providers, d, s, price, moneyAccount)
+	err = contracts.DeployUpkeeping(hexSk, localAddress, keepers, providers, storeDays, storeSize, storePrice, moneyAccount)
 	if err != nil {
 		return err
 	}
@@ -67,9 +64,9 @@ func (gp *groupService) deployUpKeepingAndChannel() error {
 	}
 
 	//依次与各provider签署channel合约
-	timeOut := big.NewInt(int64(d * 24 * 60 * 60)) //秒，存储时间
+	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60)) //秒，存储时间
 	var moneyToChannel = new(big.Int)
-	moneyToChannel = moneyToChannel.Mul(big.NewInt(s), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
+	moneyToChannel = moneyToChannel.Mul(big.NewInt(storeSize), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
 
 	log.Println("Begin to dploy channel contract...")
 
@@ -111,7 +108,7 @@ func (gp *groupService) deployUpKeepingAndChannel() error {
 }
 
 func saveContracts(userID string) error {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	if gp == nil {
 		return errors.New("does not exist or has not started")
 	}
@@ -134,7 +131,7 @@ func saveContracts(userID string) error {
 	return nil
 }
 
-func saveUpkeeping(userID string, gp *groupService) error {
+func saveUpkeeping(userID string, gp *groupInfo) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -154,7 +151,7 @@ func saveUpkeeping(userID string, gp *groupService) error {
 	return nil
 }
 
-func saveChannel(userID string, gp *groupService) error {
+func saveChannel(userID string, gp *groupInfo) error {
 	if gp.upKeepingItem == nil {
 		return errors.New("get upkeeing first")
 	}
@@ -222,7 +219,7 @@ func saveChannel(userID string, gp *groupService) error {
 }
 
 func saveChannelValue(userID string) error {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	if gp == nil {
 		return errors.New("does not exist or has not started")
 	}
@@ -245,7 +242,7 @@ func saveChannelValue(userID string) error {
 	return nil
 }
 
-func saveOffer(userID string, gp *groupService) error {
+func saveOffer(userID string, gp *groupInfo) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -276,7 +273,7 @@ func saveOffer(userID string, gp *groupService) error {
 	return nil
 }
 
-func saveQuery(userID string, gp *groupService) error {
+func saveQuery(userID string, gp *groupInfo) error {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err
@@ -296,7 +293,7 @@ func saveQuery(userID string, gp *groupService) error {
 }
 
 func getUpkeepingItem(userID, proid string) (*contracts.UpKeepingItem, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	if gp == nil {
 		return nil, errors.New("does not exist or has not started")
 	}
@@ -309,7 +306,7 @@ func getUpkeepingItem(userID, proid string) (*contracts.UpKeepingItem, error) {
 }
 
 func getQueryItem(userID string) (*contracts.QueryItem, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	if gp == nil {
 		return nil, errors.New("does not exist or has not started")
 	}
@@ -323,7 +320,7 @@ func getQueryItem(userID string) (*contracts.QueryItem, error) {
 }
 
 func getChannelItem(userID, proid string) (*contracts.ChannelItem, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	if gp == nil {
 		return nil, errors.New("does not exist or has not started")
 	}
@@ -341,7 +338,7 @@ func getChannelItem(userID, proid string) (*contracts.ChannelItem, error) {
 }
 
 func getOfferItem(userID, proid string) (*contracts.OfferItem, error) {
-	gp := getGroupService(userID)
+	gp := getGroup(userID)
 	if gp == nil {
 		return nil, errors.New("does not exist or has not started")
 	}

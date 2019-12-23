@@ -72,7 +72,7 @@ const (
 // B，Task里指明任务类型，及UserID等所需参数，Start的时候构造出临时Job运行
 // 暂停的时候保存好状态（如已上传的index等），将Job释放，重新Start再构建Job运行
 type TaskInfo struct {
-	LfsService *LfsService
+	lfsInfo *lfsInfo
 	objectInfo     *pb.ObjectInfo
 	BucketID   int32
 	Job        Job

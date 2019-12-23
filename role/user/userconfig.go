@@ -9,27 +9,23 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func (gp *groupService) userBLS12ConfigInit() error {
+func initBLS12Config() (*mcl.KeySet, error) {
 	log.Printf("Generating BLS12 Sk and Pk for %s: \n", gp.userid)
 	kset, err := mcl.GenKeySet()
 	if err != nil {
 		log.Println("Init BlS12 keyset error: ", err)
-		return err
+		return nil, err
 	}
-	gp.keySet = kset
-	return nil
+	return kset, nil
 }
 
-func (gp *groupService) putUserConfig() {
-	if gp.keySet == nil {
-		log.Println("Need to init or load")
-	}
-	kmBls, err := metainfo.NewKeyMeta(gp.userid, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+func putUserConfig(userID string, keepers []string, sk []byte, keySet *mcl.KeySet) {
+	kmBls, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
 	if err != nil {
 		return
 	}
 
-	userBLS12Config, err := role.BLS12KeysetToByte(gp.keySet, gp.privateKey)
+	userBLS12Config, err := role.BLS12KeysetToByte(keySet, sk)
 	if err != nil {
 		log.Println("Marshal BlS12 config failed: ", err)
 		return
@@ -43,14 +39,14 @@ func (gp *groupService) putUserConfig() {
 	}
 
 	//最后发送本节点的BLS12公钥到自己的keeper上保存
-	for _, keeper := range gp.keepers {
+	for _, kid := range keepers {
 		retry := 0
 		for retry < 10 {
-			err := putKeyTo(kmBls.ToString(), string(userBLS12Config), keeper.keeperID)
+			err := putKeyTo(kmBls.ToString(), string(userBLS12Config), kid)
 			if err != nil {
 				retry++
 				if retry >= 10 {
-					log.Println("gp.localNode.Routing.CmdPut failed :", err)
+					log.Println("put config failed :", err)
 				}
 				time.Sleep(30 * time.Second)
 			}
@@ -60,29 +56,36 @@ func (gp *groupService) putUserConfig() {
 
 }
 
-func (gp *groupService) loadBLS12Config() error {
-	kmBls, err := metainfo.NewKeyMeta(gp.userid, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+func loadBLS12Config(userID string, keepers []string, sk []byte) (keySet *mcl.KeySet, err error) {
+	kmBls, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	userBLS12ConfigKey := kmBls.ToString()
 	userBLS12config, err := getKeyFrom(userBLS12ConfigKey, "local")
 	if err == nil && len(userBLS12config) > 0 { //先从本地找，如果有就解析一下
-		gp.keySet, _ = parseBLS12ConfigMeta(gp.privateKey, userBLS12config)
+		keySet, err = parseBLS12ConfigMeta(sk, userBLS12config)
 	}
 
 	//get from remote
 	found := false
-	for _, keeper := range gp.keepers {
-		userBLS12config, err = getKeyFrom(userBLS12ConfigKey, keeper.keeperID)
+	mkey := &mcl.KeySet{}
+	bmap := make(map[string]bool)
+	for _, kid := range keepers {
+		userBLS12config, err = getKeyFrom(userBLS12ConfigKey, kid)
 		if err == nil && len(userBLS12config) > 0 {
-			gp.keySet, err = parseBLS12ConfigMeta(gp.privateKey, userBLS12config)
+			mkeySet, err = parseBLS12ConfigMeta(sk, userBLS12config)
 			if err == nil {
 				found = true
 				break
 			}
+			bmap[kid] = true
 		}
+	}
+
+	if keySet == nil && mkey != nil && mkey.Pk != nil {
+		keySet = mkey
 	}
 
 	// get localconfig
@@ -94,17 +97,19 @@ func (gp *groupService) loadBLS12Config() error {
 			log.Println("put blsconfig to lcoal failed: ", err)
 		}
 
-		for _, keeper := range gp.keepers {
-			err := putKeyTo(userBLS12ConfigKey, string(userBLS12config), keeper.keeperID)
+		for kid, has := range bmap {
+			if !has {
+				continue
+			}
+			err := putKeyTo(userBLS12ConfigKey, string(userBLS12config), kid)
 			if err != nil {
-				log.Println("put blsconfig to keeper", keeper.keeperID, " failed: ", err)
+				log.Println("put blsconfig to keeper", kid, " failed: ", err)
 			}
 		}
-
 	}
 
-	log.Println("BlS12 SK and Pk is loaded for ", gp.userid)
-	return nil
+	log.Println("BlS12 SK and Pk is loaded for ", userID)
+	return keySet, nil
 }
 
 func parseBLS12ConfigMeta(privKey, userBLS12config []byte) (*mcl.KeySet, error) {

@@ -12,20 +12,20 @@ import (
 )
 
 // DeleteObject deletes a object in lfs
-func (lfs *LfsService) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -54,20 +54,20 @@ func (lfs *LfsService) DeleteObject(bucketName, objectName string) (*pb.ObjectIn
 }
 
 // HeadObject get the info of an object
-func (lfs *LfsService) HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, string, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, string, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, "", err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, "", ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, "", ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, "", ErrBucketNotExist
 	}
@@ -85,25 +85,25 @@ func (lfs *LfsService) HeadObject(bucketName, objectName string, avail bool) (*p
 	}
 	var AvailTime string
 	if avail {
-		AvailTime, _ = lfs.GetObjectAvailTime(object)
+		AvailTime, _ = l.GetObjectAvailTime(object)
 	}
 	return &object.ObjectInfo, AvailTime, nil
 }
 
 // ListObject lists all objects of a bucket
-func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, nil, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, nil, ErrObjectNotExist
 	}
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, nil, ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, nil, ErrBucketNotExist
 	}
@@ -120,7 +120,7 @@ func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.Obj
 		if avail {
 			if strings.HasPrefix(object.Name, pre) {
 				objects = append(objects, &object.ObjectInfo)
-				availTime, _ := lfs.GetObjectAvailTime(object)
+				availTime, _ := l.GetObjectAvailTime(object)
 				availTimes = append(availTimes, availTime)
 			}
 		} else {
@@ -133,18 +133,18 @@ func (lfs *LfsService) ListObject(bucketName, pre string, avail bool) ([]*pb.Obj
 }
 
 // ShowStorageSpaceAll show lfs used space without appointed bucket
-func (lfs *LfsService) ShowStorageSpaceAll() ([]uint64, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) ShowStorageSpaceAll() ([]uint64, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return nil, err
 	}
 
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	storageSpaceAll := make([]uint64, 0, len(lfs.meta.bucketByID))
-	for _, bucket := range lfs.meta.bucketByID {
+	storageSpaceAll := make([]uint64, 0, len(l.meta.bucketByID))
+	for _, bucket := range l.meta.bucketByID {
 		var storageSpace int64
 
 		for _, objectElement := range bucket.objects {
@@ -167,20 +167,20 @@ func (lfs *LfsService) ShowStorageSpaceAll() ([]uint64, error) {
 }
 
 // ShowStorageSpace show lfs used space
-func (lfs *LfsService) ShowStorageSpace(bucketName, pre string) (int, error) {
-	err := isStart(lfs.userid)
+func (l *lfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
+	err := IsOnline(l.userid)
 	if err != nil {
 		return 0, err
 	}
-	if lfs.meta.bucketNameToID == nil {
+	if l.meta.bucketNameToID == nil {
 		return 0, ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return 0, ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return 0, ErrBucketNotExist
 	}
@@ -198,9 +198,9 @@ func (lfs *LfsService) ShowStorageSpace(bucketName, pre string) (int, error) {
 	return storageSpace, nil
 }
 
-func (lfs *LfsService) getLastChalTime(blockID string) (time.Time, error) {
+func (l *lfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
-	gp := getGroupService(lfs.userid)
+	gp := getGroup(l.userid)
 	_, conkeepers, err := gp.getKeepers(-1)
 	if err != nil {
 		return latestTime, err
@@ -230,18 +230,18 @@ func (lfs *LfsService) getLastChalTime(blockID string) (time.Time, error) {
 }
 
 // GetObjectAvailTime get available time of objects
-func (lfs *LfsService) GetObjectAvailTime(object *objectInfo) (string, error) {
+func (l *lfsInfo) GetObjectAvailTime(object *objectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
-	bucket := lfs.meta.bucketByID[object.BucketID]
+	bucket := l.meta.bucketByID[object.BucketID]
 	blockCount := bucket.DataCount + bucket.ParityCount
-	bm, err := metainfo.NewBlockMeta(lfs.userid, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
+	bm, err := metainfo.NewBlockMeta(l.userid, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
 	if err != nil {
 		return "", err
 	}
 	for i := 0; i < int(blockCount); i++ {
 		bm.SetBid(strconv.Itoa(i))
 		blockID := bm.ToString()
-		blockAvailTime, err := lfs.getLastChalTime(blockID)
+		blockAvailTime, err := l.getLastChalTime(blockID)
 		if err != nil {
 			log.Printf("Get block-%s's availTime failed!err: %v\n", blockID, err)
 			continue

@@ -40,12 +40,12 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	if err != nil {
 		return "", err
 	}
-	uploadTask, err := lfs.ConstructUpload(object, "", bucket, upload.Stream)
+	ut, err := lfs.ConstructUpload(object, "", bucket, upload.Stream)
 	if err != nil {
 		return "", err
 	}
 	go func() {
-		err := uploadTask.Start(ctx)
+		err := ut.Start(ctx)
 		uploads.RemoveByID(upload.ID)
 		obj, _, err := lfs.HeadObject(bucket, object, false)
 		if err != nil {
