@@ -254,10 +254,8 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	err = lfs.GetObject(bucket, object, bufw, complete, user.DefaultDownloadOptions())
-	if err != nil {
-		return gr, err
-	}
+	go lfs.GetObject(bucket, object, bufw, complete, user.DefaultDownloadOptions())
+
 	// Setup cleanup function to cause the above go-routine to
 	// exit in case of partial read
 	pipeCloser := func() { piper.Close() }
@@ -288,9 +286,11 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 		Start:  startOffset,
 		Length: length,
 	})
+
 	if err != nil {
 		return err
 	}
+
 	return errRes
 }
 

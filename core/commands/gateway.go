@@ -87,7 +87,7 @@ var gwStartCmd = &cmds.Command{
 			return err
 		}
 		list := &StringList{
-			ChildLists: []string{"Gateway of " + addr.String() + " started at: ", ep},
+			ChildLists: []string{"Gateway of " + addr.String() + " started at: " + ep},
 		}
 		return cmds.EmitOnce(res, list)
 	},

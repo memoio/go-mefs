@@ -145,9 +145,11 @@ func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
 			if !sc.ConnectTo(context.Background(), localNode, provider.providerID) { //连接不上此provider
 				unconPro = append(unconPro, provider.providerID)
 				continue
+			} else {
+				conPro = append(conPro, provider.providerID)
+				i++
 			}
-			conPro = append(conPro, provider.providerID)
-			i++
+
 		}
 	}
 
@@ -155,7 +157,7 @@ func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
 		return conPro, unconPro, ErrNoEnoughProvider
 	}
 
-	return conPro, unconPro, ErrNoEnoughProvider
+	return conPro, unconPro, nil
 }
 
 func (g *groupInfo) putDataToKeepers(key *metainfo.KeyMeta, value string) error {

@@ -43,6 +43,11 @@ type Service interface {
 	ShowBucketStorage(bucketName string) (uint64, error)
 }
 
+// InitUserDaemon inits
+func InitUserDaemon(node *core.MefsNode) {
+	localNode = node
+}
+
 // NewUser add a new user
 func NewUser(uid string, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int, rdo bool) (Service, error) {
 	if user, ok := allUsers.Load(uid); ok && user != nil {

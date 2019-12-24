@@ -423,6 +423,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case metainfo.RoleUser:
 		fmt.Println("started as a user")
 
+		user.InitUserDaemon(node)
+
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
 			return err

@@ -45,6 +45,7 @@ type uploadTask struct { //一个上传任务实例
 
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
+	log.Println("PutObject: ", bucketName, objectName)
 	if !l.online {
 		return nil, errors.New("user is not running")
 	}
@@ -178,7 +179,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	breakFlag := false
 
 	blockMetas := make([]blockMeta, bc)
-	data := make([]byte, 0, readByte)
+	data := make([]byte, readByte)
 
 	h := md5.New()
 Loop:
@@ -189,7 +190,6 @@ Loop:
 			return nil
 		default:
 			readLen := readByte - int(u.curOffset)*readUnit
-			data = data[:0]
 			//尽量一次性读一整个stripe所需数据
 			n, err := io.ReadAtLeast(u.reader, data, readLen)
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -197,15 +197,18 @@ Loop:
 			} else if err != nil {
 				return err
 			}
+
+			tmp := data[:n]
+
 			// 对整个文件的数据进行MD5校验
-			h.Write(data)
+			h.Write(tmp)
 
 			// encrypt
 			if u.encrypt {
-				if len(data)%aes.BlockSize != 0 {
-					data = aes.PKCS5Padding(data)
+				if len(tmp)%aes.BlockSize != 0 {
+					tmp = aes.PKCS5Padding(tmp)
 				}
-				data, err = aes.AesEncrypt(data, u.sKey[:])
+				tmp, err = aes.AesEncrypt(tmp, u.sKey[:])
 				if err != nil {
 					return err
 				}
@@ -218,7 +221,7 @@ Loop:
 				return err
 			}
 
-			encodedData, offset, err := enc.Encode(data, bm.ToString(3), int32(u.curOffset))
+			encodedData, offset, err := enc.Encode(tmp, bm.ToString(3), int32(u.curOffset))
 			if err != nil {
 				log.Println("encodedData", err)
 				return err
@@ -304,11 +307,11 @@ Loop:
 				}
 			}
 			u.length += int64(n)
-			if u.curOffset >= int64(utils.SegementCount-1) { //如果写满了一个stripe
+			if offset >= int(utils.SegementCount-1) { //如果写满了一个stripe
 				u.curStripe++
 				u.curOffset = 0
 			} else {
-				u.curOffset++
+				u.curOffset = int64(offset + 1)
 			}
 			if breakFlag {
 				u.etag = hex.EncodeToString(h.Sum(nil))

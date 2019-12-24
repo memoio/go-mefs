@@ -670,10 +670,7 @@ var lfsGetObjectCmd = &cmds.Command{
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
 		options := user.DefaultDownloadOptions()
-		err = lfs.GetObject(req.Arguments[0], req.Arguments[1], bufw, complete, options)
-		if err != nil {
-			return err
-		}
+		go lfs.GetObject(req.Arguments[0], req.Arguments[1], bufw, complete, options)
 
 		return res.Emit(piper)
 	},

@@ -251,7 +251,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	for _, provider := range g.providers {
 		_, err = sendMetaRequest(kmPid, g.userID, provider.providerID)
 		if err != nil {
-			log.Println("Send provider", provider, " err:", err)
+			log.Println("Send provider", provider.providerID, " err:", err)
 		}
 	}
 	log.Println(g.userID + ":Group Service is ready")

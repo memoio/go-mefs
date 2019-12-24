@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
-	"errors"
-	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -91,6 +89,7 @@ type downloadTask struct {
 
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
+	log.Println("GetObject: ", bucketName, objectName)
 	ok := IsOnline(l.userID)
 	if !ok {
 		return ErrLfsServiceNotReady
@@ -117,13 +116,14 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 	if !ok || object == nil || object.Deletion {
 		return ErrObjectNotExist
 	}
-	if opts.Start+opts.Length > object.Size {
-		return ErrObjectOptionsInvalid
-	}
 
 	length := opts.Length
 	if opts.Length < 0 {
 		length = object.GetSize() - opts.Start
+	}
+
+	if opts.Start+length > object.Size {
+		return ErrObjectOptionsInvalid
 	}
 
 	stripeSize := int64(utils.BlockSize * bucket.DataCount)
@@ -139,18 +139,9 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 
 	decoder := dataformat.NewDataCoder(bucket.Policy, bucket.DataCount, bucket.ParityCount, int32(bucket.TagFlag), bucket.SegmentSize, l.keySet)
 
-	var skey [32]byte
-	if bucket.Encryption {
-		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-		tmpkey := l.privateKey
-		tmpkey = append(tmpkey, byte(bucket.BucketID))
-		skey = sha256.Sum256(tmpkey)
-	}
-
 	dl := &downloadTask{
 		userID:       l.userID,
 		bucketID:     bucket.BucketID,
-		sKey:         skey,
 		group:        l.gInfo,
 		decoder:      decoder,
 		state:        Pending,
@@ -161,6 +152,14 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 		dLength:      length,
 		writer:       writer,
 		completeFunc: completeFuncs,
+	}
+
+	if bucket.Encryption {
+		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
+		tmpkey := l.privateKey
+		tmpkey = append(tmpkey, byte(bucket.BucketID))
+		dl.sKey = sha256.Sum256(tmpkey)
+		dl.encrypt = true
 	}
 
 	return dl.Start(context.Background())
@@ -179,41 +178,46 @@ func (do *downloadTask) Start(ctx context.Context) error {
 
 	job := newDownloadJob(do.userID, do.bucketID, do.encrypt, do.sKey, do.decoder, do.group, do.writer)
 	//构造任务并运行
-	for {
-		var remain int64
-		//如果当前seg offset从0开始
-		if segStart == 0 {
-			if do.dLength <= (curStripe-do.curStripe)*stripeSize-segPos-do.dStart {
-				//最后剩下一部分
-				remain = (do.dLength + segPos + do.dStart) % (stripeSize)
-			} else {
-				//填满一整个stripe
-				remain = stripeSize
+	var remain int64
+	//只有下载任务的第一个stripe才可能从非0的offset开始
+	if do.dLength <= stripeSize-segPos-do.dStart {
+		//第一种情况，处在某一个stripe的中间
+		remain = do.dLength
+	} else {
+		//第二种情况，此stripe填到末尾
+		remain = stripeSize - segPos - do.dStart
+	}
 
-			}
-		} else {
-			//只有下载任务的第一个stripe才可能从非0的offset开始
-			if do.dLength <= stripeSize-segPos-do.dStart {
-				//第一种情况，处在某一个stripe的中间
-				remain = do.dLength
-			} else {
-				//第二种情况，此stripe填到末尾
-				remain = stripeSize - segPos - do.dStart
-			}
-		}
+	for {
 		//重复读取stripe中所需内容
 		n, err := job.rangeRead(ctx, curStripe-1, segStart, dStart, remain)
 		if err != nil {
 			do.Complete(err)
 			return err
 		}
+
+		if n != remain {
+			log.Println("length is not match")
+		}
+
 		do.sizeReceived += int(n)
+
 		if int64(do.sizeReceived) >= do.dLength {
 			break
 		}
+
 		curStripe++
 		dStart = 0
 		segStart = 0
+
+		if do.dLength <= (curStripe-do.curStripe)*stripeSize-segPos-do.dStart {
+			//最后剩下一部分
+			remain = (do.dLength + segPos + do.dStart) % (stripeSize)
+		} else {
+			//填满一整个stripe
+			remain = stripeSize
+
+		}
 	}
 	if w, ok := do.writer.(*bufio.Writer); ok {
 		w.Flush()
@@ -270,79 +274,75 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		return 0, err
 	}
 
-	datas := make([][]byte, blockCount)
-	var tempReceiveBlockCount int32
-	var needRepair = true //是否需要修复
+	var count int32
 	var data []byte
-Loop:
+	needRepair := true //是否需要修复
+	datas := make([][]byte, blockCount)
+
 	for i := 0; i < int(blockCount); i++ {
-		select {
-		case <-ctx.Done(): //取消了本次下载
-			fmt.Println("Cancel download")
-			return 0, errors.New("Task canceled")
-		default:
-			if blockCount-int32(i)+tempReceiveBlockCount < dataCount {
-				log.Printf("Get Obeject failed, Err: %v\n", ErrCannotGetEnoughBlock)
-				return 0, ErrCannotGetEnoughBlock
-			}
-			bm.SetBid(strconv.Itoa(i))
-			ncid := bm.ToString()
-			provider, _, err := ds.group.getBlockProviders(ncid)
-			if err != nil || provider == ds.userID {
-				log.Printf("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
-				continue Loop
-			}
+		// fails too many, no need to download
+		if blockCount-int32(i)+count < dataCount {
+			log.Printf("Get Obeject failed, Err: %v\n", ErrCannotGetEnoughBlock)
+			return 0, ErrCannotGetEnoughBlock
+		}
 
-			//user给channel合约签名，发给provider
-			mes, money, err := ds.getMessage(ncid, provider)
-			if err != nil {
-				continue Loop
-			}
+		bm.SetBid(strconv.Itoa(i))
+		ncid := bm.ToString()
+		provider, _, err := ds.group.getBlockProviders(ncid)
+		if err != nil || provider == ds.userID {
+			log.Printf("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
+			continue
+		}
 
-			//获取数据块
-			b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
-			if err != nil {
-				log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
-				continue Loop
-			}
-			blkData := b.RawData()
-			//需要检查数据块的长度也没问题
-			ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(ds.decoder.TagFlag), int(ds.decoder.SegmentSize), int(dataCount), int(parityCount), int(remain), ds.decoder.Policy)
-			if !ok {
-				log.Printf("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
-				continue Loop
-			}
+		//user给channel合约签名，发给provider
+		mes, money, err := ds.getMessage(ncid, provider)
+		if err != nil {
+			continue
+		}
 
-			if ok := dataformat.VerifyBlock(blkData, ncid, ds.decoder.KeySet.Pk); !ok || err != nil {
-				log.Println("Verify Block failed.", ncid, "from:", provider)
-				continue Loop
-			}
+		//获取数据块
+		b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
+		if err != nil {
+			log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
+			continue
+		}
+		blkData := b.RawData()
+		//需要检查数据块的长度也没问题
+		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(ds.decoder.TagFlag), int(ds.decoder.SegmentSize), int(dataCount), int(parityCount), int(remain), ds.decoder.Policy)
+		if !ok {
+			log.Printf("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
+			continue
+		}
 
-			if !cfg.Test {
-				//下载数据成功，将内存的channel的value更改
-				cItem, err := getChannelItem(ds.userID, provider)
-				if err == nil && cItem != nil {
-					log.Println("下载成功，更改内存中channel.value", cItem.ChannelAddr, money.String())
-					cItem.Value = money
-				}
-			}
+		if ok := dataformat.VerifyBlock(blkData, ncid, ds.decoder.KeySet.Pk); !ok || err != nil {
+			log.Println("Verify Block failed.", ncid, "from:", provider)
+			continue
+		}
 
-			if ds.decoder.Policy == dataformat.RsPolicy {
-				datas[i] = blkData
-			} else {
-				datas[0] = blkData
-			}
-			tempReceiveBlockCount++
-
-			if tempReceiveBlockCount >= dataCount {
-				if i == int(dataCount)-1 {
-					needRepair = false
-				}
-				break Loop
+		if !cfg.Test {
+			//下载数据成功，将内存的channel的value更改
+			cItem, err := getChannelItem(ds.userID, provider)
+			if err == nil && cItem != nil {
+				log.Println("下载成功，更改内存中channel.value", cItem.ChannelAddr, money.String())
+				cItem.Value = money
 			}
 		}
+
+		if ds.decoder.Policy == dataformat.RsPolicy {
+			datas[i] = blkData
+		} else {
+			datas[0] = blkData
+		}
+		count++
+
+		if count >= dataCount {
+			if i == int(dataCount)-1 {
+				needRepair = false
+			}
+			break
+		}
 	}
-	if tempReceiveBlockCount < dataCount {
+	if count < dataCount {
 		log.Println("Download failed-", ErrCannotGetEnoughBlock)
 		return 0, ErrCannotGetEnoughBlock
 	}
@@ -351,6 +351,11 @@ Loop:
 		log.Println("Download failed-", err)
 		return 0, err
 	}
+
+	if remain+offset > int64(len(data)) {
+		return 0, ErrCannotGetEnoughBlock
+	}
+
 	if int64(len(data)) > remain+offset {
 		if ds.encrypt {
 			padding := aes.BlockSize - ((remain-1)%aes.BlockSize + 1)
@@ -378,9 +383,6 @@ Loop:
 		return remain, nil
 	}
 
-	if remain+offset > int64(len(data)) {
-		return 0, ErrCannotGetEnoughBlock
-	}
 	if ds.encrypt {
 		data, err = aes.AesDecrypt(data, ds.sKey[:])
 		if err != nil {
@@ -388,11 +390,17 @@ Loop:
 			return 0, err
 		}
 	}
+
 	//使用匿名函数调度
-	_, err = ds.writer.Write(data[offset : offset+remain])
+	wl, err := ds.writer.Write(data[offset : offset+remain])
 	if err != nil {
 		return 0, err
 	}
+
+	if int64(wl) != remain {
+		log.Println("write length is not equal")
+	}
+
 	return remain, nil
 }
 

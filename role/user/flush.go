@@ -112,7 +112,7 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 		return err
 	}
 	providers, _, err := l.gInfo.getProviders(int(sb.MetaBackupCount))
-	if err != nil {
+	if err != nil && len(providers) == 0 {
 		return err
 	}
 	for j := 0; j < len(providers); j++ { //
@@ -195,13 +195,13 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
 	MetaBackupCount := l.meta.sb.MetaBackupCount
-	providers, _, _ := l.gInfo.getProviders(int(MetaBackupCount))
-	if providers == nil {
-		return ErrNoProviders
+	providers, _, err := l.gInfo.getProviders(int(MetaBackupCount))
+	if err != nil && len(providers) == 0 {
+		return err
 	}
 	BucketBuffer := bytes.NewBuffer(nil)
 	BucketDelimitedWriter := ggio.NewDelimitedWriter(BucketBuffer)
-	err := BucketDelimitedWriter.WriteMsg(&bucket.BucketInfo)
+	err = BucketDelimitedWriter.WriteMsg(&bucket.BucketInfo)
 	if err != nil {
 		return err
 	}
@@ -355,9 +355,9 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
 	MetaBackupCount := l.meta.sb.MetaBackupCount
-	providers, _, _ := l.gInfo.getProviders(int(MetaBackupCount))
-	if providers == nil {
-		return ErrNoProviders
+	providers, _, err := l.gInfo.getProviders(int(MetaBackupCount))
+	if err != nil && len(providers) == 0 {
+		return err
 	}
 	objectsBuffer := bytes.NewBuffer(nil)
 	objectDelimitedWriter := ggio.NewDelimitedWriter(objectsBuffer)
