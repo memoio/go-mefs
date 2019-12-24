@@ -68,7 +68,7 @@ func deployUpKeepingAndChannel(userID string, ks []*keeperInfo, ps []*providerIn
 	var moneyToChannel = new(big.Int)
 	moneyToChannel = moneyToChannel.Mul(big.NewInt(storeSize), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
 
-	log.Println("Begin to dploy channel contract...")
+	log.Println("Begin to deploy channel contract...")
 
 	var wg sync.WaitGroup
 	for _, proAddr := range providers {
