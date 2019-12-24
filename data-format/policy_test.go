@@ -23,7 +23,7 @@ var buckid = 1
 // 因只考虑生成3+2个stripe，故测试Rs时，文件长度不超过3M；测试Mul时，文件长度不超过1M
 var Rslen = 2 * 1024 * 1024
 var Mullen = 1 * 1024 * 1024
-var opt = &DataEncoder{
+var opt = &DataCoder{
 	DataCount:   3,
 	ParityCount: 2,
 	TagFlag:     BLS12,

@@ -3,10 +3,12 @@ package user
 import (
 	"container/list"
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
 
+	mcl "github.com/memoio/go-mefs/bls12"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	"github.com/memoio/go-mefs/utils/bitset"
 )
@@ -24,22 +26,6 @@ type LfsInfo struct {
 	inProcess  int //atomic
 	context    context.Context
 	cancelFunc context.CancelFunc
-}
-
-// Service defines user's function
-type Service interface {
-	Start() error
-	Stop()
-	Flush() error
-	ListBucket(prefix string) ([]*pb.BucketInfo, error)
-	CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
-	HeadBucket(bucketName string) (*pb.BucketInfo, error)
-	DeleteBucket(bucketName string) (*pb.BucketInfo, error)
-	DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error)
-	HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, error)
-	PutObject(bucketName, objectName string, reader io.Reader) error
-	GetObject(bucketName, objectName string)
-	IsOnline() bool
 }
 
 // Logs records lfs metainfo
@@ -82,9 +68,9 @@ func (l *LfsInfo) Start() error {
 		return errors.New("The user is running")
 	}
 
-	l.state = false
+	l.online = false
 
-	has, err = u.gInfo.start(l.context)
+	has, err := l.gInfo.start(l.context)
 	if err != nil {
 		log.Println("start group err: ", err)
 		return err
@@ -92,7 +78,7 @@ func (l *LfsInfo) Start() error {
 
 	if has {
 		// init or send bls config
-		mkey, err := loadBLS12Config(userID, l.gInfo.tempKeepers, l.privateKey)
+		mkey, err := loadBLS12Config(l.userID, l.gInfo.tempKeepers, l.privateKey)
 
 		if err != nil || mkey == nil {
 			log.Println("no bls config err: ", err)
@@ -100,13 +86,13 @@ func (l *LfsInfo) Start() error {
 		}
 		l.keySet = mkey
 	} else {
-		mkey, err := userBLS12ConfigInit()
+		mkey, err := initBLS12Config()
 		if err != nil {
 			log.Println("init bls config err: ", err)
 			return err
 		}
 
-		putUserConfig(userID, l.gInfo.tempKeepers, l.privateKey, mkey)
+		putUserConfig(l.userID, l.gInfo.tempKeepers, l.privateKey, mkey)
 
 		l.keySet = mkey
 	}
@@ -186,10 +172,16 @@ func newSuperBlock() *superBlock {
 	}
 }
 
-// Start starts user's info
-func (l *LfsInfo) Stop() error {
+// Stop user's info
+func (l *LfsInfo) Stop() {
 	//用于通知资源释放
 	l.cancelFunc()
+}
+
+// Online user's info
+func (l *LfsInfo) Online() bool {
+	//用于通知资源释放
+	return l.online
 }
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
@@ -231,7 +223,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			l.meta.sb.RUnlock()
 			return err
 		}
-		log.Println("Flush Superblock to local finish. The uid is ", l.userid)
+		log.Println("Flush Superblock to local finish. The uid is ", l.userID)
 	}
 	l.meta.sb.RUnlock()
 
@@ -245,7 +237,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("Flush %s BucketInfo and objects Info to local finish. The uid is %s\n", bucket.Name, l.userid)
+			log.Printf("Flush %s BucketInfo and objects Info to local finish. The uid is %s\n", bucket.Name, l.userID)
 		}
 	}
 
@@ -272,7 +264,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 				return err
 			}
 			bucket.dirty = false
-			log.Printf("Flush %s BucketInfo and objects Info to provider finish. The uid is %s\n", bucket.Name, l.useriID)
+			log.Printf("Flush %s BucketInfo and objects Info to provider finish. The uid is %s\n", bucket.Name, l.userID)
 		}
 	}
 	saveChannelValue(l.userID)

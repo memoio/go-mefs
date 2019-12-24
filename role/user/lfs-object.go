@@ -11,12 +11,17 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
+// ObjectOptions is
+type ObjectOptions struct {
+	UserDefined map[string]string
+}
+
 // DeleteObject deletes a object in lfs
 func (l *LfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, err
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
@@ -54,61 +59,60 @@ func (l *LfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, e
 }
 
 // HeadObject get the info of an object
-func (l *LfsInfo) HeadObject(bucketName, objectName string, avail bool) (*pb.ObjectInfo, string, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, "", err
+func (l *LfsInfo) HeadObject(bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error) {
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
-		return nil, "", ErrBucketNotExist
+		return nil, ErrBucketNotExist
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
-		return nil, "", ErrBucketNotExist
+		return nil, ErrBucketNotExist
 	}
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
-		return nil, "", ErrBucketNotExist
+		return nil, ErrBucketNotExist
 	}
 	// TODO:具体实现
 	if bucket.objects == nil {
-		return nil, "", ErrObjectNotExist
+		return nil, ErrObjectNotExist
 	}
 	objectElement, ok := bucket.objects[objectName]
 	if !ok || objectElement == nil {
-		return nil, "", ErrObjectNotExist
+		return nil, ErrObjectNotExist
 	}
 	object, ok := objectElement.Value.(*objectInfo)
 	if !ok {
-		return nil, "", ErrObjectNotExist
+		return nil, ErrObjectNotExist
 	}
-	var AvailTime string
-	if avail {
-		AvailTime, _ = l.GetObjectAvailTime(object)
-	}
-	return &object.ObjectInfo, AvailTime, nil
+	//var AvailTime string
+	//if avail {
+	//	AvailTime, _ = l.GetObjectAvailTime(object)
+	//}
+	return &object.ObjectInfo, nil
 }
 
-// ListObject lists all objects of a bucket
-func (l *LfsInfo) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectInfo, []string, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, nil, err
+// ListObjects lists all objects of a bucket
+func (l *LfsInfo) ListObjects(bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error) {
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
-		return nil, nil, ErrObjectNotExist
+		return nil, ErrObjectNotExist
 	}
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
-		return nil, nil, ErrBucketNotExist
+		return nil, ErrBucketNotExist
 	}
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
-		return nil, nil, ErrBucketNotExist
+		return nil, ErrBucketNotExist
 	}
 	var objects []*pb.ObjectInfo
-	var availTimes []string
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		if objectElement == nil {
 			continue
@@ -117,35 +121,31 @@ func (l *LfsInfo) ListObject(bucketName, pre string, avail bool) ([]*pb.ObjectIn
 		if !ok || object.Deletion {
 			continue
 		}
-		if avail {
-			if strings.HasPrefix(object.Name, pre) {
-				objects = append(objects, &object.ObjectInfo)
-				availTime, _ := l.GetObjectAvailTime(object)
-				availTimes = append(availTimes, availTime)
-			}
-		} else {
-			if strings.HasPrefix(object.Name, pre) {
-				objects = append(objects, &object.ObjectInfo)
-			}
+		//if avail {
+		//	if strings.HasPrefix(object.Name, pre) {
+		//		objects = append(objects, &object.ObjectInfo)
+		//		availTime, _ := l.GetObjectAvailTime(object)
+		//		availTimes = append(availTimes, availTime)
+		//	}
+		if strings.HasPrefix(object.Name, prefix) {
+			objects = append(objects, &object.ObjectInfo)
 		}
 	}
-	return objects, availTimes, nil
+	return objects, nil
 }
 
-// ShowStorageSpaceAll show lfs used space without appointed bucket
-func (l *LfsInfo) ShowStorageSpaceAll() ([]uint64, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, err
+// ShowStorage show lfs used space without appointed bucket
+func (l *LfsInfo) ShowStorage() (uint64, error) {
+	if !l.online {
+		return 0, ErrLfsServiceNotReady
 	}
 
 	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
+		return 0, ErrBucketNotExist
 	}
 
-	storageSpaceAll := make([]uint64, 0, len(l.meta.bucketByID))
+	var storageSpace uint64
 	for _, bucket := range l.meta.bucketByID {
-		var storageSpace int64
 
 		for _, objectElement := range bucket.objects {
 			if objectElement == nil {
@@ -157,21 +157,19 @@ func (l *LfsInfo) ShowStorageSpaceAll() ([]uint64, error) {
 				continue
 			}
 
-			storageSpace += object.GetSize()
+			storageSpace += uint64(object.GetSize())
 		}
-
-		storageSpaceAll = append(storageSpaceAll, uint64(storageSpace))
 	}
 
-	return storageSpaceAll, nil
+	return storageSpace, nil
 }
 
-// ShowStorageSpace show lfs used space
-func (l *LfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return 0, err
+// ShowBucketStorage show lfs used spaceBucket
+func (l *LfsInfo) ShowBucketStorage(bucketName string) (uint64, error) {
+	if !l.online {
+		return 0, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
 		return 0, ErrBucketNotExist
 	}
@@ -184,7 +182,7 @@ func (l *LfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
 	if !ok || bucket == nil || bucket.Deletion {
 		return 0, ErrBucketNotExist
 	}
-	var storageSpace int
+	var storageSpace uint64
 	for _, objectElement := range bucket.objects {
 		if objectElement == nil {
 			continue
@@ -193,14 +191,14 @@ func (l *LfsInfo) ShowStorageSpace(bucketName, pre string) (int, error) {
 		if !ok || object.Deletion {
 			continue
 		}
-		storageSpace += int(object.GetSize())
+		storageSpace += uint64(object.GetSize())
 	}
 	return storageSpace, nil
 }
 
 func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
-	gp := getGroup(l.userid)
+	gp := getGroup(l.userID)
 	_, conkeepers, err := gp.getKeepers(-1)
 	if err != nil {
 		return latestTime, err
@@ -230,11 +228,11 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 }
 
 // GetObjectAvailTime get available time of objects
-func (l *LfsInfo) GetObjectAvailTime(object *objectInfo) (string, error) {
+func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := l.meta.bucketByID[object.BucketID]
 	blockCount := bucket.DataCount + bucket.ParityCount
-	bm, err := metainfo.NewBlockMeta(l.userid, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
+	bm, err := metainfo.NewBlockMeta(l.userID, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
 	if err != nil {
 		return "", err
 	}

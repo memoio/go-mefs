@@ -63,7 +63,7 @@ var (
 	ErrNoKeepers             = errors.New("there is no keepers")
 	ErrNoEnoughProvider      = errors.New("no enough providers")
 	ErrNoEnoughKeeper        = errors.New("no enough keepers")
-	ErrCannotConnectNetwork  = errors.New("cannot connect network")
+	ErrCannotConnectNetwork  = errors.New("cannot connect")
 	ErrCannotDeleteMetaBlock = errors.New("cannot delete metablock in provider")
 
 	ErrBucketNotExist     = errors.New("bucket not exist")
@@ -85,15 +85,27 @@ var (
 )
 
 func putKeyTo(key, value, node string) error {
-	if node != "local" && localNode.PeerHost.Network().Connectedness(node) != inet.Connected {
-		sc.ConnectTo(context.Background(), localNode, node)
+	if node != "local" {
+		pid, err := peer.IDB58Decode(node)
+		if err != nil {
+			return err
+		}
+		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
+			sc.ConnectTo(context.Background(), localNode, node)
+		}
 	}
 	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
 }
 
 func getKeyFrom(key, node string) ([]byte, error) {
-	if node != "local" && localNode.PeerHost.Network().Connectedness(node) != inet.Connected {
-		sc.ConnectTo(context.Background(), localNode, node)
+	if node != "local" {
+		pid, err := peer.IDB58Decode(node)
+		if err != nil {
+			return nil, err
+		}
+		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
+			sc.ConnectTo(context.Background(), localNode, node)
+		}
 	}
 
 	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)

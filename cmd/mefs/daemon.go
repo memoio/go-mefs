@@ -422,7 +422,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	case metainfo.RoleUser:
 		fmt.Println("started as a user")
-		user.InitUserBook(node)
 
 		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
@@ -432,7 +431,17 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 		if cfg.Test {
 			go func() {
-				err = user.StartUser(node.Identity.Pretty(), cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
+				lfs, err := user.NewUser(node.Identity.Pretty(), cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
+				if err != nil {
+					fmt.Println("Start local user failed:", err)
+					err := user.KillUser(node.Identity.Pretty())
+					if err != nil {
+						fmt.Println("lfsuser.KillUser failed:", err)
+					}
+					return
+				}
+
+				err = lfs.Start()
 				if err != nil {
 					fmt.Println("Start local user failed:", err)
 					err := user.KillUser(node.Identity.Pretty())

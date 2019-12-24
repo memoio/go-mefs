@@ -6,7 +6,7 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 )
 
-type DataEncoder struct {
+type DataCoder struct {
 	Policy      int32 // 1为RS纠删码，2为Mul多副本
 	DataCount   int32 // 若为多副本，则副本总数等于DataCount+ParityCount
 	ParityCount int32 // 若为多副本，
@@ -15,20 +15,13 @@ type DataEncoder struct {
 	KeySet      *mcl.KeySet
 }
 
-//DataDecoder 用于用一个stripe中获取纯数据，无tag
-type DataDecoder struct {
-	Policy      int32 // 1为RS纠删码，2为Mul多副本
-	DataCount   int32 // 若为多副本，则副本总数等于DataCount+ParityCount
-	ParityCount int32 // 若为多副本，
-}
-
 // 构建一个dataformat配置
-func NewDataEncoder(policy int32, dataCount, pairtyCount, tagflag int32, segmentSize uint64, keyset *mcl.KeySet) *DataEncoder {
+func NewDataCoder(policy int32, dataCount, pairtyCount, tagflag int32, segmentSize uint64, keyset *mcl.KeySet) *DataCoder {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
 	}
 
-	newOpt := &DataEncoder{
+	newOpt := &DataCoder{
 		Policy:      policy,
 		DataCount:   dataCount,
 		ParityCount: pairtyCount,
@@ -41,7 +34,7 @@ func NewDataEncoder(policy int32, dataCount, pairtyCount, tagflag int32, segment
 
 // Encode的策略选择
 // 传入数据，返回编码后的stripe或者多副本
-func (opt *DataEncoder) Encode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int, error) {
+func (opt *DataCoder) Encode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int, error) {
 	var stripe [][]byte
 	var offset int32
 	var err error
@@ -62,7 +55,7 @@ func (opt *DataEncoder) Encode(data []byte, ncidPrefix string, beginOffset int32
 	return stripe, int(offset), nil
 }
 
-func (opt *DataEncoder) mulEncode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int32, error) {
+func (opt *DataCoder) mulEncode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int32, error) {
 	if beginOffset == 0 {
 		stripe, offset, err := DataEncodeToMul(data, ncidPrefix, opt.DataCount, opt.ParityCount, opt.SegmentSize, uint64(opt.TagFlag), opt.KeySet)
 		if err != nil {
@@ -78,7 +71,7 @@ func (opt *DataEncoder) mulEncode(data []byte, ncidPrefix string, beginOffset in
 	return stripe, int32(offset), nil
 }
 
-func (opt *DataEncoder) rsEncode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int32, error) {
+func (opt *DataCoder) rsEncode(data []byte, ncidPrefix string, beginOffset int32) ([][]byte, int32, error) {
 	if beginOffset == 0 {
 		stripe, offset, err := EncodeDataToPreStripe(data, ncidPrefix, int(opt.DataCount), int(opt.ParityCount), int(opt.TagFlag), opt.SegmentSize, opt.KeySet)
 		if err != nil {
@@ -93,15 +86,7 @@ func (opt *DataEncoder) rsEncode(data []byte, ncidPrefix string, beginOffset int
 	return stripe, int32(offset), nil
 }
 
-func NewDataDecoder(policy, dataCount, pairtyCount int32) (*DataDecoder, error) {
-	return &DataDecoder{
-		Policy:      policy,
-		DataCount:   dataCount,
-		ParityCount: pairtyCount,
-	}, nil
-}
-
-func (dec *DataDecoder) Decode(datas [][]byte, offsetStart int, needRepair bool) ([]byte, error) {
+func (dec *DataCoder) Decode(datas [][]byte, offsetStart int, needRepair bool) ([]byte, error) {
 	var data []byte
 	var err error
 	switch dec.Policy {

@@ -17,8 +17,8 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func deployUpKeepingAndChannel(userID string, sk []byte, ks []keeperInfo, ps []providerInfo, storeDays int64, storeSize int64, storePrice int64) error {
-	hexSk := utils.EthSkByteToEthString(sk)
+func deployUpKeepingAndChannel(userID string, ks []*keeperInfo, ps []*providerInfo, storeDays int64, storeSize int64, storePrice int64) error {
+	hexSk := utils.EthSkByteToEthString(getSk(userID))
 	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return err

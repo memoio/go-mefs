@@ -381,17 +381,24 @@ var lfsStartUserCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		err = user.StartUser(uid, false, pwd, capacity, duration, price, ks, ps, rdo)
+		lfs, err := user.NewUser(uid, false, pwd, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			user.KillUser(uid)
 			return err
 		}
+
+		err = lfs.Start()
+		if err != nil {
+			user.KillUser(uid)
+			return err
+		}
+
 		// 等待启动完成, 4minute
 		waitLimited := 160
 		waitCount := 0
 		tick := time.Tick(3 * time.Second)
 		for {
-			if user.IsUserOnline(uid) == true {
+			if lfs.Online() {
 				break
 			}
 			select {
@@ -459,15 +466,22 @@ var lfsHeadObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
-		object, availTime, err := lfsService.HeadObject(req.Arguments[0], req.Arguments[1], true)
+
+		object, err := lfs.HeadObject(req.Arguments[0], req.Arguments[1], user.ObjectOptions{})
 		if err != nil {
 			return err
 		}
-		availTim, err := time.Parse(utils.BASETIME, availTime)
+
+		avail, err := lfs.GetObjectAvailTime(object)
+		if err != nil {
+			return err
+		}
+
+		availTim, err := time.Parse(utils.BASETIME, avail)
 		if err != nil {
 			availTim = time.Unix(0, 0)
 		}
@@ -538,41 +552,46 @@ var lfsPutObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
-		BucketName := req.Arguments[0]
+
+		bucketName := req.Arguments[0]
 		objectName := req.Options[ObjectName].(string)
 		f := req.Files.Entries()
-		var upload user.Job
 		//目前只上传第一个文件
-		if f.Next() {
-			if objectName == "" {
-				objectName = f.Name()
-			}
-			file := f.Node()
-			var fileNext files.File
-			switch fileType := file.(type) {
-			case files.Directory:
-				return errors.New("unsupported now")
-			case files.File:
-				fileNext = fileType
-			}
-			upload, err = lfsService.ConstructUpload(objectName, "", BucketName, fileNext)
-			if err != nil {
-				return err
-			}
-		} else {
+		if !f.Next() {
 			return errNoFileToUpload
 		}
-		//此处Context是否应改为User的Context，否则在过程中kill user时，行为未定义
-		err = upload.Start(req.Context)
+
+		if objectName == "" {
+			objectName = f.Name()
+		}
+		file := f.Node()
+		var fileNext files.File
+		switch fileType := file.(type) {
+		case files.Directory:
+			return errors.New("unsupported now")
+		case files.File:
+			fileNext = fileType
+		}
+		object, err := lfs.PutObject(bucketName, objectName, fileNext)
 		if err != nil {
 			return err
 		}
+
+		ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
+		objectStat := ObjectStat{
+			Name:  object.GetName(),
+			Size:  object.GetSize(),
+			MD5:   object.GetETag(),
+			Ctime: ctime.Format(utils.SHOWTIME),
+			Dir:   false,
+		}
 		return cmds.EmitOnce(res, &Objects{
-			Method: "Put Object Success",
+			Method:  "Put Object Success",
+			Objects: []ObjectStat{objectStat},
 		})
 	},
 	Type: Objects{},
@@ -632,10 +651,12 @@ var lfsGetObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
+
 		piper, pipew := io.Pipe()
 		bufw := bufio.NewWriterSize(pipew, user.DefaultBufSize)
 		checkErrAndClosePipe := func(err error) error {
@@ -649,13 +670,10 @@ var lfsGetObjectCmd = &cmds.Command{
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
 		options := user.DefaultDownloadOptions()
-		dl, err := lfsService.ConstructDownload(req.Arguments[0], req.Arguments[1], bufw, complete, options)
+		err = lfs.GetObject(req.Arguments[0], req.Arguments[1], bufw, complete, options)
 		if err != nil {
 			return err
 		}
-
-		//此处Context是否应改为User的Context，否则在过程中kill user时，行为未定义
-		go dl.Start(req.Context)
 
 		return res.Emit(piper)
 	},
@@ -766,35 +784,33 @@ var lfsListObjectsCmd = &cmds.Command{
 		if !found {
 			avail = true
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
+
 		bucketName := req.Arguments[0]
-		objects, availTimes, err := lfsService.ListObject(bucketName, prefix, avail)
+		objects, err := lfs.ListObjects(bucketName, prefix, user.ObjectOptions{})
 		if err != nil {
 			return err
 		}
 
-		if len(objects) > len(availTimes) && avail {
-			t := time.Unix(0, 0)
-			paddingTime := t.Format(utils.SHOWTIME)
-			for i := 0; i < len(objects)-len(availTimes); i++ {
-				availTimes = append(availTimes, paddingTime)
-			}
-		}
 		objectsInfo := &Objects{
 			Method: "List Objects",
 		}
-		for i, object := range objects {
+		for _, object := range objects {
 			ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
-			availTimeShow := ""
+			// init with creation time
+			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
-				availTim, err := time.Parse(utils.BASETIME, availTimes[i])
-				if err != nil {
-					availTim = time.Unix(0, 0)
+				at, err := lfs.GetObjectAvailTime(object)
+				if err == nil {
+					availTim, err := time.Parse(utils.BASETIME, at)
+					if err == nil {
+						avaTime = availTim.Format(utils.SHOWTIME)
+					}
 				}
-				availTimeShow = availTim.Format(utils.SHOWTIME)
 			}
 			tempObState := ObjectStat{
 				Name:           object.GetName(),
@@ -802,7 +818,7 @@ var lfsListObjectsCmd = &cmds.Command{
 				MD5:            object.GetETag(),
 				Ctime:          ctime.Format(utils.SHOWTIME),
 				Dir:            false,
-				LatestChalTime: availTimeShow,
+				LatestChalTime: avaTime,
 			}
 			objectsInfo.Objects = append(objectsInfo.Objects, tempObState)
 		}
@@ -860,11 +876,12 @@ var lfsDeleteObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
-		object, err := lfsService.DeleteObject(req.Arguments[0], req.Arguments[1])
+
+		object, err := lfs.DeleteObject(req.Arguments[0], req.Arguments[1])
 		if err != nil {
 			return err
 		}
@@ -935,12 +952,13 @@ var lfsHeadBucketCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
+
 		bucketName := req.Arguments[0]
-		bucket, err := lfsService.HeadBucket(bucketName)
+		bucket, err := lfs.HeadBucket(bucketName)
 		if err != nil {
 			return err
 		}
@@ -1035,16 +1053,17 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
+
 		bucketOptions := user.DefaultBucketOptions()
 		bucketOptions.Policy = int32(policy)
 		bucketOptions.DataCount = int32(dataCount)
 		bucketOptions.ParityCount = int32(parityCount)
 		bucketOptions.Encryption = encrytion
-		bucket, err := lfsService.CreateBucket(req.Arguments[0], bucketOptions)
+		bucket, err := lfs.CreateBucket(req.Arguments[0], bucketOptions)
 		if err != nil {
 			return err
 		}
@@ -1109,12 +1128,13 @@ It outputs the following to stdout:
 			}
 		}
 
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
+
 		prefix := req.Options[PrefixFilter].(string)
-		buckets, err := lfsService.ListBucket(prefix)
+		buckets, err := lfs.ListBuckets(prefix)
 		if err != nil {
 			return err
 		}
@@ -1187,11 +1207,13 @@ It outputs the following to stdout:
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
-		bucket, err := lfsService.DeleteBucket(req.Arguments[0])
+
+		bucket, err := lfs.DeleteBucket(req.Arguments[0])
 		if err != nil {
 			return err
 		}
@@ -1305,7 +1327,7 @@ var lfsListProviderrsCmd = &cmds.Command{
 				return err
 			}
 		}
-		unconpro, conpro, _ := user.GetLocalProviders(userid)
+		conpro, unconpro, _ := user.GetProviders(userid, -1)
 		providers := make([]PeerState, len(unconpro)+len(conpro))
 		for i := 0; i < len(conpro); i++ {
 			providers[i].PeerID = conpro[i]
@@ -1352,7 +1374,11 @@ var lfsListUsersCmd = &cmds.Command{
 			if err != nil {
 				continue
 			}
-			userAddrs[i] = addr.String() + "\t" + user + "\t" + states[i]
+			if states[i] {
+				userAddrs[i] = addr.String() + "\t" + user + "\t" + "online"
+			} else {
+				userAddrs[i] = addr.String() + "\t" + user + "\t" + "offline"
+			}
 		}
 		list := &StringList{
 			ChildLists: userAddrs,
@@ -1406,16 +1432,17 @@ var lfsFsyncCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
+
 		IsForce, ok := req.Options[ForceFlush].(bool)
 		if !ok {
 			fmt.Println("input wrong isForce.")
 			return errWrongInput
 		}
-		err = lfsService.Fsync(IsForce)
+		err = lfs.Fsync(IsForce)
 		if err != nil {
 			return err
 		}
@@ -1468,23 +1495,24 @@ mefs lfs show_storage show the storage space used(kb)
 		if !found {
 			prefix = ""
 		}
-		lfsService := user.GetLfsService(userid)
-		if lfsService == nil {
+		lfs := user.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
-		buckets, err := lfsService.ListBucket(prefix)
+
+		buckets, err := lfs.ListBuckets(prefix)
 		if err != nil {
 			return err
 		}
-		var StorageSize int
+		var storageSize uint64
 		for _, bucket := range buckets {
-			storageSpace, err := lfsService.ShowStorageSpace(bucket.Name, prefix)
+			storageSpace, err := lfs.ShowBucketStorage(bucket.Name)
 			if err != nil {
 				return err
 			}
-			StorageSize += storageSpace
+			storageSize += storageSpace
 		}
-		FloatStorage := float64(StorageSize)
+		FloatStorage := float64(storageSize)
 		var OutStorage string
 		if FloatStorage < 1024 && FloatStorage >= 0 {
 			OutStorage = fmt.Sprintf("%.2f", FloatStorage) + "B"

@@ -10,7 +10,7 @@ import (
 )
 
 func initBLS12Config() (*mcl.KeySet, error) {
-	log.Printf("Generating BLS12 Sk and Pk for %s: \n", gp.userid)
+	log.Println("Generating BLS12 Sk and Pk")
 	kset, err := mcl.GenKeySet()
 	if err != nil {
 		log.Println("Init BlS12 keyset error: ", err)
@@ -65,27 +65,28 @@ func loadBLS12Config(userID string, keepers []string, sk []byte) (keySet *mcl.Ke
 	userBLS12ConfigKey := kmBls.ToString()
 	userBLS12config, err := getKeyFrom(userBLS12ConfigKey, "local")
 	if err == nil && len(userBLS12config) > 0 { //先从本地找，如果有就解析一下
-		keySet, err = parseBLS12ConfigMeta(sk, userBLS12config)
+		mkey, err := parseBLS12ConfigMeta(sk, userBLS12config)
+		if err == nil && keySet != nil {
+			keySet = mkey
+		}
 	}
 
 	//get from remote
 	found := false
-	mkey := &mcl.KeySet{}
 	bmap := make(map[string]bool)
 	for _, kid := range keepers {
 		userBLS12config, err = getKeyFrom(userBLS12ConfigKey, kid)
 		if err == nil && len(userBLS12config) > 0 {
-			mkeySet, err = parseBLS12ConfigMeta(sk, userBLS12config)
-			if err == nil {
+			mkey, err := parseBLS12ConfigMeta(sk, userBLS12config)
+			if err == nil && mkey != nil {
 				found = true
+				if keySet == nil {
+					keySet = mkey
+				}
 				break
 			}
 			bmap[kid] = true
 		}
-	}
-
-	if keySet == nil && mkey != nil && mkey.Pk != nil {
-		keySet = mkey
 	}
 
 	// get localconfig

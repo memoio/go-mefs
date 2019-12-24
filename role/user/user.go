@@ -3,28 +3,52 @@ package user
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path"
 	"sync"
 
-	mcl "github.com/memoio/go-mefs/bls12"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	pb "github.com/memoio/go-mefs/role/user/pb"
 )
 
 var localNode *core.MefsNode
 
 var allUsers sync.Map
 
+// Service defines user's function
+type Service interface {
+	Start() error
+	Stop()
+	Fsync(bool) error
+	Online() bool
+
+	ListBuckets(prefix string) ([]*pb.BucketInfo, error)
+	CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
+	HeadBucket(bucketName string) (*pb.BucketInfo, error)
+	DeleteBucket(bucketName string) (*pb.BucketInfo, error)
+
+	ListObjects(bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error)
+
+	PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error)
+
+	GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error
+	HeadObject(bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error)
+	DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error)
+
+	ShowStorage() (uint64, error)
+	ShowBucketStorage(bucketName string) (uint64, error)
+}
+
 // NewUser add a new user
 func NewUser(uid string, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int, rdo bool) (Service, error) {
-	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return value.(*userInfo), error.New("user is running")
+	if user, ok := allUsers.Load(uid); ok && user != nil {
+		return user.(*LfsInfo), errors.New("user is running")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	// 读keystore下uid文件
 	keypath, err := config.Path("", path.Join("keystore", uid))
 	if err != nil {
@@ -49,19 +73,20 @@ func NewUser(uid string, isInit bool, pwd string, capacity int64, duration int64
 		storePrice:  price,
 		keeperSLA:   ks,
 		providerSLA: ps,
-		reDeploy:    redeploy,
+		reDeploy:    rdo,
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	lInfo := &LfsInfo{
 		userID:     uid,
 		context:    ctx,
 		cancelFunc: cancel,
 		privateKey: userkey.PrivateKey,
-		gInfo : ginfo,
-		state:      errState,
+		gInfo:      ginfo,
 	}
 
-	allUsers.Store(userID, lInfo)
+	allUsers.Store(uid, lInfo)
 
 	return lInfo, nil
 }
@@ -69,7 +94,7 @@ func NewUser(uid string, isInit bool, pwd string, capacity int64, duration int64
 // IsOnline judges
 func IsOnline(userID string) bool {
 	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return value.(*userInfo).online
+		return user.(*LfsInfo).online
 	}
 
 	return false
@@ -77,14 +102,14 @@ func IsOnline(userID string) bool {
 
 func getSk(userID string) []byte {
 	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return value.(*userInfo).privateKey
+		return user.(*LfsInfo).privateKey
 	}
 	return nil
 }
 
 func getGroup(userID string) *groupInfo {
 	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return value.(*userInfo).gInfo
+		return user.(*LfsInfo).gInfo
 	}
 	return nil
 }
@@ -101,7 +126,7 @@ func KillUser(userID string) error {
 }
 
 // GetUser gets userInfo
-func GetUser(userID string) Service {
+func GetUser(userID string) *LfsInfo {
 	if user, ok := allUsers.Load(userID); ok && user != nil {
 		return user.(*LfsInfo)
 	}
@@ -110,7 +135,6 @@ func GetUser(userID string) Service {
 
 // GetUsers gets
 func GetUsers() ([]string, []bool, error) {
-
 	var users []string
 	var states []bool
 	allUsers.Range(func(key, value interface{}) bool {
@@ -118,7 +142,7 @@ func GetUsers() ([]string, []bool, error) {
 		us := value.(*LfsInfo)
 		users = append(users, id)
 
-		states = append(states, us.)
+		states = append(states, us.online)
 
 		return true
 	})
@@ -128,17 +152,18 @@ func GetUsers() ([]string, []bool, error) {
 // PersistBeforeExit is
 func PersistBeforeExit() error {
 	allUsers.Range(func(key, value interface{}) bool {
-		uInfo := value.(*userInfo)
+		uInfo := value.(*LfsInfo)
 		if !uInfo.online {
 			return true
 		}
-		err = uInfo.Fsync(false)
+		err := uInfo.Fsync(false)
 		if err != nil {
 			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
 		} else {
 			log.Printf("User %s Persist completed\n", uInfo.userID)
 		}
 		uInfo.cancelFunc() //释放资源
+		return true
 	})
 	return nil
 }

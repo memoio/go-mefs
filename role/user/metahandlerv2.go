@@ -1,10 +1,14 @@
 package user
 
 import (
+	"context"
 	"log"
 	"strings"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 // HandlerV2 User角色回调接口的实现，
@@ -48,18 +52,14 @@ func (user *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (strin
 // value: kid1kid2..../pid1pid2
 func handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
 	gp := getGroup(km.GetMid())
-	if gService == nil {
+	if gp == nil {
 		return
 	}
 
 	gp.initResMutex.Lock()
 	defer gp.initResMutex.Unlock()
-	userState, err := getState(gp.userid)
-	if err != nil {
-		log.Println("handleUserInitRes()getState()err:", err, "userid:", gp.userID)
-		return
-	}
-	if userState == collecting { //收集信息阶段，才继续
+
+	if gp.state == collecting { //收集信息阶段，才继续
 		log.Println("Receive: InitResponse，from：", from, ", value is：", metaValue)
 		splitedMeta := strings.Split(metaValue, metainfo.DELIMITER)
 		if len(splitedMeta) != 2 {

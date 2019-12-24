@@ -38,7 +38,7 @@ var inGenerate int
 var keeperIDs []string
 var posSkByte []byte
 
-var opt = &df.DataEncoder{
+var opt = &df.DataCoder{
 	DataCount:   1,
 	ParityCount: 4,
 	TagFlag:     df.BLS12,

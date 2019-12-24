@@ -37,6 +37,7 @@ var gwStartCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(PassWord, "pwd", "The password for user").WithDefault(utils.DefaultPassword),
+		cmds.StringOption("EndPoint", "url", "The gateway endpoint: ip:port, default is: 127.0.0.1:5080").WithDefault("127.0.0.1:5080"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -62,6 +63,12 @@ var gwStartCmd = &cmds.Command{
 		if !ok || len(pwd) < 8 {
 			return errWrongInput
 		}
+
+		ep, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			return errWrongInput
+		}
+
 		rootpath, _ := fsrepo.BestKnownPath()
 		keypath, _ := config.Path(rootpath, fsrepo.Keystore)
 		keyfile, err := config.Path(keypath, uid)
@@ -75,12 +82,12 @@ var gwStartCmd = &cmds.Command{
 			return err
 		}
 
-		err = miniogw.Start(addr.String(), pwd)
+		err = miniogw.Start(addr.String(), pwd, ep)
 		if err != nil {
 			return err
 		}
 		list := &StringList{
-			ChildLists: []string{"Gateway of " + addr.String() + " started"},
+			ChildLists: []string{"Gateway of " + addr.String() + " started at: ", ep},
 		}
 		return cmds.EmitOnce(res, list)
 	},

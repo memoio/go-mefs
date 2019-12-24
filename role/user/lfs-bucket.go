@@ -13,16 +13,15 @@ import (
 // CreateBucket create a bucket for a specified LFSservice
 func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
 	// TODO judge datacount + parity count <= providers
-
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, err
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	err = CheckValidBucketName(bucketName)
+	err := CheckValidBucketName(bucketName)
 	if err != nil {
 		return nil, ErrBucketNameInvalid
 	}
@@ -30,6 +29,7 @@ func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 	if _, ok := l.meta.bucketNameToID[bucketName]; ok {
 		return nil, ErrBucketAlreadyExist
 	}
+
 	l.meta.sb.Lock()
 	defer l.meta.sb.Unlock()
 	// 多副本策略
@@ -77,10 +77,10 @@ func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 
 // DeleteBucket deletes a bucket from a specified LFSservice
 func (l *LfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, err
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
@@ -103,10 +103,10 @@ func (l *LfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 
 // HeadBucket get a superBucket's metainfo
 func (l *LfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, err
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
@@ -122,12 +122,12 @@ func (l *LfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 	return &bucket.BucketInfo, nil
 }
 
-// ListBucket lists all superBucket in a lfsservice
-func (l *LfsInfo) ListBucket(pre string) ([]*pb.BucketInfo, error) {
-	err := IsOnline(l.userid)
-	if err != nil {
-		return nil, err
+// ListBuckets lists all Buckets information
+func (l *LfsInfo) ListBuckets(prefix string) ([]*pb.BucketInfo, error) {
+	if !l.online {
+		return nil, ErrLfsServiceNotReady
 	}
+
 	if l.meta.bucketByID == nil {
 		return nil, ErrBucketNotExist
 	}
@@ -136,7 +136,7 @@ func (l *LfsInfo) ListBucket(pre string) ([]*pb.BucketInfo, error) {
 		if bs.Deletion {
 			continue
 		}
-		if strings.HasPrefix(bs.Name, pre) {
+		if strings.HasPrefix(bs.Name, prefix) {
 			lsuperBucket = append(lsuperBucket, &bs.BucketInfo)
 		}
 	}

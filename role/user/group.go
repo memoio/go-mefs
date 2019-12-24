@@ -95,13 +95,17 @@ func newGroup(uid string, duration int64, capacity int64, price int64, ks int, p
 // step5: init userconfig, deploy upkeeping contract and channel contracts(need modify)
 func (g *groupInfo) start(ctx context.Context) (bool, error) {
 	// getUK
+	uaddr, err := address.GetAddressFromID(g.userID)
+	if err != nil {
+		return false, err
+	}
 	_, uk, err := contracts.GetUKFromResolver(uaddr)
 	switch err {
 	case nil: //部署过
 		log.Println("begin to start user : ", g.userID)
 		item, err := contracts.GetUpkeepingInfo(uaddr, uk)
 		if err != nil {
-			return err
+			return false, err
 		}
 		// keeper数量、provider的数量应以合约约定为主
 		g.keeperSLA = int(item.KeeperSLA)
@@ -116,7 +120,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		return true, nil
 	case contracts.ErrNotDeployedMapper, contracts.ErrNotDeployedUk: //没有部署过
 		log.Println("begin to init user : ", g.userID)
-		err := gp.initGroup(ctx)
+		err := g.initGroup(ctx)
 		if err != nil {
 			return false, err
 		}
@@ -128,7 +132,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 func (g *groupInfo) connect(ctx context.Context) error {
 	log.Println("Connect keepers and providers for use: ", g.userID)
 
-	err = testConnect()
+	err := testConnect()
 	if err != nil {
 		return err
 	}
@@ -183,7 +187,6 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			break
 		}
 
-		keepers = unsuccess
 		// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
 		if len(g.keepers) < KeeperSLA {
 			time.Sleep(time.Minute)
@@ -234,7 +237,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	// 构造key告诉keeper和provider自己已经启动
-	kmPid, err := metainfo.NewKeyMeta(gp.userID, metainfo.UserDeployedContracts)
+	kmPid, err := metainfo.NewKeyMeta(g.userID, metainfo.UserDeployedContracts)
 	if err != nil {
 		log.Println("Construct Deployed key error", err)
 		return err
@@ -262,7 +265,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 // user init
 func (g *groupInfo) initGroup(ctx context.Context) error {
-	addr, err := address.GetAddressFromID(uid)
+	addr, err := address.GetAddressFromID(g.userID)
 	if err != nil {
 		return err
 	}
@@ -280,7 +283,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(g.storeDays))
 
 	deployPrice := big.NewInt(int64(740621000000000))
-	deployPrice.Add(big.NewInt(1128277), big.NewInt(int64(652346*gp.providerSLA)))
+	deployPrice.Add(big.NewInt(1128277), big.NewInt(int64(652346*g.providerSLA)))
 	var leastMoney = new(big.Int)
 	leastMoney = leastMoney.Add(moneyAccount, deployPrice)
 	if balance.Cmp(leastMoney) < 0 { //余额不足
@@ -292,7 +295,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 
 	sk := utils.EthSkByteToEthString(getSk(g.userID))
 
-	queryAddr, err = contracts.DeployQuery(addr, sk, g.storeSize, g.storeDays, g.storePrice, g.keeperSLA, g.providerSLA, gp.reDeploy)
+	queryAddr, err := contracts.DeployQuery(addr, sk, g.storeSize, g.storeDays, g.storePrice, g.keeperSLA, g.providerSLA, g.reDeploy)
 	if err != nil {
 		log.Println("fail to deploy query contract")
 		return err
@@ -331,20 +334,20 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 					g.state = collectCompleted
 					g.notify(kmInit)
 				} else {
-					log.Printf("Timeout, No enough keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(gp.tempKeepers), len(gp.tempProviders), gp.keeperSLA, gp.providerSLA)
+					log.Printf("Timeout, No enough keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
 					go broadcastMetaMessage(kmInit, "")
 				}
 			case collectCompleted:
 				timeOutCount++
 				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
 				log.Printf("Timeout, waiting keeper response\n")
-				for _, keeperInfo := range gp.keepers {
+				for _, keeperInfo := range g.keepers {
 					if !keeperInfo.connected {
 						log.Printf("Keeper %s not response, waiting...", keeperInfo.keeperID)
 					}
 				}
 			case onDeploy:
-				g.handleRest()
+				g.done()
 			default:
 				return nil
 			}
@@ -357,7 +360,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 //userInitNotIf 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
 func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 	if g.state != collectCompleted {
-		return ErrWrongInitState
+		return
 	}
 	log.Println("Has enough Keeper and Providers, choosing...")
 	g.keepers = make([]*keeperInfo, 0, g.keeperSLA)
@@ -369,7 +372,6 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 		if i >= g.keeperSLA {
 			break
 		}
-		kidStr := g.tempKeepers[i]
 		kidB58, _ := peer.IDB58Decode(kidStr)
 		//判断是否链接，如果连不上，则从备选中删除，看下一个
 		if localNode.PeerHost.Network().Connectedness(kidB58) != inet.Connected {
@@ -396,7 +398,6 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 		if i >= g.providerSLA {
 			break
 		}
-		pidStr := g.tempProviders[i]
 		pidB58, _ := peer.IDB58Decode(pidStr)
 		//判断是否链接，如果连不上，则从备选中删除，看下一个
 		if localNode.PeerHost.Network().Connectedness(pidB58) != inet.Connected {
@@ -497,8 +498,8 @@ func (g *groupInfo) confirm(keeper string, initRes string) {
 
 func (g *groupInfo) done() error {
 
-	//部署合约
-	err = deployUpKeepingAndChannel()
+	//部署合约userID string, sk []byte, ks []keeperInfo, ps []providerInfo, storeDays int64, storeSize int64, storePrice int64
+	err := deployUpKeepingAndChannel(g.userID, g.keepers, g.providers, g.storeDays, g.storeSize, g.storePrice)
 	if err != nil {
 		log.Println("deployUpKeepingAndChannel failed :", err)
 	}
@@ -511,19 +512,19 @@ func (g *groupInfo) done() error {
 		log.Println("Construct Deployed key error", err)
 		return err
 	}
-	for _, keeper := range gp.keepers {
-		_, err = sendMetaRequest(kmPid, gp.userid, keeper.keeperID)
+	for _, keeper := range g.keepers {
+		_, err = sendMetaRequest(kmPid, g.userID, keeper.keeperID)
 		if err != nil {
 			log.Println("Send keeper", keeper.keeperID, " err:", err)
 		}
 	}
-	for _, provider := range gp.providers {
-		_, err = sendMetaRequest(kmPid, gp.userid, provider.providerID)
+	for _, provider := range g.providers {
+		_, err = sendMetaRequest(kmPid, g.userID, provider.providerID)
 		if err != nil {
 			log.Println("Send provider", provider, " err:", err)
 		}
 	}
-	log.Println(gp.userID + ": group is ready")
+	log.Println(g.userID + ": group is ready")
 	g.state = groupStarted
 	return nil
 }
