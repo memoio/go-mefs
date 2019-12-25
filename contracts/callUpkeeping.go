@@ -21,9 +21,9 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 	var ukAddr common.Address
 
 	//获得resolver
-	_, resolver, err := getResolverFromIndexer(userAddress, "memoriae")
+	_, resolver, err := GetResolverFromIndexer(userAddress, "memoriae")
 	if err != nil {
-		fmt.Println("getResolverErr:", err)
+		fmt.Println("GetResolverErr:", err)
 		return err
 	}
 	key, err := crypto.HexToECDSA(hexKey)
@@ -33,7 +33,7 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 	}
 
 	//获得mapper
-	_, mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
+	_, mapperInstance, err := DeployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return err
 	}
@@ -73,9 +73,9 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 //GetUKFromResolver get upKeeping-contract from the mapper, and get the mapper from the resolver
 func GetUKFromResolver(localAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
 	//获得resolver
-	_, resolverInstance, err := getResolverFromIndexer(localAddress, "memoriae")
+	_, resolverInstance, err := GetResolverFromIndexer(localAddress, "memoriae")
 	if err != nil {
-		fmt.Println("getResolverErr:", err)
+		fmt.Println("GetResolverErr:", err)
 		return InvalidAddr, uk, err
 	}
 
