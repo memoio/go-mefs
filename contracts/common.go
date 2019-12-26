@@ -481,7 +481,10 @@ func DeployMapper(localAddress common.Address, ownerAddress common.Address, reso
 		err = CheckTx(tx)
 		if err != nil {
 			log.Println("addMapper transaction fails", err)
-			return mapperAddr, mapperInstance, err
+			if retryCount > 20 {
+				return mapperAddr, mapperInstance, err
+			}
+			continue
 		}
 
 		retryCount = 0
