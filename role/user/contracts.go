@@ -61,7 +61,7 @@ func (gp *groupService) deployUpKeepingAndChannel() error {
 	if err != nil {
 		return err
 	}
-	err = contracts.SetQueryCompleted(hexSk, localAddress, queryAddr)
+	err = contracts.SetQueryCompleted(hexSk, queryAddr)
 	if err != nil {
 		return err
 	}

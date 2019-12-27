@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,14 +32,14 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	var queryAddr common.Address
 
 	//获得resolver
-	_, resolver, err := getResolverFromIndexer(userAddress, "query")
+	_, resolver, err := GetResolverFromIndexer(userAddress, "query")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return queryAddr, err
 	}
 
 	//获得mapper
-	_, mapperInstance, err := deployMapper(userAddress, userAddress, resolver, hexKey)
+	_, mapperInstance, err := DeployMapper(userAddress, userAddress, resolver, hexKey)
 	if err != nil {
 		return queryAddr, err
 	}
@@ -58,11 +60,12 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	client := GetClient(EndPoint)
 	// 部署query
 	retryCount := 0
+	var tx *types.Transaction
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		queryAddr, _, _, err = market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+		queryAddr, tx, _, err = market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > 5 {
 				fmt.Println("deployQueryErr:", err)
@@ -72,6 +75,13 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 			continue
 		}
 		break
+	}
+
+	//检查交易
+	err = CheckTx(tx)
+	if err != nil{
+		log.Println("deployQuery transaction fails", err)
+		return queryAddr, err
 	}
 
 	err = addToMapper(userAddress, mapperInstance, queryAddr, hexKey)
@@ -84,7 +94,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 }
 
 //SetQueryCompleted when user has found providers and keepers needed, user call this function
-func SetQueryCompleted(hexKey string, userAddress common.Address, queryAddress common.Address) error {
+func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 	query, err := market.NewQuery(queryAddress, GetClient(EndPoint))
 	if err != nil {
 		fmt.Println("newQueryErr:", err)
@@ -157,9 +167,9 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 	fmt.Println("begin to deploy offer-contract...")
 	var offerAddr common.Address
 	//获得resolver实例
-	_, resolverInstance, err := getResolverFromIndexer(providerAddress, "offer")
+	_, resolverInstance, err := GetResolverFromIndexer(providerAddress, "offer")
 	if err != nil {
-		fmt.Println("getResolverErr:", err)
+		fmt.Println("GetResolverErr:", err)
 		return offerAddr, err
 	}
 
@@ -171,7 +181,7 @@ func DeployOffer(providerAddress common.Address, hexKey string, capacity int64, 
 	}
 
 	client := GetClient(EndPoint)
-	_, mapperInstance, err := deployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
+	_, mapperInstance, err := DeployMapper(providerAddress, providerAddress, resolverInstance, hexKey)
 	if err != nil {
 		fmt.Println("deployMapperErr:", err)
 		return offerAddr, err
@@ -254,15 +264,15 @@ func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (co
 	var err error
 	switch addrType {
 	case Offer:
-		_, resolverInstance, err = getResolverFromIndexer(localAddr, "offer")
+		_, resolverInstance, err = GetResolverFromIndexer(localAddr, "offer")
 		if err != nil {
-			fmt.Println("getResolverErr:", err)
+			fmt.Println("GetResolverErr:", err)
 			return marketAddr, err
 		}
 	case Query:
-		_, resolverInstance, err = getResolverFromIndexer(localAddr, "query")
+		_, resolverInstance, err = GetResolverFromIndexer(localAddr, "query")
 		if err != nil {
-			fmt.Println("getResolverErr:", err)
+			fmt.Println("GetResolverErr:", err)
 			return marketAddr, err
 		}
 	default:

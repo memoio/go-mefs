@@ -17,7 +17,7 @@ import (
 // DeployResolverForChannel provider deploys mapper to save user's mapper
 // provider owns second sesolverß
 func DeployResolverForChannel(localAddress common.Address, hexKey string) (common.Address, error) {
-	resolverAddr, resolverInstance, err := deployResolver(localAddress, hexKey, "channel")
+	resolverAddr, resolverInstance, err := DeployResolver(localAddress, hexKey, "channel")
 	if err != nil {
 		return resolverAddr, err
 	}
@@ -40,7 +40,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 	client := GetClient(EndPoint)
 
 	//根据key(provider的地址)从indexer中获得对应的resolver
-	_, resolverInstance, err := getResolverFromIndexer(localAddress, "channel")
+	_, resolverInstance, err := GetResolverFromIndexer(localAddress, "channel")
 	if err != nil {
 		fmt.Println("getResolverErr:", err)
 		return channelAddr, err
@@ -72,7 +72,7 @@ func DeployChannelContract(hexKey string, localAddress common.Address, providerA
 
 	//从上面的resolver中，获得本user的mapper，如果没有，则部署mapper
 	// user owns mapper
-	_, mapperInstance, err := deployMapper(localAddress, localAddress, secondInstance, hexKey)
+	_, mapperInstance, err := DeployMapper(localAddress, localAddress, secondInstance, hexKey)
 	if err != nil {
 		log.Println("deploy Mapper for Channel Err:", err)
 		return channelAddr, err
@@ -143,7 +143,7 @@ func CloseChannel(localAddress common.Address, userAddress common.Address, hexKe
 func GetChannelAddr(localAddress, providerAddress, userAddress common.Address) (common.Address, *channel.Channel, error) {
 	var channelAddr common.Address
 
-	_, resolverInstance, err := getResolverFromIndexer(localAddress, "channel")
+	_, resolverInstance, err := GetResolverFromIndexer(localAddress, "channel")
 	if err != nil {
 		fmt.Println("get Resolver Err:", err)
 		return channelAddr, nil, err
