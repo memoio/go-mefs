@@ -214,7 +214,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	var res string
 	var tempTime time.Time
 	for _, keeper := range conkeepers {
-		res, err = sendMetaRequest(km, "", keeper)
+		res, err = localNode.Data.SendMetaRequest(km, "", keeper)
 		if err != nil {
 			continue
 		}

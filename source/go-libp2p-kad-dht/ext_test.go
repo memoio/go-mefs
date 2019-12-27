@@ -12,9 +12,8 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	u "github.com/ipfs/go-ipfs-util"
-	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
-	record "github.com/libp2p/go-libp2p-record"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 )
 
 func TestGetFailures(t *testing.T) {

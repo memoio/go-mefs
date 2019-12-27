@@ -22,7 +22,6 @@ func NewMessage(typ Message_MessageType, key []byte, level int) *Message {
 		Type: typ,
 		Key:  key,
 	}
-	m.SetClusterLevel(level)
 	return m
 }
 
@@ -117,25 +116,6 @@ func (m *Message_Peer) Addresses() []ma.Multiaddr {
 		maddrs = append(maddrs, maddr)
 	}
 	return maddrs
-}
-
-// GetClusterLevel gets and adjusts the cluster level on the message.
-// a +/- 1 adjustment is needed to distinguish a valid first level (1) and
-// default "no value" protobuf behavior (0)
-func (m *Message) GetClusterLevel() int {
-	level := m.GetClusterLevelRaw() - 1
-	if level < 0 {
-		return 0
-	}
-	return int(level)
-}
-
-// SetClusterLevel adjusts and sets the cluster level on the message.
-// a +/- 1 adjustment is needed to distinguish a valid first level (1) and
-// default "no value" protobuf behavior (0)
-func (m *Message) SetClusterLevel(level int) {
-	lvl := int32(level)
-	m.ClusterLevelRaw = lvl
 }
 
 // Loggable turns a Message into machine-readable log output

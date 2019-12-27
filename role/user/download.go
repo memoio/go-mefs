@@ -301,7 +301,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 
 		//获取数据块
-		b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
+		b, err := localNode.Data.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
 		if err != nil {
 			log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
 			continue

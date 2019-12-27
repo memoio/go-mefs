@@ -9,14 +9,11 @@ import (
 	"sync"
 	"time"
 
-	inet "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-peer"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 	"github.com/mgutz/ansi"
 )
 
@@ -130,24 +127,12 @@ func checkLocalPeers(ctx context.Context) {
 		return true
 	})
 	for _, keeper := range tmpKeepers {
-		kid, err := peer.IDB58Decode(keeper)
-		if err != nil {
-			continue
-		}
-
 		thisInfo, err := getKInfo(keeper)
 		if thisInfo != nil {
 			continue
 		}
 
-		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
-			thisInfo.online = true
-			thisInfo.lastAvailTime = utils.GetUnixNow()
-			continue
-		}
-
-		sc.ConnectTo(ctx, localNode, keeper)
-		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
+		if localNode.Data.Connect(ctx, keeper) {
 			thisInfo.online = true
 			thisInfo.lastAvailTime = utils.GetUnixNow()
 		} else {
@@ -162,24 +147,12 @@ func checkLocalPeers(ctx context.Context) {
 	})
 
 	for _, keeper := range tmpKeepers {
-		kid, err := peer.IDB58Decode(keeper)
-		if err != nil {
-			continue
-		}
-
 		thisInfo, err := getPInfo(keeper)
 		if thisInfo != nil {
 			continue
 		}
 
-		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
-			thisInfo.online = true
-			thisInfo.lastAvailTime = utils.GetUnixNow()
-			continue
-		}
-
-		sc.ConnectTo(ctx, localNode, keeper)
-		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
+		if localNode.Data.Connect(ctx, keeper) {
 			thisInfo.online = true
 			thisInfo.lastAvailTime = utils.GetUnixNow()
 		} else {
@@ -216,7 +189,7 @@ func checkConnectedPeer(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		val, _ := getKeyFrom(kmRole.ToString(), id)
+		val, _ := localNode.Data.GetKey(kmRole.ToString(), id)
 		if string(val) == metainfo.RoleKeeper {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {

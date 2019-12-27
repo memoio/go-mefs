@@ -6,7 +6,7 @@
 
 ```go
 type MetaMessageHandler interface {
-	HandleMetaMessage(MetaMessageType, string, string, string) (string, error)
+	HandleMetaMessage(int, string, []byte, string) (string, error)
 	GetRole() (string, error)
 }
 
@@ -40,7 +40,7 @@ type keeperHandler struct {
 	Role string
 }
 
-func (keeper *keeperHandler) HandleMetaMessage(typ meta.MetaMessageType, metaKey, metaValue, from string) (string, error) { //from即发来这个请求的节点ID，可以做一点最基本的检查
+func (keeper *keeperHandler) HandleMetaMessage(opType int, metaKey string, metaValue []byte, from string) (string, error) { //from即发来这个请求的节点ID，可以做一点最基本的检查
     if keeper == nil {
 		return meta.MetaHandleError, errKeeperServiceNotReady
 	}

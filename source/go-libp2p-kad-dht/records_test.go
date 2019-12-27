@@ -11,7 +11,6 @@ import (
 	ci "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	record "github.com/libp2p/go-libp2p-record"
 	tnet "github.com/libp2p/go-libp2p-testing/net"
 )
 
@@ -201,8 +200,7 @@ func TestPubkeyBadKeyFromDHT(t *testing.T) {
 	}
 
 	// Store incorrect public key on node B
-	rec := record.MakePutRecord(pkkey, wrongbytes)
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec := MakePutRecord(pkkey, wrongbytes)
 	err = dhtB.putLocal(pkkey, rec)
 	if err != nil {
 		t.Fatal(err)
@@ -240,8 +238,7 @@ func TestPubkeyBadKeyFromDHTGoodKeyDirect(t *testing.T) {
 	}
 
 	// Store incorrect public key on node B
-	rec := record.MakePutRecord(pkkey, wrongbytes)
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec := MakePutRecord(pkkey, wrongbytes)
 	err = dhtB.putLocal(pkkey, rec)
 	if err != nil {
 		t.Fatal(err)

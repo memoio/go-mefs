@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-
 	lru "github.com/hashicorp/golang-lru/simplelru"
-	cid "github.com/ipfs/go-cid"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
-	autobatch "github.com/memoio/go-mefs/source/go-datastore/autobatch"
-	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	logging "github.com/ipfs/go-log"
 	goprocess "github.com/jbenet/goprocess"
 	goprocessctx "github.com/jbenet/goprocess/context"
+	"github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/ipfs/go-cid"
+	ds "github.com/memoio/go-mefs/source/go-datastore"
+	autobatch "github.com/memoio/go-mefs/source/go-datastore/autobatch"
+	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	base32 "github.com/whyrusleeping/base32"
 )
 

@@ -36,7 +36,7 @@ func (api *BlockAPI) Put(ctx context.Context, src io.Reader, ncid string, opts .
 		return nil, err
 	}
 
-	err = api.node.Blocks.PutBlock(b)
+	err = api.node.Data.PutBlock(b)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +49,11 @@ func (api *BlockAPI) Putto(scid string, pid string, ctx context.Context) (coreif
 	var ncid cid.Cid
 	ncid = cid.NewCidV2([]byte(scid))
 
-	block, err := api.node.Blocks.GetBlock(ctx, ncid)
+	block, err := api.node.Data.GetBlock(ctx, ncid)
 	if err != nil {
 		return nil, err
 	}
-	err = api.node.Blocks.PutBlockTo(block, pid)
+	err = api.node.Data.PutBlockTo(block, pid)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (api *BlockAPI) Get(ctx context.Context, p string) (io.Reader, error) {
 	var ncid cid.Cid
 	ncid = cid.NewCidV2([]byte(p))
 
-	b, err := api.node.Blocks.GetBlock(ctx, ncid)
+	b, err := api.node.Data.GetBlock(ctx, ncid)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (api *BlockAPI) GetFrom(ctx context.Context, p string, peerid string) (io.R
 	if err != nil {
 		return nil, err
 	}
-	b, err := api.node.Blocks.GetBlockFrom(ctx, peerid, p, 2*time.Minute, sig)
+	b, err := api.node.Data.GetBlockFrom(ctx, peerid, p, 2*time.Minute, sig)
 	if err != nil || b == nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (api *BlockAPI) GetFrom(ctx context.Context, p string, peerid string) (io.R
 func (api *BlockAPI) Stat(ctx context.Context, p string) (coreiface.BlockStat, error) {
 	ncid := cid.NewCidV2([]byte(p))
 
-	b, err := api.node.Blocks.GetBlock(ctx, ncid)
+	b, err := api.node.Data.GetBlock(ctx, ncid)
 	if err != nil {
 		return nil, err
 	}

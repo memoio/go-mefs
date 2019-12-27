@@ -8,7 +8,7 @@ import (
 	"time"
 
 	repo "github.com/memoio/go-mefs/repo"
-	bserv "github.com/memoio/go-mefs/source/go-blockservice"
+	"github.com/memoio/go-mefs/source/data"
 	retry "github.com/memoio/go-mefs/source/go-datastore/retrystore"
 	bstore "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 
@@ -19,7 +19,6 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 	pstoremem "github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	record "github.com/libp2p/go-libp2p-record"
 )
 
 type BuildCfg struct {
@@ -93,10 +92,6 @@ func NewNode(ctx context.Context, cfg *BuildCfg, password, nKey string) (*MefsNo
 		Peerstore: pstoremem.NewPeerstore(),
 		Password:  password,
 		NetKey:    nKey,
-	}
-
-	n.RecordValidator = record.NamespacedValidator{
-		"pk": record.PublicKeyValidator{},
 	}
 
 	if cfg.Online {
@@ -183,7 +178,7 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 		}
 	}
 
-	n.Blocks = bserv.New(n.Blockstore, n.Routing)
+	n.Data = data.New(n.Blockstore, n.Repo.Datastore(), n.PeerHost, n.Routing)
 
 	return nil
 }

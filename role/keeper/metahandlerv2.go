@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"context"
 	"errors"
 	"log"
 	"strconv"
@@ -22,43 +23,33 @@ type HandlerV2 struct {
 
 // HandleMetaMessage keeper角色层metainfo的回调函数,传入对方节点发来的kv，和对方节点的peerid
 //没有返回值时，返回complete，或者返回规定信息
-func (keeper *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (string, error) {
+func (keeper *HandlerV2) HandleMetaMessage(opType int, metaKey string, metaValue []byte, from string) (string, error) {
 	km, err := metainfo.GetKeyMeta(metaKey) //注意 这里对metakey已经进行过一次查错,保证传入的数据长度是满足keytype要求的
 	if err != nil {
 		return "", err
 	}
-	keytype := km.GetKeyType()
-	switch keytype {
-	case metainfo.UserInitReq: //user初始化
+	dtype := km.GetDType()
+	switch dtype {
+	case metainfo.UserInit: //user初始化
 		go handleUserInitReq(km, from)
-	case metainfo.UserInitNotif: //user初始化确认
+	case metainfo.UserNotify: //user初始化确认
 		return handleNewUserNotif(km, metaValue, from)
-	case metainfo.UserDeployedContracts: //user部署好合约
-		go handleUserDeloyedContracts(km, metaValue, from)
-	case metainfo.DeleteBlock: //user删除块
+	case metainfo.Contract: //user部署好合约
+		go handleUserDeloyedContracts(km, from)
+	case metainfo.Block: //user删除块
 		go handleDeleteBlockMeta(km)
-	case metainfo.NewKPReq: //user申请新的provider
-		return handleNewProviderReq(km, metaValue)
-	case metainfo.BlockMetaInfo: //user发送块元数据
+	case metainfo.BlockPos: //user发送块元数据
 		go handleBlockMeta(km, metaValue, from)
-	case metainfo.Proof: //provider 挑战回复
+	case metainfo.Challenge:
 		go handleProofResultBls12(km, metaValue, from)
-	case metainfo.RepairRes: //provider 修复回复
+	case metainfo.Repair: //provider 修复回复
 		go handleRepairResponse(km, metaValue, from)
-	case metainfo.Sync: //keeper 同步信息
-		go handleSync(km, metaValue, from)
-	case metainfo.StorageSync:
+	case metainfo.Storage:
 		go handleStorageSync(km, metaValue, from)
-	case metainfo.Query: //user查询信息
-		return handleQueryInfo(km)
-	case metainfo.GetPeerAddr:
+	case metainfo.ExteralAddress:
 		return handlePeerAddr(km)
-	case metainfo.PosAdd:
+	case metainfo.Pos:
 		go handlePosAdd(km, metaValue, from)
-	case metainfo.PosDelete:
-		go handlePosDelete(km, metaValue, from)
-	case metainfo.Test:
-		go handleTest(km)
 	default: //没有匹配的信息，丢弃
 		return "", nil
 	}
@@ -137,39 +128,37 @@ func handleUserInitReq(km *metainfo.KeyMeta, from string) {
 	//查询出user的keeper和provider
 	//首先看看内存里是否有该节点
 
-	km.SetKeyType(metainfo.UserInitRes)
-	putKeyTo(km.ToString(), response, "local")
-	sendMetaRequest(km, response, from)
+	localNode.Data.PutKey(context.Background(), km.ToString(), []byte(response), "local")
+	localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(response), nil, from)
 }
 
-func handleNewUserNotif(km *metainfo.KeyMeta, metaValue, from string) (string, error) {
+func handleNewUserNotif(km *metainfo.KeyMeta, metaValue []byte, from string) (string, error) {
 	log.Println("NewUserNotif", km.ToString(), metaValue, "From:", from)
+
+	ctx := context.Background()
+
 	userID := km.GetMid()
 
 	go fillPinfo(userID, metaValue, from)
 
-	kmRes, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeBft)
-	if err != nil {
-		log.Println(err)
-		return "", err
-	}
-
 	if !localPeerInfo.enableBft {
 		resValue := "simple"
-		putKeyTo(kmRes.ToString(), resValue, "local")
+		localNode.Data.PutKey(ctx, km.ToString(), []byte(resValue), "local")
 		log.Println("use simple mode，userID:", userID)
 		return resValue, nil
 	}
 
 	// todo
 	resValue := "bft|ip"
-	putKeyTo(kmRes.ToString(), resValue, "local")
+	localNode.Data.PutKey(ctx, km.ToString(), []byte(resValue), "local")
 	log.Println("use bft mode，userID:", userID)
 	return resValue, nil
 }
 
-func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
-	log.Println("NewUserDeployedContracts", km.ToString(), metaValue, "From:", from)
+func handleUserDeloyedContracts(km *metainfo.KeyMeta, from string) {
+	log.Println("NewUserDeployedContracts", km.ToString(), "From:", from)
+
+	ctx := context.Background()
 
 	userID := km.GetMid()
 
@@ -192,32 +181,7 @@ func handleUserDeloyedContracts(km *metainfo.KeyMeta, metaValue, from string) {
 	log.Println("Save ", userID, "'s BLSconfig success")
 }
 
-//handleSync 同步操作的回调函数，同步信息中，第一个option为这个信息的类别，根据信息的类别做不同的同步操作
-func handleSync(km *metainfo.KeyMeta, metaValue, from string) {
-	options := km.GetOptions()
-	if len(options) < 1 {
-		log.Println("handleSync()error:", metainfo.ErrIllegalKey, km.ToString())
-	}
-	syncType := options[0]
-	var err error
-	switch syncType { //TODO:检查参数是否完整
-	case metainfo.SyncTypeBlock:
-		err = handleSyncBlock(km, metaValue)
-	case metainfo.SyncTypeChalPay:
-		err = handleSyncChalPay(km, metaValue)
-	case metainfo.SyncTypeChalRes:
-		err = handleSyncChalres(km, metaValue)
-	case metainfo.SyncTypeUID, metainfo.SyncTypePid, metainfo.SyncTypeKid:
-		err = syncKUPIDs(km, metaValue)
-	default:
-		err = errorWrongSyncType
-	}
-	if err != nil {
-		log.Printf("handleSync()error:%s\nmetakey:%s\nmetavalue:%s\nfrom:%s\n", err, km.ToString(), metaValue, from)
-	}
-}
-
-func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
+func handleBlockMeta(km *metainfo.KeyMeta, metaValue []byte, from string) {
 	blockID := km.GetMid()
 	bm, err := metainfo.GetBlockMeta(blockID)
 	if err != nil {
@@ -225,14 +189,13 @@ func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 		return
 	}
 
-	km.SetKeyType(metainfo.Local)
-	err = putKeyTo(km.ToString(), metaValue, "local")
+	err = localNode.Data.PutKey(context.Background(), km.ToString(), metaValue, "local")
 	if err != nil {
 		log.Println("handleBlockMeta err: ", err)
 		return
 	}
 
-	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
+	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) < 2 {
 		log.Println("handleBlockMeta err: ", metainfo.ErrIllegalValue)
 		return
@@ -252,8 +215,8 @@ func handleBlockMeta(km *metainfo.KeyMeta, metaValue, from string) {
 	return
 }
 
-func handleStorageSync(km *metainfo.KeyMeta, value, pid string) {
-	vals := strings.Split(value, metainfo.DELIMITER)
+func handleStorages(km *metainfo.KeyMeta, value []byte, pid string) {
+	vals := strings.Split(string(value), metainfo.DELIMITER)
 	if len(vals) < 2 {
 		return
 	}
@@ -284,14 +247,9 @@ func handleDeleteBlockMeta(km *metainfo.KeyMeta) { //立即删除某些块的元
 		log.Println("handleDeleteBlockMeta err: ", err)
 		return
 	}
-	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
-	if err != nil {
-		log.Println("handleDeleteBlockMeta err: ", err)
-		return
-	}
 
 	//获取保存这个块的provider
-	metavalueByte, err := getKeyFrom(kmBlock.ToString(), "local")
+	metavalueByte, err := localNode.Data.GetKey(context.Background(), kmBlock.ToString(), "local")
 	if err != nil {
 		log.Println("handleDeleteBlockMeta err: ", err)
 		return
@@ -302,35 +260,11 @@ func handleDeleteBlockMeta(km *metainfo.KeyMeta) { //立即删除某些块的元
 		log.Println("handleDeleteBlockMeta err: ", metainfo.ErrIllegalValue)
 		return
 	}
-	err = deleteFrom(kmBlock.ToString(), "local")
+	err = localNode.Data.DeleteKey(context.Background(), km.ToString(), "local")
 	if err != nil && err != ds.ErrNotFound {
 		log.Println("handleDeleteBlockMeta err: ", err)
 	}
 	deleteBlockFromMem(bm.GetUid(), splitedValue[0], blockID)
-}
-
-func handleNewProviderReq(km *metainfo.KeyMeta, metaValue string) (string, error) {
-	userID := km.GetMid()
-	options := km.GetOptions()
-	_, ok := getGroupsInfo(userID)
-	if !ok {
-		return "", errUnmatchedPeerID
-	}
-	_, err := strconv.Atoi(options[0])
-	if err != nil {
-		return "", err
-	}
-	var res string
-
-	if remain := len(metaValue) % utils.IDLength; remain != 0 {
-		metaValue = metaValue[:len(metaValue)-remain]
-	}
-
-	for i := 0; i < len(metaValue)/utils.IDLength; i++ {
-		res += string(metaValue[i*utils.IDLength : (i+1)*utils.IDLength])
-	}
-
-	return res, nil
 }
 
 func handlePeerAddr(km *metainfo.KeyMeta) (string, error) {
@@ -365,7 +299,7 @@ func handleQueryInfo(km *metainfo.KeyMeta) (string, error) {
 		if err != nil {
 			return "", errBlockNotExist
 		}
-		blockMetaValue, err := getKeyFrom(kmReq.ToString(), "local")
+		blockMetaValue, err := localNode.Data.GetKey(kmReq.ToString(), "local")
 		if err != nil || blockMetaValue == nil {
 			return "", errBlockNotExist
 		}

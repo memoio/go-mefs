@@ -8,7 +8,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 // HandlerV2 User角色回调接口的实现，
@@ -76,7 +75,7 @@ func handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
 			if !utils.CheckDup(gp.tempKeepers, kid) {
 				continue
 			}
-			if sc.ConnectTo(context.Background(), localNode, kid) {
+			if localNode.Data.Connect(context.Background(), kid) {
 				gp.tempKeepers = append(gp.tempKeepers, kid)
 			}
 		}

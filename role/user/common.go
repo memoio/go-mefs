@@ -1,24 +1,17 @@
 package user
 
 import (
-	"context"
 	"errors"
 	"log"
 	"math/big"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
-	inet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 //-------Group Type------
@@ -83,80 +76,6 @@ var (
 	ErrCannotAddBlock       = errors.New("cannot put this block")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
 )
-
-func putKeyTo(key, value, node string) error {
-	if node != "local" {
-		pid, err := peer.IDB58Decode(node)
-		if err != nil {
-			return err
-		}
-		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-			sc.ConnectTo(context.Background(), localNode, node)
-		}
-	}
-	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
-}
-
-func getKeyFrom(key, node string) ([]byte, error) {
-	if node != "local" {
-		pid, err := peer.IDB58Decode(node)
-		if err != nil {
-			return nil, err
-		}
-		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-			sc.ConnectTo(context.Background(), localNode, node)
-		}
-	}
-
-	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
-}
-
-func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-
-	pid, err := peer.IDB58Decode(to)
-	if err != nil {
-		return err
-	}
-	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-		sc.ConnectTo(context.Background(), localNode, to)
-	}
-
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
-}
-
-func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	pid, err := peer.IDB58Decode(to)
-	if err != nil {
-		return "", err
-	}
-	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-		sc.ConnectTo(context.Background(), localNode, to)
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
-}
-
-// broadcastMetaMessage 广播发送信息，现在只针对初始化流程写
-func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	ctx = context.WithValue(ctx, "User_Init_Req", true)
-	/*pc, _, _, _ := runtime.Caller(2)
-	caller := runtime.FuncForPC(pc).Name()
-	ctx = context.WithValue(ctx, "caller", caller)*/
-	_, err := localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
-	return err
-}
 
 func DefaultBucketOptions() *pb.BucketOptions {
 	return &pb.BucketOptions{

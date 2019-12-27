@@ -61,7 +61,7 @@ func (provider *HandlerV2) GetRole() (string, error) {
 func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
 	blockID := km.GetMid()
 	bcid := cid.NewCidV2([]byte(blockID))
-	err := localNode.Blocks.DeleteBlock(bcid)
+	err := localNode.Data.DeleteBlock(bcid)
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}

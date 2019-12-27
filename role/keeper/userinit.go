@@ -70,7 +70,7 @@ func userNewInit(userID string, keeperCount, providerCount int, price int64) (st
 		return true
 	})
 
-	putKeyTo(kmKid.ToString(), pids.String(), "local")
+	localNode.Data.PutKey(context.Backgroud(), kmKid.ToString(), []byte(pids.String()), "local")
 
 	newResponse.WriteString(metainfo.DELIMITER)
 	pids.Reset()
@@ -89,7 +89,7 @@ func userNewInit(userID string, keeperCount, providerCount int, price int64) (st
 		return true
 	})
 
-	putKeyTo(kmPid.ToString(), pids.String(), "local")
+	localNode.Data.PutKey(context.Backgroud(), kmPid.ToString(), []byte(pids.String()), "local")
 
 	return newResponse.String(), nil
 }
@@ -161,12 +161,12 @@ func initUserInfo(groupid string, keepers, providers []string) (*groupsInfo, err
 
 // fillPinfo fill user's uInfo, groupsInfo in ukpMap
 // not get upkeeping contract
-func fillPinfo(groupid string, metaValue string, from string) {
+func fillPinfo(groupid string, metaValue []byte, from string) {
 
 	var keepers []string
 	var providers []string
 	//将value切分，生成好对应的keepers和providers列表
-	splited := strings.Split(metaValue, metainfo.DELIMITER)
+	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
 		log.Println("handleNewUserNotif value is not correct: ", metaValue)
 		return
@@ -213,7 +213,7 @@ func fillPinfo(groupid string, metaValue string, from string) {
 		pidstrings.WriteString(keeperID)
 	}
 
-	putKeyTo(kmKid.ToString(), pidstrings.String(), "local")
+	localNode.Data.PutKey(context.Backgroud(), kmKid.ToString(), byte(pidstrings.String()), "local")
 
 	pidstrings.Reset()
 	for _, proID := range tempInfo.providers {
@@ -227,7 +227,7 @@ func fillPinfo(groupid string, metaValue string, from string) {
 		ledgerInfo.Store(thisPU, newChal)
 	}
 
-	putKeyTo(kmPid.ToString(), pidstrings.String(), "local")
+	localNode.Data.PutKey(context.Backgroud(), kmPid.ToString(), []byte(pidstrings.String()), "local")
 
 	return
 }

@@ -33,30 +33,25 @@ type providerContracts struct {
 	proInfo       contracts.ProviderItem
 }
 
-func putKeyTo(key, value, node string) error {
-	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
+func localNode.Data.GetKey(key, node string) ([]byte, error) {
+	return localNode.Routing.(*dht.KadDHT).CmdGetFrom(key, node)
 }
 
-func getKeyFrom(key, node string) ([]byte, error) {
-	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
-}
-
-func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
+func localNode.Data.SendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
 	caller := ""
 	for _, i := range []int{0, 1, 2, 3, 4} {
 		pc, _, _, _ := runtime.Caller(i)
 		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
 	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
+	return localNode.Routing.(*dht.KadDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
 }
 
-func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
+func localNode.Data.SendMetaRequest(ctx context.Context, typ, key string, metaValue []byte, to string) ([]byte, error) {
+	p, err := peer.IDB58Decode(to)
+	if err != nil {
+		return []byte, err
 	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
+	return localNode.Routing.(*dht.KadDHT).SendMetaRequest(ctx,typ,key, metaValue, to)
 }
 
 func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
@@ -70,7 +65,7 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := getKeyFrom(userconfigkey, keeperID)
+	userconfigbyte, err := localNode.Data.GetKey(userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +86,7 @@ func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := getKeyFrom(userconfigkey, keeperID)
+	userconfigbyte, err := localNode.Data.GetKey(userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}

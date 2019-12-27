@@ -229,7 +229,7 @@ func saveLastPay(thisPU puKey, signature, proof string, beginTime, endTime int64
 		return nil, "", err
 	}
 	valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-	putKeyTo(kmLast.ToString(), valueLast, "local")
+	localNode.Data.PutKey(context.Backgroud(), kmLast.ToString(), []byte(valueLast), "local")
 	//key: `uid/"sync"/"chalpay"/pid/beginTime/endTime`
 	//value: `spacetime/signature/proof`
 	//for storing
@@ -239,7 +239,7 @@ func saveLastPay(thisPU puKey, signature, proof string, beginTime, endTime int64
 		return nil, "", err
 	}
 	metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-	putKeyTo(km.ToString(), metaValue, "local")
+	localNode.Data.PutKey(context.Backgroud(), km.ToString(), []byte(metaValue), "local")
 
 	//将此次支付作为最近一次支付，保存在内存中
 	thisChalPay := &chalpay{
@@ -274,7 +274,7 @@ func checkLastPayTime(thisPU puKey) int64 {
 			return failtime
 		}
 		// get from leveldb
-		valueByte, err := getKeyFrom(kmLast.ToString(), "local")
+		valueByte, err := localNode.Data.GetKey(kmLast.ToString(), "local")
 		if err != nil {
 			log.Println("no lastTime data, return Unix(0)")
 			return failtime

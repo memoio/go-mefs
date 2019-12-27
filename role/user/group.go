@@ -15,7 +15,6 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 const (
@@ -142,7 +141,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		var unsuccess []string
 		for _, kid := range g.tempKeepers {
 			// 连接失败加入unsuccess
-			if !sc.ConnectTo(ctx, localNode, kid) {
+			if !localNode.Data.Connect(ctx, kid) {
 				unsuccess = append(unsuccess, kid)
 				log.Println("Connect to keeper", kid, "failed.")
 				continue
@@ -155,7 +154,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			res, err := getKeyFrom(kmKid.ToString(), kid)
+			res, err := localNode.Data.GetKey(kmKid.ToString(), kid)
 			if err == nil && res != nil {
 				resStr := string(res)
 				splitRes := strings.Split(resStr, metainfo.DELIMITER)
@@ -199,7 +198,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 	for i := 0; i < connectTryCount; i++ {
 		for _, pid := range g.tempProviders {
-			if sc.ConnectTo(ctx, localNode, pid) {
+			if localNode.Data.Connect(ctx, pid) {
 				log.Println("Connect to provider-", pid, "success.")
 			} else {
 				log.Println("Connect to provider-", pid, "failed.")
@@ -243,13 +242,13 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return err
 	}
 	for _, keeper := range g.keepers {
-		_, err = sendMetaRequest(kmPid, g.userID, keeper.keeperID)
+		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, keeper.keeperID)
 		if err != nil {
 			log.Println("Send keeper", keeper.keeperID, " err:", err)
 		}
 	}
 	for _, provider := range g.providers {
-		_, err = sendMetaRequest(kmPid, g.userID, provider.providerID)
+		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, provider.providerID)
 		if err != nil {
 			log.Println("Send provider", provider.providerID, " err:", err)
 		}
@@ -314,7 +313,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 		log.Println("gp connect: NewKeyMeta error!")
 		return err
 	}
-	go broadcastMetaMessage(kmInit, "")
+	go localNode.Data.BroadcastMessage(kmInit, "")
 	g.state = collecting
 
 	// wait 20 minutes for collecting
@@ -335,7 +334,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 					g.notify(kmInit)
 				} else {
 					log.Printf("Timeout, No enough keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
-					go broadcastMetaMessage(kmInit, "")
+					go localNode.Data.BroadcastMessage(kmInit, "")
 				}
 			case collectCompleted:
 				timeOutCount++
@@ -372,12 +371,9 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 		if i >= g.keeperSLA {
 			break
 		}
-		kidB58, _ := peer.IDB58Decode(kidStr)
-		//判断是否链接，如果连不上，则从备选中删除，看下一个
-		if localNode.PeerHost.Network().Connectedness(kidB58) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), localNode, kidStr) {
-				continue
-			}
+
+		if !localNode.Data.Connect(context.Background(), kidStr) {
+			continue
 		}
 		tempK := &keeperInfo{
 			keeperID:  kidStr,
@@ -398,12 +394,9 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 		if i >= g.providerSLA {
 			break
 		}
-		pidB58, _ := peer.IDB58Decode(pidStr)
-		//判断是否链接，如果连不上，则从备选中删除，看下一个
-		if localNode.PeerHost.Network().Connectedness(pidB58) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), localNode, pidStr) {
-				continue
-			}
+
+		if !localNode.Data.Connect(context.Background(), pidStr) {
+			continue
 		}
 		i++
 
@@ -444,7 +437,7 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 			retry := 0
 			// retry
 			for retry < 10 {
-				res, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
+				res, err := localNode.Data.SendMetaRequest(km, assignedKP, keeper) //发送确认信息
 				if err != nil {
 					retry++
 					time.Sleep(30 * time.Second)
@@ -513,13 +506,13 @@ func (g *groupInfo) done() error {
 		return err
 	}
 	for _, keeper := range g.keepers {
-		_, err = sendMetaRequest(kmPid, g.userID, keeper.keeperID)
+		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, keeper.keeperID)
 		if err != nil {
 			log.Println("Send keeper", keeper.keeperID, " err:", err)
 		}
 	}
 	for _, provider := range g.providers {
-		_, err = sendMetaRequest(kmPid, g.userID, provider.providerID)
+		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, provider.providerID)
 		if err != nil {
 			log.Println("Send provider", provider, " err:", err)
 		}
@@ -549,7 +542,7 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 	}
 	blockMeta := kmBlock.ToString()
 	for _, kp := range g.keepers {
-		pidAndOffset, err := getKeyFrom(blockMeta, kp.keeperID)
+		pidAndOffset, err := localNode.Data.GetKey(blockMeta, kp.keeperID)
 		if err != nil || pidAndOffset == nil {
 			continue
 		}
@@ -564,16 +557,10 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 			log.Println("Offset decode error-", pidstr, err)
 			continue
 		}
-		pid, err := peer.IDB58Decode(pidstr)
-		if err != nil {
-			log.Println("Wrong format providerID-", pidstr, err)
-			continue
-		}
-		if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), localNode, pidstr) { //连接不上此provider
-				log.Println("Cannot connect to blockprovider-", pidstr)
-				return pidstr, offset, ErrNoProviders
-			}
+
+		if !localNode.Data.Connect(context.Background(), pidstr) { //连接不上此provider
+			log.Println("Cannot connect to blockprovider-", pidstr)
+			return pidstr, offset, ErrNoProviders
 		}
 		return pidstr, offset, nil
 	}
@@ -603,18 +590,11 @@ func (g *groupInfo) getKeepers(count int) ([]string, []string, error) {
 		if i >= num {
 			break
 		}
-		kid, err := peer.IDB58Decode(kp.keeperID)
-		if err != nil {
+
+		if !localNode.Data.Connect(context.Background(), kp.keeperID) { //连接不上此keeper
+			unconKeepers = append(unconKeepers, kp.keeperID)
 			continue
-		}
-		if localNode.PeerHost.Network().Connectedness(kid) == inet.Connected {
-			conKeepers = append(conKeepers, kp.keeperID)
-			i++
 		} else {
-			if !sc.ConnectTo(context.Background(), localNode, kp.keeperID) { //连接不上此keeper
-				unconKeepers = append(unconKeepers, kp.keeperID)
-				continue
-			}
 			conKeepers = append(conKeepers, kp.keeperID)
 			i++
 		}
@@ -651,22 +631,13 @@ func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
 		if i >= num {
 			break
 		}
-		pid, err := peer.IDB58Decode(provider.providerID)
-		if err != nil {
+
+		if !localNode.Data.Connect(context.Background(), provider.providerID) { //连接不上此provider
+			unconPro = append(unconPro, provider.providerID)
 			continue
-		}
-		if localNode.PeerHost.Network().Connectedness(pid) == inet.Connected {
+		} else {
 			conPro = append(conPro, provider.providerID)
 			i++
-		} else {
-			if !sc.ConnectTo(context.Background(), localNode, provider.providerID) { //连接不上此provider
-				unconPro = append(unconPro, provider.providerID)
-				continue
-			} else {
-				conPro = append(conPro, provider.providerID)
-				i++
-			}
-
 		}
 	}
 
@@ -684,7 +655,7 @@ func (g *groupInfo) putDataToKeepers(key *metainfo.KeyMeta, value string) error 
 
 	var count int
 	for _, keeper := range g.keepers {
-		_, err := sendMetaRequest(key, value, keeper.keeperID)
+		_, err := localNode.Data.SendMetaRequest(key, value, keeper.keeperID)
 		if err != nil {
 			log.Println("send metaMessage to ", keeper.keeperID, " error :", err)
 			count++
@@ -703,7 +674,7 @@ func (g *groupInfo) putDataToProviders(key *metainfo.KeyMeta, value string) erro
 
 	var count int
 	for _, provider := range g.providers {
-		_, err := sendMetaRequest(key, value, provider.providerID)
+		_, err := localNode.Data.SendMetaRequest(key, value, provider.providerID)
 		if err != nil {
 			log.Println("send metaMessage to ", provider.providerID, " error :", err)
 			count++
@@ -746,28 +717,24 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 		log.Println("construct delete block KV error :", err)
 		return err
 	}
-	pid, err := peer.IDB58Decode(provider)
-	if err != nil {
-		return err
+
+	if !localNode.Data.Connect(context.Background(), provider) { //连接不上此provider
+		log.Println("Cannot delete Block-", blockID, ErrCannotConnectNetwork)
+		return ErrCannotConnectNetwork
 	}
-	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-		if !sc.ConnectTo(context.Background(), localNode, provider) { //连接不上此provider
-			log.Println("Cannot delete Block-", blockID, ErrCannotConnectNetwork)
-			return ErrCannotConnectNetwork
-		}
-	}
+
 	if updateMeta { //这个需要等待返回
-		res, err := sendMetaRequest(km, "", provider)
+		res, err := localNode.Data.SendMetaRequest(km, "", provider)
 		if strings.Compare(res, metainfo.MetaHandlerComplete) != 0 || err != nil {
 			log.Println("Cannot delete Block-", blockID, res, err)
 			return ErrCannotDeleteMetaBlock
 		}
 	} else {
-		go sendMetaRequest(km, "", provider)
+		go localNode.Data.SendMetaRequest(km, "", provider)
 	}
 
 	for _, kp := range g.keepers { //从keeper上删除blockMeta
-		go sendMetaRequest(km, "", kp.keeperID)
+		go localNode.Data.SendMetaRequest(km, "", kp.keeperID)
 	}
 
 	return nil

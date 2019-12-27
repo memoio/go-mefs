@@ -1,14 +1,12 @@
 package keeper
 
 import (
+	"context"
 	"errors"
-	"runtime"
-
-	"github.com/memoio/go-mefs/utils/metainfo"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/role"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var (
@@ -51,13 +49,17 @@ func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
 }
 
 func getUserBLS12ConfigByte(userID string) ([]byte, error) {
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := getKeyFrom(userconfigkey, "local")
-	if err == nil {
+	userconfigbyte, err := localNode.Data.GetKey(ctx, userconfigkey, "local")
+	if err == nil && userconfigbyte != nil {
 		return userconfigbyte, nil
 	}
 	gp, ok := getGroupsInfo(userID)
@@ -66,46 +68,14 @@ func getUserBLS12ConfigByte(userID string) ([]byte, error) {
 	}
 
 	for _, keeperID := range gp.keepers {
-		userconfigbyte, err = getKeyFrom(userconfigkey, keeperID)
-		if err == nil {
-			putKeyTo(userconfigkey, string(userconfigbyte), "local")
+		if keeperID == localNode.Identity.Pretty() {
+			continue
+		}
+		userconfigbyte, err = localNode.Data.GetKey(ctx, userconfigkey, keeperID)
+		if err == nil && userconfigbyte != nil {
 			return userconfigbyte, nil
 		}
 	}
 
 	return nil, errors.New("no user configkey")
-}
-
-//---network---
-func putKeyTo(key, value, node string) error {
-	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
-}
-
-func getKeyFrom(key, node string) ([]byte, error) {
-	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
-}
-
-func deleteFrom(key, node string) error {
-	if node == "local" {
-		return localNode.Routing.(*dht.IpfsDHT).DeleteLocal(key)
-	}
-	return nil
-}
-
-func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
-}
-
-func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
 }

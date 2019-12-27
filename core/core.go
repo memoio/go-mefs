@@ -33,24 +33,23 @@ import (
 	smux "github.com/libp2p/go-libp2p-core/mux"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/routing"
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	pnet "github.com/libp2p/go-libp2p-pnet"
 	quic "github.com/libp2p/go-libp2p-quic-transport"
-	record "github.com/libp2p/go-libp2p-record"
-	routing "github.com/libp2p/go-libp2p-routing"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery"
-	p2pbhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	mafilter "github.com/libp2p/go-maddr-filter"
 
+	p2pbhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	version "github.com/memoio/go-mefs"
 	config "github.com/memoio/go-mefs/config"
 	p2p "github.com/memoio/go-mefs/p2p"
 	repo "github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/fsrepo"
-	bserv "github.com/memoio/go-mefs/source/go-blockservice"
+	"github.com/memoio/go-mefs/source/data"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	bstore "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -91,18 +90,16 @@ type MefsNode struct {
 	NetKey          string
 
 	// Services
-	Peerstore  pstore.Peerstore   // storage for other Peer instances
-	Blockstore bstore.Blockstore  // the raw blockstore, no filestore wrapping
-	Blocks     bserv.BlockService // the block service, get/add blocks.
+	Peerstore  pstore.Peerstore  // storage for other Peer instances
+	Blockstore bstore.Blockstore // the raw blockstore, no filestore wrapping
+	Data       data.Service      // the block service, get/add blocks.
 	Reporter   metrics.Reporter
 	Discovery  discovery.Service
 
 	// Online
-	PeerHost     p2phost.Host        // the network host (server+client)
-	Bootstrapper io.Closer           // the periodic bootstrapper
-	Routing      routing.IpfsRouting // the routing system. recommend ipfs-dht
-
-	RecordValidator record.Validator
+	PeerHost     p2phost.Host    // the network host (server+client)
+	Bootstrapper io.Closer       // the periodic bootstrapper
+	Routing      routing.Routing // the routing system. recommend ipfs-dht
 
 	P2P *p2p.P2P
 
@@ -376,7 +373,7 @@ func (n *MefsNode) HandlePeerFound(p peer.AddrInfo) {
 // initialized with the host and _before_ we start listening.
 func (n *MefsNode) startOnlineServicesWithHost(ctx context.Context, host p2phost.Host, routingOption RoutingOption) error {
 	// setup routing service
-	r, err := routingOption(ctx, host, n.Repo.Datastore(), n.RecordValidator)
+	r, err := routingOption(ctx, host, n.Repo.Datastore())
 	if err != nil {
 		return err
 	}
@@ -418,7 +415,7 @@ func (n *MefsNode) teardown() error {
 	// closed before that other object
 
 	if n.Routing != nil {
-		closers = append(closers, n.Routing.(*dht.IpfsDHT).Process())
+		closers = append(closers, n.Routing.(*dht.KadDHT).Process())
 	}
 
 	if n.Bootstrapper != nil {
@@ -639,24 +636,22 @@ func startListening(host p2phost.Host, cfg *config.Config) error {
 	return nil
 }
 
-func constructDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching, validator record.Validator) (routing.IpfsRouting, error) {
+func constructDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching) (routing.Routing, error) {
 	return dht.New(
 		ctx, host,
 		dhtopts.Datastore(dstore),
-		dhtopts.Validator(validator),
 	)
 }
 
-func constructClientDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching, validator record.Validator) (routing.IpfsRouting, error) {
+func constructClientDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching) (routing.Routing, error) {
 	return dht.New(
 		ctx, host,
 		dhtopts.Client(true),
 		dhtopts.Datastore(dstore),
-		dhtopts.Validator(validator),
 	)
 }
 
-type RoutingOption func(context.Context, p2phost.Host, ds.Batching, record.Validator) (routing.IpfsRouting, error)
+type RoutingOption func(context.Context, p2phost.Host, ds.Batching) (routing.Routing, error)
 
 type DiscoveryOption func(context.Context, p2phost.Host) (discovery.Service, error)
 

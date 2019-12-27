@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	ci "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 
-	ci "github.com/libp2p/go-libp2p-core/crypto"
+	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 )
 
 // MaxRecordAge specifies the maximum time that any node will hold onto a record
@@ -19,12 +20,20 @@ import (
 // it must be rebroadcasted more frequently than once every 'MaxRecordAge'
 const MaxRecordAge = time.Hour * 36
 
+// MakePutRecord creates a dht record for the given key/value pair
+func MakePutRecord(key string, value []byte) *pb.Record {
+	record := new(pb.Record)
+	record.Key = []byte(key)
+	record.Value = value
+	return record
+}
+
 type pubkrs struct {
 	pubk ci.PubKey
 	err  error
 }
 
-func (dht *IpfsDHT) GetPublicKey(ctx context.Context, p peer.ID) (ci.PubKey, error) {
+func (dht *KadDHT) GetPublicKey(ctx context.Context, p peer.ID) (ci.PubKey, error) {
 	logger.Debugf("getPublicKey for: %s", p)
 
 	// Check locally. Will also try to extract the public key from the peer
@@ -75,7 +84,7 @@ func (dht *IpfsDHT) GetPublicKey(ctx context.Context, p peer.ID) (ci.PubKey, err
 	return nil, err
 }
 
-func (dht *IpfsDHT) getPublicKeyFromDHT(ctx context.Context, p peer.ID) (ci.PubKey, error) {
+func (dht *KadDHT) getPublicKeyFromDHT(ctx context.Context, p peer.ID) (ci.PubKey, error) {
 	// Only retrieve one value, because the public key is immutable
 	// so there's no need to retrieve multiple versions
 	pkkey := routing.KeyForPublicKey(p)
@@ -96,7 +105,7 @@ func (dht *IpfsDHT) getPublicKeyFromDHT(ctx context.Context, p peer.ID) (ci.PubK
 	return pubk, nil
 }
 
-func (dht *IpfsDHT) getPublicKeyFromNode(ctx context.Context, p peer.ID) (ci.PubKey, error) {
+func (dht *KadDHT) getPublicKeyFromNode(ctx context.Context, p peer.ID) (ci.PubKey, error) {
 	// check locally, just in case...
 	pk := dht.peerstore.PubKey(p)
 	if pk != nil {

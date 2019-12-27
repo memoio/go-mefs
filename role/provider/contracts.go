@@ -94,7 +94,7 @@ func saveChannel(userID string) error {
 	if err != nil {
 		return err
 	}
-	valueByte, err := getKeyFrom(km.ToString(), "local")
+	valueByte, err := localNode.Data.GetKey(km.ToString(), "local")
 	if err != nil {
 		// 本地没查到，value设为0
 		log.Println("Can't get channel value in local,err :", err, ", so  set channel value to 0")

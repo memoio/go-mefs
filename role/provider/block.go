@@ -64,7 +64,7 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 				log.Printf("Error create block %s: %s", bcid.String(), err)
 				return
 			}
-			err = localNode.Blockstore.Put(Nblk)
+			err = localNode.Data..Put(Nblk)
 			if err != nil {
 				log.Printf("Error writing block to datastore: %s", err)
 				return
@@ -76,7 +76,7 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 
 		switch typ {
 		case "append":
-			if has, err := localNode.Blockstore.Has(bcid); !has || err != nil {
+			if has, err := localNode.Data..Has(bcid); !has || err != nil {
 				log.Printf("Error append field to block %s: %s", bcid.String(), err)
 				return
 			}
@@ -90,7 +90,7 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 				log.Printf("Error append field to block %s: %s", bcid.String(), err)
 				return
 			}
-			err = localNode.Blockstore.Append(bcid, []byte(value), beginOffset, endOffset)
+			err = localNode.Data..Append(bcid, []byte(value), beginOffset, endOffset)
 			if err != nil {
 				log.Printf("Error append field to block %s: %s", bcid.String(), err)
 				return
@@ -106,8 +106,8 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 				log.Printf("Error append field to block %s: %s", bcid.String(), err)
 				return
 			}
-			if has, _ := localNode.Blockstore.Has(bcid); true == has {
-				err := localNode.Blockstore.DeleteBlock(bcid)
+			if has, _ := localNode.Data..Has(bcid); true == has {
+				err := localNode.Data..DeleteBlock(bcid)
 				if err != nil {
 					log.Printf("Error delete block %s: %s", bcid.String(), err)
 				}
@@ -117,7 +117,7 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 				log.Printf("Error create block %s: %s", bcid.String(), err)
 				return
 			}
-			err = localNode.Blockstore.Put(Nblk)
+			err = localNode.Data..Put(Nblk)
 			if err != nil {
 				log.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
 				return
@@ -153,7 +153,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 		// 内存channel的value变化
 		// 然后持久化
 		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
-		b, err := localNode.Blockstore.Get(bcid)
+		b, err := localNode.Data..Get(bcid)
 		if err != nil {
 			return "", errors.New("Block is not found")
 		}
@@ -166,7 +166,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
 			log.Println("Downlaod success，change channel.value and persist: ", value.String())
 			channelItem.Value = value
 			proContracts.channelBook.Store(userID, channelItem)
-			err = putKeyTo(key, value.String(), "local")
+			err = localNode.Data.PutKey(context.Backgroud(), key, byte(value.String()), "local")
 			if err != nil {
 				log.Println("cmdPutErr:", err)
 			}

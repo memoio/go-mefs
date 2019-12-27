@@ -331,11 +331,11 @@ func (l *LfsInfo) flushSuperBlockLocal() error {
 	if err != nil {
 		return err
 	}
-	err = localNode.Blocks.DeleteBlock(bcid)
+	err = localNode.Data.DeleteBlock(bcid)
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}
-	err = localNode.Blocks.PutBlock(b)
+	err = localNode.Data.PutBlock(b)
 	if err != nil {
 		return ErrCannotAddBlock
 	}
@@ -391,7 +391,7 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 		if err != nil {
 			return err
 		}
-		err = localNode.Blocks.PutBlockTo(b, providers[j])
+		err = localNode.Data.PutBlockTo(b, providers[j])
 		if err != nil {
 			return err
 		}
@@ -442,11 +442,11 @@ func (l *LfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
 	if err != nil {
 		return err
 	}
-	err = localNode.Blocks.DeleteBlock(bcid)
+	err = localNode.Data.DeleteBlock(bcid)
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}
-	err = localNode.Blocks.PutBlock(b)
+	err = localNode.Data.PutBlock(b)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 		if err != nil {
 			return err
 		}
-		err = localNode.Blocks.PutBlockTo(b, providers[j])
+		err = localNode.Data.PutBlockTo(b, providers[j])
 		if err != nil {
 			return err
 		}
@@ -554,11 +554,11 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 			if err != nil {
 				return err
 			}
-			err = localNode.Blocks.DeleteBlock(bcid)
+			err = localNode.Data.DeleteBlock(bcid)
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
-			err = localNode.Blocks.PutBlock(b)
+			err = localNode.Data.PutBlock(b)
 			if err != nil {
 				return ErrCannotAddBlock
 			}
@@ -593,11 +593,11 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 		if err != nil {
 			return err
 		}
-		err = localNode.Blocks.DeleteBlock(bcid)
+		err = localNode.Data.DeleteBlock(bcid)
 		if err != nil && err != bs.ErrNotFound {
 			return err
 		}
-		err = localNode.Blocks.PutBlock(b)
+		err = localNode.Data.PutBlock(b)
 		if err != nil {
 			return ErrCannotAddBlock
 		}
@@ -653,7 +653,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 				if err != nil {
 					return err
 				}
-				err = localNode.Blocks.PutBlockTo(b, providers[j])
+				err = localNode.Data.PutBlockTo(b, providers[j])
 				if err != nil {
 					return err
 				}
@@ -698,7 +698,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 			if err != nil {
 				return err
 			}
-			err = localNode.Blocks.PutBlockTo(b, providers[j])
+			err = localNode.Data.PutBlockTo(b, providers[j])
 			if err != nil {
 				return err
 			}
@@ -738,9 +738,9 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 	if l.keySet == nil {
 		return nil, ErrKeySetIsNil
 	}
-	if b, err = localNode.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+	if b, err = localNode.Data.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
 	} else { //若本地无超级块，向自己的provider进行查询
-		err = localNode.Blocks.DeleteBlock(bcidlocal)
+		err = localNode.Data.DeleteBlock(bcidlocal)
 		if err != nil && err != bs.ErrNotFound {
 			return nil, err
 		}
@@ -755,7 +755,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				log.Println("Cannot load Lfs superblock.", err)
 				return nil, ErrCannotLoadMetaBlock
 			}
-			b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //向指定provider查询超级块
+			b, err = localNode.Data.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //向指定provider查询超级块
 			if err != nil {                                                                                        //*错误处理
 				log.Printf("Get metablock %s from %s failed: %s.\n", ncid, provider, err)
 				continue
@@ -824,9 +824,9 @@ func (l *LfsInfo) loadBucketInfo() error {
 		}
 		ncidlocal := bm.ToString()
 		bcidlocal := cid.NewCidV2([]byte(ncidlocal))
-		if b, err = localNode.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+		if b, err = localNode.Data.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
-			err = localNode.Blocks.DeleteBlock(bcidlocal)
+			err = localNode.Data.DeleteBlock(bcidlocal)
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
@@ -839,7 +839,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 					log.Printf("load superBucket: %d's block: %s from provider: %s falied.\n", bucketID, ncid, provider)
 					continue
 				}
-				b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //获取数据块
+				b, err = localNode.Data.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //获取数据块
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)
@@ -903,9 +903,9 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		}
 		ncidlocal := bm.ToString()
 		bcidlocal := cid.NewCidV2([]byte(ncidlocal))
-		if b, err = localNode.Blocks.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+		if b, err = localNode.Data.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
-			err = localNode.Blocks.DeleteBlock(bcidlocal)
+			err = localNode.Data.DeleteBlock(bcidlocal)
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
@@ -917,7 +917,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				if err != nil && j == int(l.meta.sb.MetaBackupCount)-1 {
 					return ErrCannotLoadMetaBlock
 				}
-				b, err = localNode.Blocks.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig)
+				b, err = localNode.Data.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig)
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)

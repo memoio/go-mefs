@@ -13,8 +13,6 @@ type BlockMeta struct {
 	bid string
 }
 
-const BLOCK_DELIMITER = "_"
-
 func (bm *BlockMeta) GetUid() string {
 	if bm == nil {
 		return ""

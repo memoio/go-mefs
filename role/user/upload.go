@@ -283,7 +283,7 @@ Loop:
 				if err != nil {
 					return err
 				}
-				err = localNode.Blocks.PutBlockTo(b, provider)
+				err = localNode.Data.PutBlockTo(b, provider)
 				if err != nil {
 					log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
 					continue

@@ -10,7 +10,6 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 var repch chan string
@@ -161,7 +160,7 @@ func repairBlock(ctx context.Context, blockID string) {
 	}
 
 	if len(response) > 0 {
-		if !sc.ConnectTo(ctx, localNode, response) {
+		if !localNode.Data.Connect(ctx, response) {
 			log.Println("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
@@ -185,15 +184,15 @@ func repairBlock(ctx context.Context, blockID string) {
 	}
 
 	log.Println("cpids: ", cpids, " ,rpids: ", metaValue, ",repairs on: ", response)
-	_, err = sendMetaRequest(km, metaValue, response)
+	_, err = localNode.Data.SendMetaRequest(km, metaValue, response)
 	if err != nil {
 		log.Println("err: ", err)
 	}
 }
 
-func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
+func handleRepairResponse(km *metainfo.KeyMeta, metaValue []byte, provider string) {
 	blockID := km.GetMid()
-	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
+	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) != 4 {
 		log.Println("handleRepairResponse err: ", metainfo.ErrIllegalValue, metaValue)
 		return
@@ -233,7 +232,7 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
 		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
 		metaSyncTo(kmBlock, metaValue)
 		kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
-		err = putKeyTo(kmBlock.ToString(), metaValue, "local")
+		err = localNode.Data.PutKey(context.Backgroud(), kmBlock.ToString(), []byte(metaValue), "local")
 		if err != nil {
 			log.Println("construct SyncPidsK error :", err)
 			return

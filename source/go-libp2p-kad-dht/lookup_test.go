@@ -3,7 +3,7 @@ package dht
 import (
 	"testing"
 
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 )
 
 func TestLoggableKey(t *testing.T) {

@@ -68,7 +68,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
-		tmpdata, tmptag, err := localNode.Blockstore.GetSegAndTag(blockID, uint64(electedOffset))
+		tmpdata, tmptag, err := localNode.Data..GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
 			faultBlocks = append(faultBlocks, index)
 		} else {
@@ -76,7 +76,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 			if !isTrue {
 				log.Println("verify tag failed")
 				//验证失败，则在本地删除此块
-				err := localNode.Blocks.DeleteBlock(blockID)
+				err := localNode.Data.DeleteBlock(blockID)
 				if err != nil {
 					log.Println("Delete block", blockID.String(), "error:", err)
 				}
@@ -121,7 +121,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = sendMetaRequest(retKm, retValue, from)
+	_, err = localNode.Data.SendMetaRequest(retKm, retValue, from)
 	if err != nil {
 		log.Println("send proof err: ", err)
 	}

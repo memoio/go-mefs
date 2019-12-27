@@ -25,14 +25,13 @@ import (
 	opts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 
-	"github.com/ipfs/go-cid"
 	u "github.com/ipfs/go-ipfs-util"
 	kb "github.com/libp2p/go-libp2p-kbucket"
-	"github.com/libp2p/go-libp2p-record"
 	swarmt "github.com/libp2p/go-libp2p-swarm/testing"
 	"github.com/libp2p/go-libp2p-testing/ci"
 	travisci "github.com/libp2p/go-libp2p-testing/ci/travis"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/ipfs/go-cid"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -107,7 +106,7 @@ func (testAtomicPutValidator) Select(_ string, bs [][]byte) (int, error) {
 	return index, nil
 }
 
-func setupDHT(ctx context.Context, t *testing.T, client bool) *IpfsDHT {
+func setupDHT(ctx context.Context, t *testing.T, client bool) *KadDHT {
 	d, err := New(
 		ctx,
 		bhost.New(swarmt.GenSwarm(t, ctx, swarmt.OptDisableReuseport)),
@@ -120,9 +119,9 @@ func setupDHT(ctx context.Context, t *testing.T, client bool) *IpfsDHT {
 	return d
 }
 
-func setupDHTS(t *testing.T, ctx context.Context, n int) []*IpfsDHT {
+func setupDHTS(t *testing.T, ctx context.Context, n int) []*KadDHT {
 	addrs := make([]ma.Multiaddr, n)
-	dhts := make([]*IpfsDHT, n)
+	dhts := make([]*KadDHT, n)
 	peers := make([]peer.ID, n)
 
 	sanityAddrsMap := make(map[string]struct{})
@@ -148,7 +147,7 @@ func setupDHTS(t *testing.T, ctx context.Context, n int) []*IpfsDHT {
 	return dhts
 }
 
-func connectNoSync(t *testing.T, ctx context.Context, a, b *IpfsDHT) {
+func connectNoSync(t *testing.T, ctx context.Context, a, b *KadDHT) {
 	t.Helper()
 
 	idB := b.self
@@ -164,7 +163,7 @@ func connectNoSync(t *testing.T, ctx context.Context, a, b *IpfsDHT) {
 	}
 }
 
-func wait(t *testing.T, ctx context.Context, a, b *IpfsDHT) {
+func wait(t *testing.T, ctx context.Context, a, b *KadDHT) {
 	t.Helper()
 
 	// loop until connection notification has been received.
@@ -178,14 +177,14 @@ func wait(t *testing.T, ctx context.Context, a, b *IpfsDHT) {
 	}
 }
 
-func connect(t *testing.T, ctx context.Context, a, b *IpfsDHT) {
+func connect(t *testing.T, ctx context.Context, a, b *KadDHT) {
 	t.Helper()
 	connectNoSync(t, ctx, a, b)
 	wait(t, ctx, a, b)
 	wait(t, ctx, b, a)
 }
 
-func bootstrap(t *testing.T, ctx context.Context, dhts []*IpfsDHT) {
+func bootstrap(t *testing.T, ctx context.Context, dhts []*KadDHT) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -211,7 +210,7 @@ func TestValueGetSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var dhts [5]*IpfsDHT
+	var dhts [5]*KadDHT
 
 	for i := range dhts {
 		dhts[i] = setupDHT(ctx, t, false)
@@ -294,9 +293,6 @@ func TestValueSetInvalid(t *testing.T) {
 	defer dhtA.host.Close()
 	defer dhtB.host.Close()
 
-	dhtA.Validator.(record.NamespacedValidator)["v"] = testValidator{}
-	dhtB.Validator.(record.NamespacedValidator)["v"] = blankValidator{}
-
 	connect(t, ctx, dhtA, dhtB)
 
 	testSetGet := func(val string, failset bool, exp string, experr error) {
@@ -348,9 +344,6 @@ func TestSearchValue(t *testing.T) {
 	defer dhtB.host.Close()
 
 	connect(t, ctx, dhtA, dhtB)
-
-	dhtA.Validator.(record.NamespacedValidator)["v"] = testValidator{}
-	dhtB.Validator.(record.NamespacedValidator)["v"] = testValidator{}
 
 	ctxT, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
@@ -450,9 +443,6 @@ func TestValueGetInvalid(t *testing.T) {
 	defer dhtB.Close()
 	defer dhtA.host.Close()
 	defer dhtB.host.Close()
-
-	dhtA.Validator.(record.NamespacedValidator)["v"] = blankValidator{}
-	dhtB.Validator.(record.NamespacedValidator)["v"] = testValidator{}
 
 	connect(t, ctx, dhtA, dhtB)
 
@@ -595,7 +585,7 @@ func TestLocalProvides(t *testing.T) {
 }
 
 // if minPeers or avgPeers is 0, dont test for it.
-func waitForWellFormedTables(t *testing.T, dhts []*IpfsDHT, minPeers, avgPeers int, timeout time.Duration) bool {
+func waitForWellFormedTables(t *testing.T, dhts []*KadDHT, minPeers, avgPeers int, timeout time.Duration) bool {
 	// test "well-formed-ness" (>= minPeers peers in every routing table)
 
 	checkTables := func() bool {
@@ -631,7 +621,7 @@ func waitForWellFormedTables(t *testing.T, dhts []*IpfsDHT, minPeers, avgPeers i
 	}
 }
 
-func printRoutingTables(dhts []*IpfsDHT) {
+func printRoutingTables(dhts []*KadDHT) {
 	// the routing tables should be full now. let's inspect them.
 	fmt.Printf("checking routing table of %d\n", len(dhts))
 	for _, dht := range dhts {
@@ -810,7 +800,7 @@ func TestProvidesMany(t *testing.T) {
 	defer cancel()
 
 	var wg sync.WaitGroup
-	getProvider := func(dht *IpfsDHT, k cid.Cid) {
+	getProvider := func(dht *KadDHT, k cid.Cid) {
 		defer wg.Done()
 
 		expected := providers[k]
@@ -1141,7 +1131,6 @@ func TestAtomicPut(t *testing.T) {
 	defer cancel()
 
 	d := setupDHT(ctx, t, false)
-	d.Validator = testAtomicPutValidator{}
 
 	// fnc to put a record
 	key := "testkey"

@@ -42,7 +42,7 @@ func metaSyncTo(keyMeta *metainfo.KeyMeta, metaValue string, targets ...string) 
 	keyMeta.SetKeyType(metainfo.Sync)
 
 	for _, p := range targets {
-		_, err := sendMetaRequest(keyMeta, metaValue, p)
+		_, err := localNode.Data.SendMetaRequest(keyMeta, metaValue, p)
 		if err != nil {
 			log.Println(err)
 			return
@@ -183,7 +183,7 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 	if len(splitedMetaValue) < 2 {
 		return metainfo.ErrIllegalValue
 	}
-	localValueByte, _ := getKeyFrom(km.ToString(), "local")
+	localValueByte, _ := localNode.Data.GetKey(km.ToString(), "local")
 	localValueString := string(localValueByte) //从本地取数据
 	if localValueString != "" {                //如果本地有同样数据，判断是否覆盖原有数据
 		splitedLocalValue := strings.Split(localValueString, metainfo.DELIMITER)
@@ -209,7 +209,7 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 
 	addBlocktoMem(uid, pid, blockID, offset)
 
-	err = putKeyTo(km.ToString(), metaValue, "local") //最后，保存数据到本地
+	err = localNode.Data.PutKey(context.Backgroud(), km.ToString(), []byte(metaValue), "local") //最后，保存数据到本地
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func handleSyncBlock(km *metainfo.KeyMeta, metaValue string) error {
 func syncKUPIDs(km *metainfo.KeyMeta, pids string) error {
 	km.SetKeyType(metainfo.Local)
 	metaKey := km.ToString()
-	err := putKeyTo(metaKey, pids, "local")
+	err := localNode.Data.PutKey(context.Backgroud(), etaKey, []byte(pids), "local")
 	if err != nil {
 		return err
 	}

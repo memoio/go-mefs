@@ -10,7 +10,6 @@ import (
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
 var localNode *core.MefsNode
@@ -70,7 +69,7 @@ func PersistBeforeExit() error {
 		if err != nil {
 			return err
 		}
-		err = putKeyTo(km.ToString(), channel.Value.String(), "local")
+		err = localNode.Data.PutKey(context.Backgroud(), km.ToString(), []byte(channel.Value.String()), "local")
 		if err != nil {
 			return err
 		}
@@ -82,7 +81,7 @@ func PersistBeforeExit() error {
 	}
 	posValue := posCidPrefix
 	log.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
-	err = putKeyTo(posKM.ToString(), posValue, "local")
+	err = localNode.Data.PutKey(posKM.ToString(), posValue, "local")
 	if err != nil {
 		log.Println("CmdPutTo posKM error :", err)
 		return err
@@ -112,12 +111,9 @@ func storageSync(ctx context.Context) error {
 	value := strconv.FormatUint(maxSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10)
 
 	for _, kid := range klist {
-		_, err = sendMetaRequest(km, value, kid)
+		_, err = localNode.Data.SendMetaRequest(km, value, kid)
 		if err != nil {
 			log.Println("storage info send to", kid, "error: ", err)
-			if sc.ConnectTo(ctx, localNode, kid) {
-				sendMetaRequest(km, value, kid)
-			}
 		}
 	}
 

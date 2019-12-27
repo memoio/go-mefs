@@ -42,7 +42,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 			cids = append(cids, blkid)
 			pid := splitcpid[1]
 			if blkid != blockID {
-				blk, err := localNode.Blocks.GetBlockFrom(localNode.Context(), pid, blkid, time.Minute, sig)
+				blk, err := localNode.Data.GetBlockFrom(localNode.Context(), pid, blkid, time.Minute, sig)
 				if blk != nil && err == nil {
 					right := rs.VerifyBlock(blk.RawData(), blkid, pubKey)
 					if right {
@@ -104,7 +104,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 		log.Println("repair ", blockID, " failed, error: ", err)
 		retMetaValue := "RepairFailed" + metainfo.DELIMITER + ret
 		log.Println("repair response metavalue :", retMetaValue)
-		_, err = sendMetaRequest(retKm, retMetaValue, keeper)
+		_, err = localNode.Data.SendMetaRequest(retKm, retMetaValue, keeper)
 		if err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 		for _, tmpCid := range cids {
 			if len(tmpCid) > 0 {
 				temcid := cid.NewCidV2([]byte(tmpCid))
-				err = localNode.Blocks.DeleteBlock(temcid)
+				err = localNode.Data.DeleteBlock(temcid)
 				if err != nil && err != bs.ErrNotFound {
 					log.Println("delete error :", err)
 					return err
@@ -131,7 +131,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	for _, tmpCid := range cids {
 		if len(tmpCid) > 0 {
 			temcid := cid.NewCidV2([]byte(tmpCid))
-			err = localNode.Blocks.DeleteBlock(temcid)
+			err = localNode.Data.DeleteBlock(temcid)
 			if err != nil && err != bs.ErrNotFound {
 				log.Println("delete error :", err)
 				return err
@@ -139,7 +139,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 		}
 	}
 	//把修复好的block放到本地；
-	err = localNode.Blocks.PutBlock(newblk)
+	err = localNode.Data.PutBlock(newblk)
 	if err != nil {
 		log.Println("add block failed, error :", err)
 		return err
@@ -147,7 +147,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 	retMetaValue := "RepairSuccess" + metainfo.DELIMITER + ret
 	log.Println("repair response metavalue :", retMetaValue)
 	log.Println("repair success：", blockID)
-	_, err = sendMetaRequest(retKm, retMetaValue, keeper)
+	_, err = localNode.Data.SendMetaRequest(retKm, retMetaValue, keeper)
 	if err != nil {
 		log.Println("repair response err :", err)
 		return err

@@ -316,7 +316,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	}
 	value := cfg.Role //角色信息的value
-	err = node.Routing.(*dht.IpfsDHT).CmdPutTo(keystring, value, "local")
+	err = node.Routing.(*dht.KadDHT).CmdPutTo(keystring, value, "local")
 	if err != nil {
 		fmt.Println("node.Routing.CmdPut falied: ", err)
 	}
@@ -416,7 +416,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			fmt.Println("Start keeperService failed:", err)
 			return err
 		}
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&keeper.HandlerV2{Role: metainfo.RoleKeeper})
+		err = node.Routing.(*dht.KadDHT).AssignmetahandlerV2(&keeper.HandlerV2{Role: metainfo.RoleKeeper})
 		if err != nil {
 			return err
 		}
@@ -425,7 +425,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		user.InitUserDaemon(node)
 
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
+		err = node.Routing.(*dht.KadDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
 		if err != nil {
 			return err
 		}
@@ -461,7 +461,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			fmt.Println("Start providerService failed:", err)
 			return err
 		}
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&provider.HandlerV2{Role: metainfo.RoleProvider})
+		err = node.Routing.(*dht.KadDHT).AssignmetahandlerV2(&provider.HandlerV2{Role: metainfo.RoleProvider})
 		if err != nil {
 			return err
 		}

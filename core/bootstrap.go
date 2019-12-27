@@ -34,7 +34,7 @@ type BootstrapConfig struct {
 	// node has less open connections than this number, it will open connections
 	// to the bootstrap nodes. From there, the routing system should be able
 	// to use the connections to the bootstrap nodes to connect to even more
-	// peers. Routing systems like the IpfsDHT do so in their own Bootstrap
+	// peers. Routing systems like the KadDHT do so in their own Bootstrap
 	// process, which issues random queries to find more peers.
 	MinPeerThreshold int
 

@@ -3,10 +3,9 @@ package dhtopts
 import (
 	"fmt"
 
+	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dssync "github.com/memoio/go-mefs/source/go-datastore/sync"
-	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	record "github.com/libp2p/go-libp2p-record"
 )
 
 // Deprecated: The old format did not support more than one message per stream, and is not supported
@@ -21,7 +20,6 @@ var (
 // Options is a structure containing all the options that can be used when constructing a DHT.
 type Options struct {
 	Datastore ds.Batching
-	Validator record.Validator
 	Client    bool
 	Protocols []protocol.ID
 }
@@ -42,9 +40,6 @@ type Option func(*Options) error
 // Defaults are the default DHT options. This option will be automatically
 // prepended to any options you pass to the DHT constructor.
 var Defaults = func(o *Options) error {
-	o.Validator = record.NamespacedValidator{
-		"pk": record.PublicKeyValidator{},
-	}
 	o.Datastore = dssync.MutexWrap(ds.NewMapDatastore())
 	o.Protocols = DefaultProtocols
 	return nil
@@ -73,30 +68,6 @@ func Client(only bool) Option {
 // Validator configures the DHT to use the specified validator.
 //
 // Defaults to a namespaced validator that can only validate public keys.
-func Validator(v record.Validator) Option {
-	return func(o *Options) error {
-		o.Validator = v
-		return nil
-	}
-}
-
-// NamespacedValidator adds a validator namespaced under `ns`. This option fails
-// if the DHT is not using a `record.NamespacedValidator` as it's validator (it
-// uses one by default but this can be overridden with the `Validator` option).
-//
-// Example: Given a validator registered as `NamespacedValidator("ipns",
-// myValidator)`, all records with keys starting with `/ipns/` will be validated
-// with `myValidator`.
-func NamespacedValidator(ns string, v record.Validator) Option {
-	return func(o *Options) error {
-		nsval, ok := o.Validator.(record.NamespacedValidator)
-		if !ok {
-			return fmt.Errorf("can only add namespaced validators to a NamespacedValidator")
-		}
-		nsval[ns] = v
-		return nil
-	}
-}
 
 // Protocols sets the protocols for the DHT
 //

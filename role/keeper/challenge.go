@@ -25,12 +25,12 @@ func challengeRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			challengeProviderBLS12()
+			challengeProviderBLS12(ctx)
 		}
 	}
 }
 
-func challengeProviderBLS12() {
+func challengeProviderBLS12(ctx context.Context) {
 	log.Println("Challenge start at: ", utils.GetTimeNow())
 
 	pus := getPUKeysFromukpInfo()
@@ -100,11 +100,11 @@ func challengeProviderBLS12() {
 		thischalinfo.chalCid = ret
 		thischalinfo.lastChalTime = challengetime
 
-		go doChallengeBLS12(pu, hByte, challengetime)
+		go doChallengeBLS12(ctx, pu, hByte, challengetime)
 	}
 }
 
-func doChallengeBLS12(pu puKey, hByte []byte, chaltime int64) {
+func doChallengeBLS12(ctx context.Context, pu puKey, hByte []byte, chaltime int64) {
 	fail := false
 	// clean before return
 	defer func() {
@@ -122,8 +122,8 @@ func doChallengeBLS12(pu puKey, hByte []byte, chaltime int64) {
 		fail = true
 		return
 	}
-	metaValue := b58.Encode(hByte)
-	_, err = sendMetaRequest(km, metaValue, pu.pid)
+
+	_, err = localNode.Data.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), hByte, nil, pu.pid)
 	if err != nil {
 		log.Println("DoChallengeBLS12 error :", err)
 		fail = true
@@ -159,7 +159,7 @@ func cleanLastChallenge(pu puKey) {
 
 //handleProofResultBls12 handles the challenge result from provider
 //key: uid/"proof"/chaltime,value: proof[/FaultBlocks]
-func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
+func handleProofResultBls12(km *metainfo.KeyMeta, proof []byte, pid string) {
 	ops := km.GetOptions()
 	if len(ops) < 1 {
 		return
@@ -183,7 +183,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		return
 	}
 
-	spliteProof := strings.Split(proof, metainfo.DELIMITER)
+	spliteProof := strings.Split(string(proof), metainfo.DELIMITER)
 	if len(spliteProof) < 3 {
 		return
 	}

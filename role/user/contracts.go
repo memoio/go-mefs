@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"log"
@@ -82,12 +83,12 @@ func deployUpKeepingAndChannel(userID string, ks []*keeperInfo, ps []*providerIn
 			}
 			//设置channel的value初始值为0
 			//存到本地
-			channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue)
+			channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Contract)
 			if err != nil {
 				return
 			}
 			key := channelValueKeyMeta.ToString() // hexChannelAddress|13|channelvalue
-			err = putKeyTo(key, strconv.FormatInt(0, 10), "local")
+			err = localNode.Data.PutKey(context.Background(), key, []byte(strconv.FormatInt(0, 10)), "local")
 			if err != nil {
 				return
 			}
@@ -96,7 +97,7 @@ func deployUpKeepingAndChannel(userID string, ks []*keeperInfo, ps []*providerIn
 			if err != nil {
 				return
 			}
-			err = putKeyTo(key, strconv.FormatInt(0, 10), providerID)
+			err = localNode.Data.PutKey(context.Background(), key, []byte(strconv.FormatInt(0, 10)), providerID)
 			if err != nil {
 				return
 			}
@@ -179,16 +180,16 @@ func saveChannel(userID string, gp *groupInfo) error {
 
 		// 先从本地找value
 		var value = new(big.Int)
-		channelValueKeyMeta, err := metainfo.NewKeyMeta(item.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
+		channelValueKeyMeta, err := metainfo.NewKeyMeta(item.ChannelAddr, metainfo.Channel, metainfo.SyncTypeChannelValue)
 		if err != nil {
 			return err
 		}
 
-		valueByte, err := getKeyFrom(channelValueKeyMeta.ToString(), "local")
+		valueByte, err := localNode.Data.GetKey(channelValueKeyMeta.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
 			log.Println("Can't get channel value in local,err :", err, ", so try to get from ", proID)
-			valueByte, err = getKeyFrom(channelValueKeyMeta.ToString(), proID)
+			valueByte, err = localNode.Data.GetKey(channelValueKeyMeta.ToString(), proID)
 			if err != nil {
 				// provider上也没找到，value设为0
 				log.Println("Can't get channel price from ", proID, ",err :", err, ", so set channel price to 0.")
@@ -231,7 +232,7 @@ func saveChannelValue(userID string) error {
 				log.Println("NewKeyMeta err:", proInfo.providerID, err)
 				continue
 			}
-			err = putKeyTo(km.ToString(), proInfo.chanItem.Value.String(), "local")
+			err = localNode.Data.PutKey(km.ToString(), proInfo.chanItem.Value.String(), "local")
 			if err != nil {
 				log.Println("CmdPutTo error", proInfo.providerID, err)
 				continue

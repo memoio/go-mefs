@@ -91,7 +91,7 @@ func PosService(ctx context.Context, gc bool) {
 		log.Println("NewKeyMeta posKM error :", err)
 	} else {
 		log.Println("posKm :", posKM.ToString())
-		posValue, err := getKeyFrom(posKM.ToString(), "local")
+		posValue, err := localNode.Data.GetKey(posKM.ToString(), "local")
 		if err != nil {
 			log.Println("Get posKM from local error :", err)
 		} else {
@@ -152,14 +152,14 @@ func traversePath(gc bool) {
 			for i := 0; i < 5; i++ {
 				posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
 				ncid := cid.NewCidV2([]byte(posCid))
-				exist, err := localNode.Blockstore.Has(ncid)
+				exist, err := localNode.Data..Has(ncid)
 				if err != nil {
 					continue
 				}
 
 				if exist {
 					if gc {
-						localNode.Blockstore.DeleteBlock(ncid)
+						localNode.Data..DeleteBlock(ncid)
 					}
 				} else {
 					break
@@ -279,7 +279,7 @@ func generatePosBlocks(increaseSpace uint64) {
 				continue
 			}
 			log.Println("New block success :", newblk.Cid())
-			err = localNode.Blocks.PutBlock(newblk)
+			err = localNode.Data.PutBlock(newblk)
 			if err != nil {
 				log.Println("add block failed, error :", err)
 			}
@@ -293,13 +293,13 @@ func generatePosBlocks(increaseSpace uint64) {
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
 		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosAdd)
 		for _, keeper := range keeperIDs {
-			sendMetaRequest(km, metaValue, keeper)
+			localNode.Data.SendMetaRequest(km, metaValue, keeper)
 		}
 
 		// 本地更新
 		posValue := posCidPrefix
 		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
-		err = putKeyTo(posKM.ToString(), posValue, "local")
+		err = localNode.Data.PutKey(context.Backgroud(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -331,7 +331,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		for i := 0; i < 5; i++ {
 			blockID := posCidPrefix + "_" + strconv.Itoa(i)
 			ncid := cid.NewCidV2([]byte(blockID))
-			err := localNode.Blockstore.DeleteBlock(ncid)
+			err := localNode.Data..DeleteBlock(ncid)
 			if err != nil {
 				log.Println("delete block: ", blockID, " error :", err)
 				j++
@@ -356,7 +356,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
-		err = putKeyTo(posKM.ToString(), posValue, "local")
+		err = localNode.Data.PutKey(context.Backgroud(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -372,7 +372,7 @@ func deletePosBlocks(decreseSpace uint64) {
 			}
 			metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
 			for _, keeper := range keeperIDs {
-				sendMetaRequest(km, metavalue, keeper)
+				localNode.Data.SendMetaRequest(km, metavalue, keeper)
 			}
 		}
 	}
