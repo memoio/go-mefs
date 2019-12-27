@@ -34,6 +34,7 @@ require (
 	github.com/howeyc/fsnotify v0.9.0 // indirect
 	github.com/influxdata/influxdb v1.7.7 // indirect
 	github.com/ipfs/bbloom v0.0.1
+	github.com/ipfs/go-cid v0.0.4
 	github.com/ipfs/go-fs-lock v0.0.1
 	github.com/ipfs/go-ipfs-addr v0.0.1
 	github.com/ipfs/go-ipfs-cmds v0.1.0
@@ -44,6 +45,7 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-metrics-prometheus v0.0.2
 	github.com/ipfs/go-path v0.0.7
+	github.com/ipfs/go-todocounter v0.0.2
 	github.com/jbenet/go-temp-err-catcher v0.0.0-20150120210811-aac704a3f4f2
 	github.com/jbenet/goprocess v0.1.3
 	github.com/karalabe/usb v0.0.0-20190703133951-9be757f914c0 // indirect
@@ -64,7 +66,7 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-yamux v0.2.1
 	github.com/libp2p/go-maddr-filter v0.0.5
-	github.com/memoio/go-mefs/source/go-libp2p-kad-dht v0.0.0-00010101000000-000000000000
+	github.com/libp2p/go-msgio v0.0.4
 	github.com/memoio/mefs-go-http-client v0.0.0-20190807085537-81d338e169a3
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/minio/cli v1.22.0
@@ -78,6 +80,7 @@ require (
 	github.com/multiformats/go-multiaddr-net v0.1.1
 	github.com/multiformats/go-multibase v0.0.1
 	github.com/multiformats/go-multihash v0.0.10
+	github.com/multiformats/go-multistream v0.1.0
 	github.com/nats-io/nats-streaming-server v0.16.2 // indirect
 	github.com/ncw/gmp v1.0.4
 	github.com/olekukonko/tablewriter v0.0.1 // indirect
@@ -93,22 +96,23 @@ require (
 	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	github.com/urfave/cli v1.21.0
-	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc // indirect
+	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/go-ctrlnet v0.0.0-20180313164037-f564fbbdaa95
 	github.com/whyrusleeping/go-sysinfo v0.0.0-20190219211824-4a357d4b90b1
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7
 	github.com/whyrusleeping/stump v0.0.0-20160611222256-206f8f13aae1
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208 // indirect
+	go.opencensus.io v0.22.2
 	go.uber.org/zap v1.12.0 // indirect
 	go4.org v0.0.0-20190313082347-94abd6928b1d // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
+	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
 )
 
 replace (
-	github.com/memoio/go-mefs/source/go-libp2p-kad-dht => ./source/go-libp2p-kad-dht
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392 => github.com/golang/crypto v0.0.0-20190923035154-9ee001bba392
 	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69 => github.com/golang/sys v0.0.0-20190922100055-0a153f010e69
 )

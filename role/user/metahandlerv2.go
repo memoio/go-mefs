@@ -17,39 +17,33 @@ type HandlerV2 struct {
 
 // HandleMetaMessage User角色层metainfo的回调函数,传入对方节点发来的kv，和对方节点的peerid
 //没有返回值时，返回complete，或者返回规定信息
-func (user *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (string, error) {
+func (user *HandlerV2) HandleMetaMessage(dt int, metaKey string, metaValue []byte, from string) ([]byte, error) {
 	km, err := metainfo.GetKeyMeta(metaKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	keytype := km.GetKeyType()
+	keytype := km.GetDType()
 
 	gService := getGroup(km.GetMid())
 	if gService == nil {
-		return "", ErrLfsServiceNotReady
+		return nil, ErrLfsServiceNotReady
 	}
 
 	switch keytype {
-	case metainfo.UserInitReq:
-		log.Println("keytype：UserInitReq 不处理")
-	case metainfo.UserInitRes: //handle init response from keeper
-		go handleUserInitRes(km, metaValue, from)
-	case metainfo.Test:
-		handleTest(km)
-	case metainfo.GetBlock:
-		log.Println("getBlock: ", km.ToString())
-	case metainfo.PutBlock:
-		log.Println("putBlock: ", km.ToString())
+	case metainfo.UserInit: //handle init response from keeper
+		if dt == metainfo.Put {
+			go handleUserInit(km, metaValue, from)
+		}
 	default: //没有匹配的信息，报错
-		return "", metainfo.ErrWrongType
+		return nil, metainfo.ErrWrongType
 	}
-	return metainfo.MetaHandlerComplete, nil
+	return []byte(metainfo.MetaHandlerComplete), nil
 }
 
 // handleUserInitRes 收到keeper回应的初始化信息，将value中的keeper provider信息整理到备选信息中
 // key: userID/"User_Init_Res"/keepercount/providercount,
 // value: kid1kid2..../pid1pid2
-func handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
+func handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from string) {
 	gp := getGroup(km.GetMid())
 	if gp == nil {
 		return
@@ -60,7 +54,7 @@ func handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
 
 	if gp.state == collecting { //收集信息阶段，才继续
 		log.Println("Receive: InitResponse，from：", from, ", value is：", metaValue)
-		splitedMeta := strings.Split(metaValue, metainfo.DELIMITER)
+		splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
 		if len(splitedMeta) != 2 {
 			return
 		}
@@ -82,14 +76,10 @@ func handleUserInitRes(km *metainfo.KeyMeta, metaValue, from string) {
 		providers := splitedMeta[1]
 		for i := 0; i < len(providers)/utils.IDLength; i++ {
 			pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
-			_, err := peer.IDB58Decode(pid)
-			if err != nil {
-				continue
-			}
 			if !utils.CheckDup(gp.tempProviders, pid) {
 				continue
 			}
-			if sc.ConnectTo(context.Background(), localNode, pid) {
+			if localNode.Data.Connect(context.Background(), pid) {
 				gp.tempProviders = append(gp.tempProviders, pid)
 			}
 		}

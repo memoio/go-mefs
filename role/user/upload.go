@@ -15,8 +15,6 @@ import (
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
-	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -249,13 +247,19 @@ Loop:
 				if u.curOffset == 0 {
 					if i < len(pros) {
 						provider = pros[i]
-						km, _ = metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(offset))
+						km, _ = metainfo.NewKeyMeta(ncid, metainfo.Block)
 					} else {
 						blockMetas[i].cid = ncid
 						blockMetas[i].offset = offset
 						blockMetas[i].provider = u.userID
 						continue
 					}
+					err = localNode.Data.PutBlock(ctx, km.ToString(), encodedData[i], provider)
+					if err != nil {
+						log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
+						continue
+					}
+					count++
 				} else {
 					provider, _, err = u.gInfo.getBlockProviders(ncid)
 					if err != nil || provider == u.userID {
@@ -273,22 +277,14 @@ Loop:
 						}
 						continue
 					}
-					km, _ = metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "append", strconv.Itoa(int(u.curOffset)), strconv.Itoa(offset))
+					km, _ = metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(u.curOffset)), strconv.Itoa(offset))
+					err = localNode.Data.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
+					if err != nil {
+						log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
+						continue
+					}
+					count++
 				}
-
-				//开始上传这个块
-				Key := km.ToString()
-				bcid := cid.NewCidV2([]byte(Key))
-				b, err := blocks.NewBlockWithCid(encodedData[i], bcid)
-				if err != nil {
-					return err
-				}
-				err = localNode.Data.PutBlockTo(b, provider)
-				if err != nil {
-					log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
-					continue
-				}
-				count++
 
 				blockMetas[i].cid = ncid
 				blockMetas[i].offset = offset

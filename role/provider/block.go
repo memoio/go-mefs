@@ -1,31 +1,31 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
 	pb "github.com/memoio/go-mefs/role/user/pb"
-	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
+	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
-	// key is cid|ops|type|begin|end
+func handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	// key is "block"/cid
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
-	if len(splitedNcid) == 0 {
-		return errors.New("No value in km")
+	if len(splitedNcid) != 2 {
+		return errors.New("Wrong value for put block")
 	}
-	bmeta, err := metainfo.GetBlockMeta(splitedNcid[0])
+
+	bmeta, err := metainfo.GetBlockMeta(splitedNcid[1])
 	if err != nil {
 		return nil
 	}
@@ -56,127 +56,115 @@ func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
 		return errors.New("NotMyUser")
 	}
 
+	ctx := context.Background()
+
 	go func() {
-		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
-		if len(splitedNcid) < 5 {
-			Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
-			if err != nil {
-				log.Printf("Error create block %s: %s", bcid.String(), err)
-				return
-			}
-			err = localNode.Data..Put(Nblk)
-			if err != nil {
-				log.Printf("Error writing block to datastore: %s", err)
-				return
-			}
+		err = localNode.Data.PutBlock(ctx, km.ToString(), value, "local")
+		if err != nil {
+			log.Printf("Error writing block to datastore: %s", err)
 			return
 		}
-
-		typ := splitedNcid[2]
-
-		switch typ {
-		case "append":
-			if has, err := localNode.Data..Has(bcid); !has || err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			beginOffset, err := strconv.Atoi(splitedNcid[3])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			endOffset, err := strconv.Atoi(splitedNcid[4])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			err = localNode.Data..Append(bcid, []byte(value), beginOffset, endOffset)
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-		case "update":
-			_, err := strconv.Atoi(splitedNcid[3])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			_, err = strconv.Atoi(splitedNcid[4])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			if has, _ := localNode.Data..Has(bcid); true == has {
-				err := localNode.Data..DeleteBlock(bcid)
-				if err != nil {
-					log.Printf("Error delete block %s: %s", bcid.String(), err)
-				}
-			}
-			Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
-			if err != nil {
-				log.Printf("Error create block %s: %s", bcid.String(), err)
-				return
-			}
-			err = localNode.Data..Put(Nblk)
-			if err != nil {
-				log.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
-				return
-			}
-		default:
-			log.Printf("Wrong type in put block")
-		}
+		return
 	}()
 
 	return nil
 }
 
-func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
+func handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	// key is "block"/cid/begin/end
+	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
+	if len(splitedNcid) != 4 {
+		return errors.New("Wrong value for put block")
+	}
+
+	bmeta, err := metainfo.GetBlockMeta(splitedNcid[1])
+	if err != nil {
+		return nil
+	}
+
+	isMyuser := false
+	// 保存合约
+	upItem, err := getUpkeeping(bmeta.GetUid())
+	if err != nil {
+		go saveUpkeeping(bmeta.GetUid())
+	} else {
+		localID := localNode.Identity.Pretty()
+		for _, proID := range upItem.ProviderIDs {
+			if localID == proID {
+				isMyuser = true
+				offerItem, err := getOffer()
+				if err != nil {
+					return err
+				}
+				if upItem.Price < offerItem.Price {
+					return errors.New("price is lower now")
+				}
+				break
+			}
+		}
+	}
+
+	if !isMyuser {
+		return errors.New("NotMyUser")
+	}
+
+	ctx := context.Background()
+	go func() {
+		err = localNode.Data.AppendBlock(ctx, km.ToString(), value, "local")
+		if err != nil {
+			log.Printf("Error append field to block %s: %s", km.ToString(), err)
+			return
+		}
+	}()
+	return nil
+}
+
+func handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
 	// key is cid|ops|sig
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) < 3 {
-		return "", errors.New("Key is too short")
+		return nil, errors.New("Key is too short")
 	}
 
 	sigByte, err := b58.Decode(splitedNcid[2])
 	if err != nil {
-		return "", errors.New("Signature format is wrong")
+		return nil, errors.New("Signature format is wrong")
 	}
 
 	res, userID, key, value, err := verify(sigByte)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
-		return "", err
+		return nil, err
 	}
 
 	if res {
 		// 验证通过
 		// 内存channel的value变化
 		// 然后持久化
-		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
-		b, err := localNode.Data..Get(bcid)
+		b, err := localNode.Data.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
-			return "", errors.New("Block is not found")
+			return nil, errors.New("Block is not found")
 		}
 		if key != "" {
 			channelItem, err := getChannel(userID)
 			if err != nil {
-				return "", errors.New("Find channelItem in channelBook error")
+				return nil, errors.New("Find channelItem in channelBook error")
 			}
 
 			log.Println("Downlaod success，change channel.value and persist: ", value.String())
 			channelItem.Value = value
 			proContracts.channelBook.Store(userID, channelItem)
-			err = localNode.Data.PutKey(context.Backgroud(), key, byte(value.String()), "local")
+			err = localNode.Data.PutKey(context.Background(), key, []byte(value.String()), "local")
 			if err != nil {
 				log.Println("cmdPutErr:", err)
 			}
 		}
-		return string(b.RawData()), nil
+		return b.RawData(), nil
 	}
 
 	log.Printf("verify is false %s", splitedNcid[0])
 
-	return "", errors.New("Signature is wrong")
+	return nil, errors.New("Signature is wrong")
 }
 
 // verify verifies the transaction
@@ -230,7 +218,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	if err != nil {
 		return false, "", "", nil, err
 	}
-	channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue) // HexChannelAddress|13|channelValue
+	channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Channel) // HexChannelAddress|13|channelValue
 	if err != nil {
 		return false, "", "", nil, err
 	}
@@ -239,4 +227,13 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 		return false, "", "", nil, err
 	}
 	return res, userID, channelValueKeyMeta.ToString(), value, nil
+}
+
+func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
+	blockID := km.GetMid()
+	err := localNode.Data.DeleteBlock(context.Background(), blockID, "local")
+	if err != nil && err != bs.ErrNotFound {
+		return err
+	}
+	return nil
 }

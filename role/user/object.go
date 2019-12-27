@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"log"
 	"strconv"
 	"strings"
@@ -207,14 +208,15 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 		return latestTime, ErrNoKeepers
 	}
 
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.Query, metainfo.QueryTypeLastChal)
+	km, err := metainfo.NewKeyMeta(blockID, metainfo.ChalTime)
 	if err != nil {
 		return latestTime, err
 	}
-	var res string
+
 	var tempTime time.Time
+	ctx := context.Background()
 	for _, keeper := range conkeepers {
-		res, err = localNode.Data.SendMetaRequest(km, "", keeper)
+		res, err := localNode.Data.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, keeper)
 		if err != nil {
 			continue
 		}

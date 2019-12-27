@@ -162,6 +162,8 @@ func saveChannel(userID string, gp *groupInfo) error {
 		return err
 	}
 
+	ctx := context.Background()
+
 	for _, proInfo := range gp.providers {
 		if proInfo.chanItem != nil {
 			continue
@@ -180,16 +182,16 @@ func saveChannel(userID string, gp *groupInfo) error {
 
 		// 先从本地找value
 		var value = new(big.Int)
-		channelValueKeyMeta, err := metainfo.NewKeyMeta(item.ChannelAddr, metainfo.Channel, metainfo.SyncTypeChannelValue)
+		km, err := metainfo.NewKeyMeta(item.ChannelAddr, metainfo.Channel)
 		if err != nil {
 			return err
 		}
 
-		valueByte, err := localNode.Data.GetKey(channelValueKeyMeta.ToString(), "local")
+		valueByte, err := localNode.Data.GetKey(ctx, km.ToString(), "local")
 		if err != nil {
 			// 本地没找到，从provider上找
 			log.Println("Can't get channel value in local,err :", err, ", so try to get from ", proID)
-			valueByte, err = localNode.Data.GetKey(channelValueKeyMeta.ToString(), proID)
+			valueByte, err = localNode.Data.GetKey(ctx, km.ToString(), proID)
 			if err != nil {
 				// provider上也没找到，value设为0
 				log.Println("Can't get channel price from ", proID, ",err :", err, ", so set channel price to 0.")
@@ -224,15 +226,18 @@ func saveChannelValue(userID string) error {
 	if gp == nil {
 		return errors.New("does not exist or has not started")
 	}
+
+	ctx := context.Background()
+
 	for _, proInfo := range gp.providers {
 		if proInfo.chanItem != nil {
 			// 保存本地形式：K-provider，V-channel此时的value
-			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
+			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelAddr, metainfo.Channel)
 			if err != nil {
 				log.Println("NewKeyMeta err:", proInfo.providerID, err)
 				continue
 			}
-			err = localNode.Data.PutKey(km.ToString(), proInfo.chanItem.Value.String(), "local")
+			err = localNode.Data.PutKey(ctx, km.ToString(), proInfo.chanItem.Value.Bytes(), "local")
 			if err != nil {
 				log.Println("CmdPutTo error", proInfo.providerID, err)
 				continue

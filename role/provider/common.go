@@ -1,16 +1,15 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"log"
-	"runtime"
 	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -33,39 +32,18 @@ type providerContracts struct {
 	proInfo       contracts.ProviderItem
 }
 
-func localNode.Data.GetKey(key, node string) ([]byte, error) {
-	return localNode.Routing.(*dht.KadDHT).CmdGetFrom(key, node)
-}
-
-func localNode.Data.SendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.KadDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
-}
-
-func localNode.Data.SendMetaRequest(ctx context.Context, typ, key string, metaValue []byte, to string) ([]byte, error) {
-	p, err := peer.IDB58Decode(to)
-	if err != nil {
-		return []byte, err
-	}
-	return localNode.Routing.(*dht.KadDHT).SendMetaRequest(ctx,typ,key, metaValue, to)
-}
-
 func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 	pubKeyI, ok := usersConfigs.Load(userID)
 	if ok {
 		return pubKeyI.(*mcl.PublicKey), nil
 	}
 
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
 	if err != nil {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Data.GetKey(userconfigkey, keeperID)
+	userconfigbyte, err := localNode.Data.GetKey(context.Background(), userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +59,12 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 }
 
 func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
 	if err != nil {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Data.GetKey(userconfigkey, keeperID)
+	userconfigbyte, err := localNode.Data.GetKey(context.Background(), userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}

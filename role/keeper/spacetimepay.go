@@ -127,15 +127,12 @@ func spaceTimePay() {
 			}
 		}
 
-		km, metaValue, err := saveLastPay(pu, "signature", "proof", startTime, lastTime, spaceTime)
+		_, _, err = saveLastPay(pu, "signature", "proof", startTime, lastTime, spaceTime)
 		if err != nil {
 			log.Println("saveLastPay() failed: ", err)
 			return
 		}
-		if amount.Sign() > 0 {
-			km.SetKeyType(metainfo.Sync)
-			metaSyncTo(km, metaValue) //send this value to other keepers
-		}
+		// sync to other keepers
 		log.Println("spaceTimePay complete!")
 	}
 }
@@ -220,26 +217,26 @@ func fetchChalresult(thisPU puKey, timestart int64, timeend int64) ([]int64, []i
 }
 
 func saveLastPay(thisPU puKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
-	//key: `uid/"local"/"lastpay"/pid`
+	//key: `lastpay"/uid/pid`
 	//value: `beginTime/endTime/spacetime/signature/proof`
 	//for get
-	kmLast, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.Local, metainfo.SyncTypeLastPay, thisPU.pid)
+	kmLast, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.LastPay, thisPU.pid)
 	if err != nil {
 		log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
 		return nil, "", err
 	}
 	valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-	localNode.Data.PutKey(context.Backgroud(), kmLast.ToString(), []byte(valueLast), "local")
-	//key: `uid/"sync"/"chalpay"/pid/beginTime/endTime`
+	localNode.Data.PutKey(context.Background(), kmLast.ToString(), []byte(valueLast), "local")
+	//key: `"chalpay"/uid/pid/beginTime/endTime`
 	//value: `spacetime/signature/proof`
 	//for storing
-	km, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.Local, metainfo.SyncTypeChalPay, thisPU.pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
+	km, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.ChalPay, thisPU.pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 	if err != nil {
 		log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
 		return nil, "", err
 	}
 	metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-	localNode.Data.PutKey(context.Backgroud(), km.ToString(), []byte(metaValue), "local")
+	localNode.Data.PutKey(context.Background(), km.ToString(), []byte(metaValue), "local")
 
 	//将此次支付作为最近一次支付，保存在内存中
 	thisChalPay := &chalpay{
@@ -268,13 +265,13 @@ func checkLastPayTime(thisPU puKey) int64 {
 	}
 
 	if thisChalinfo.lastPay == nil {
-		kmLast, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.Local, metainfo.SyncTypeLastPay, thisPU.uid)
+		kmLast, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.LastPay, thisPU.uid)
 		if err != nil {
 			log.Println(err)
 			return failtime
 		}
 		// get from leveldb
-		valueByte, err := localNode.Data.GetKey(kmLast.ToString(), "local")
+		valueByte, err := localNode.Data.GetKey(context.Background(), kmLast.ToString(), "local")
 		if err != nil {
 			log.Println("no lastTime data, return Unix(0)")
 			return failtime

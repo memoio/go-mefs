@@ -282,7 +282,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	//把每个角色的k v保存到本地leveldb中
 	nid := node.Identity.Pretty()
-	kmRole, err := metainfo.NewKeyMeta(nid, metainfo.Local, metainfo.SyncTypeRole)
+	kmRole, err := metainfo.NewKeyMeta(nid, metainfo.Role)
 	if err != nil {
 		return err
 	}
@@ -316,7 +316,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	}
 	value := cfg.Role //角色信息的value
-	err = node.Routing.(*dht.KadDHT).CmdPutTo(keystring, value, "local")
+	err = node.Routing.(*dht.KadDHT).PutTo(node.Context(), keystring, []byte(value), "local")
 	if err != nil {
 		fmt.Println("node.Routing.CmdPut falied: ", err)
 	}

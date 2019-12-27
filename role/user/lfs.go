@@ -16,7 +16,6 @@ import (
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
@@ -326,16 +325,19 @@ func (l *LfsInfo) flushSuperBlockLocal() error {
 		return err
 	}
 	ncid := bm.ToString()
-	bcid := cid.NewCidV2([]byte(ncid))
-	b, err := blocks.NewBlockWithCid(dataEncoded[0], bcid)
+	km, err := metainfo.NewKeyMeta(ncid, metainfo.Block)
 	if err != nil {
 		return err
 	}
-	err = localNode.Data.DeleteBlock(bcid)
+
+	ctx := context.Background()
+
+	err = localNode.Data.DeleteBlock(ctx, km.ToString(), "local")
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}
-	err = localNode.Data.PutBlock(b)
+
+	err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[0], "local")
 	if err != nil {
 		return ErrCannotAddBlock
 	}
@@ -377,21 +379,20 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 	if err != nil && len(providers) == 0 {
 		return err
 	}
+
+	ctx := context.Background()
+
 	for j := 0; j < len(providers); j++ { //
 		bm.SetBid(strconv.Itoa(j))
 		ncid := bm.ToString()
 
-		km, err := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
+		km, err := metainfo.NewKeyMeta(ncid, metainfo.Block)
 		if err != nil {
 			continue
 		}
 		updateKey := km.ToString()
-		bcid := cid.NewCidV2([]byte(updateKey))
-		b, err := blocks.NewBlockWithCid(dataEncoded[j], bcid)
-		if err != nil {
-			return err
-		}
-		err = localNode.Data.PutBlockTo(b, providers[j])
+
+		err = localNode.Data.PutBlock(ctx, updateKey, dataEncoded[j], providers[j])
 		if err != nil {
 			return err
 		}
@@ -437,16 +438,18 @@ func (l *LfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
 		return err
 	}
 	ncid := bm.ToString()
-	bcid := cid.NewCidV2([]byte(ncid))
-	b, err := blocks.NewBlockWithCid(dataEncoded[0], bcid)
+	km, err := metainfo.NewKeyMeta(ncid, metainfo.Block)
 	if err != nil {
 		return err
 	}
-	err = localNode.Data.DeleteBlock(bcid)
+
+	ctx := context.Background()
+
+	err = localNode.Data.DeleteBlock(ctx, km.ToString(), "local")
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}
-	err = localNode.Data.PutBlock(b)
+	err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[0], "local")
 	if err != nil {
 		return err
 	}
@@ -475,23 +478,21 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	ncidPrefix := bm.ToString(3)
 	BucketBytes := BucketBuffer.Bytes()
 	dataEncoded, offset, err := dataformat.DataEncodeToMul(BucketBytes, ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+
+	ctx := context.Background()
+
 	for j := 0; j < int(MetaBackupCount); j++ { //
 		bm.SetBid(strconv.Itoa(j))
 		ncid := bm.ToString()
 		if err != nil {
 			return err
 		}
-		km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
-		updateKey := km.ToString()
-		bcid := cid.NewCidV2([]byte(updateKey))
-		b, err := blocks.NewBlockWithCid(dataEncoded[j], bcid)
+		km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+		err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 		if err != nil {
 			return err
 		}
-		err = localNode.Data.PutBlockTo(b, providers[j])
-		if err != nil {
-			return err
-		}
+
 		err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))
 		if err != nil {
 			return err
@@ -530,6 +531,7 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 	bucketID := bucket.BucketID
 	objectsStripeID := 1 //ObjectInfo的stripe从1开始
 	objectsBlockLength := 0
+	ctx := context.Background()
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		object, ok := objectElement.Value.(*objectInfo)
 		if !ok {
@@ -549,16 +551,14 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 				return err
 			}
 			ncid := bm.ToString()
-			bcid := cid.NewCidV2([]byte(ncid))
-			b, err := blocks.NewBlockWithCid(dataEncoded[0], bcid)
-			if err != nil {
-				return err
-			}
-			err = localNode.Data.DeleteBlock(bcid)
+
+			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+
+			err = localNode.Data.DeleteBlock(ctx, km.ToString(), "local")
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
-			err = localNode.Data.PutBlock(b)
+			err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[0], "local")
 			if err != nil {
 				return ErrCannotAddBlock
 			}
@@ -588,16 +588,13 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 			return err
 		}
 		ncid := bm.ToString()
-		bcid := cid.NewCidV2([]byte(ncid))
-		b, err := blocks.NewBlockWithCid(dataEncoded[0], bcid)
-		if err != nil {
-			return err
-		}
-		err = localNode.Data.DeleteBlock(bcid)
+		km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+
+		err = localNode.Data.DeleteBlock(ctx, km.ToString(), "local")
 		if err != nil && err != bs.ErrNotFound {
 			return err
 		}
-		err = localNode.Data.PutBlock(b)
+		err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[0], "local")
 		if err != nil {
 			return ErrCannotAddBlock
 		}
@@ -627,6 +624,9 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 	bucketID := bucket.BucketID
 	objectsStripeID := 1
 	objectsBlockLength := 0
+
+	ctx := context.Background()
+
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		object, ok := objectElement.Value.(*objectInfo)
 		if !ok {
@@ -646,14 +646,9 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 			for j := 0; j < len(providers); j++ {
 				bm.SetBid(strconv.Itoa(j))
 				ncid := bm.ToString()
-				km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
-				updateKey := km.ToString()
-				bcid := cid.NewCidV2([]byte(updateKey))
-				b, err := blocks.NewBlockWithCid(dataEncoded[j], bcid)
-				if err != nil {
-					return err
-				}
-				err = localNode.Data.PutBlockTo(b, providers[j])
+				km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+
+				err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 				if err != nil {
 					return err
 				}
@@ -691,14 +686,8 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 		for j := 0; j < len(providers); j++ {
 			bm.SetBid(strconv.Itoa(j))
 			ncid := bm.ToString()
-			km, _ := metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(int(offset)))
-			updateKey := km.ToString()
-			bcid := cid.NewCidV2([]byte(updateKey))
-			b, err := blocks.NewBlockWithCid(dataEncoded[j], bcid)
-			if err != nil {
-				return err
-			}
-			err = localNode.Data.PutBlockTo(b, providers[j])
+			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+			err = localNode.Data.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 			if err != nil {
 				return err
 			}
@@ -734,17 +723,22 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		return nil, err
 	}
 	ncidlocal := bm.ToString()
-	bcidlocal := cid.NewCidV2([]byte(ncidlocal))
+	km, _ := metainfo.NewKeyMeta(ncidlocal, metainfo.Block)
+
 	if l.keySet == nil {
 		return nil, ErrKeySetIsNil
 	}
-	if b, err = localNode.Data.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+
+	ctx := context.Background()
+
+	b, err = localNode.Data.GetBlock(ctx, km.ToString(), nil, "local")
+	if err == nil && b != nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
 	} else { //若本地无超级块，向自己的provider进行查询
-		err = localNode.Data.DeleteBlock(bcidlocal)
+		err = localNode.Data.DeleteBlock(ctx, km.ToString(), "local")
 		if err != nil && err != bs.ErrNotFound {
 			return nil, err
 		}
-		log.Printf("Cannot Get superBlock in block %s from local datastore. Try to get it from remote servers.\n", ncidlocal)
+		log.Printf("Try to get it from remote servers.\n", ncidlocal)
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
 			bm.SetBid(strconv.Itoa(j))
 			ncid := bm.ToString()
@@ -755,8 +749,8 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				log.Println("Cannot load Lfs superblock.", err)
 				return nil, ErrCannotLoadMetaBlock
 			}
-			b, err = localNode.Data.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //向指定provider查询超级块
-			if err != nil {                                                                                        //*错误处理
+			b, err = localNode.Data.GetBlock(ctx, ncid, sig, provider) //向指定provider查询超级块
+			if err != nil {                                            //*错误处理
 				log.Printf("Get metablock %s from %s failed: %s.\n", ncid, provider, err)
 				continue
 			}
@@ -823,10 +817,10 @@ func (l *LfsInfo) loadBucketInfo() error {
 			return err
 		}
 		ncidlocal := bm.ToString()
-		bcidlocal := cid.NewCidV2([]byte(ncidlocal))
-		if b, err = localNode.Data.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+		ctx := context.Background()
+		if b, err = localNode.Data.GetBlock(ctx, ncidlocal, nil, "local"); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
-			err = localNode.Data.DeleteBlock(bcidlocal)
+			err = localNode.Data.DeleteBlock(ctx, ncidlocal, "local")
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
@@ -839,7 +833,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 					log.Printf("load superBucket: %d's block: %s from provider: %s falied.\n", bucketID, ncid, provider)
 					continue
 				}
-				b, err = localNode.Data.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig) //获取数据块
+				b, err = localNode.Data.GetBlock(ctx, ncid, sig, provider) //获取数据块
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)
@@ -902,10 +896,10 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			return err
 		}
 		ncidlocal := bm.ToString()
-		bcidlocal := cid.NewCidV2([]byte(ncidlocal))
-		if b, err = localNode.Data.GetBlock(context.Background(), bcidlocal); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+		ctx := context.Background()
+		if b, err = localNode.Data.GetBlock(ctx, ncidlocal, nil, "local"); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
-			err = localNode.Data.DeleteBlock(bcidlocal)
+			err = localNode.Data.DeleteBlock(ctx, ncidlocal, "local")
 			if err != nil && err != bs.ErrNotFound {
 				return err
 			}
@@ -917,7 +911,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				if err != nil && j == int(l.meta.sb.MetaBackupCount)-1 {
 					return ErrCannotLoadMetaBlock
 				}
-				b, err = localNode.Data.GetBlockFrom(localNode.Context(), provider, ncid, DefaultGetBlockDelay, sig)
+				b, err = localNode.Data.GetBlock(ctx, ncid, sig, provider)
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)

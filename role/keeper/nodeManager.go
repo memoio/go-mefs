@@ -128,7 +128,7 @@ func checkLocalPeers(ctx context.Context) {
 	})
 	for _, keeper := range tmpKeepers {
 		thisInfo, err := getKInfo(keeper)
-		if thisInfo != nil {
+		if err != nil || thisInfo == nil {
 			continue
 		}
 
@@ -148,7 +148,7 @@ func checkLocalPeers(ctx context.Context) {
 
 	for _, keeper := range tmpKeepers {
 		thisInfo, err := getPInfo(keeper)
-		if thisInfo != nil {
+		if err != nil || thisInfo == nil {
 			continue
 		}
 
@@ -185,11 +185,11 @@ func checkConnectedPeer(ctx context.Context) error {
 		}
 
 		log.Println("try to get new: ", id, " roleinfo from net and chain")
-		kmRole, err := metainfo.NewKeyMeta(id, metainfo.Local, metainfo.SyncTypeRole)
+		kmRole, err := metainfo.NewKeyMeta(id, metainfo.Role)
 		if err != nil {
 			return err
 		}
-		val, _ := localNode.Data.GetKey(kmRole.ToString(), id)
+		val, _ := localNode.Data.GetKey(context.Background(), kmRole.ToString(), id)
 		if string(val) == metainfo.RoleKeeper {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {

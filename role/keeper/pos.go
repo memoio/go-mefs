@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"context"
 	"log"
 	"strconv"
 	"strings"
@@ -30,13 +31,13 @@ func handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string) {
 			continue
 		}
 
-		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
+		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Pos)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		pidAndOffset := from + metainfo.DELIMITER + strconv.Itoa(off)
-		err = localNode.Data.PutKey(context.Backgroud(), kmBlock.ToString(), []byte(pidAndOffset), "local")
+		err = localNode.Data.PutKey(context.Background(), kmBlock.ToString(), []byte(pidAndOffset), "local")
 		if err != nil {
 			log.Println(err)
 			return
@@ -57,19 +58,19 @@ func handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string) {
 }
 
 // handlePosDelete() handles block_meta deletion
-func handlePosDelete(km *metainfo.KeyMeta, metaValue, from string) {
-	deleteBlocks := strings.Split(metaValue, metainfo.DELIMITER)
+func handlePosDelete(km *metainfo.KeyMeta, metaValue []byte, from string) {
+	deleteBlocks := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if from != km.GetMid() {
 		log.Println("handlePosDelete error! from and km.mid are: ", from, km.GetMid())
 	}
 	for _, blockID := range deleteBlocks {
 		//先删除本地信息
-		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
+		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		err = localNode.Data.DeleteKey(kmBlock.ToString(), "local")
+		err = localNode.Data.DeleteKey(context.Background(), kmBlock.ToString(), "local")
 		if err != nil && err != ds.ErrNotFound {
 			log.Println(err)
 			return

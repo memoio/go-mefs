@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -20,7 +21,7 @@ func initBLS12Config() (*mcl.KeySet, error) {
 }
 
 func putUserConfig(userID string, keepers []string, sk []byte, keySet *mcl.KeySet) {
-	kmBls, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	kmBls, err := metainfo.NewKeyMeta(userID, metainfo.Config)
 	if err != nil {
 		return
 	}
@@ -32,7 +33,8 @@ func putUserConfig(userID string, keepers []string, sk []byte, keySet *mcl.KeySe
 	}
 
 	// put to local first
-	err = localNode.Data.PutKey(kmBls.ToString(), string(userBLS12Config), "local")
+	ctx := context.Background()
+	err = localNode.Data.PutKey(ctx, kmBls.ToString(), userBLS12Config, "local")
 	if err != nil {
 		log.Println("CmdPutTo()err")
 		return
@@ -42,7 +44,7 @@ func putUserConfig(userID string, keepers []string, sk []byte, keySet *mcl.KeySe
 	for _, kid := range keepers {
 		retry := 0
 		for retry < 10 {
-			err := localNode.Data.PutKey(kmBls.ToString(), string(userBLS12Config), kid)
+			err := localNode.Data.PutKey(ctx, kmBls.ToString(), userBLS12Config, kid)
 			if err != nil {
 				retry++
 				if retry >= 10 {
@@ -57,13 +59,14 @@ func putUserConfig(userID string, keepers []string, sk []byte, keySet *mcl.KeySe
 }
 
 func loadBLS12Config(userID string, keepers []string, sk []byte) (keySet *mcl.KeySet, err error) {
-	kmBls, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	kmBls, err := metainfo.NewKeyMeta(userID, metainfo.Config)
 	if err != nil {
 		return nil, err
 	}
 
 	userBLS12ConfigKey := kmBls.ToString()
-	userBLS12config, err := localNode.Data.GetKey(userBLS12ConfigKey, "local")
+	ctx := context.Background()
+	userBLS12config, err := localNode.Data.GetKey(ctx, userBLS12ConfigKey, "local")
 	if err == nil && len(userBLS12config) > 0 { //先从本地找，如果有就解析一下
 		mkey, err := parseBLS12ConfigMeta(sk, userBLS12config)
 		if err == nil && keySet != nil {
@@ -75,7 +78,7 @@ func loadBLS12Config(userID string, keepers []string, sk []byte) (keySet *mcl.Ke
 	found := false
 	bmap := make(map[string]bool)
 	for _, kid := range keepers {
-		userBLS12config, err = localNode.Data.GetKey(userBLS12ConfigKey, kid)
+		userBLS12config, err = localNode.Data.GetKey(ctx, userBLS12ConfigKey, kid)
 		if err == nil && len(userBLS12config) > 0 {
 			mkey, err := parseBLS12ConfigMeta(sk, userBLS12config)
 			if err == nil && mkey != nil {
@@ -93,7 +96,7 @@ func loadBLS12Config(userID string, keepers []string, sk []byte) (keySet *mcl.Ke
 	// remote has no config; resend
 	if !found && len(userBLS12config) > 0 {
 		// store local
-		err = localNode.Data.PutKey(userBLS12ConfigKey, string(userBLS12config), "local")
+		err = localNode.Data.PutKey(ctx, userBLS12ConfigKey, userBLS12config, "local")
 		if err != nil {
 			log.Println("put blsconfig to lcoal failed: ", err)
 		}
@@ -102,7 +105,7 @@ func loadBLS12Config(userID string, keepers []string, sk []byte) (keySet *mcl.Ke
 			if !has {
 				continue
 			}
-			err := localNode.Data.PutKey(userBLS12ConfigKey, string(userBLS12config), kid)
+			err := localNode.Data.PutKey(ctx, userBLS12ConfigKey, userBLS12config, kid)
 			if err != nil {
 				log.Println("put blsconfig to keeper", kid, " failed: ", err)
 			}

@@ -184,13 +184,13 @@ func repairBlock(ctx context.Context, blockID string) {
 	}
 
 	log.Println("cpids: ", cpids, " ,rpids: ", metaValue, ",repairs on: ", response)
-	_, err = localNode.Data.SendMetaRequest(km, metaValue, response)
+	_, err = localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(metaValue), nil, response)
 	if err != nil {
 		log.Println("err: ", err)
 	}
 }
 
-func handleRepairResponse(km *metainfo.KeyMeta, metaValue []byte, provider string) {
+func handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provider string) {
 	blockID := km.GetMid()
 	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) != 4 {
@@ -224,15 +224,14 @@ func handleRepairResponse(km *metainfo.KeyMeta, metaValue []byte, provider strin
 		deleteBlockFromMem(oldpu.uid, oldpu.pid, blockID)
 
 		//更新block的meta信息
-		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Sync, metainfo.SyncTypeBlock)
+		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 		if err != nil {
 			log.Println("construct Syncblock KV error :", err)
 			return
 		}
 		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
-		metaSyncTo(kmBlock, metaValue)
-		kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
-		err = localNode.Data.PutKey(context.Backgroud(), kmBlock.ToString(), []byte(metaValue), "local")
+
+		err = localNode.Data.PutKey(context.Background(), kmBlock.ToString(), []byte(metaValue), "local")
 		if err != nil {
 			log.Println("construct SyncPidsK error :", err)
 			return
@@ -273,7 +272,7 @@ func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
 		}
 
 		if flag == len(ugid) {
-			if sc.ConnectTo(ctx, localNode, tmpPro) {
+			if localNode.Data.Connect(ctx, tmpPro) {
 				response = tmpPro
 				break
 			}

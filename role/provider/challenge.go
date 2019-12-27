@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"log"
 	"strconv"
 	"strings"
@@ -14,7 +15,7 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
+func handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
 	ops := km.GetOptions()
 
 	if len(ops) < 1 {
@@ -30,7 +31,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	}
 
 	hProto := &pb.Chalnum{}
-	hByte, _ := b58.Decode(metaValue)
+	hByte, _ := b58.Decode(string(metaValue))
 	err = proto.Unmarshal(hByte, hProto)
 	if err != nil {
 		log.Println("unmarshal h failed, err: ", err)
@@ -68,7 +69,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
-		tmpdata, tmptag, err := localNode.Data..GetSegAndTag(blockID, uint64(electedOffset))
+		tmpdata, tmptag, err := localNode.Blockstore.GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
 			faultBlocks = append(faultBlocks, index)
 		} else {
@@ -76,7 +77,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 			if !isTrue {
 				log.Println("verify tag failed")
 				//验证失败，则在本地删除此块
-				err := localNode.Data.DeleteBlock(blockID)
+				err := localNode.Data.DeleteBlock(context.Background(), blockID.String(), "local")
 				if err != nil {
 					log.Println("Delete block", blockID.String(), "error:", err)
 				}
@@ -109,7 +110,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 
 	log.Println("proof is right")
 
-	retKm, err := metainfo.NewKeyMeta(userID, metainfo.Proof, ops[0])
+	retKm, err := metainfo.NewKeyMeta(userID, metainfo.Challenge, ops[0])
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = localNode.Data.SendMetaRequest(retKm, retValue, from)
+	_, err = localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		log.Println("send proof err: ", err)
 	}

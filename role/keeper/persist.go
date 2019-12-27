@@ -44,8 +44,10 @@ func PersistlocalPeerInfo() error {
 	}
 	localID := localNode.Identity.Pretty() //本地id
 
+	ctx := context.Background()
+
 	// persist keepers
-	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeKid)
+	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
 	if err != nil {
 		return err
 	}
@@ -57,7 +59,7 @@ func PersistlocalPeerInfo() error {
 	})
 
 	if pids.Len() > 0 {
-		err = localNode.Data.PutKey(context.Backgroud(), kmKID.ToString(), []byte(pids.String()), "local")
+		err = localNode.Data.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), "local")
 		if err != nil {
 			return err
 		}
@@ -66,7 +68,7 @@ func PersistlocalPeerInfo() error {
 
 	// persist providers
 	pids.Reset()
-	kmPID, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypePid)
+	kmPID, err := metainfo.NewKeyMeta(localID, metainfo.Providers)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,7 @@ func PersistlocalPeerInfo() error {
 	})
 
 	if pids.Len() > 0 {
-		err = localNode.Data.PutKey(context.Backgroud(), kmPID.ToString(), []byte(pids.String()), "local")
+		err = localNode.Data.PutKey(ctx, kmPID.ToString(), []byte(pids.String()), "local")
 		if err != nil {
 			return err
 		}
@@ -85,7 +87,8 @@ func PersistlocalPeerInfo() error {
 
 	// persist users
 	pids.Reset()
-	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeUID)
+
+	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
 	if err != nil {
 		return err
 	}
@@ -96,14 +99,14 @@ func PersistlocalPeerInfo() error {
 	})
 
 	if pids.Len() > 0 {
-		err = localNode.Data.PutKey(context.Backgroud(), kmUID.ToString(), []byte(pids.String()), "local")
+		err = localNode.Data.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), "local")
 		if err != nil {
 			return err
 		}
 	}
 
 	// persist ledgerInfos
-	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeLedger)
+	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.LedgerMap)
 	if err != nil {
 		return err
 	}
@@ -151,7 +154,7 @@ func PersistlocalPeerInfo() error {
 		log.Println("proto.Marshal error:", err)
 	}
 
-	err = localNode.Data.PutKey(context.Backgroud(), kmLedger.ToString(), ledgerByte, "local")
+	err = localNode.Data.PutKey(ctx, kmLedger.ToString(), ledgerByte, "local")
 	if err != nil {
 		return err
 	}
@@ -164,13 +167,15 @@ func loadAllUser() error {
 	log.Println("Load All userID's Information")
 	localID := localNode.Identity.Pretty() //本地id
 
-	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeUID)
+	ctx := context.Background()
+
+	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
 	if err != nil {
 		return err
 	}
 
 	var wg sync.WaitGroup
-	if users, err := localNode.Data.GetKey(kmUID.ToString(), "local"); users != nil && err == nil {
+	if users, err := localNode.Data.GetKey(ctx, kmUID.ToString(), "local"); users != nil && err == nil {
 		for i := 0; i < len(users)/utils.IDLength; i++ { //对user进行循环，逐个恢复user信息
 			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(userID)
@@ -189,12 +194,12 @@ func loadAllUser() error {
 	}
 
 	// load ledgerinfo
-	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeLedger)
+	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.LedgerMap)
 	if err != nil {
 		return err
 	}
 
-	if ledgers, err := localNode.Data.GetKey(kmLedger.ToString(), "local"); ledgers != nil && err == nil {
+	if ledgers, err := localNode.Data.GetKey(ctx, kmLedger.ToString(), "local"); ledgers != nil && err == nil {
 		ledgerinProto := &pb.LedgerInfo{}
 		err = proto.Unmarshal(ledgers, ledgerinProto)
 		if err != nil {
@@ -284,15 +289,14 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 		return errKeeperServiceNotReady
 	}
 	localID := localNode.Identity.Pretty() //本地id
-
 	// load keepers
-	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypeKid)
+	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
 	if err != nil {
 
 		return err
 	}
 
-	if kids, err := localNode.Data.GetKey(kmKID.ToString(), "local"); kids != nil && err == nil {
+	if kids, err := localNode.Data.GetKey(ctx, kmKID.ToString(), "local"); kids != nil && err == nil {
 		for i := 0; i < len(kids)/utils.IDLength; i++ {
 			tmpKid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)
@@ -311,12 +315,12 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 	}
 
 	// load providers
-	kmPID, err := metainfo.NewKeyMeta(localID, metainfo.Local, metainfo.SyncTypePid)
+	kmPID, err := metainfo.NewKeyMeta(localID, metainfo.Providers)
 	if err != nil {
 		return err
 	}
 
-	if pids, err := localNode.Data.GetKey(kmPID.ToString(), "local"); pids != nil && err == nil {
+	if pids, err := localNode.Data.GetKey(ctx, kmPID.ToString(), "local"); pids != nil && err == nil {
 		for i := 0; i < len(pids)/utils.IDLength; i++ {
 			tmpKid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)
@@ -328,7 +332,7 @@ func loadKnownKeepersAndProviders(ctx context.Context) error {
 				continue
 			}
 
-			if sc.ConnectTo(ctx, localNode, tmpKid) {
+			if localNode.Data.Connect(ctx, tmpKid) {
 				thisPinfo.lastAvailTime = utils.GetUnixNow()
 				thisPinfo.online = true
 			}
@@ -367,6 +371,7 @@ func cleanTestUsersRegular(ctx context.Context) {
 
 func cleanTestUsers() {
 	unpaids := getUnpaidUsers()
+	ctx := context.Background()
 	for _, userID := range unpaids {
 		thisKPInfo, ok := ukpInfo.Load(userID)
 		if !ok {
@@ -405,54 +410,28 @@ func cleanTestUsers() {
 				blockID := key.(string)
 				log.Println("Delete testUser block-", blockID)
 				//先通知Provider删除块
-				km, err := metainfo.NewKeyMeta(blockID, metainfo.DeleteBlock)
+				km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 				if err != nil {
 					log.Println("construct delete block KV error :", err)
 					return false
 				}
-				_, err = localNode.Data.SendMetaRequest(km, "", pu.pid)
+				err = localNode.Data.DeleteBlock(ctx, km.ToString(), pu.pid)
 				if err != nil {
-					retryCount := 3
-					for i := 0; i < retryCount; i++ {
-						_, err = localNode.Data.SendMetaRequest(km, "", pu.pid)
-						if err == nil {
-							break
-						}
-					}
-					if err != nil {
-						log.Println("Delete testUser block failed-", blockID, "error:", err)
-					}
+					log.Println("Delete testUser block failed-", blockID, "error:", err)
 				}
 
 				//再在本地删除记录
-				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
+				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 				if err != nil {
 					log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
 				}
-				err = localNode.Data.DeleteKey(kmBlock.ToString(), "local")
+				err = localNode.Data.DeleteKey(ctx, kmBlock.ToString(), "local")
 				if err != nil {
 					log.Println("Delete local Message error:", err)
 				}
 				return true
 			})
 
-			//将其从账本中删除
-			kmKID, err := metainfo.NewKeyMeta(pu.uid, metainfo.Local, metainfo.SyncTypeKid)
-			if err != nil {
-				return
-			}
-			err = localNode.Data.DeleteKey(kmKID.ToString(), "local")
-			if err != nil {
-				log.Println("Delete local Message error:", err)
-			}
-			kmPID, err := metainfo.NewKeyMeta(pu.uid, metainfo.Local, metainfo.SyncTypePid)
-			if err != nil {
-				return
-			}
-			err = localNode.Data.DeleteKey(kmPID.ToString(), "local")
-			if err != nil {
-				log.Println("Delete local Message error:", err)
-			}
 			ukpInfo.Delete(pu.uid)
 			ledgerInfo.Delete(pu)
 		}

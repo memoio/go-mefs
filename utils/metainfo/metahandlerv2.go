@@ -20,6 +20,6 @@ const (
 
 // MetaMessageHandler 接口，用于进行节点交互信息的回调操作，节点启动时，根据角色启动不同的接口实例，用Routing.Assignmetahandler挂接
 type MetaMessageHandler interface {
-	HandleMetaMessage(string, []byte, string) ([]byte, error) //传入Key Value 和发送信息的节点id
-	GetRole() (string, error)                                 //获取本节点的角色信息
+	HandleMetaMessage(int, string, []byte, string) ([]byte, error) //传入Key Value 和发送信息的节点id
+	GetRole() (string, error)                                      //获取本节点的角色信息
 }

@@ -157,9 +157,9 @@ func cleanLastChallenge(pu puKey) {
 	thischalinfo.inChallenge = false
 }
 
-//handleProofResultBls12 handles the challenge result from provider
+//handleProof handles the challenge result from provider
 //key: uid/"proof"/chaltime,value: proof[/FaultBlocks]
-func handleProofResultBls12(km *metainfo.KeyMeta, proof []byte, pid string) {
+func handleProof(km *metainfo.KeyMeta, proof []byte, pid string) {
 	ops := km.GetOptions()
 	if len(ops) < 1 {
 		return

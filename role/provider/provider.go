@@ -65,11 +65,11 @@ func PersistBeforeExit() error {
 	channels := getChannels()
 	for _, channel := range channels {
 		// 保存本地形式：K-userID，V-channel此时的value
-		km, err := metainfo.NewKeyMeta(channel.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
+		km, err := metainfo.NewKeyMeta(channel.ChannelAddr, metainfo.Channel)
 		if err != nil {
 			return err
 		}
-		err = localNode.Data.PutKey(context.Backgroud(), km.ToString(), []byte(channel.Value.String()), "local")
+		err = localNode.Data.PutKey(context.Background(), km.ToString(), []byte(channel.Value.String()), "local")
 		if err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ func PersistBeforeExit() error {
 	}
 	posValue := posCidPrefix
 	log.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
-	err = localNode.Data.PutKey(posKM.ToString(), posValue, "local")
+	err = localNode.Data.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 	if err != nil {
 		log.Println("CmdPutTo posKM error :", err)
 		return err
@@ -102,7 +102,7 @@ func storageSync(ctx context.Context) error {
 		return nil
 	}
 
-	km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.StorageSync)
+	km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.Storage)
 	if err != nil {
 		log.Println("construct StorageSync KV error :", err)
 		return err
@@ -111,7 +111,7 @@ func storageSync(ctx context.Context) error {
 	value := strconv.FormatUint(maxSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10)
 
 	for _, kid := range klist {
-		_, err = localNode.Data.SendMetaRequest(km, value, kid)
+		_, err = localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(value), nil, kid)
 		if err != nil {
 			log.Println("storage info send to", kid, "error: ", err)
 		}

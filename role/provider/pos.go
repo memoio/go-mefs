@@ -91,7 +91,7 @@ func PosService(ctx context.Context, gc bool) {
 		log.Println("NewKeyMeta posKM error :", err)
 	} else {
 		log.Println("posKm :", posKM.ToString())
-		posValue, err := localNode.Data.GetKey(posKM.ToString(), "local")
+		posValue, err := localNode.Data.GetKey(ctx, posKM.ToString(), "local")
 		if err != nil {
 			log.Println("Get posKM from local error :", err)
 		} else {
@@ -152,14 +152,14 @@ func traversePath(gc bool) {
 			for i := 0; i < 5; i++ {
 				posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
 				ncid := cid.NewCidV2([]byte(posCid))
-				exist, err := localNode.Data..Has(ncid)
+				exist, err := localNode.Blockstore.Has(ncid)
 				if err != nil {
 					continue
 				}
 
 				if exist {
 					if gc {
-						localNode.Data..DeleteBlock(ncid)
+						localNode.Blockstore.DeleteBlock(ncid)
 					}
 				} else {
 					break
@@ -279,7 +279,7 @@ func generatePosBlocks(increaseSpace uint64) {
 				continue
 			}
 			log.Println("New block success :", newblk.Cid())
-			err = localNode.Data.PutBlock(newblk)
+			err = localNode.Blockstore.Put(newblk)
 			if err != nil {
 				log.Println("add block failed, error :", err)
 			}
@@ -291,15 +291,15 @@ func generatePosBlocks(increaseSpace uint64) {
 
 		// 向keeper发送元数据
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
-		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosAdd)
+		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.Pos)
 		for _, keeper := range keeperIDs {
-			localNode.Data.SendMetaRequest(km, metaValue, keeper)
+			localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(metaValue), nil, keeper)
 		}
 
 		// 本地更新
 		posValue := posCidPrefix
 		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
-		err = localNode.Data.PutKey(context.Backgroud(), posKM.ToString(), []byte(posValue), "local")
+		err = localNode.Data.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -331,7 +331,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		for i := 0; i < 5; i++ {
 			blockID := posCidPrefix + "_" + strconv.Itoa(i)
 			ncid := cid.NewCidV2([]byte(blockID))
-			err := localNode.Data..DeleteBlock(ncid)
+			err := localNode.Blockstore.DeleteBlock(ncid)
 			if err != nil {
 				log.Println("delete block: ", blockID, " error :", err)
 				j++
@@ -356,7 +356,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
-		err = localNode.Data.PutKey(context.Backgroud(), posKM.ToString(), []byte(posValue), "local")
+		err = localNode.Data.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -365,14 +365,14 @@ func deletePosBlocks(decreseSpace uint64) {
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
 		if j < 5 {
-			km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.PosDelete)
+			km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.Pos)
 			if err != nil {
 				log.Println("construct put blockMeta KV error :", err)
 				return
 			}
 			metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
 			for _, keeper := range keeperIDs {
-				localNode.Data.SendMetaRequest(km, metavalue, keeper)
+				localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Delete), km.ToString(), []byte(metavalue), nil, keeper)
 			}
 		}
 	}

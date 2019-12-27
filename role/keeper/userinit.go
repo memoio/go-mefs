@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"context"
 	"errors"
 	"log"
 	"strings"
@@ -35,12 +36,12 @@ func initUser(userID string, keeperCount, providerCount int, price int64) (strin
 func userNewInit(userID string, keeperCount, providerCount int, price int64) (string, error) {
 	localID := localNode.Identity.Pretty()
 
-	kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
+	kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Keepers)
 	if err != nil {
 		return "", err
 	}
 
-	kmPid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypePid)
+	kmPid, err := metainfo.NewKeyMeta(userID, metainfo.Providers)
 	if err != nil {
 		return "", err
 	}
@@ -70,7 +71,7 @@ func userNewInit(userID string, keeperCount, providerCount int, price int64) (st
 		return true
 	})
 
-	localNode.Data.PutKey(context.Backgroud(), kmKid.ToString(), []byte(pids.String()), "local")
+	localNode.Data.PutKey(context.Background(), kmKid.ToString(), []byte(pids.String()), "local")
 
 	newResponse.WriteString(metainfo.DELIMITER)
 	pids.Reset()
@@ -89,7 +90,7 @@ func userNewInit(userID string, keeperCount, providerCount int, price int64) (st
 		return true
 	})
 
-	localNode.Data.PutKey(context.Backgroud(), kmPid.ToString(), []byte(pids.String()), "local")
+	localNode.Data.PutKey(context.Background(), kmPid.ToString(), []byte(pids.String()), "local")
 
 	return newResponse.String(), nil
 }
@@ -196,13 +197,13 @@ func fillPinfo(groupid string, metaValue []byte, from string) {
 		return
 	}
 
-	kmKid, err := metainfo.NewKeyMeta(groupid, metainfo.Local, metainfo.SyncTypeKid)
+	kmKid, err := metainfo.NewKeyMeta(groupid, metainfo.Keepers)
 	if err != nil {
 		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
 
-	kmPid, err := metainfo.NewKeyMeta(groupid, metainfo.Local, metainfo.SyncTypePid)
+	kmPid, err := metainfo.NewKeyMeta(groupid, metainfo.Providers)
 	if err != nil {
 		log.Println("handleNewUserNotif err: ", err)
 		return
@@ -213,7 +214,7 @@ func fillPinfo(groupid string, metaValue []byte, from string) {
 		pidstrings.WriteString(keeperID)
 	}
 
-	localNode.Data.PutKey(context.Backgroud(), kmKid.ToString(), byte(pidstrings.String()), "local")
+	localNode.Data.PutKey(context.Background(), kmKid.ToString(), []byte(pidstrings.String()), "local")
 
 	pidstrings.Reset()
 	for _, proID := range tempInfo.providers {
@@ -227,7 +228,7 @@ func fillPinfo(groupid string, metaValue []byte, from string) {
 		ledgerInfo.Store(thisPU, newChal)
 	}
 
-	localNode.Data.PutKey(context.Backgroud(), kmPid.ToString(), []byte(pidstrings.String()), "local")
+	localNode.Data.PutKey(context.Background(), kmPid.ToString(), []byte(pidstrings.String()), "local")
 
 	return
 }

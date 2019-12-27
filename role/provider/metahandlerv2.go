@@ -3,8 +3,6 @@ package provider
 import (
 	"log"
 
-	cid "github.com/memoio/go-mefs/source/go-cid"
-	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -15,61 +13,50 @@ type HandlerV2 struct {
 
 // HandleMetaMessage provider角色层metainfo的回调函数,传入对方节点发来的kv，和对方节点的peerid
 //没有返回值时，返回complete，或者返回规定信息
-func (provider *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (string, error) {
+func (provider *HandlerV2) HandleMetaMessage(optype int, metaKey string, metaValue []byte, from string) ([]byte, error) {
 	km, err := metainfo.GetKeyMeta(metaKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	keytype := km.GetKeyType()
-	switch keytype {
-	case metainfo.Test:
-		go handleTest(km)
-	case metainfo.UserInitReq:
-		log.Println("keytype：UserInitReq, do not handle it")
-	case metainfo.UserDeployedContracts:
+	dtype := km.GetDType()
+	switch dtype {
+	case metainfo.Contract:
 		go handleUserDeployedContracts(km, metaKey, from)
 	case metainfo.Challenge:
 		go handleChallengeBls12(km, metaValue, from)
 	case metainfo.Repair:
 		go handleRepair(km, metaValue, from)
-	case metainfo.DeleteBlock:
-		go handleDeleteBlock(km, from)
-	case metainfo.GetBlock:
-		res, err := handleGetBlock(km, from)
-		if err != nil {
-			log.Println("getBlcokError: ", err)
-		} else {
-			return res, nil
-		}
-	case metainfo.PutBlock:
-		err := handlePutBlock(km, metaValue, from)
-		if err != nil {
-			log.Println("put Blcok Error: ", err)
-			return metainfo.MetaPutBlockErr, nil
+	case metainfo.Block:
+		switch optype {
+		case metainfo.Put:
+			err := handlePutBlock(km, metaValue, from)
+			if err != nil {
+				log.Println("put Blcok Error: ", err)
+				return nil, err
+			}
+		case metainfo.Get:
+			res, err := handleGetBlock(km, from)
+			if err != nil {
+				log.Println("getBlcokError: ", err)
+			} else {
+				return res, nil
+			}
+		case metainfo.Append:
+			err := handleAppendBlock(km, metaValue, from)
+			if err != nil {
+				log.Println("put Blcok Error: ", err)
+				return nil, err
+			}
+		case metainfo.Delete:
+			go handleDeleteBlock(km, from)
 		}
 	default: //没有匹配的信息，报错
-		return "", metainfo.ErrWrongType
+		return nil, metainfo.ErrWrongType
 	}
-	return metainfo.MetaHandlerComplete, nil
+	return []byte(metainfo.MetaHandlerComplete), nil
 }
 
 // GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
 func (provider *HandlerV2) GetRole() (string, error) {
 	return provider.Role, nil
-}
-
-func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
-	blockID := km.GetMid()
-	bcid := cid.NewCidV2([]byte(blockID))
-	err := localNode.Data.DeleteBlock(bcid)
-	if err != nil && err != bs.ErrNotFound {
-		return err
-	}
-	return nil
-}
-
-func handleTest(km *metainfo.KeyMeta) {
-	log.Println("测试用回调函数")
-	log.Println("km.mid:", km.GetMid())
-	log.Println("km.options", km.GetOptions())
 }

@@ -333,7 +333,7 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 }
 
 func (n *impl) getAddrAndConnect(ctx context.Context, to string) bool {
-	km, err := metainfo.NewKeyMeta(to, metainfo.ExteralAddress)
+	km, err := metainfo.NewKeyMeta(to, metainfo.ExternalAddress)
 	if err != nil {
 		return false
 	}

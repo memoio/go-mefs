@@ -252,7 +252,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 	if dht.metahandlerv2 == nil {
 		return nil, metainfo.ErrMetaHandlerNotAssign
 	}
-	res, err := dht.metahandlerv2.HandleMetaMessage(metaKey, metaValue, p.Pretty())
+	res, err := dht.metahandlerv2.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
 	if err != nil {
 		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\ncaller:%s\n", err, metaKey, p.Pretty(), string(pmes.GetKey()))
 	}
@@ -270,7 +270,7 @@ func (dht *KadDHT) handleMetaBroadcast(ctx context.Context, key string, p peer.I
 		return nil, metainfo.ErrMetaHandlerNotAssign
 	}
 
-	res, err := dht.metahandlerv2.HandleMetaMessage(key, nil, p.Pretty())
+	res, err := dht.metahandlerv2.HandleMetaMessage(1, key, nil, p.Pretty())
 	if err != nil {
 		log.Println("handleMetaBroadcast()err:%s\nmetakey:%s\nfrom:%s\n", err, key, p.Pretty())
 	}

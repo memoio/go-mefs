@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math/big"
@@ -90,11 +91,11 @@ func saveChannel(userID string) error {
 
 	// 先去本地查
 	var value = new(big.Int)
-	km, err := metainfo.NewKeyMeta(chanItem.ChannelAddr, metainfo.Local, metainfo.SyncTypeChannelValue)
+	km, err := metainfo.NewKeyMeta(chanItem.ChannelAddr, metainfo.Channel)
 	if err != nil {
 		return err
 	}
-	valueByte, err := localNode.Data.GetKey(km.ToString(), "local")
+	valueByte, err := localNode.Data.GetKey(context.Background(), km.ToString(), "local")
 	if err != nil {
 		// 本地没查到，value设为0
 		log.Println("Can't get channel value in local,err :", err, ", so  set channel value to 0")

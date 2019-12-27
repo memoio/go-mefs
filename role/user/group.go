@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	inet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -150,16 +148,16 @@ func (g *groupInfo) connect(ctx context.Context) error {
 				keeperID:  kid,
 				connected: true,
 			}
-			kmKid, err := metainfo.NewKeyMeta(g.userID, metainfo.Local, metainfo.SyncTypeKid)
+			kmKid, err := metainfo.NewKeyMeta(g.userID, metainfo.Keepers)
 			if err != nil {
 				return err
 			}
-			res, err := localNode.Data.GetKey(kmKid.ToString(), kid)
+			res, err := localNode.Data.GetKey(ctx, kmKid.ToString(), kid)
 			if err == nil && res != nil {
 				resStr := string(res)
 				splitRes := strings.Split(resStr, metainfo.DELIMITER)
 				if len(splitRes) > 3 {
-					if splitRes[1] == metainfo.SyncTypeBft {
+					if splitRes[1] == "bft" {
 						tempKeeper.isBFT = true
 					}
 				}
@@ -236,19 +234,20 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	// 构造key告诉keeper和provider自己已经启动
-	kmPid, err := metainfo.NewKeyMeta(g.userID, metainfo.UserDeployedContracts)
+	kmc, err := metainfo.NewKeyMeta(g.userID, metainfo.Contract)
 	if err != nil {
 		log.Println("Construct Deployed key error", err)
 		return err
 	}
+
 	for _, keeper := range g.keepers {
-		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, keeper.keeperID)
+		_, err = localNode.Data.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, keeper.keeperID)
 		if err != nil {
 			log.Println("Send keeper", keeper.keeperID, " err:", err)
 		}
 	}
 	for _, provider := range g.providers {
-		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, provider.providerID)
+		_, err = localNode.Data.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, provider.providerID)
 		if err != nil {
 			log.Println("Send provider", provider.providerID, " err:", err)
 		}
@@ -308,12 +307,12 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 	}
 
 	//构造init信息并发送 此时，初始化阶段为collecting
-	kmInit, err := metainfo.NewKeyMeta(g.userID, metainfo.UserInitReq, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), queryAddr.String())
+	kmInit, err := metainfo.NewKeyMeta(g.userID, metainfo.UserInit, queryAddr.String(), strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("gp connect: NewKeyMeta error!")
 		return err
 	}
-	go localNode.Data.BroadcastMessage(kmInit, "")
+	go localNode.Data.BroadcastMessage(ctx, kmInit.ToString())
 	g.state = collecting
 
 	// wait 20 minutes for collecting
@@ -334,7 +333,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 					g.notify(kmInit)
 				} else {
 					log.Printf("Timeout, No enough keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
-					go localNode.Data.BroadcastMessage(kmInit, "")
+					go localNode.Data.BroadcastMessage(ctx, kmInit.ToString())
 				}
 			case collectCompleted:
 				timeOutCount++
@@ -426,7 +425,9 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 	}
 	//构造发给keeper的初始化确认信息并发送给自己的所有keeper
 	assignedKP := assignedKeeper + metainfo.DELIMITER + assignedProvider
-	km.SetKeyType(metainfo.UserInitNotif)
+	km.SetDType(metainfo.UserNotify)
+
+	ctx := context.Background()
 
 	var wg sync.WaitGroup
 	for _, keeper := range g.keepers { //循环发消息
@@ -437,12 +438,12 @@ func (g *groupInfo) notify(km *metainfo.KeyMeta) {
 			retry := 0
 			// retry
 			for retry < 10 {
-				res, err := localNode.Data.SendMetaRequest(km, assignedKP, keeper) //发送确认信息
+				res, err := localNode.Data.SendMetaRequest(ctx, int32(metainfo.Put), km.ToString(), []byte(assignedKP), nil, keeper) //发送确认信息
 				if err != nil {
 					retry++
 					time.Sleep(30 * time.Second)
 				} else {
-					g.confirm(keeper, res)
+					g.confirm(keeper, string(res))
 					return
 				}
 			}
@@ -500,19 +501,22 @@ func (g *groupInfo) done() error {
 	saveContracts(g.userID)
 
 	// 构造key告诉keeper和provider自己已经部署好合约
-	kmPid, err := metainfo.NewKeyMeta(g.userID, metainfo.UserDeployedContracts)
+	kmc, err := metainfo.NewKeyMeta(g.userID, metainfo.Contract)
 	if err != nil {
 		log.Println("Construct Deployed key error", err)
 		return err
 	}
+
+	ctx := context.Background()
+
 	for _, keeper := range g.keepers {
-		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, keeper.keeperID)
+		_, err = localNode.Data.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, keeper.keeperID)
 		if err != nil {
 			log.Println("Send keeper", keeper.keeperID, " err:", err)
 		}
 	}
 	for _, provider := range g.providers {
-		_, err = localNode.Data.SendMetaRequest(kmPid, g.userID, provider.providerID)
+		_, err = localNode.Data.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, provider.providerID)
 		if err != nil {
 			log.Println("Send provider", provider, " err:", err)
 		}
@@ -536,13 +540,13 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 	var pidstr string
 	var offset int
 
-	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Local, metainfo.SyncTypeBlock)
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
 		return "", 0, err
 	}
 	blockMeta := kmBlock.ToString()
 	for _, kp := range g.keepers {
-		pidAndOffset, err := localNode.Data.GetKey(blockMeta, kp.keeperID)
+		pidAndOffset, err := localNode.Data.GetKey(context.Background(), blockMeta, kp.keeperID)
 		if err != nil || pidAndOffset == nil {
 			continue
 		}
@@ -648,14 +652,14 @@ func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
 	return conPro, unconPro, nil
 }
 
-func (g *groupInfo) putDataToKeepers(key *metainfo.KeyMeta, value string) error {
+func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
-
+	ctx := context.Background()
 	var count int
 	for _, keeper := range g.keepers {
-		_, err := localNode.Data.SendMetaRequest(key, value, keeper.keeperID)
+		_, err := localNode.Data.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper.keeperID)
 		if err != nil {
 			log.Println("send metaMessage to ", keeper.keeperID, " error :", err)
 			count++
@@ -667,36 +671,17 @@ func (g *groupInfo) putDataToKeepers(key *metainfo.KeyMeta, value string) error 
 	return nil
 }
 
-func (g *groupInfo) putDataToProviders(key *metainfo.KeyMeta, value string) error {
-	if g.state < groupStarted {
-		return ErrLfsServiceNotReady
-	}
-
-	var count int
-	for _, provider := range g.providers {
-		_, err := localNode.Data.SendMetaRequest(key, value, provider.providerID)
-		if err != nil {
-			log.Println("send metaMessage to ", provider.providerID, " error :", err)
-			count++
-		}
-	}
-	if count == len(g.providers) {
-		return ErrNoProviders
-	}
-	return nil
-}
-
 func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset int) error {
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
-	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockMetaInfo, metainfo.SyncTypeBlock)
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
 		log.Println("construct put blockMeta KV error :", err)
 		return err
 	}
 	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
-	return g.putDataToKeepers(kmBlock, metaValue)
+	return g.putDataToKeepers(kmBlock.ToString(), []byte(metaValue))
 }
 
 //删除块
@@ -712,7 +697,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 		return err
 	}
 
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.DeleteBlock)
+	km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 	if err != nil {
 		log.Println("construct delete block KV error :", err)
 		return err
@@ -724,17 +709,18 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	}
 
 	if updateMeta { //这个需要等待返回
-		res, err := localNode.Data.SendMetaRequest(km, "", provider)
-		if strings.Compare(res, metainfo.MetaHandlerComplete) != 0 || err != nil {
-			log.Println("Cannot delete Block-", blockID, res, err)
+		err := localNode.Data.DeleteBlock(context.Background(), km.ToString(), provider)
+		if err != nil {
+			log.Println("Cannot delete Block-", blockID, err)
 			return ErrCannotDeleteMetaBlock
 		}
 	} else {
-		go localNode.Data.SendMetaRequest(km, "", provider)
+		go localNode.Data.DeleteBlock(context.Background(), km.ToString(), provider)
 	}
 
+	km.SetDType(metainfo.BlockPos)
 	for _, kp := range g.keepers { //从keeper上删除blockMeta
-		go localNode.Data.SendMetaRequest(km, "", kp.keeperID)
+		go localNode.Data.DeleteKey(context.Background(), km.ToString(), kp.keeperID)
 	}
 
 	return nil

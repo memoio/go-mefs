@@ -53,11 +53,16 @@ const (
 	Channel
 	Block    // provider handle block data
 	BlockPos // keeper handle block pos
-	ExteralAddress
+	ExternalAddress
 	Challenge
 	Repair
 	Storage
 	Pos
+	PosMeta
+	LedgerMap
+	ChalTime
+	LastPay
+	ChalPay // each pay
 )
 
 // KeyMeta is datatype/mid/ops
