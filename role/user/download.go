@@ -17,6 +17,7 @@ import (
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -45,7 +46,7 @@ type notif struct {
 
 //针对Bucket内stripe的下载，可复用
 type downloadJob struct {
-	userID         string
+	fsID           string
 	bucketID       int32
 	encrypt        bool
 	sKey           [32]byte
@@ -58,7 +59,7 @@ type downloadJob struct {
 
 func newDownloadJob(uid string, bid int32, cry bool, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
 	return &downloadJob{
-		userID:   uid,
+		fsID:     uid,
 		bucketID: bid,
 		encrypt:  cry,
 		sKey:     sk,
@@ -70,7 +71,7 @@ func newDownloadJob(uid string, bid int32, cry bool, sk [32]byte, dec *dataforma
 
 //下载一整个对象的下载任务
 type downloadTask struct {
-	userID       string
+	fsID         string
 	bucketID     int32
 	encrypt      bool
 	sKey         [32]byte
@@ -90,8 +91,7 @@ type downloadTask struct {
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
 	log.Println("GetObject: ", bucketName, objectName)
-	ok := IsOnline(l.userID)
-	if !ok {
+	if !l.online {
 		return ErrLfsServiceNotReady
 	}
 
@@ -140,7 +140,7 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 	decoder := dataformat.NewDataCoder(bucket.Policy, bucket.DataCount, bucket.ParityCount, int32(bucket.TagFlag), bucket.SegmentSize, l.keySet)
 
 	dl := &downloadTask{
-		userID:       l.userID,
+		fsID:         l.fsID,
 		bucketID:     bucket.BucketID,
 		group:        l.gInfo,
 		decoder:      decoder,
@@ -176,7 +176,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
 	segPos := segStart * int64(segSize) * int64(dc)
 
-	job := newDownloadJob(do.userID, do.bucketID, do.encrypt, do.sKey, do.decoder, do.group, do.writer)
+	job := newDownloadJob(do.fsID, do.bucketID, do.encrypt, do.sKey, do.decoder, do.group, do.writer)
 	//构造任务并运行
 	var remain int64
 	//只有下载任务的第一个stripe才可能从非0的offset开始
@@ -262,15 +262,9 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	dataCount := ds.decoder.DataCount
 	parityCount := ds.decoder.ParityCount
 	blockCount := dataCount + parityCount
-	bm, err := metainfo.NewBlockMeta(ds.userID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
+	bm, err := metainfo.NewBlockMeta(ds.fsID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
 		log.Println("Download failed-", err)
-		return 0, err
-	}
-
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println("get config from Download failed, err: ", err)
 		return 0, err
 	}
 
@@ -289,7 +283,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		bm.SetBid(strconv.Itoa(i))
 		ncid := bm.ToString()
 		provider, _, err := ds.group.getBlockProviders(ncid)
-		if err != nil || provider == ds.userID {
+		if err != nil || provider == ds.fsID {
 			log.Printf("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
 			continue
 		}
@@ -301,7 +295,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 
 		//获取数据块
-		b, err := localNode.Data.GetBlock(ctx, ncid, mes, provider)
+		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
 		if err != nil {
 			log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
 			continue
@@ -319,13 +313,11 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			continue
 		}
 
-		if !cfg.Test {
-			//下载数据成功，将内存的channel的value更改
-			cItem, err := getChannelItem(ds.userID, provider)
-			if err == nil && cItem != nil {
-				log.Println("下载成功，更改内存中channel.value", cItem.ChannelAddr, money.String())
-				cItem.Value = money
-			}
+		//下载数据成功，将内存的channel的value更改
+		cItem := ds.group.getChannel(provider)
+		if cItem != nil {
+			cItem.Value = money
+			log.Println("download success，change channel.value", cItem.ChannelAddr, money.String())
 		}
 
 		if ds.decoder.Policy == dataformat.RsPolicy {
@@ -407,34 +399,29 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.Int, error) {
 	money := big.NewInt(0)
 	//user给channel合约签名，发给provider
-	userID := ds.userID
-	privateKey := getSk(userID)
-	localAddress, providerAddress, hexSK, err := buildSignParams(userID, provider, privateKey)
+	userID := ds.group.owner
+	hexSK := ds.group.privKey
+
+	providerAddress, err := address.GetAddressFromID(provider)
 	if err != nil {
-		log.Printf("buildSignParams about Block %s from %s failed.\n", ncid, provider)
+		log.Println("GetProAddr err: ", err)
+		return nil, nil, err
+	}
+
+	localAddress, err := address.GetAddressFromID(userID)
+	if err != nil {
+		log.Println("GetLocalAddr err: ", err)
 		return nil, nil, err
 	}
 
 	var channelAddr common.Address
 
-	//判断是不是测试user，如果是，就将channelAddress设为0
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println("get config from Download failed.")
-		return nil, nil, err
-	}
-	if cfg.Test {
-		channelAddress := contracts.InvalidAddr
-		channelAddr = common.HexToAddress(channelAddress)
-		//设置此次下载需要签名的金额，money此时不用变仍为0
-	} else {
-		cItem, err := getChannelItem(userID, provider)
-		if err == nil && cItem != nil {
-			channelAddr = common.HexToAddress(cItem.ChannelAddr)
-			// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
-			addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-			money = money.Add(cItem.Value, big.NewInt(addValue)) //100 + valueBase
-		}
+	cItem := ds.group.getChannel(provider)
+	if cItem != nil {
+		channelAddr = common.HexToAddress(cItem.ChannelAddr)
+		// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
+		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
+		money = money.Add(cItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 	moneyByte := money.Bytes()
 

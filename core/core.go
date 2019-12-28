@@ -54,6 +54,7 @@ import (
 	bstore "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	dhtopts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
+	"github.com/memoio/go-mefs/source/instance"
 	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -100,6 +101,7 @@ type MefsNode struct {
 	PeerHost     p2phost.Host    // the network host (server+client)
 	Bootstrapper io.Closer       // the periodic bootstrapper
 	Routing      routing.Routing // the routing system. recommend ipfs-dht
+	Inst         instance.Service
 
 	P2P *p2p.P2P
 

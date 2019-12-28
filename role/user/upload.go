@@ -27,7 +27,7 @@ type UploadOptions struct {
 
 // uploadTask has info for upload
 type uploadTask struct { //一个上传任务实例
-	userID    string
+	fsID      string
 	encrypt   bool
 	sKey      [32]byte
 	bucketID  int32
@@ -91,7 +91,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 		int32(bucket.TagFlag), bucket.SegmentSize, l.keySet)
 
 	ul := &uploadTask{
-		userID:    l.userID,
+		fsID:      l.fsID,
 		startTime: time.Now(), // for queue?
 		reader:    reader,
 		gInfo:     l.gInfo,
@@ -214,7 +214,7 @@ Loop:
 
 			//在这里先将数据编码
 			//这里只输入BucketID和StripeID，blockID后面动态改变
-			bm, err := metainfo.NewBlockMeta(u.userID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(int(u.curStripe)), "0")
+			bm, err := metainfo.NewBlockMeta(u.fsID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(int(u.curStripe)), "0")
 			if err != nil {
 				return err
 			}
@@ -251,10 +251,10 @@ Loop:
 					} else {
 						blockMetas[i].cid = ncid
 						blockMetas[i].offset = offset
-						blockMetas[i].provider = u.userID
+						blockMetas[i].provider = u.fsID
 						continue
 					}
-					err = localNode.Data.PutBlock(ctx, km.ToString(), encodedData[i], provider)
+					err = u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], provider)
 					if err != nil {
 						log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
 						continue
@@ -262,7 +262,7 @@ Loop:
 					count++
 				} else {
 					provider, _, err = u.gInfo.getBlockProviders(ncid)
-					if err != nil || provider == u.userID {
+					if err != nil || provider == u.fsID {
 						log.Println("Append Block to", provider, "failed:", err)
 						_, err := peer.IDB58Decode(provider)
 
@@ -273,12 +273,12 @@ Loop:
 						} else {
 							blockMetas[i].cid = ncid
 							blockMetas[i].offset = offset
-							blockMetas[i].provider = u.userID
+							blockMetas[i].provider = u.fsID
 						}
 						continue
 					}
 					km, _ = metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(u.curOffset)), strconv.Itoa(offset))
-					err = localNode.Data.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
+					err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
 					if err != nil {
 						log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
 						continue

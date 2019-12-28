@@ -199,7 +199,7 @@ func (l *LfsInfo) ShowBucketStorage(bucketName string) (uint64, error) {
 
 func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
-	gp := getGroup(l.userID)
+	gp := l.gInfo
 	_, conkeepers, err := gp.getKeepers(-1)
 	if err != nil {
 		return latestTime, err
@@ -216,7 +216,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	var tempTime time.Time
 	ctx := context.Background()
 	for _, keeper := range conkeepers {
-		res, err := localNode.Data.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, keeper)
+		res, err := l.ds.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, keeper)
 		if err != nil {
 			continue
 		}
@@ -234,7 +234,7 @@ func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := l.meta.bucketByID[object.BucketID]
 	blockCount := bucket.DataCount + bucket.ParityCount
-	bm, err := metainfo.NewBlockMeta(l.userID, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
+	bm, err := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
 	if err != nil {
 		return "", err
 	}

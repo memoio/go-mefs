@@ -11,6 +11,7 @@ import (
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -190,7 +191,7 @@ func checkConnectedPeer(ctx context.Context) error {
 			return err
 		}
 		val, _ := localNode.Data.GetKey(context.Background(), kmRole.ToString(), id)
-		if string(val) == metainfo.RoleKeeper {
+		if string(val) == instance.RoleKeeper {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {
 				return err
@@ -208,7 +209,7 @@ func checkConnectedPeer(ctx context.Context) error {
 				thisInfoI.online = true
 				thisInfoI.lastAvailTime = utils.GetUnixNow()
 			}
-		} else if string(val) == metainfo.RoleProvider {
+		} else if string(val) == instance.RoleProvider {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {
 				return err

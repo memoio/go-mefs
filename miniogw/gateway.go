@@ -30,7 +30,7 @@ var (
 )
 
 // Start gateway
-func Start(addr, pwd, endPoint string) error {
+func Start(addr, pwd, endPoint string, fs user.FileSyetem) error {
 	minio.RegisterGatewayCommand(cli.Command{
 		Name:            "lfs",
 		Usage:           "Mefs Log File System Service (LFS)",
@@ -60,13 +60,18 @@ func Start(addr, pwd, endPoint string) error {
 }
 
 // Handler for 'minio gateway oss' command line.
-func mefsGatewayMain(ctx *cli.Context) {
-	minio.StartGateway(ctx, &Mefs{"lfs"})
+func mefsGatewayMain(ctx *cli.Context, f user.FileSyetem) {
+	m := &Mefs{
+		host: "lfs",
+		fs:   f,
+	}
+	minio.StartGateway(ctx, m)
 }
 
 // Mefs implements Lfs Gateway.
 type Mefs struct {
 	host string
+	fs   user.FileSyetem
 }
 
 // Name implements Gateway interface.
@@ -83,6 +88,7 @@ func (g *Mefs) NewGatewayLayer(creds auth.Credentials) (minio.ObjectLayer, error
 	uploads := NewMultipartUploads()
 	return &lfsGateway{
 		userID:    uid,
+		lfs:       g.fs,
 		multipart: uploads,
 	}, nil
 }
@@ -96,13 +102,14 @@ func (g *Mefs) Production() bool {
 type lfsGateway struct {
 	minio.GatewayUnsupported
 	userID    string
+	lfs       user.FileSyetem
 	multipart *MultipartUploads
 }
 
 // Shutdown saves any gateway metadata to disk
 // if necessary and reload upon next restart.
 func (l *lfsGateway) Shutdown(ctx context.Context) error {
-	return user.KillUser(l.userID)
+	return l.lfs.Stop()
 }
 
 // StorageInfo is not relevant to LFS backend.
@@ -110,20 +117,18 @@ func (l *lfsGateway) StorageInfo(ctx context.Context) (si minio.StorageInfo) {
 	si.Backend.Type = minio.BackendGateway
 	si.Backend.GatewayOnline = true
 
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return si
 	}
 
-	use, _ := lfs.ShowStorage()
+	use, _ := l.lfs.ShowStorage()
 	si.Used = []uint64{use}
 	return si
 }
 
 // MakeBucketWithLocation creates a new container on LFS backend.
 func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options string) error {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return user.ErrLfsServiceNotReady
 	}
 	bucketOptions := &pb.BucketOptions{}
@@ -132,17 +137,16 @@ func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options
 		log.Println("bucketOptions Unmarshal err", err)
 		bucketOptions = user.DefaultBucketOptions()
 	}
-	_, err = lfs.CreateBucket(bucket, bucketOptions)
+	_, err = l.lfs.CreateBucket(bucket, bucketOptions)
 	return err
 }
 
 // GetBucketInfo gets bucket metadata.
 func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return bi, user.ErrLfsServiceNotReady
 	}
-	bucketInfo, err := lfs.HeadBucket(bucket)
+	bucketInfo, err := l.lfs.HeadBucket(bucket)
 	if err != nil {
 		return bi, err
 	}
@@ -153,11 +157,10 @@ func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio
 
 // ListBuckets lists all LFS buckets.
 func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInfo, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return nil, user.ErrLfsServiceNotReady
 	}
-	bucketsInfo, err := lfs.ListBuckets("")
+	bucketsInfo, err := l.lfs.ListBuckets("")
 	if err != nil {
 		return nil, err
 	}
@@ -171,26 +174,24 @@ func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 
 // DeleteBucket deletes a bucket on LFS.
 func (l *lfsGateway) DeleteBucket(ctx context.Context, bucket string) error {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return user.ErrLfsServiceNotReady
 	}
 
-	_, err := lfs.DeleteBucket(bucket)
+	_, err := l.lfs.DeleteBucket(bucket)
 
 	return err
 }
 
 // ListObjects lists all blobs in LFS bucket filtered by prefix.
 func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return loi, user.ErrLfsServiceNotReady
 	}
 
 	var ops user.ObjectOptions
 
-	objs, err := lfs.ListObjects(bucket, prefix, ops)
+	objs, err := l.lfs.ListObjects(bucket, prefix, ops)
 	if err != nil {
 		return loi, user.ErrLfsServiceNotReady
 	}
@@ -208,14 +209,13 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 // ListObjectsV2 lists all blobs in LFS bucket filtered by prefix
 func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string, maxKeys int,
 	fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return loi, user.ErrLfsServiceNotReady
 	}
 
 	var ops user.ObjectOptions
 
-	objs, err := lfs.ListObjects(bucket, prefix, ops)
+	objs, err := l.lfs.ListObjects(bucket, prefix, ops)
 	if err != nil {
 		return loi, user.ErrLfsServiceNotReady
 	}
@@ -232,8 +232,7 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 
 // GetObjectNInfo - returns object info and locked object ReadCloser
 func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return gr, user.ErrLfsServiceNotReady
 	}
 
@@ -254,7 +253,7 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	go lfs.GetObject(bucket, object, bufw, complete, user.DefaultDownloadOptions())
+	go l.lfs.GetObject(bucket, object, bufw, complete, user.DefaultDownloadOptions())
 
 	// Setup cleanup function to cause the above go-routine to
 	// exit in case of partial read
@@ -269,8 +268,7 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 // startOffset indicates the starting read location of the object.
 // length indicates the total length of the object.
 func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOffset, length int64, writer io.Writer, etag string, opts minio.ObjectOptions) error {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return user.ErrLfsServiceNotReady
 	}
 
@@ -282,7 +280,7 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	err := lfs.GetObject(bucket, key, bufw, complete, &user.DownloadOptions{
+	err := l.lfs.GetObject(bucket, key, bufw, complete, &user.DownloadOptions{
 		Start:  startOffset,
 		Length: length,
 	})
@@ -296,13 +294,12 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 
 // GetObjectInfo reads object info and replies back ObjectInfo.
 func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return objInfo, user.ErrLfsServiceNotReady
 	}
 
 	var ops user.ObjectOptions
-	obj, err := lfs.HeadObject(bucket, object, ops)
+	obj, err := l.lfs.HeadObject(bucket, object, ops)
 	if err != nil {
 		return minio.ObjectInfo{}, err
 	}
@@ -320,13 +317,12 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 
 // PutObject creates a new object with the incoming data.
 func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return objInfo, user.ErrLfsServiceNotReady
 	}
 
 	reader := bufio.NewReaderSize(r.Reader, user.DefaultBufSize)
-	obj, err := lfs.PutObject(bucket, object, reader)
+	obj, err := l.lfs.PutObject(bucket, object, reader)
 	if err != nil {
 		return objInfo, err
 	}
@@ -350,26 +346,24 @@ func (l *lfsGateway) CopyObject(ctx context.Context, srcBucket, srcObject, dstBu
 
 // DeleteObject deletes a blob in bucket.
 func (l *lfsGateway) DeleteObject(ctx context.Context, bucket, object string) error {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return user.ErrLfsServiceNotReady
 	}
 
-	_, err := lfs.DeleteObject(bucket, object)
+	_, err := l.lfs.DeleteObject(bucket, object)
 
 	return err
 }
 
 func (l *lfsGateway) DeleteObjects(ctx context.Context, bucket string, objects []string) ([]error, error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return nil, user.ErrLfsServiceNotReady
 	}
 
 	errFlag := 0
 	errs := make([]error, len(objects))
 	for i, object := range objects {
-		_, err := lfs.DeleteObject(bucket, object)
+		_, err := l.lfs.DeleteObject(bucket, object)
 		if err != nil {
 			errFlag = 1
 			errs[i] = err

@@ -30,27 +30,30 @@ var (
 )
 
 type impl struct {
+	naddr  string // network address
 	bstore bs.Blockstore
-
 	dstore ds.Datastore
-
-	rt routing.Routing
-
-	ph p2phost.Host
+	rt     routing.Routing
+	ph     p2phost.Host
 }
 
 // New returns data.Service
-func New(b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routing.Routing) Service {
+func New(nid string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routing.Routing) Service {
 	if r == nil {
 		log.Println("network is not running.")
 	}
 
 	return &impl{
+		naddr:  nid,
 		rt:     r,
 		ph:     host,
 		dstore: d,
 		bstore: b,
 	}
+}
+
+func (n *impl) GetNetAddr() string {
+	return n.naddr
 }
 
 func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data, sig []byte, to string) error {
@@ -163,7 +166,7 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		return nil, err
 	}
 
-	if string(bdata) == metainfo.MetaHandlerComplete {
+	if string(bdata) == "complete" {
 		return nil, errors.New("get block failed")
 	}
 

@@ -22,7 +22,7 @@ import (
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
-	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/source/instance"
 )
 
 var (
@@ -30,11 +30,11 @@ var (
 )
 
 //AssignmetahandlerV2 根据角色为当前节点挂载回调函数
-func (dht *KadDHT) AssignmetahandlerV2(metahandler metainfo.MetaMessageHandler) error {
+func (dht *KadDHT) AssignmetahandlerV2(metahandler instance.Service) error {
 	if metahandler == nil {
 		return errmetahandlerNotAssign
 	}
-	dht.metahandlerv2 = metahandler
+	dht.metahandler = metahandler
 	return nil
 }
 
@@ -249,10 +249,10 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 	// append/iter can be done here
 
-	if dht.metahandlerv2 == nil {
-		return nil, metainfo.ErrMetaHandlerNotAssign
+	if dht.metahandler == nil {
+		return nil, instance.ErrMetaHandlerNotAssign
 	}
-	res, err := dht.metahandlerv2.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
+	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
 	if err != nil {
 		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\ncaller:%s\n", err, metaKey, p.Pretty(), string(pmes.GetKey()))
 	}
@@ -266,11 +266,11 @@ func (dht *KadDHT) handleMetaBroadcast(ctx context.Context, key string, p peer.I
 	logger.SetTag(ctx, "peer", p)
 	defer func() { logger.FinishWithErr(ctx, err) }() //各项记录操作
 
-	if dht.metahandlerv2 == nil {
-		return nil, metainfo.ErrMetaHandlerNotAssign
+	if dht.metahandler == nil {
+		return nil, instance.ErrMetaHandlerNotAssign
 	}
 
-	res, err := dht.metahandlerv2.HandleMetaMessage(1, key, nil, p.Pretty())
+	res, err := dht.metahandler.HandleMetaMessage(1, key, nil, p.Pretty())
 	if err != nil {
 		log.Println("handleMetaBroadcast()err:%s\nmetakey:%s\nfrom:%s\n", err, key, p.Pretty())
 	}

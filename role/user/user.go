@@ -3,169 +3,126 @@ package user
 import (
 	"context"
 	"errors"
-	"io"
 	"log"
-	"os"
-	"path"
 	"sync"
 
-	config "github.com/memoio/go-mefs/config"
-	"github.com/memoio/go-mefs/core"
-	"github.com/memoio/go-mefs/repo/fsrepo"
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/memoio/go-mefs/source/data"
+	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
+	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-var localNode *core.MefsNode
-
-var allUsers sync.Map
-
-// Service defines user's function
-type Service interface {
-	Start() error
-	Stop()
-	Fsync(bool) error
-	Online() bool
-
-	ListBuckets(prefix string) ([]*pb.BucketInfo, error)
-	CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
-	HeadBucket(bucketName string) (*pb.BucketInfo, error)
-	DeleteBucket(bucketName string) (*pb.BucketInfo, error)
-
-	ListObjects(bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error)
-
-	PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error)
-
-	GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error
-	HeadObject(bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error)
-	DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error)
-
-	ShowStorage() (uint64, error)
-	ShowBucketStorage(bucketName string) (uint64, error)
+//Info implements user service
+type Info struct {
+	netID string
+	role  string
+	ds    data.Service
+	fsMap sync.Map // now key is queryID, value is *lfsInfo
+	qMap  sync.Map // key is userID, value is *userInfo
 }
 
-// InitUserDaemon inits
-func InitUserDaemon(node *core.MefsNode) {
-	localNode = node
+type userInfo struct {
+	querys []string // now, only one
 }
 
-// NewUser add a new user
-func NewUser(uid string, isInit bool, pwd string, capacity int64, duration int64, price int64, ks int, ps int, rdo bool) (Service, error) {
-	if user, ok := allUsers.Load(uid); ok && user != nil {
-		return user.(*LfsInfo), errors.New("user is running")
+// New constructs a new user service
+func New(nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
+	us := &Info{
+		role:  instance.RoleUser,
+		netID: nid,
+		ds:    d,
 	}
-
-	// 读keystore下uid文件
-	keypath, err := config.Path("", path.Join("keystore", uid))
+	err := rt.(*dht.KadDHT).AssignmetahandlerV2(us)
 	if err != nil {
-		return nil, ErrDirNotExist
+		return nil, err
+	}
+	return us, nil
+}
+
+// NewFS add a new user
+func (u *Info) NewFS(uid, queryID string, sk []byte, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
+	uinfo, ok := u.qMap.Load(uid)
+	if ok {
+		queryID := uinfo.(*userInfo).querys[0]
+		fs, ok := u.fsMap.Load(queryID)
+		if ok {
+			return fs.(*LfsInfo), errors.New("user exists")
+		}
 	}
 
-	_, err = os.Stat(keypath)
-	if os.IsNotExist(err) {
-		return nil, ErrDirNotExist
-	}
-
-	userkey, err := fsrepo.GetPrivateKeyFromKeystore(uid, keypath, pwd)
+	// getUK
+	uaddr, err := ad.GetAddressFromID(uid)
 	if err != nil {
 		return nil, err
 	}
 
-	ginfo := &groupInfo{
-		userID:      uid,
-		state:       errState,
-		storeDays:   duration,
-		storeSize:   capacity,
-		storePrice:  price,
-		keeperSLA:   ks,
-		providerSLA: ps,
-		reDeploy:    rdo,
+	ginfo := newGroup(uid, utils.EthSkByteToEthString(sk), capacity, duration, price, ks, ps, rdo, u.ds)
+
+	// queryID == uid indicats this is a testuser
+	if queryID != uid {
+		qItem := getQuery(uaddr)
+		if qItem != nil {
+			ginfo.queryItem = qItem
+		} else {
+			err := deployQuery(uid, utils.EthSkByteToEthString(sk), capacity, duration, price, ks, ps, rdo)
+			if err != nil {
+				return nil, err
+			}
+			qItem = getQuery(uaddr)
+			if qItem == nil {
+				return nil, errors.New("fail to get query from chain, please restart")
+			}
+			ginfo.queryItem = qItem
+		}
+		qid, _ := ad.GetIDFromAddress(qItem.QueryAddr)
+		queryID = qid
+		ginfo.groupID = queryID
+	}
+
+	_, ok = u.qMap.Load(uid)
+	if !ok {
+		uq := &userInfo{
+			querys: make([]string, 1),
+		}
+		uq.querys = append(uq.querys, queryID)
+		u.qMap.Store(uid, uq)
+	}
+
+	uItem := getUpKeeping(uaddr)
+	if uItem != nil {
+		ginfo.upKeepingItem = uItem
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	lInfo := &LfsInfo{
-		userID:     uid,
+		owner:      uid,
+		fsID:       queryID,
 		context:    ctx,
 		cancelFunc: cancel,
-		privateKey: userkey.PrivateKey,
+		privateKey: sk,
 		gInfo:      ginfo,
+		ds:         u.ds,
 	}
 
-	allUsers.Store(uid, lInfo)
+	u.fsMap.Store(queryID, lInfo)
 
 	return lInfo, nil
 }
 
-// IsOnline judges
-func IsOnline(userID string) bool {
-	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return user.(*LfsInfo).online
-	}
-
-	return false
-}
-
-func getSk(userID string) []byte {
-	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return user.(*LfsInfo).privateKey
-	}
-	return nil
-}
-
-func getGroup(userID string) *groupInfo {
-	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return user.(*LfsInfo).gInfo
-	}
-	return nil
-}
-
-// KillUser kills
-func KillUser(userID string) error {
-	if user, ok := allUsers.Load(userID); ok && user != nil {
-		user.(*LfsInfo).Stop()
-		allUsers.Delete(userID)
-		return nil
-	}
-
-	return ErrUserNotExist
-}
-
-// GetUser gets userInfo
-func GetUser(userID string) *LfsInfo {
-	if user, ok := allUsers.Load(userID); ok && user != nil {
-		return user.(*LfsInfo)
-	}
-	return nil
-}
-
-// GetUsers gets
-func GetUsers() ([]string, []bool, error) {
-	var users []string
-	var states []bool
-	allUsers.Range(func(key, value interface{}) bool {
-		id := key.(string)
-		us := value.(*LfsInfo)
-		users = append(users, id)
-
-		states = append(states, us.online)
-
-		return true
-	})
-	return users, states, nil
-}
-
-// PersistBeforeExit is
-func PersistBeforeExit() error {
-	allUsers.Range(func(key, value interface{}) bool {
+func (u *Info) Stop() error {
+	u.fsMap.Range(func(key, value interface{}) bool {
 		uInfo := value.(*LfsInfo)
 		if !uInfo.online {
 			return true
 		}
-		err := uInfo.Fsync(false)
+		err := uInfo.Fsync(true)
 		if err != nil {
-			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
+			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.owner, err)
 		} else {
-			log.Printf("User %s Persist completed\n", uInfo.userID)
+			log.Printf("User %s Persist completed\n", uInfo.owner)
 		}
 		uInfo.cancelFunc() //释放资源
 		return true
@@ -173,16 +130,45 @@ func PersistBeforeExit() error {
 	return nil
 }
 
-// ShowInfo 输出本节点的信息
-func ShowInfo(userID string) map[string]string {
-	outmap := map[string]string{}
-	log.Println(">>>>>>>>>>>>>>ShowInfo>>>>>>>>>>>>>>")
-	defer log.Println("================================")
-	us := GetUser(userID)
-	if us == nil {
-		outmap["error: "] = "userService==nil"
-		return outmap
+func (u *Info) KillUser(userID string) error {
+	uinfo, ok := u.qMap.Load(userID)
+	if ok {
+		queryID := uinfo.(*userInfo).querys[0]
+		fs, ok := u.fsMap.Load(queryID)
+		if ok {
+			fs.(*LfsInfo).Stop()
+			u.fsMap.Delete(queryID)
+		}
 	}
+	return nil
+}
 
-	return outmap
+func (u *Info) Fsync() error {
+	u.fsMap.Range(func(key, value interface{}) bool {
+		uInfo := value.(*LfsInfo)
+		if !uInfo.online {
+			return true
+		}
+		err := uInfo.Fsync(true)
+		if err != nil {
+			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.owner, err)
+		} else {
+			log.Printf("User %s Persist completed\n", uInfo.owner)
+		}
+		return true
+	})
+	return nil
+}
+
+// GetUser gets userInfo
+func (u *Info) GetUser(userID string) FileSyetem {
+	uinfo, ok := u.qMap.Load(userID)
+	if ok {
+		queryID := uinfo.(*userInfo).querys[0]
+		fs, ok := u.fsMap.Load(queryID)
+		if ok {
+			return fs.(*LfsInfo)
+		}
+	}
+	return nil
 }

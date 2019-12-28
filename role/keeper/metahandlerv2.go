@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
+	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -62,7 +63,7 @@ func (keeper *HandlerV2) HandleMetaMessage(opType int, metaKey string, metaValue
 	default: //没有匹配的信息，丢弃
 		return nil, errors.New("Beyond the capacity")
 	}
-	return []byte(metainfo.MetaHandlerComplete), nil
+	return []byte(instance.MetaHandlerComplete), nil
 }
 
 // GetRole 获取这个节点的角色信息，返回错误说明keeper还没有启动好

@@ -24,12 +24,11 @@ var (
 )
 
 func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object string, options minio.ObjectOptions) (uploadID string, err error) {
-	lfs := user.GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
+	if !l.lfs.Online() {
 		return "", user.ErrLfsServiceNotReady
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	_, err = lfs.HeadBucket(bucket)
+	_, err = l.lfs.HeadBucket(bucket)
 	if err != nil {
 		cancel()
 		return "", err
@@ -40,7 +39,7 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	if err != nil {
 		return "", err
 	}
-	obj, err := lfs.PutObject(bucket, object, upload.Stream)
+	obj, err := l.lfs.PutObject(bucket, object, upload.Stream)
 	if err != nil {
 		return "", err
 	}

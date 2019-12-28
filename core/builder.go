@@ -178,7 +178,7 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 		}
 	}
 
-	n.Data = data.New(n.Blockstore, n.Repo.Datastore(), n.PeerHost, n.Routing)
+	n.Data = data.New(n.Identity.Pretty(), n.Blockstore, n.Repo.Datastore(), n.PeerHost, n.Routing)
 
 	return nil
 }

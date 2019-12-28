@@ -148,24 +148,6 @@ func checkBucketNameCommon(bucketName string, strict bool) (err error) {
 	return err
 }
 
-func testConnect() error {
-	waitTime := 0 //进行网络连接
-	for {
-		if waitTime > 60 { //连不上网？
-			log.Println(ErrCannotConnectNetwork, "please restart and retry.")
-			return ErrCannotConnectNetwork
-		}
-		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
-			break //连上网了，退出
-		} else {
-			log.Println(ErrCannotConnectNetwork, "waiting...")
-			time.Sleep(10 * time.Second) //没联网，等联网
-		}
-		waitTime++
-	}
-	return nil
-}
-
 // BuildSignMessage builds sign message for test or repair
 func BuildSignMessage() ([]byte, error) {
 	money := big.NewInt(123)

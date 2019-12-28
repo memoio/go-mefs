@@ -30,7 +30,7 @@ import (
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	providers "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/providers"
-	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/source/instance"
 )
 
 var logger = logging.Logger("dht")
@@ -61,8 +61,8 @@ type KadDHT struct {
 
 	plk sync.Mutex
 
-	protocols     []protocol.ID // DHT protocols
-	metahandlerv2 metainfo.MetaMessageHandler
+	protocols   []protocol.ID // DHT protocols
+	metahandler instance.Service
 }
 
 // Assert that MEFS assumptions about interfaces aren't broken. These aren't a

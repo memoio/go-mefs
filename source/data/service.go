@@ -8,6 +8,7 @@ import (
 
 // Service is for data
 type Service interface {
+	GetNetAddr() string
 	GetKey(ctx context.Context, key, to string) ([]byte, error)
 	PutKey(ctx context.Context, key string, data []byte, to string) error
 	// AppendKey key is dtype/id/op1/op2

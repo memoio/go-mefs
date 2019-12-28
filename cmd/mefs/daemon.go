@@ -421,39 +421,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			return err
 		}
 	case metainfo.RoleUser:
-		fmt.Println("started as a user")
-
-		user.InitUserDaemon(node)
-
-		err = node.Routing.(*dht.KadDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
+		fmt.Println("Starting as a user")
+		ins, err = user.New(node)
 		if err != nil {
-			return err
+			fmt.Println("Start user daemon fails; please restart")
 		}
+
+		n.Inst = ins
 
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
-		if cfg.Test {
-			go func() {
-				lfs, err := user.NewUser(node.Identity.Pretty(), cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
-				if err != nil {
-					fmt.Println("Start local user failed:", err)
-					err := user.KillUser(node.Identity.Pretty())
-					if err != nil {
-						fmt.Println("lfsuser.KillUser failed:", err)
-					}
-					return
-				}
-
-				err = lfs.Start()
-				if err != nil {
-					fmt.Println("Start local user failed:", err)
-					err := user.KillUser(node.Identity.Pretty())
-					if err != nil {
-						fmt.Println("lfsuser.KillUser failed:", err)
-					}
-					return
-				}
-			}()
-		}
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("started as a provider")
 		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)

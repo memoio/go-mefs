@@ -3,6 +3,7 @@ package provider
 import (
 	"log"
 
+	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -53,7 +54,7 @@ func (provider *HandlerV2) HandleMetaMessage(optype int, metaKey string, metaVal
 	default: //没有匹配的信息，报错
 		return nil, metainfo.ErrWrongType
 	}
-	return []byte(metainfo.MetaHandlerComplete), nil
+	return []byte(instance.MetaHandlerComplete), nil
 }
 
 // GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
