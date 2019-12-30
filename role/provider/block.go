@@ -18,8 +18,8 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
-	// key is "block"/cid
+func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	// key is "block"/blockID
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
 		return errors.New("Wrong value for put block")
@@ -32,15 +32,15 @@ func handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 
 	isMyuser := false
 	// 保存合约
-	upItem, err := getUpkeeping(bmeta.GetQid())
+	upItem, err := p.getUpkeeping(bmeta.GetQid())
 	if err != nil {
-		go saveUpkeeping(bmeta.GetQid())
+		go p.saveUpkeeping(bmeta.GetQid())
 	} else {
-		localID := localNode.Identity.Pretty()
+		localID := p.netID
 		for _, proID := range upItem.ProviderIDs {
 			if localID == proID {
 				isMyuser = true
-				offerItem, err := getOffer()
+				offerItem, err := p.getOffer()
 				if err != nil {
 					return err
 				}
@@ -59,7 +59,7 @@ func handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 	ctx := context.Background()
 
 	go func() {
-		err = localNode.Data.PutBlock(ctx, km.ToString(), value, "local")
+		err = p.ds.PutBlock(ctx, km.ToString(), value, "local")
 		if err != nil {
 			log.Printf("Error writing block to datastore: %s", err)
 			return
@@ -70,7 +70,7 @@ func handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 	return nil
 }
 
-func handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 	// key is "block"/cid/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 4 {
@@ -84,15 +84,15 @@ func handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 
 	isMyuser := false
 	// 保存合约
-	upItem, err := getUpkeeping(bmeta.GetQid())
+	upItem, err := p.getUpkeeping(bmeta.GetQid())
 	if err != nil {
-		go saveUpkeeping(bmeta.GetQid())
+		go p.saveUpkeeping(bmeta.GetQid())
 	} else {
-		localID := localNode.Identity.Pretty()
+		localID := p.netID
 		for _, proID := range upItem.ProviderIDs {
 			if localID == proID {
 				isMyuser = true
-				offerItem, err := getOffer()
+				offerItem, err := p.getOffer()
 				if err != nil {
 					return err
 				}
@@ -110,7 +110,7 @@ func handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 
 	ctx := context.Background()
 	go func() {
-		err = localNode.Data.AppendBlock(ctx, km.ToString(), value, "local")
+		err = p.ds.AppendBlock(ctx, km.ToString(), value, "local")
 		if err != nil {
 			log.Printf("Error append field to block %s: %s", km.ToString(), err)
 			return
@@ -119,7 +119,7 @@ func handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 	return nil
 }
 
-func handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
+func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
 	// key is cid|ops|sig
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) < 3 {
@@ -131,7 +131,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
 		return nil, errors.New("Signature format is wrong")
 	}
 
-	res, userID, key, value, err := verify(sigByte)
+	res, userID, key, value, err := p.verify(sigByte)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 		return nil, err
@@ -141,20 +141,20 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
 		// 验证通过
 		// 内存channel的value变化
 		// 然后持久化
-		b, err := localNode.Data.GetBlock(context.Background(), splitedNcid[0], nil, "local")
+		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
 			return nil, errors.New("Block is not found")
 		}
 		if key != "" {
-			channelItem, err := getChannel(userID)
+			channelItem, err := p.getChannel(userID)
 			if err != nil {
 				return nil, errors.New("Find channelItem in channelBook error")
 			}
 
 			log.Println("Downlaod success，change channel.value and persist: ", value.String())
 			channelItem.Value = value
-			proContracts.channelBook.Store(userID, channelItem)
-			err = localNode.Data.PutKey(context.Background(), key, []byte(value.String()), "local")
+			p.conManager.channelBook.Store(userID, channelItem)
+			err = p.ds.PutKey(context.Background(), key, []byte(value.String()), "local")
 			if err != nil {
 				log.Println("cmdPutErr:", err)
 			}
@@ -168,7 +168,7 @@ func handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
 }
 
 // verify verifies the transaction
-func verify(mes []byte) (bool, string, string, *big.Int, error) {
+func (p *Info) verify(mes []byte) (bool, string, string, *big.Int, error) {
 	signForChannel := &pb.SignForChannel{}
 	err := proto.Unmarshal(mes, signForChannel)
 	if err != nil {
@@ -192,7 +192,7 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	if err != nil {
 		return false, "", "", nil, err
 	}
-	item, ok := proContracts.channelBook.Load(userID)
+	item, ok := p.conManager.channelBook.Load(userID)
 	if !ok {
 		log.Println("Not find ", userID, "'s channelItem in channelBook.")
 		return false, "", "", nil, errors.New("Find channelItem in channelBook error")
@@ -229,9 +229,9 @@ func verify(mes []byte) (bool, string, string, *big.Int, error) {
 	return res, userID, channelValueKeyMeta.ToString(), value, nil
 }
 
-func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
+func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
 	blockID := km.GetMid()
-	err := localNode.Data.DeleteBlock(context.Background(), blockID, "local")
+	err := p.ds.DeleteBlock(context.Background(), blockID, "local")
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}

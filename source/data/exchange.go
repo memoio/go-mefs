@@ -417,3 +417,11 @@ func (n *impl) GetExternalAddr(p string) ([]byte, error) {
 
 	return nil, errors.New("No remote address")
 }
+
+func (n *impl) BlockStore() bs.Blockstore {
+	return n.bstore
+}
+
+func (n *impl) DataStore() ds.Datastore {
+	return n.dstore
+}

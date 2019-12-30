@@ -342,7 +342,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			// 增加provider的persist，将channel的value值保存到本地
 		case metainfo.RoleProvider:
 			fmt.Println("Provider-persisting before shut down")
-			err = provider.PersistBeforeExit()
+			err = node.Inst.(*provider.Info).Stop()
 			if err != nil {
 				fmt.Println("Persist falied: ", err)
 			}
@@ -428,22 +428,20 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("started as a provider")
-		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), sk, node.Data, node.Routing, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err
 		}
-		err = node.Routing.(*dht.KadDHT).AssignmetahandlerV2(&provider.HandlerV2{Role: metainfo.RoleProvider})
-		if err != nil {
-			return err
-		}
+
+		node.Inst = ins
 
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
 		if pos {
 			fmt.Println("Start pos Service")
-			go provider.PosService(req.Context, gc)
+			go ins.(*provider.Info).PosService(req.Context, gc)
 		}
 	default:
 	}

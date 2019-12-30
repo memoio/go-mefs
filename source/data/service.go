@@ -5,7 +5,9 @@ import (
 
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
+	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
+	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 )
 
 // Service is for data
@@ -32,4 +34,6 @@ type Service interface {
 	Connect(ctx context.Context, to string) bool
 	GetPeers() []peer.ID
 	GetExternalAddr(p string) ([]byte, error)
+	BlockStore() bs.Blockstore
+	DataStore() ds.Datastore
 }

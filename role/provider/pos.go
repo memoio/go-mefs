@@ -46,7 +46,7 @@ var opt = &df.DataCoder{
 }
 
 // PosService starts pos
-func PosService(ctx context.Context, gc bool) {
+func (p *Info) PosService(ctx context.Context, gc bool) {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
 	posID = pos.GetPosId()
@@ -59,14 +59,14 @@ func PosService(ctx context.Context, gc bool) {
 			log.Println("Save upkeeping in posService error, exit from pos mode.")
 			return
 		}
-		err := saveUpkeeping(posID)
+		err := p.saveUpkeeping(posID)
 		if err == nil {
 			break
 		}
 		retryCount++
 	}
 
-	if value, ok := proContracts.upKeepingBook.Load(posID); ok {
+	if value, ok := p.conManager.upKeepingBook.Load(posID); ok {
 		keeperIDs = value.(contracts.UpKeepingItem).KeeperIDs
 	}
 
@@ -74,7 +74,7 @@ func PosService(ctx context.Context, gc bool) {
 	getConfig := false
 
 	for _, tmpKeeper := range keeperIDs {
-		if err := getUserConifg(posID, tmpKeeper); err == nil {
+		if err := p.getUserConifg(posID, tmpKeeper); err == nil {
 			getConfig = true
 			break
 		}
@@ -91,7 +91,7 @@ func PosService(ctx context.Context, gc bool) {
 		log.Println("NewKeyMeta posKM error :", err)
 	} else {
 		log.Println("posKm :", posKM.ToString())
-		posValue, err := localNode.Data.GetKey(ctx, posKM.ToString(), "local")
+		posValue, err := p.ds.GetKey(ctx, posKM.ToString(), "local")
 		if err != nil {
 			log.Println("Get posKM from local error :", err)
 		} else {
@@ -113,18 +113,18 @@ func PosService(ctx context.Context, gc bool) {
 		}
 	}
 
-	traversePath(gc)
+	p.traversePath(gc)
 	log.Println("pos blocks reaches gid: ", curGid, ", sid: ", curSid)
 
 	//开始pos
-	posRegular(ctx)
+	p.posRegular(ctx)
 }
 
 // posRegular checks posBlocks and decide to add/delete
-func posRegular(ctx context.Context) {
+func (p *Info) posRegular(ctx context.Context) {
 	log.Println("Pos start!")
 
-	doGenerateOrDelete()
+	p.doGenerateOrDelete()
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -134,13 +134,13 @@ func posRegular(ctx context.Context) {
 		case <-ticker.C:
 			if inGenerate == 0 {
 				// 如果超过了90%，则删除10%容量的posBlocks；如果低于80%，则生成到80%
-				go doGenerateOrDelete()
+				go p.doGenerateOrDelete()
 			}
 		}
 	}
 }
 
-func traversePath(gc bool) {
+func (p *Info) traversePath(gc bool) {
 	if gc {
 		log.Println("clean pos blocks first")
 	}
@@ -150,16 +150,16 @@ func traversePath(gc bool) {
 		sid := 0
 		for sid = 0; sid < 1024; sid++ {
 			for i := 0; i < 5; i++ {
-				posCid := posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
+				posCid := posID + "_" + p.netID + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
 				ncid := cid.NewCidV2([]byte(posCid))
-				exist, err := localNode.Blockstore.Has(ncid)
+				exist, err := p.ds.BlockStore().Has(ncid)
 				if err != nil {
 					continue
 				}
 
 				if exist {
 					if gc {
-						localNode.Blockstore.DeleteBlock(ncid)
+						p.ds.BlockStore().DeleteBlock(ncid)
 					}
 				} else {
 					break
@@ -186,38 +186,38 @@ func traversePath(gc bool) {
 			}
 		}
 
-		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + p.netID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 
 		break
 	}
 }
 
-func doGenerateOrDelete() {
+func (p *Info) doGenerateOrDelete() {
 	inGenerate = 1
 	defer func() {
 		inGenerate = 0
 	}()
-	usedSpace, err := getDiskUsage()
+	usedSpace, err := p.getDiskUsage()
 	if err != nil {
 		return
 	}
 
-	totalSpace := getDiskTotal()
+	totalSpace := p.getDiskTotal()
 
 	ratio := float64(usedSpace) / float64(totalSpace)
 	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
 	if ratio <= lowWater {
-		generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
+		p.generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
 	} else if ratio >= highWater {
-		deletePosBlocks(uint64(usedSpace / 10))
+		p.deletePosBlocks(uint64(usedSpace / 10))
 	}
 }
 
-func uploadMulpolicy(data []byte) ([][]byte, int, error) {
+func (p *Info) uploadMulpolicy(data []byte) ([][]byte, int, error) {
 	opt.Policy = df.MulPolicy
 	// 构建加密秘钥
-	buckid := localNode.Identity.Pretty() + strconv.Itoa(curGid)
+	buckid := p.netID + strconv.Itoa(curGid)
 	tmpkey := []byte(string(posSkByte) + buckid)
 	skey := sha256.Sum256(tmpkey)
 	// 加密、Encode
@@ -233,7 +233,7 @@ func uploadMulpolicy(data []byte) ([][]byte, int, error) {
 }
 
 // generatePosBlocks generate block accoding to the free space
-func generatePosBlocks(increaseSpace uint64) {
+func (p *Info) generatePosBlocks(increaseSpace uint64) {
 	// fillRandom()
 	// DataEncodeToMul()
 	// send BlockMeta to keepers
@@ -260,8 +260,8 @@ func generatePosBlocks(increaseSpace uint64) {
 			curGid += 1024
 		}
 
-		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		data, _, err := uploadMulpolicy(tmpData)
+		posCidPrefix = posID + "_" + p.netID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		data, _, err := p.uploadMulpolicy(tmpData)
 		if err != nil {
 			log.Println("UploadMulpolicy in generate Pos Blocks error :", err)
 			continue
@@ -279,7 +279,7 @@ func generatePosBlocks(increaseSpace uint64) {
 				continue
 			}
 			log.Println("New block success :", newblk.Cid())
-			err = localNode.Blockstore.Put(newblk)
+			err = p.ds.BlockStore().Put(newblk)
 			if err != nil {
 				log.Println("add block failed, error :", err)
 			}
@@ -291,15 +291,15 @@ func generatePosBlocks(increaseSpace uint64) {
 
 		// 向keeper发送元数据
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
-		km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.Pos)
+		km, err := metainfo.NewKeyMeta(p.netID, metainfo.Pos)
 		for _, keeper := range keeperIDs {
-			localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(metaValue), nil, keeper)
+			p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(metaValue), nil, keeper)
 		}
 
 		// 本地更新
 		posValue := posCidPrefix
 		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
-		err = localNode.Data.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
+		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -307,7 +307,7 @@ func generatePosBlocks(increaseSpace uint64) {
 	}
 }
 
-func deletePosBlocks(decreseSpace uint64) {
+func (p *Info) deletePosBlocks(decreseSpace uint64) {
 	log.Println("data is about to exceed the space limit, delete pos blcoks")
 
 	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
@@ -331,7 +331,7 @@ func deletePosBlocks(decreseSpace uint64) {
 		for i := 0; i < 5; i++ {
 			blockID := posCidPrefix + "_" + strconv.Itoa(i)
 			ncid := cid.NewCidV2([]byte(blockID))
-			err := localNode.Blockstore.DeleteBlock(ncid)
+			err := p.ds.BlockStore().DeleteBlock(ncid)
 			if err != nil {
 				log.Println("delete block: ", blockID, " error :", err)
 				j++
@@ -352,11 +352,11 @@ func deletePosBlocks(decreseSpace uint64) {
 			curSid = -1
 		}
 
-		posCidPrefix = posID + "_" + localNode.Identity.Pretty() + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + p.netID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
-		err = localNode.Data.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
+		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
 			log.Println("CmdPutTo posKM error :", err)
 			continue
@@ -365,24 +365,24 @@ func deletePosBlocks(decreseSpace uint64) {
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
 		if j < 5 {
-			km, err := metainfo.NewKeyMeta(localNode.Identity.Pretty(), metainfo.Pos)
+			km, err := metainfo.NewKeyMeta(p.netID, metainfo.Pos)
 			if err != nil {
 				log.Println("construct put blockMeta KV error :", err)
 				return
 			}
 			metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
 			for _, keeper := range keeperIDs {
-				localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Delete), km.ToString(), []byte(metavalue), nil, keeper)
+				p.ds.SendMetaRequest(context.Background(), int32(metainfo.Delete), km.ToString(), []byte(metavalue), nil, keeper)
 			}
 		}
 	}
 }
 
-func getUserConifg(userID, keeperID string) error {
+func (p *Info) getUserConifg(userID, keeperID string) error {
 	// 需要用私钥decode出bls的私钥，用user中的方法
 	//获取公钥
 	opt.KeySet = new(mcl.KeySet)
-	pubKey, err := getNewUserConfig(userID, keeperID)
+	pubKey, err := p.getNewUserConfig(userID, keeperID)
 	if err != nil {
 		log.Println("getNewUserConfig in get userconfig error :", err)
 		return err
@@ -391,7 +391,7 @@ func getUserConifg(userID, keeperID string) error {
 	opt.KeySet.Pk = pubKey
 
 	//获取私钥
-	opt.KeySet.Sk, err = getUserPrivateKey(userID, keeperID)
+	opt.KeySet.Sk, err = p.getUserPrivateKey(userID, keeperID)
 	if err != nil {
 		log.Println("getUserPrivateKey in get userconfig error ", err)
 		return err

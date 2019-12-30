@@ -15,7 +15,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
+func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 	var nbid int
 	var cids []string
 	var ret string
@@ -27,7 +27,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 	blockID := km.GetMid()
 	userID := blockID[:utils.IDLength]
 
-	pubKey, err := getNewUserConfig(userID, keeper)
+	pubKey, err := p.getNewUserConfig(userID, keeper)
 	if err != nil {
 		log.Println("get new user`s config failed,error :", err)
 		return err
@@ -44,7 +44,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 			cids = append(cids, blkid)
 			pid := splitcpid[1]
 			if blkid != blockID {
-				blk, err := localNode.Data.GetBlock(ctx, blkid, sig, pid)
+				blk, err := p.ds.GetBlock(ctx, blkid, sig, pid)
 				if blk != nil && err == nil {
 					right := rs.VerifyBlock(blk.RawData(), blkid, pubKey)
 					if right {
@@ -106,7 +106,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 		log.Println("repair ", blockID, " failed, error: ", err)
 		retMetaValue := "RepairFailed" + metainfo.DELIMITER + ret
 		log.Println("repair response metavalue :", retMetaValue)
-		_, err = localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retMetaValue), nil, keeper)
+		_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retMetaValue), nil, keeper)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 		for _, tmpCid := range cids {
 			if len(tmpCid) > 0 {
 				temcid := cid.NewCidV2([]byte(tmpCid))
-				err = localNode.Blockstore.DeleteBlock(temcid)
+				err = p.ds.BlockStore().DeleteBlock(temcid)
 				if err != nil && err != bs.ErrNotFound {
 					log.Println("delete error :", err)
 					return err
@@ -133,7 +133,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 	for _, tmpCid := range cids {
 		if len(tmpCid) > 0 {
 			temcid := cid.NewCidV2([]byte(tmpCid))
-			err = localNode.Blockstore.DeleteBlock(temcid)
+			err = p.ds.BlockStore().DeleteBlock(temcid)
 			if err != nil && err != bs.ErrNotFound {
 				log.Println("delete error :", err)
 				return err
@@ -141,7 +141,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 		}
 	}
 	//把修复好的block放到本地；
-	err = localNode.Blockstore.Put(newblk)
+	err = p.ds.BlockStore().Put(newblk)
 	if err != nil {
 		log.Println("add block failed, error :", err)
 		return err
@@ -149,7 +149,7 @@ func handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
 	retMetaValue := "RepairSuccess" + metainfo.DELIMITER + ret
 	log.Println("repair response metavalue :", retMetaValue)
 	log.Println("repair success：", blockID)
-	_, err = localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retMetaValue), nil, keeper)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
 		log.Println("repair response err :", err)
 		return err

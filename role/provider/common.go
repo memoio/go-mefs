@@ -3,13 +3,11 @@ package provider
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -24,7 +22,7 @@ var (
 	errGetContractItem         = errors.New("Can't get contract Item")
 )
 
-type providerContracts struct {
+type pContracts struct {
 	upKeepingBook sync.Map // K-user的id, V-upkeeping
 	channelBook   sync.Map // K-user的id, V-Channel
 	queryBook     sync.Map // K-user的id, V-Query
@@ -32,8 +30,8 @@ type providerContracts struct {
 	proInfo       contracts.ProviderItem
 }
 
-func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
-	pubKeyI, ok := usersConfigs.Load(userID)
+func (p *Info) getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
+	pubKeyI, ok := p.blsConfigs.Load(userID)
 	if ok {
 		return pubKeyI.(*mcl.PublicKey), nil
 	}
@@ -43,7 +41,7 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Data.GetKey(context.Background(), userconfigkey, keeperID)
+	userconfigbyte, err := p.ds.GetKey(context.Background(), userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,18 +51,18 @@ func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 
-	usersConfigs.Store(userID, mkey.Pk)
+	p.blsConfigs.Store(userID, mkey.Pk)
 
 	return mkey.Pk, nil
 }
 
-func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
+func (p *Info) getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
 	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
 	if err != nil {
 		return nil, err
 	}
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Data.GetKey(context.Background(), userconfigkey, keeperID)
+	userconfigbyte, err := p.ds.GetKey(context.Background(), userconfigkey, keeperID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,20 +76,14 @@ func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
 }
 
 // getDiskUsage gets the disk usage
-func getDiskUsage() (uint64, error) {
-	dataStore := localNode.Repo.Datastore()
-	DataSpace, err := ds.DiskUsage(dataStore)
-	if err != nil {
-		log.Println("get disk usage failed :", err)
-		return 0, err
-	}
-	return DataSpace, nil
+func (p *Info) getDiskUsage() (uint64, error) {
+	return 0, nil
 }
 
 // getDiskTotal gets the disk total space which is set in config
-func getDiskTotal() uint64 {
+func (p *Info) getDiskTotal() uint64 {
 	var maxSpaceInByte uint64
-	proItem, err := getProInfo()
+	proItem, err := p.getProInfo()
 	if err != nil {
 		maxSpaceInByte = 10 * 1024 * 1024 * 1024
 	} else {

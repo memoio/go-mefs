@@ -15,7 +15,7 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
+func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
 	ops := km.GetOptions()
 
 	if len(ops) < 1 {
@@ -24,7 +24,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) e
 
 	userID := km.GetMid()
 	log.Println("receive", userID, " 's challenge from", from)
-	pubKey, err := getNewUserConfig(userID, from)
+	pubKey, err := p.getNewUserConfig(userID, from)
 	if err != nil {
 		log.Println("get new user`s config from:", from, "failed, error :", err)
 		return err
@@ -69,7 +69,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) e
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
-		tmpdata, tmptag, err := localNode.Blockstore.GetSegAndTag(blockID, uint64(electedOffset))
+		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
 			faultBlocks = append(faultBlocks, index)
 		} else {
@@ -77,7 +77,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) e
 			if !isTrue {
 				log.Println("verify tag failed")
 				//验证失败，则在本地删除此块
-				err := localNode.Data.DeleteBlock(context.Background(), blockID.String(), "local")
+				err := p.ds.DeleteBlock(context.Background(), blockID.String(), "local")
 				if err != nil {
 					log.Println("Delete block", blockID.String(), "error:", err)
 				}
@@ -122,7 +122,7 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) e
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = localNode.Data.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retValue), nil, from)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		log.Println("send proof err: ", err)
 	}
