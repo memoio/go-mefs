@@ -1,20 +1,24 @@
 package keeper
 
 import (
+	"errors"
 	"log"
-	"strconv"
 	"sync"
 
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-//puKey 作为其他结构体的key，
-//目前用PU做key的结构体有LedgerInfo，PayInfo,用pid和uid共同索引信息
-type puKey struct {
-	pid string
-	uid string
+type ledger struct {
+	localID string
+	ds      data.Service
+	lMap    sync.Map //key:pqKey，value:*groupsInfo
+}
+
+type pqKey struct {
+	pid string // providerID
+	qid string // queryID
 }
 
 //chalinfo 作为LedgerInfo的value key是PU对
@@ -51,20 +55,8 @@ type chalresult struct {
 	proof         string //挑战结果的证据
 }
 
-//key: PU，value: *chalinfo
-var ledgerInfo sync.Map
-
-func getChalinfo(thisPU puKey) (*chalinfo, bool) {
-	thischalinfo, ok := ledgerInfo.Load(thisPU)
-	if !ok {
-		gp, ok := getGroupsInfo(thisPU.uid)
-		if ok && gp != nil {
-			newchalinfo := &chalinfo{}
-			ledgerInfo.Store(thisPU, newchalinfo)
-		}
-	}
-
-	thischalinfo, ok = ledgerInfo.Load(thisPU)
+func (l *ledger) getChalinfo(thisPU pqKey) (*chalinfo, bool) {
+	thischalinfo, ok := l.lMap.Load(thisPU)
 	if !ok {
 		return nil, false
 	}
@@ -72,47 +64,20 @@ func getChalinfo(thisPU puKey) (*chalinfo, bool) {
 	return thischalinfo.(*chalinfo), true
 }
 
-func getChalresult(thisPU puKey, time int64) (*chalresult, bool) {
-	thischalinfo, ok := getChalinfo(thisPU)
-	if !ok || thischalinfo == nil {
-		return nil, false
+// bid is bucketID_stripeID_chunkID
+func (l *ledger) addBlockMeta(qid, pid, bid string, offset int) (*cidInfo, error) {
+	log.Println("add block: ", bid, "for query: ", qid, " and provider: ", pid)
+
+	pu := pqKey{
+		pid: pid,
+		qid: qid,
 	}
 
-	thischalresult, ok := thischalinfo.chalMap.Load(time)
+	thisChal, ok := l.getChalinfo(pu)
 	if !ok {
-		return nil, false
-	}
-	return thischalresult.(*chalresult), true
-}
-
-func addCidinfotoMem(uid, pid, blockid string, newCidinfo *cidInfo) error {
-	cidString, err := metainfo.GetCidFromBlock(blockid)
-	if err != nil {
-		return err
+		return nil, errors.New("cannot create chalinfo")
 	}
 
-	newCidInfo, err := doAddCidinfotoLedger(uid, pid, cidString, newCidinfo)
-	if err != nil {
-		return err
-	}
-	return doAddBlocktoBucket(uid, cidString, newCidInfo)
-}
-
-func addBlocktoMem(uid, pid, blockid string, offset int) error {
-	log.Println("add block: ", blockid, "to user: ", uid, " and provider: ", pid)
-	cidString, err := metainfo.GetCidFromBlock(blockid)
-	if err != nil {
-		return err
-	}
-
-	newCidInfo, err := doAddBlocktoLedger(uid, pid, cidString, offset)
-	if err != nil {
-		return err
-	}
-	return doAddBlocktoBucket(uid, cidString, newCidInfo)
-}
-
-func doAddBlocktoLedger(uid, pid, cidString string, offset int) (*cidInfo, error) {
 	newcidinfo := &cidInfo{
 		availtime: utils.GetUnixNow(),
 		offset:    offset,
@@ -120,119 +85,39 @@ func doAddBlocktoLedger(uid, pid, cidString string, offset int) (*cidInfo, error
 		storedOn:  pid,
 	}
 
-	return doAddCidinfotoLedger(uid, pid, cidString, newcidinfo)
-}
-
-func doAddCidinfotoLedger(uid, pid, cidString string, newCidinfo *cidInfo) (*cidInfo, error) {
-
-	pu := puKey{
-		pid: pid,
-		uid: uid,
-	}
-
-	thisinfo, ok := ledgerInfo.Load(pu)
-	oldOffset := 0
-	offset := newCidinfo.offset
+	oldOffset := -1
+	v, ok := thisChal.cidMap.Load(bid)
 	if ok {
-		thechalinfo := thisinfo.(*chalinfo)
-
-		act, loaded := thechalinfo.cidMap.Load(cidString)
-		if loaded {
-			oldOffset = act.(*cidInfo).offset
-			if oldOffset < offset {
-				newCidinfo.offset = offset
-			} else {
-				// stored length is longer
-				return act.(*cidInfo), nil
-			}
-		} else {
-			oldOffset = -1
+		newcidinfo = v.(*cidInfo)
+		oldOffset = newcidinfo.offset
+		if offset > oldOffset {
+			newcidinfo.offset = oldOffset
 		}
-		thechalinfo.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
 
-		thechalinfo.cidMap.Store(cidString, newCidinfo)
+		if newcidinfo.storedOn != pid {
+			newcidinfo.storedOn = pid
+		}
 	} else {
-		newchalinfo := &chalinfo{
-			maxlength: int64(offset+1) * df.DefaultSegmentSize,
-		}
-		newchalinfo.cidMap.Store(cidString, newCidinfo)
-		ledgerInfo.Store(pu, newchalinfo)
+		thisChal.cidMap.Store(bid, newcidinfo)
 	}
 
-	return newCidinfo, nil
+	thisChal.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
+
+	return newcidinfo, nil
 }
 
-func doAddBlocktoBucket(uid, cid string, newcidinfo *cidInfo) error {
-	bid, sid, chunkID, err := metainfo.GetIDsFromBlock(cid)
-	if err != nil {
-		return err
-	}
-
-	thisBucketinfo, ok := getBucketInfo(uid, bid)
-	if !ok {
-		return nil
-	}
-
-	thisBucketinfo.stripes.Store(cid, newcidinfo)
-
-	snum, err := strconv.Atoi(sid)
-	if err != nil {
-		return err
-	}
-
-	if int32(snum) > thisBucketinfo.largestStripes {
-		thisBucketinfo.largestStripes = int32(snum)
-	}
-
-	cnum, err := strconv.Atoi(chunkID)
-	if err != nil {
-		return err
-	}
-
-	if int32(cnum) > thisBucketinfo.chunkNum {
-		thisBucketinfo.chunkNum = int32(cnum)
-	}
-
-	return nil
-}
-
-func deleteBlockFromMem(uid, pid, cidString string) {
-	cidString, err := metainfo.GetCidFromBlock(cidString)
-	if err != nil {
-		return
-	}
-	deleteBlockInLedger(uid, pid, cidString)
-	deleteBlockFromBucket(uid, cidString)
-}
-
-func deleteBlockInLedger(uid, pid, cidString string) {
-	pu := puKey{
+func (l *ledger) deleteBlockMeta(qid, pid, bid string) {
+	pu := pqKey{
 		pid: pid,
-		uid: uid,
+		qid: qid,
 	}
 
-	if thischalinfo, ok := getChalinfo(pu); ok {
-		thiscid, ok := thischalinfo.cidMap.Load(cidString)
+	if thischalinfo, ok := l.lMap.Load(pu); ok {
+		thischal := thischalinfo.(*chalinfo)
+		thiscid, ok := thischal.cidMap.Load(bid)
 		if ok {
-			thischalinfo.maxlength -= (int64(thiscid.(*cidInfo).offset+1) * df.DefaultSegmentSize)
+			thischal.maxlength -= (int64(thiscid.(*cidInfo).offset+1) * df.DefaultSegmentSize)
+			thischal.cidMap.Delete(bid)
 		}
-		thischalinfo.cidMap.Delete(cidString)
-	}
-}
-
-func deleteBlockFromBucket(uid, cidString string) {
-	bid, _, _, err := metainfo.GetIDsFromBlock(cidString)
-	if err != nil {
-		return
-	}
-
-	thisgroup, ok := getGroupsInfo(uid)
-	if !ok {
-		return
-	}
-
-	thisbucket, ok := thisgroup.buckets.Load(bid)
-	if ok {
-		thisbucket.(*bucketInfo).stripes.Delete(cidString)
 	}
 }

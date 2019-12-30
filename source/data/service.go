@@ -3,7 +3,9 @@ package data
 import (
 	"context"
 
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
+	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 )
 
 // Service is for data
@@ -26,4 +28,7 @@ type Service interface {
 	BroadcastMessage(ctx context.Context, key string) error
 	Connect(ctx context.Context, to string) bool
 	TestConnect() error
+
+	Itererate(prefix string) ([]dsq.Entry, error)
+	GetPeers() []peer.ID
 }

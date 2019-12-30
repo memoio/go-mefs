@@ -522,7 +522,7 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 	return "", 0, ErrNoProviders
 }
 
-func (g *groupInfo) getKeepers(count int) ([]string, []string, error) {
+func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
 	num := count
 	if count < 0 {
 		num = len(g.tempKeepers)
@@ -555,7 +555,7 @@ func (g *groupInfo) getKeepers(count int) ([]string, []string, error) {
 	return conKeepers, unconKeepers, nil
 }
 
-func (g *groupInfo) getProviders(count int) ([]string, []string, error) {
+func (g *groupInfo) GetProviders(count int) ([]string, []string, error) {
 	num := count
 	if count < 0 {
 		num = len(g.tempProviders)

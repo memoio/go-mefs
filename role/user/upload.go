@@ -228,7 +228,7 @@ Loop:
 			//如果是新的一个stripe，则需要重新找provider
 			var pros []string
 			if u.curOffset == 0 {
-				pros, _, err = u.gInfo.getProviders(bc)
+				pros, _, err = u.gInfo.GetProviders(bc)
 				if pros == nil || len(pros) < least {
 					log.Println("putobject err：", ErrNoEnoughProvider)
 					return ErrNoEnoughProvider

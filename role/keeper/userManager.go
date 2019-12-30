@@ -5,36 +5,44 @@ import (
 	"sort"
 	"sync"
 
+	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/source/data"
 )
+
+type ukp struct {
+	localID string
+	ds      data.Service
+	gMap    sync.Map //key:queryid，value:*groupsInfo
+}
 
 // user-keeper-provider map
 type groupsInfo struct {
-	userID       string
+	groupID      string // is queryID
+	owner        string // is userID
 	keepers      []string
 	providers    []string
 	localKeeper  string
 	masterKeeper string
 	buckets      sync.Map // key is bucket id; value is *bucketInfo
 	upkeeping    *contracts.UpKeepingItem
+	query        *contracts.QueryItem
+	blsPubKey    *mcl.PublicKey
 }
 
 type bucketInfo struct {
-	bucketID       int32
-	dataCount      int32
-	parityCount    int32
-	chunkNum       int32 // = dataCount+parityCount
-	largestStripes int32
-	stripes        sync.Map // key is cid, value is *cidInfo
+	bucketID       int
+	dataCount      int
+	parityCount    int
+	chunkNum       int // = dataCount+parityCount; which is largest chunkID
+	largestStripes int
+	stripes        sync.Map // key is stripeID_chunkID, value is *cidInfo
 }
 
-//key:userid，value:*groupsInfo
-var ukpInfo sync.Map
-
-func getPUKeysFromukpInfo() []puKey {
-	var res []puKey
-	localKeeper := localNode.Identity.Pretty()
-	ukpInfo.Range(func(k, v interface{}) bool {
+func (u *ukp) getPUKeys() []pqKey {
+	var res []pqKey
+	localKeeper := u.localID
+	u.gMap.Range(func(k, v interface{}) bool {
 		key := k.(string)
 		if key == localKeeper {
 			return true
@@ -45,7 +53,7 @@ func getPUKeysFromukpInfo() []puKey {
 		}
 		for _, proID := range value.providers {
 			tmpPU := puKey{
-				uid: key,
+				qid: key,
 				pid: proID,
 			}
 			res = append(res, tmpPU)
@@ -55,9 +63,9 @@ func getPUKeysFromukpInfo() []puKey {
 	return res
 }
 
-func getUnpaidUsers() []string {
+func (u *ukp) getUnpaidUsers() []string {
 	var res []string
-	ukpInfo.Range(func(k, v interface{}) bool {
+	u.gMap.Range(func(k, v interface{}) bool {
 		key := k.(string)
 		value := v.(*groupsInfo)
 		if value.upkeeping != nil {
@@ -70,12 +78,13 @@ func getUnpaidUsers() []string {
 }
 
 //getGroupsInfo wrap get and set if not exist
-func getGroupsInfo(groupid string) (*groupsInfo, bool) {
+func (u *ukp) getGroupsInfo(groupid string) (*groupsInfo, bool) {
 	thisGroupinfo, ok := ukpInfo.Load(groupid)
 	if !ok {
 		tempInfo := &groupsInfo{
-			userID:       groupid,
-			localKeeper:  groupid,
+			groupID:      groupid,
+			queryID:      groupid,
+			localKeeper:  u.localID,
 			masterKeeper: groupid,
 		}
 		err := saveUpkeepingToGP(groupid, tempInfo)
@@ -83,33 +92,20 @@ func getGroupsInfo(groupid string) (*groupsInfo, bool) {
 			return nil, false
 		}
 
-		localID := localNode.Identity.Pretty()
-		for _, keeperID := range tempInfo.keepers {
-			if localID == keeperID {
-				tempInfo.localKeeper = localID
-			}
-		}
-		if tempInfo.localKeeper == localID {
-			ukpInfo.Store(groupid, tempInfo)
-			return tempInfo, true
-		}
-
-		return nil, false
+		ukpInfo.Store(groupid, tempInfo)
+		return tempInfo, true
 	}
 
-	out, ok := thisGroupinfo.(*groupsInfo) //做类型断言的检查，接口的类型转换出错说明数据有问题，报错
-	if !ok {
-		log.Println("thisGroupinfo.(*groupsInfo) err！", thisGroupinfo)
-		return nil, false
-	}
-	return out, true
+	return thisGroupinfo.(*groupsInfo), true
 }
 
-func getBucketInfo(userID, bucketID string) (*bucketInfo, bool) {
-	thisgroup, ok := getGroupsInfo(userID)
+func (u *ukp) getBucketInfo(groupID, bucketID string) (*bucketInfo, bool) {
+	thisGroupinfo, ok := ukpInfo.Load(groupID)
 	if !ok {
 		return nil, false
 	}
+
+	thisgroup := thisGroupinfo.(*groupsInfo)
 
 	thisbucket, ok := thisgroup.buckets.Load(bucketID)
 	if !ok {
@@ -120,16 +116,68 @@ func getBucketInfo(userID, bucketID string) (*bucketInfo, bool) {
 	return thisbucket.(*bucketInfo), true
 }
 
-func getLocalKeeperInGroup(groupid string) (string, error) {
-	thisGroupInfo, ok := getGroupsInfo(groupid)
+func (u *ukp) addBlockMeta(gid, bid string, ci *cidInfo) error {
+	bucketID, stripeID, chunkID, err := metainfo.GetIDsFromBlock(bid)
+	if err != nil {
+		return err
+	}
+
+	thisBucketinfo, ok := u.getBucketInfo(gid, bucketID)
+	if !ok {
+		return errors.New("cannot create bucket info")
+	}
+
+	thisBucketinfo.stripes.Store(bid, ci)
+
+	snum, err := strconv.Atoi(stripeID)
+	if err != nil {
+		return err
+	}
+
+	if int32(snum) > thisBucketinfo.largestStripes {
+		thisBucketinfo.largestStripes = int32(snum)
+	}
+
+	cnum, err := strconv.Atoi(chunkID)
+	if err != nil {
+		return err
+	}
+
+	if int32(cnum) > thisBucketinfo.chunkNum {
+		thisBucketinfo.chunkNum = int32(cnum)
+	}
+
+	return nil
+}
+
+func (u *ukp) deleteBlockMeta(gid, bid string) {
+	bucketID, _, _, err := metainfo.GetIDsFromBlock(bid)
+	if err != nil {
+		return
+	}
+
+	thisGroupinfo, ok := u.gMap.Load(groupid)
+	if !ok {
+		return
+	}
+
+	thisgroup := thisGroupinfo.(*groupsInfo)
+
+	thisbucket, ok := thisgroup.buckets.Load(bid)
+	if ok {
+		thisbucket.(*bucketInfo).stripes.Delete(bid)
+	}
+}
+
+func (u *ukp) getLocalKeeperInGroup(groupid string) (string, error) {
+	thisGroupInfo, ok := u.getGroupsInfo(groupid)
 	if !ok {
 		log.Println("getGroupsInfo err! groupid:", groupid)
 		return "", errNoGroupsInfo
 	}
 	if thisGroupInfo.localKeeper == groupid {
-		localID := localNode.Identity.Pretty()
 		for _, keeperID := range thisGroupInfo.keepers {
-			if keeperID == localID {
+			if keeperID == u.localID {
 				thisGroupInfo.localKeeper = keeperID
 			}
 		}
@@ -142,8 +190,8 @@ func getLocalKeeperInGroup(groupid string) (string, error) {
 	return thisGroupInfo.localKeeper, nil
 }
 
-func getMasterKeeperInGroup(groupid string) (string, error) {
-	thisGroupInfo, ok := getGroupsInfo(groupid)
+func (u *ukp) getMasterKeeperInGroup(groupid string) (string, error) {
+	thisGroupInfo, ok := u.getGroupsInfo(groupid)
 	if !ok {
 		log.Println("getGroupsInfo err! groupid:", groupid)
 		return "", errNoGroupsInfo
@@ -159,14 +207,14 @@ func getMasterKeeperInGroup(groupid string) (string, error) {
 	return thisGroupInfo.masterKeeper, nil
 }
 
-func localKeeperIsMaster(groupid string) bool {
-	masterID, err := getMasterKeeperInGroup(groupid)
+func (u *ukp) localKeeperIsMaster(groupid string) bool {
+	masterID, err := u.getMasterKeeperInGroup(groupid)
 	if err != nil {
 		log.Println("getMasterKeeperInGroup err.", err)
 		return false
 	}
 
-	localID, err := getLocalKeeperInGroup(groupid)
+	localID, err := u.getLocalKeeperInGroup(groupid)
 	if err != nil {
 		log.Println("getLocalKeeperInGroup err.", err)
 		return false
@@ -177,8 +225,8 @@ func localKeeperIsMaster(groupid string) bool {
 
 // if this provider belongs to this keeper, then this keeper is master
 // else call localKeeperIsMaster
-func isMasterKeeper(groupid string, pid string) bool {
-	thisGroupsInfo, ok := getGroupsInfo(groupid)
+func (u *ukp) isMasterKeeper(groupid string, pid string) bool {
+	thisGroupsInfo, ok := u.getGroupsInfo(groupid)
 	if !ok {
 		log.Println("localkeeperIsMaster err! There is no information in Pinfo,groupid:", groupid)
 		return false
@@ -199,7 +247,7 @@ func isMasterKeeper(groupid string, pid string) bool {
 		}
 	}
 
-	return localKeeperIsMaster(groupid)
+	return u.localKeeperIsMaster(groupid)
 }
 
 //getMasterID choose the middle nodes

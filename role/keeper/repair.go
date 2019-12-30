@@ -12,9 +12,7 @@ import (
 	"github.com/memoio/go-mefs/utils/pos"
 )
 
-var repch chan string
-
-func checkLedger(ctx context.Context) {
+func (k *Info) checkLedger(ctx context.Context) {
 	log.Println("Check Ledger start!")
 	time.Sleep(2 * CHALTIME)
 	ticker := time.NewTicker(CHECKTIME)
@@ -24,78 +22,73 @@ func checkLedger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			doCheckLedgerForRepair()
-		}
-	}
-}
-
-func doCheckLedgerForRepair() {
-	log.Println("Repair starts!")
-	pus := getPUKeysFromukpInfo()
-	for _, pu := range pus {
-		// not repair pos blocks
-		if pu.uid == pos.GetPosId() {
-			continue
-		}
-
-		// only master repair
-		if !isMasterKeeper(pu.uid, pu.pid) {
-			continue
-		}
-
-		thisInfo, ok := ledgerInfo.Load(pu)
-		if !ok {
-			continue
-		}
-
-		thischalinfo := thisInfo.(*chalinfo)
-
-		thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-			thisinfo := value.(*cidInfo)
-			eclasped := utils.GetUnixNow() - thisinfo.availtime
-			switch thisinfo.repair {
-			case 0:
-				if EXPIRETIME < eclasped {
-					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-					log.Println("Need repair cid first time: ", cid)
-					thisinfo.repair++
-					repch <- cid
+			log.Println("Repair starts!")
+			pus := k.ukpManager.getPUKeysFromukpInfo()
+			for _, pu := range pus {
+				// not repair pos blocks
+				if pu.qid == pos.GetPosId() {
+					continue
 				}
-			case 1:
-				if 4*EXPIRETIME < eclasped {
-					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-					log.Println("Need repair cid second time: ", cid)
-					thisinfo.repair++
-					repch <- cid
+
+				// only master repair
+				if !isMasterKeeper(pu.qid, pu.pid) {
+					continue
 				}
-			case 2:
-				if 16*EXPIRETIME < eclasped {
-					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-					log.Println("Need repair cid third time: ", cid)
-					thisinfo.repair++
-					repch <- cid
+
+				thisInfo, ok := k.lManager.lMap.Load(pu)
+				if !ok {
+					continue
 				}
-			default:
-				// > 30 days; we donnot repair
-				if 480*EXPIRETIME >= eclasped {
-					// try every 32 hours
-					if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
-						cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-						log.Println("Need repair cid tried: ", cid)
-						thisinfo.repair++
-						repch <- cid
+
+				thischalinfo := thisInfo.(*chalinfo)
+
+				thischalinfo.cidMap.Range(func(key, value interface{}) bool {
+					thisinfo := value.(*cidInfo)
+					eclasped := utils.GetUnixNow() - thisinfo.availtime
+					switch thisinfo.repair {
+					case 0:
+						if EXPIRETIME < eclasped {
+							cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+							log.Println("Need repair cid first time: ", cid)
+							thisinfo.repair++
+							k.repch <- cid
+						}
+					case 1:
+						if 4*EXPIRETIME < eclasped {
+							cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+							log.Println("Need repair cid second time: ", cid)
+							thisinfo.repair++
+							k.repch <- cid
+						}
+					case 2:
+						if 16*EXPIRETIME < eclasped {
+							cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+							log.Println("Need repair cid third time: ", cid)
+							thisinfo.repair++
+							k.repch <- cid
+						}
+					default:
+						// > 30 days; we donnot repair
+						if 480*EXPIRETIME >= eclasped {
+							// try every 32 hours
+							if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+								cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
+								log.Println("Need repair cid tried: ", cid)
+								thisinfo.repair++
+								k.repch <- cid
+							}
+						}
 					}
-				}
-			}
 
-			return true
-		})
+					return true
+				})
+			}
+		}
 	}
 }
 
-func checkrepairlist(ctx context.Context) {
+func (k *Info) repairRegular(ctx context.Context) {
 	log.Println("Check repairlist start!")
-	repch = make(chan string, 1024)
 	go func() {
 		for {
 			select {

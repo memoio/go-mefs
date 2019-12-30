@@ -12,9 +12,7 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/role/user"
 	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var TestCmd = &cmds.Command{
@@ -78,14 +76,6 @@ var infoCmd = &cmds.Command{
 		localAddress, _ := address.GetAddressFromID(id)
 		cfg, _ := n.Repo.Config()
 		stringList := []string{"id: " + id, "address: " + localAddress.String(), "Role: " + cfg.Role}
-		switch cfg.Role {
-		case metainfo.RoleUser:
-			outmap := user.ShowInfo(id)
-			for key, value := range outmap {
-				stringList = append(stringList, key+value)
-			}
-		default:
-		}
 		list := &StringList{
 			ChildLists: stringList,
 		}

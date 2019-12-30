@@ -251,7 +251,7 @@ var lfsKillUserCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		err = user.KillUser(uid)
+		err = node.Inst.(*user.Info).KillUser(uid)
 		if err != nil {
 			return err
 		}
@@ -381,15 +381,15 @@ var lfsStartUserCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		lfs, err := user.NewUser(uid, false, pwd, capacity, duration, price, ks, ps, rdo)
+		lfs, err := node.Inst.(*user.Info).NewFS(uid, "", sk, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
-			user.KillUser(uid)
+			node.Inst.(*user.Info).KillUser(uid)
 			return err
 		}
 
 		err = lfs.Start()
 		if err != nil {
-			user.KillUser(uid)
+			node.Inst.(*user.Info).KillUser(uid)
 			return err
 		}
 
@@ -405,7 +405,7 @@ var lfsStartUserCmd = &cmds.Command{
 			case <-tick:
 				waitCount++
 				if waitCount >= waitLimited {
-					user.KillUser(uid)
+					node.Inst.(*user.Info).KillUser(uid)
 					return errTimeOut
 				}
 			}
@@ -466,7 +466,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -476,7 +476,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 			return err
 		}
 
-		avail, err := lfs.GetObjectAvailTime(object)
+		avail, err := lfs.(*user.LfsInfo).GetObjectAvailTime(object)
 		if err != nil {
 			return err
 		}
@@ -552,7 +552,7 @@ var lfsPutObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -652,7 +652,7 @@ var lfsGetObjectCmd = &cmds.Command{
 			}
 		}
 
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -782,7 +782,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			avail = true
 		}
 
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -801,7 +801,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
-				at, err := lfs.GetObjectAvailTime(object)
+				at, err := lfs.(*user.LfsInfo).GetObjectAvailTime(object)
 				if err == nil {
 					availTim, err := time.Parse(utils.BASETIME, at)
 					if err == nil {
@@ -873,7 +873,7 @@ var lfsDeleteObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -949,7 +949,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1050,7 +1050,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1125,7 +1125,7 @@ It outputs the following to stdout:
 			}
 		}
 
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1205,7 +1205,7 @@ It outputs the following to stdout:
 			}
 		}
 
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1269,7 +1269,9 @@ var lfsListKeepersCmd = &cmds.Command{
 			}
 		}
 
-		unconkeepers, conkeepers, _ := user.GetKeepers(userid, -1)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
+
+		unconkeepers, conkeepers, _ := lfs.(*user.LfsInfo).GetGroup().GetKeepers(-1)
 		keepers := make([]PeerState, len(unconkeepers)+len(conkeepers))
 		for i := 0; i < len(conkeepers); i++ {
 			keepers[i].PeerID = conkeepers[i]
@@ -1324,7 +1326,10 @@ var lfsListProviderrsCmd = &cmds.Command{
 				return err
 			}
 		}
-		conpro, unconpro, _ := user.GetProviders(userid, -1)
+
+		lfs := node.Inst.(*user.Info).GetUser(userid)
+
+		conpro, unconpro, _ := lfs.(*user.LfsInfo).GetGroup().GetProviders(-1)
 		providers := make([]PeerState, len(unconpro)+len(conpro))
 		for i := 0; i < len(conpro); i++ {
 			providers[i].PeerID = conpro[i]
@@ -1361,8 +1366,17 @@ var lfsListUsersCmd = &cmds.Command{
 		//暂时不需要输入
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		users, states, err := user.GetUsers()
+		node, err := cmdenv.GetNode(env)
 		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		users := node.Inst.(*user.Info).GetAllUser()
+		if users != nil {
 			return err
 		}
 		userAddrs := make([]string, len(users))
@@ -1371,11 +1385,8 @@ var lfsListUsersCmd = &cmds.Command{
 			if err != nil {
 				continue
 			}
-			if states[i] {
-				userAddrs[i] = addr.String() + "\t" + user + "\t" + "online"
-			} else {
-				userAddrs[i] = addr.String() + "\t" + user + "\t" + "offline"
-			}
+
+			userAddrs[i] = addr.String()
 		}
 		list := &StringList{
 			ChildLists: userAddrs,
@@ -1429,7 +1440,7 @@ var lfsFsyncCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1492,7 +1503,7 @@ mefs lfs show_storage show the storage space used(kb)
 		if !found {
 			prefix = ""
 		}
-		lfs := user.GetUser(userid)
+		lfs := node.Inst.(*user.Info).GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}

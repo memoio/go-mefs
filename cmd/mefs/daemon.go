@@ -335,7 +335,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}
 		case metainfo.RoleUser:
 			fmt.Println("User-persisting before shut down")
-			err = user.PersistBeforeExit()
+			err = node.Inst.(*user.Info).Stop()
 			if err != nil {
 				fmt.Println("Persist falied: ", err)
 			}
@@ -371,6 +371,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if err != nil {
 		return err
 	}
+
+	core.LocalNode = node
 
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.MefsNodeCollector{Node: node})
@@ -422,12 +424,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	case metainfo.RoleUser:
 		fmt.Println("Starting as a user")
-		ins, err = user.New(node)
+		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start user daemon fails; please restart")
 		}
 
-		n.Inst = ins
+		node.Inst = ins
 
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样

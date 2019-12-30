@@ -200,7 +200,7 @@ func (l *LfsInfo) ShowBucketStorage(bucketName string) (uint64, error) {
 func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
 	gp := l.gInfo
-	_, conkeepers, err := gp.getKeepers(-1)
+	_, conkeepers, err := gp.GetKeepers(-1)
 	if err != nil {
 		return latestTime, err
 	}

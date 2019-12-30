@@ -19,6 +19,7 @@ import (
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
+	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -30,7 +31,7 @@ var (
 )
 
 type impl struct {
-	naddr  string // network address
+	netID  string // network address
 	bstore bs.Blockstore
 	dstore ds.Datastore
 	rt     routing.Routing
@@ -38,13 +39,13 @@ type impl struct {
 }
 
 // New returns data.Service
-func New(nid string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routing.Routing) Service {
+func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routing.Routing) Service {
 	if r == nil {
 		log.Println("network is not running.")
 	}
 
 	return &impl{
-		naddr:  nid,
+		netID:  id,
 		rt:     r,
 		ph:     host,
 		dstore: d,
@@ -53,7 +54,7 @@ func New(nid string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routi
 }
 
 func (n *impl) GetNetAddr() string {
-	return n.naddr
+	return n.netID
 }
 
 func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data, sig []byte, to string) error {
@@ -387,4 +388,16 @@ func peersWithAddresses(addrs string) (peer.AddrInfo, error) {
 	}
 
 	return pai, nil
+}
+
+func (n *impl) Itererate(prefix string) ([]dsq.Entry, error) {
+	q := dsq.Query{Prefix: prefix}
+	qr, _ := n.dstore.Query(q) //进行查询操作
+	es, _ := qr.Rest()
+
+	return es, nil
+}
+
+func (n *impl) GetPeers() []peer.ID {
+	return n.ph.Network().Peers()
 }

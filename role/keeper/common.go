@@ -23,17 +23,17 @@ var (
 )
 
 //---config----
-func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
-	thisInfo, err := getUInfo(userID)
-	if err != nil {
-		return nil, err
+func (u *ukp) getUserBLS12Config(gid string) (*mcl.PublicKey, error) {
+	thisInfo, ok := u.getGroupsInfo(gid)
+	if !ok {
+		return nil, errors.New("No Bls Key")
 	}
 
-	if thisInfo.pubKey != nil {
-		return thisInfo.pubKey, nil
+	if thisInfo.blsPubKey != nil {
+		return thisInfo.blsPubKey, nil
 	}
 
-	userconfigbyte, err := getUserBLS12ConfigByte(userID)
+	userconfigbyte, err := u.getUserBLS12ConfigByte(gid)
 	if err != nil {
 		return nil, err
 	}
@@ -43,13 +43,13 @@ func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 
-	thisInfo.pubKey = mkey.Pk
+	thisInfo.blsPubKey = mkey.Pk
 
 	return mkey.Pk, nil
 }
 
-func getUserBLS12ConfigByte(userID string) ([]byte, error) {
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
+func (u *ukp) getUserBLS12ConfigByte(qid string) ([]byte, error) {
+	kmBls12, err := metainfo.NewKeyMeta(qid, metainfo.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -58,20 +58,17 @@ func getUserBLS12ConfigByte(userID string) ([]byte, error) {
 	defer cancel()
 
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := localNode.Data.GetKey(ctx, userconfigkey, "local")
+	userconfigbyte, err := u.ds.GetKey(ctx, userconfigkey, "local")
 	if err == nil && userconfigbyte != nil {
 		return userconfigbyte, nil
 	}
-	gp, ok := getGroupsInfo(userID)
+	gp, ok := u.gMap.Load(qid)
 	if !ok {
 		return nil, errors.New("no groupinfo")
 	}
 
-	for _, keeperID := range gp.keepers {
-		if keeperID == localNode.Identity.Pretty() {
-			continue
-		}
-		userconfigbyte, err = localNode.Data.GetKey(ctx, userconfigkey, keeperID)
+	for _, keeperID := range gp.(*groupsInfo).keepers {
+		userconfigbyte, err = u.ds.GetKey(ctx, userconfigkey, keeperID)
 		if err == nil && userconfigbyte != nil {
 			return userconfigbyte, nil
 		}

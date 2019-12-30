@@ -23,6 +23,12 @@ const REPAIR_DELIMETER = "|"
 
 const version = 100
 
+const (
+	RoleKeeper   = "keeper"
+	RoleUser     = "user"
+	RoleProvider = "provider"
+)
+
 //这部分是操作码
 const (
 	Wrong int = iota
@@ -41,6 +47,7 @@ const (
 	Keepers
 	Providers
 	Users
+	LogFS
 	Managedkeepers
 	ManagedProviders
 	ManagedUsers

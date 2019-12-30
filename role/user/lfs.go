@@ -196,6 +196,10 @@ func (l *LfsInfo) Online() bool {
 	return l.online
 }
 
+func (l *LfsInfo) GetGroup() *groupInfo {
+	return l.gInfo
+}
+
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 	persistMetaInterval = 10 * time.Second
@@ -375,7 +379,7 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 	if err != nil {
 		return err
 	}
-	providers, _, err := l.gInfo.getProviders(int(sb.MetaBackupCount))
+	providers, _, err := l.gInfo.GetProviders(int(sb.MetaBackupCount))
 	if err != nil && len(providers) == 0 {
 		return err
 	}
@@ -460,7 +464,7 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
 	MetaBackupCount := l.meta.sb.MetaBackupCount
-	providers, _, err := l.gInfo.getProviders(int(MetaBackupCount))
+	providers, _, err := l.gInfo.GetProviders(int(MetaBackupCount))
 	if err != nil && len(providers) == 0 {
 		return err
 	}
@@ -613,7 +617,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
 	MetaBackupCount := l.meta.sb.MetaBackupCount
-	providers, _, err := l.gInfo.getProviders(int(MetaBackupCount))
+	providers, _, err := l.gInfo.GetProviders(int(MetaBackupCount))
 	if err != nil && len(providers) == 0 {
 		return err
 	}

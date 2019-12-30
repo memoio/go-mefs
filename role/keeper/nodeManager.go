@@ -3,15 +3,11 @@ package keeper
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -20,168 +16,193 @@ import (
 
 // store keeper information
 type kInfo struct {
-	keeperID      string
-	online        bool
-	lastAvailTime int64
+	keeperID  string
+	online    bool
+	availTime int64
 }
 
 // store provider information
 type pInfo struct {
-	providerID    string
-	maxSpace      uint64 //Bytes
-	usedSpace     uint64
-	credit        int
-	online        bool
-	lastAvailTime int64
-	offerItem     *contracts.OfferItem
+	providerID string
+	maxSpace   uint64 //Bytes from contract
+	usedSpace  uint64 //Bytes
+	credit     int
+	online     bool
+	availTime  int64
+	offerItem  *contracts.OfferItem // latest?
 }
 
 // store user information
 type uInfo struct {
 	userID    string
-	pubKey    *mcl.PublicKey
-	queryItem *contracts.QueryItem
+	querys    []string
+	queryItem *contracts.QueryItem // latest?
 }
 
-// local node information
-type peerInfo struct {
-	keepersInfo   sync.Map // keepers except self
-	providersInfo sync.Map // providers
-	usersInfo     sync.Map // users
-	enableBft     bool
-}
-
-var localPeerInfo *peerInfo
-
-func getUInfo(pid string) (*uInfo, error) {
-	thisInfoI, ok := localPeerInfo.usersInfo.Load(pid)
+func (k *Info) getUInfo(pid string) (*uInfo, error) {
+	thisInfoI, ok := u.users.Load(pid)
 	if !ok {
 		tempInfo := &uInfo{
 			userID: pid,
 		}
-		localPeerInfo.usersInfo.Store(pid, tempInfo)
+		u.users.Store(pid, tempInfo)
 		return tempInfo, nil
 	}
 
 	return thisInfoI.(*uInfo), nil
 }
 
-func getKInfo(pid string) (*kInfo, error) {
-	if localNode.Identity.Pretty() == pid {
+func (k *Info) setQuery(uid, qid string) {
+	uinfo, err := k.getUInfo(uid)
+	if err != nil {
+		return
+	}
+
+	has := false
+	for _, q := range uinfo.querys {
+		if q == qid {
+			has = true
+		}
+	}
+
+	if !has {
+		uinfo.querys = append(uinfo.querys, qid)
+	}
+}
+
+func (k *Info) getKInfo(pid string) (*kInfo, error) {
+	if k.netID == pid {
 		return nil, errors.New("is local keeper")
 	}
 
-	thisInfoI, ok := localPeerInfo.keepersInfo.Load(pid)
+	thisInfoI, ok := k.keepers.Load(pid)
 	if !ok {
 		tempInfo := &kInfo{
 			keeperID: pid,
 		}
-		localPeerInfo.keepersInfo.Store(pid, tempInfo)
+		k.keepers.Store(pid, tempInfo)
 		return tempInfo, nil
 	}
 
 	return thisInfoI.(*kInfo), nil
 }
 
-func getPInfo(pid string) (*pInfo, error) {
-	thisInfoI, ok := localPeerInfo.providersInfo.Load(pid)
+func (k *Info) getPInfo(pid string) (*pInfo, error) {
+	thisInfoI, ok := k.providers.Load(pid)
 	if !ok {
 		tempInfo := &pInfo{
 			providerID: pid,
 		}
-		localPeerInfo.providersInfo.Store(pid, tempInfo)
+		k.providers.Store(pid, tempInfo)
 		return tempInfo, nil
 	}
 
 	return thisInfoI.(*pInfo), nil
 }
 
-func addCredit(provider string) {
-	thisInfo, err := getPInfo(provider)
+func (k *Info) addCredit(provider string) {
+	thisInfo, err := k.getPInfo(provider)
 	if err != nil {
 		return
 	}
 	thisInfo.credit += 100
 }
 
-func setCredit(provider string, val int) {
-	thisInfo, err := getPInfo(provider)
+func (k *Info) setCredit(provider string, val int) {
+	thisInfo, err := k.getPInfo(provider)
 	if err != nil {
 		return
 	}
 	thisInfo.credit = val
 }
 
-func reduceCredit(provider string) {
-	thisInfo, err := getPInfo(provider)
+func (k *Info) reduceCredit(provider string) {
+	thisInfo, err := k.getPInfo(provider)
 	if err != nil {
 		return
 	}
 	thisInfo.credit -= 100
 }
 
+func (k *Info) checkPeers(ctx context.Context) {
+	log.Println("Check connected peer start!")
+	// sleep 1 minutes and then check
+	time.Sleep(time.Minute)
+	checkConnectedPeer(ctx)
+	ticker := time.NewTicker(CONPEERTIME)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			k.checkLocalPeers(ctx)
+			k.checkConnectedPeer(ctx)
+		}
+	}
+}
+
 // check connectness
-func checkLocalPeers(ctx context.Context) {
-	var tmpKeepers []string
-	localPeerInfo.keepersInfo.Range(func(key, value interface{}) bool {
-		tmpKeepers = append(tmpKeepers, key.(string))
-		return true
-	})
-	for _, keeper := range tmpKeepers {
-		thisInfo, err := getKInfo(keeper)
-		if err != nil || thisInfo == nil {
+func (k *Info) checkLocalPeers(ctx context.Context) {
+	tmpKeepers, _ = k.GetKeepers()
+
+	ntime := utils.GetUnixNow()
+	for _, kid := range tmpKeepers {
+		thisInfoI, ok := k.keepers.Load(kid)
+		if !ok {
 			continue
 		}
 
-		if localNode.Data.Connect(ctx, keeper) {
+		thisInfo := thisInfoI.(*kInfo)
+
+		if k.ds.Connect(ctx, kid) {
 			thisInfo.online = true
-			thisInfo.lastAvailTime = utils.GetUnixNow()
-		} else {
+			thisInfo.availTime = ntime
+		}
+
+		if ntime-thisInfo.availTime > EXPIRETIME {
 			thisInfo.online = false
 		}
 	}
 
-	tmpKeepers = tmpKeepers[:0]
-	localPeerInfo.providersInfo.Range(func(key, value interface{}) bool {
-		tmpKeepers = append(tmpKeepers, key.(string))
-		return true
-	})
-
-	for _, keeper := range tmpKeepers {
-		thisInfo, err := getPInfo(keeper)
-		if err != nil || thisInfo == nil {
+	tmpKeepers, _ = k.GetProviders()
+	for _, pid := range tmpKeepers {
+		thisInfoI, ok := k.providers.Load(pid)
+		if !ok {
 			continue
 		}
 
-		if localNode.Data.Connect(ctx, keeper) {
+		thisInfo := thisInfoI.(*pInfo)
+
+		if k.ds.Connect(ctx, pid) {
 			thisInfo.online = true
-			thisInfo.lastAvailTime = utils.GetUnixNow()
-		} else {
+			thisInfo.availTime = ntime
+		}
+
+		if ntime-thisInfo.availTime > EXPIRETIME {
 			thisInfo.online = false
 		}
 	}
 }
 
-func checkConnectedPeer(ctx context.Context) error {
-	checkLocalPeers(ctx)
+func (k *Info) checkConnectedPeer(ctx context.Context) error {
+	connPeers := n.ds.GetPeers() //the list of peers we are connected to
 
-	connPeers := localNode.PeerHost.Network().Peers() //the list of peers we are connected to
+	for _, pid := range connPeers {
+		id := pid.Pretty() //连接结点id的base58编码
 
-	for _, ID := range connPeers {
-		id := ID.Pretty() //连接结点id的base58编码
-
-		thisInfoI, exist := localPeerInfo.keepersInfo.Load(id)
+		thisInfoI, exist := l.keepers.Load(id)
 
 		if exist {
 			thisInfoI.(*kInfo).online = true
-			thisInfoI.(*kInfo).lastAvailTime = utils.GetUnixNow()
+			thisInfoI.(*kInfo).availTime = utils.GetUnixNow()
 			continue
 		}
 
-		thisInfoP, exist := localPeerInfo.providersInfo.Load(id)
+		thisInfoP, exist := k.providers.Load(id)
 		if exist {
 			thisInfoP.(*pInfo).online = true
-			thisInfoP.(*pInfo).lastAvailTime = utils.GetUnixNow()
+			thisInfoP.(*pInfo).availTime = utils.GetUnixNow()
 			continue
 		}
 
@@ -190,8 +211,8 @@ func checkConnectedPeer(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		val, _ := localNode.Data.GetKey(context.Background(), kmRole.ToString(), id)
-		if string(val) == instance.RoleKeeper {
+		val, _ := k.ds.GetKey(ctx, kmRole.ToString(), id)
+		if string(val) == metainfo.RoleKeeper {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {
 				return err
@@ -209,7 +230,7 @@ func checkConnectedPeer(ctx context.Context) error {
 				thisInfoI.online = true
 				thisInfoI.lastAvailTime = utils.GetUnixNow()
 			}
-		} else if string(val) == instance.RoleProvider {
+		} else if string(val) == metainfo.RoleProvider {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {
 				return err
@@ -233,30 +254,13 @@ func checkConnectedPeer(ctx context.Context) error {
 	return nil
 }
 
-func checkPeers(ctx context.Context) {
-	log.Println("Check connected peer start!")
-	// sleep 1 minutes and then check
-	time.Sleep(time.Minute)
-	checkConnectedPeer(ctx)
-	ticker := time.NewTicker(CONPEERTIME)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			checkConnectedPeer(ctx)
-		}
-	}
-}
-
 // GetUsers is
-func GetUsers() ([]string, error) {
-	if !isKeeperServiceRunning() {
+func (k *Info) GetUsers() ([]string, error) {
+	if !k.state {
 		return nil, errKeeperServiceNotReady
 	}
 	var res []string
-	ukpInfo.Range(func(uid, v interface{}) bool {
+	k.ukpManager.gMap.Range(func(uid, v interface{}) bool {
 		thisuid, ok := uid.(string)
 		if !ok {
 			return false
@@ -283,13 +287,13 @@ func GetUsers() ([]string, error) {
 }
 
 // GetProviders is
-func GetProviders() ([]string, error) {
-	if !isKeeperServiceRunning() {
+func (k *Info) GetProviders() ([]string, error) {
+	if !k.state {
 		return nil, errKeeperServiceNotReady
 	}
 
 	var res []string
-	localPeerInfo.providersInfo.Range(func(k, v interface{}) bool {
+	k.providersI.Range(func(k, v interface{}) bool {
 		res = append(res, k.(string))
 		return true
 	})
@@ -298,12 +302,12 @@ func GetProviders() ([]string, error) {
 }
 
 // GetKeepers is
-func GetKeepers() ([]string, error) {
-	if !isKeeperServiceRunning() {
+func (k *Info) GetKeepers() ([]string, error) {
+	if !k.state {
 		return nil, errKeeperServiceNotReady
 	}
 	var res []string
-	localPeerInfo.keepersInfo.Range(func(k, v interface{}) bool {
+	k.keepers.Range(func(k, v interface{}) bool {
 		res = append(res, k.(string))
 		return true
 	})
@@ -311,42 +315,7 @@ func GetKeepers() ([]string, error) {
 	return res, nil
 }
 
-// FlushKeepersAndProviders is
-func FlushKeepersAndProviders() error {
-	if !isKeeperServiceRunning() {
-		return errKeeperServiceNotReady
-	}
-	return checkConnectedPeer(context.Background())
-}
-
-// GetUsersInfomation gets user's informatin
-func GetUsersInfomation(userid string) {
-	gp, ok := getGroupsInfo(userid)
-	if !ok {
-		return
-	}
-	for _, proID := range gp.providers {
-		thisPU := puKey{
-			uid: userid,
-			pid: proID,
-		}
-		thisinfo, ok := ledgerInfo.Load(thisPU)
-		if !ok {
-			continue
-		}
-
-		thisChal := thisinfo.(*chalinfo)
-		fmt.Println("last challenge time is: ", utils.UnixToTime(thisChal.lastChalTime))
-		if thisChal.lastPay != nil {
-			fmt.Println(fmt.Println("last pay time is: ", utils.UnixToTime(thisChal.lastPay.endTime)))
-		}
-		thisChal.cidMap.Range(func(key, value interface{}) bool {
-			cinfo := value.(*cidInfo)
-			fmt.Println("cid is: ", key.(string))
-			fmt.Println("availtime is: ", utils.UnixToTime(cinfo.availtime))
-			fmt.Println("cid length is: ", cinfo.offset)
-			return true
-		})
-	}
-	return
+// Flush is
+func (k *Info) Flush(ctx context.Context) error {
+	return checkConnectedPeer(ctx)
 }

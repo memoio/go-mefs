@@ -7,45 +7,54 @@ import (
 )
 
 type BlockMeta struct {
-	uid string
-	gid string
-	sid string
-	bid string
+	queryID  string // queryID
+	bucketID string
+	stripeID string
+	chunkID  string
 }
 
-func (bm *BlockMeta) GetUid() string {
+func (bm *BlockMeta) GetQid() string {
 	if bm == nil {
 		return ""
 	}
-	return bm.uid
-}
-
-func (bm *BlockMeta) GetGid() string {
-	if bm == nil {
-		return ""
-	}
-	return bm.gid
-}
-
-func (bm *BlockMeta) GetSid() string {
-	if bm == nil {
-		return ""
-	}
-	return bm.sid
+	return bm.queryID
 }
 
 func (bm *BlockMeta) GetBid() string {
 	if bm == nil {
 		return ""
 	}
-	return bm.bid
+	return bm.bucketID
+}
+
+func (bm *BlockMeta) GetSid() string {
+	if bm == nil {
+		return ""
+	}
+	return bm.stripeID
+}
+
+func (bm *BlockMeta) GetCid() string {
+	if bm == nil {
+		return ""
+	}
+	return bm.chunkID
 }
 
 func (bm *BlockMeta) SetBid(bid string) {
 	if bm == nil {
 		return
 	}
-	bm.bid = bid
+	bm.bucketID = bid
+}
+
+// ToShortStr
+func (bm *BlockMeta) ToShortStr() string {
+	if bm == nil {
+		return ""
+	}
+	res := strings.Join([]string{bm.bucketID, bm.stripeID, bm.chunkID}, BLOCK_DELIMITER)
+	return res
 }
 
 // ToString 将BlockMeta结构体转换成字符串格式，进行传输
@@ -57,30 +66,35 @@ func (bm *BlockMeta) ToString(prefix ...int) string {
 	if len(prefix) > 0 {
 		outLength = prefix[0]
 	}
-	res := strings.Join([]string{bm.uid, bm.gid, bm.sid, bm.bid}[:outLength], BLOCK_DELIMITER)
+	res := strings.Join([]string{bm.queryID, bm.bucketID, bm.stripeID, bm.chunkID}[:outLength], BLOCK_DELIMITER)
 	return res
 }
 
-func NewBlockMeta(uidString, gidString, sidString, bidString string) (*BlockMeta, error) {
-	_, err := peer.IDB58Decode(uidString)
+func NewBlockMeta(qid, bid, sid, cid string) (*BlockMeta, error) {
+	_, err := peer.IDB58Decode(qid)
 	if err != nil {
 		return nil, err
 	}
 
 	return &BlockMeta{
-		uid: uidString,
-		gid: gidString,
-		sid: sidString,
-		bid: bidString,
+		queryID:  qid,
+		bucketID: bid,
+		stripeID: sid,
+		chunkID:  bid,
 	}, nil
 }
 
 //GetBlockMeta 对于传入的key进行整理，返回结构体KeyMeta
 func GetBlockMeta(key string) (*BlockMeta, error) {
 	splitedKey := strings.Split(key, BLOCK_DELIMITER)
-	if len(splitedKey) < 4 {
+	if len(splitedKey) < 3 {
 		return nil, ErrIllegalKey
 	}
+
+	if len(splitedKey) == 3 {
+		return NewBlockMeta(splitedKey[0], splitedKey[0], splitedKey[1], splitedKey[2])
+	}
+
 	return NewBlockMeta(splitedKey[0], splitedKey[1], splitedKey[2], splitedKey[3])
 }
 

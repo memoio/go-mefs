@@ -10,8 +10,8 @@ import (
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
-	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 //Info implements user service
@@ -30,7 +30,7 @@ type userInfo struct {
 // New constructs a new user service
 func New(nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	us := &Info{
-		role:  instance.RoleUser,
+		role:  metainfo.RoleUser,
 		netID: nid,
 		ds:    d,
 	}
@@ -42,7 +42,7 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 }
 
 // NewFS add a new user
-func (u *Info) NewFS(uid, queryID string, sk []byte, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
+func (u *Info) NewFS(uid, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
 	uinfo, ok := u.qMap.Load(uid)
 	if ok {
 		queryID := uinfo.(*userInfo).querys[0]
@@ -58,7 +58,7 @@ func (u *Info) NewFS(uid, queryID string, sk []byte, capacity, duration, price i
 		return nil, err
 	}
 
-	ginfo := newGroup(uid, utils.EthSkByteToEthString(sk), capacity, duration, price, ks, ps, rdo, u.ds)
+	ginfo := newGroup(uid, sk, capacity, duration, price, ks, ps, rdo, u.ds)
 
 	// queryID == uid indicats this is a testuser
 	if queryID != uid {
@@ -66,7 +66,7 @@ func (u *Info) NewFS(uid, queryID string, sk []byte, capacity, duration, price i
 		if qItem != nil {
 			ginfo.queryItem = qItem
 		} else {
-			err := deployQuery(uid, utils.EthSkByteToEthString(sk), capacity, duration, price, ks, ps, rdo)
+			err := deployQuery(uid, sk, capacity, duration, price, ks, ps, rdo)
 			if err != nil {
 				return nil, err
 			}
@@ -102,7 +102,7 @@ func (u *Info) NewFS(uid, queryID string, sk []byte, capacity, duration, price i
 		fsID:       queryID,
 		context:    ctx,
 		cancelFunc: cancel,
-		privateKey: sk,
+		privateKey: []byte(sk),
 		gInfo:      ginfo,
 		ds:         u.ds,
 	}
@@ -143,6 +143,29 @@ func (u *Info) KillUser(userID string) error {
 	return nil
 }
 
+// GetUser gets userInfo
+func (u *Info) GetUser(userID string) FileSyetem {
+	uinfo, ok := u.qMap.Load(userID)
+	if ok {
+		queryID := uinfo.(*userInfo).querys[0]
+		fs, ok := u.fsMap.Load(queryID)
+		if ok {
+			return fs.(*LfsInfo)
+		}
+	}
+	return nil
+}
+
+// GetAllUser gets userInfo
+func (u *Info) GetAllUser() []string {
+	res := make([]string, 0)
+	u.qMap.Range(func(k, v interface{}) bool {
+		res = append(res, k.(string))
+		return true
+	})
+	return res
+}
+
 func (u *Info) Fsync() error {
 	u.fsMap.Range(func(key, value interface{}) bool {
 		uInfo := value.(*LfsInfo)
@@ -157,18 +180,5 @@ func (u *Info) Fsync() error {
 		}
 		return true
 	})
-	return nil
-}
-
-// GetUser gets userInfo
-func (u *Info) GetUser(userID string) FileSyetem {
-	uinfo, ok := u.qMap.Load(userID)
-	if ok {
-		queryID := uinfo.(*userInfo).querys[0]
-		fs, ok := u.fsMap.Load(queryID)
-		if ok {
-			return fs.(*LfsInfo)
-		}
-	}
 	return nil
 }

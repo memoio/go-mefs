@@ -26,7 +26,7 @@ type chalpay struct {
 	proof     string
 }
 
-func spaceTimePayRegular(ctx context.Context) {
+func (k *Info) stPayRegular(ctx context.Context) {
 	log.Println("SpaceTime Pay start!")
 	ticker := time.NewTicker(SPACETIMEPAYTIME)
 	defer ticker.Stop()
@@ -155,7 +155,7 @@ func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func resultSummary(thisPU puKey, timeStart int64, timeEnd int64) (*big.Int, int64) {
+func resultSummary(thisPU pqKey, timeStart int64, timeEnd int64) (*big.Int, int64) {
 	timeList, lenghList := fetchChalresult(thisPU, timeStart, timeEnd) //取数据
 	spacetime := big.NewInt(0)
 	if len(timeList) <= 1 || len(lenghList) <= 1 {
@@ -183,7 +183,7 @@ func (p timesortlist) Len() int           { return len(p) }
 func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
 
 //get from ledger chalMap
-func fetchChalresult(thisPU puKey, timestart int64, timeend int64) ([]int64, []int64) {
+func fetchChalresult(thisPU pqKey, timestart int64, timeend int64) ([]int64, []int64) {
 	var timeList []int64  //存放挑战时间序列
 	var lenghList []int64 //存放与挑战时间同序的数据长度序列
 	var tsl timesortlist  //用来对挑战时间排序
@@ -216,7 +216,7 @@ func fetchChalresult(thisPU puKey, timestart int64, timeend int64) ([]int64, []i
 	return timeList, lenghList
 }
 
-func saveLastPay(thisPU puKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
+func saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
 	//key: `lastpay"/uid/pid`
 	//value: `beginTime/endTime/spacetime/signature/proof`
 	//for get
@@ -256,7 +256,7 @@ func saveLastPay(thisPU puKey, signature, proof string, beginTime, endTime int64
 }
 
 //获得最后一次支付的信息,最后一次的支付信息由master进行同步，会同时保存在内存和本地，先检查内存中的保存结果，若没有，则检查本地
-func checkLastPayTime(thisPU puKey) int64 {
+func checkLastPayTime(thisPU pqKey) int64 {
 	failtime := int64(0)
 
 	thisChalinfo, ok := getChalinfo(thisPU)
@@ -290,7 +290,7 @@ func checkLastPayTime(thisPU puKey) int64 {
 
 //parseLastPayKV 传入lastPay的KV，解析成 PU和*chalpay结构体
 //`uid/"local"/"lastpay"/pid` ,`beginTime/endTime/spacetime/signature/proof`
-func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (puKey, *chalpay, error) {
+func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (pqKey, *chalpay, error) {
 	splitedValue := strings.Split(value, metainfo.DELIMITER)
 	if len(splitedValue) < 5 {
 		return puKey{}, nil, errParaseMetaFailed

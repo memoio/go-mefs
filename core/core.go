@@ -76,6 +76,9 @@ func init() {
 	identify.ClientVersion = "go-mefs/" + version.CurrentVersionNumber + "/" + version.CurrentCommit
 }
 
+// LocalNode uses global var to pass
+var LocalNode *MefsNode
+
 // MefsNode is MEFS Core module. It represents an MEFS instance.
 type MefsNode struct {
 
