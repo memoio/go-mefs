@@ -48,15 +48,6 @@ func (bm *BlockMeta) SetBid(bid string) {
 	bm.bucketID = bid
 }
 
-// ToShortStr
-func (bm *BlockMeta) ToShortStr() string {
-	if bm == nil {
-		return ""
-	}
-	res := strings.Join([]string{bm.bucketID, bm.stripeID, bm.chunkID}, BLOCK_DELIMITER)
-	return res
-}
-
 // ToString 将BlockMeta结构体转换成字符串格式，进行传输
 func (bm *BlockMeta) ToString(prefix ...int) string {
 	if bm == nil {

@@ -2,16 +2,21 @@ package keeper
 
 import (
 	"context"
+	"errors"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
+	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 // handleUserInit collect keepers and providers for user
-// return kv, key: "UserInit"/userID/queryAddr/keepercount/providercount;
+// return kv, key: "UserInit"/queryID/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	log.Println("NewUserInit: ", km.ToString(), " From: ", from)
@@ -20,7 +25,6 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 		return
 	}
 
-	log.Println("Query合约信息：", queryAddr)
 	kc, err := strconv.Atoi(options[1])
 	if err != nil {
 		log.Println("handleUserInitReq: ", err)
@@ -40,7 +44,7 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	if qid != uid {
 		log.Println("Get k/p numbers from query contract of user: ", uid)
 		queryAddr, _ := ad.GetAddressFromID(qid)
-		item, err := contracts.GetQueryInfo(localAddr, common.HexToAddress(queryAddr))
+		item, err := contracts.GetQueryInfo(queryAddr, queryAddr)
 		if item.Completed || err != nil {
 			log.Println("complete:", item.Completed, "error:", err)
 			return
@@ -56,12 +60,12 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 
 	response, err = k.initUser(qid, uid, kc, pc, price)
 	if err != nil {
-		if err != nil { //硬盘查找也出错 就直接返回
+		if err != nil {
 			log.Println("handleUserInitReq err: ", err)
 			return
 		}
 	}
-	log.Println("New user: ", userID, " keeperCount: ", keeperCount, "providerCount: ", providerCount, "price: ", price)
+	log.Println("New user: ", qid, " keeperCount: ", kc, "providerCount: ", pc, "price: ", price)
 
 	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(response), nil, from)
 }
@@ -70,12 +74,11 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error) {
 	var newResponse strings.Builder
 
-	thisInfo, ok := ukpInfo.Load(userID)
+	thisInfo, ok := k.ukpManager.gMap.Load(qid)
 	if !ok {
 		localID := k.netID
 		// fill self
 		newResponse.WriteString(localID)
-		pids.WriteString(localID)
 		kc--
 		//fill other keepers
 		k.keepers.Range(func(k, v interface{}) bool {
@@ -107,7 +110,6 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 			thisinfo := v.(*pInfo)
 			if thisinfo.online == true {
 				newResponse.WriteString(key)
-				pids.WriteString(key)
 				pc--
 			}
 			return true
@@ -130,25 +132,26 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 	return newResponse.String(), nil
 }
 
+// handleUserNotify return kv, key: "UserNotify"/queryID/userID/keepercount/providercount;
+// value: kid1kid2../pid1pid2..
 func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
 	log.Println("NewUserNotify: ", km.ToString(), metaValue, "From:", from)
 
 	options := km.GetOptions()
 	if len(options) != 3 {
-		return
+		return nil, errors.New("Wrong key")
 	}
 
-	log.Println("Query合约信息：", queryAddr)
 	kc, err := strconv.Atoi(options[1])
 	if err != nil {
 		log.Println("handleUserInitReq: ", err)
-		return
+		return nil, err
 	}
 
 	pc, err := strconv.Atoi(options[2])
 	if err != nil {
 		log.Println("handleUserInitReq: ", err)
-		return
+		return nil, err
 	}
 
 	uid := options[0]
@@ -191,18 +194,18 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 		providers = append(providers, providerID)
 	}
 
-	tempInfo, err := k.fillPinfo(groupid, uid, keepers, providers)
+	tempInfo, err := k.fillGroup(groupID, userID, keepers, providers)
 	if err != nil {
 		return
 	}
 
-	kmKid, err := metainfo.NewKeyMeta(groupid, metainfo.Keepers)
+	kmKid, err := metainfo.NewKeyMeta(groupID, metainfo.Keepers)
 	if err != nil {
 		log.Println("handleNewUserNotif err: ", err)
 		return
 	}
 
-	kmPid, err := metainfo.NewKeyMeta(groupid, metainfo.Providers)
+	kmPid, err := metainfo.NewKeyMeta(groupID, metainfo.Providers)
 	if err != nil {
 		log.Println("handleNewUserNotif err: ", err)
 		return
@@ -219,12 +222,12 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 	for _, proID := range tempInfo.providers {
 		pidstrings.WriteString(proID)
 		// replace ledgerinfo
-		thisPU := puKey{
-			uid: groupid,
+		thisPU := pqKey{
+			qid: groupID,
 			pid: proID,
 		}
 		newChal := &chalinfo{}
-		ledgerInfo.Store(thisPU, newChal)
+		k.lManager.lMap.Store(thisPU, newChal)
 	}
 
 	k.ds.PutKey(ctx, kmPid.ToString(), []byte(pidstrings.String()), "local")

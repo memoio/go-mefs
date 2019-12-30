@@ -35,6 +35,7 @@ const (
 type Info struct {
 	netID      string
 	role       string
+	sk         string
 	state      bool
 	enableBft  bool
 	repch      chan string
@@ -48,9 +49,10 @@ type Info struct {
 
 // New is
 // TODO:Keeper出问题重启后，应该能自动将所有user的信息恢复到内存中
-func New(ctx context.Context, nid string, d data.Service) instance.Service {
+func New(ctx context.Context, nid, sk string, d data.Service) instance.Service {
 	m := &Info{
 		netID: nid,
+		sk:    sk,
 		state: false,
 		ds:    d,
 		repch: make(chan string, 1024),
@@ -604,14 +606,33 @@ func (k *Info) cleanTestUsers(ctx context.Context) {
 	}
 }
 
-func (k *Info) deleteBlockMeta(qid, blockID string) {
-	info, ok := k.ukpManager.gMap.Load(qid)
+func (k *Info) getBlockPos(qid, blockID string) (string, error) {
+	gri, ok := k.ukpManager.gMap.Load(qid)
 	if !ok {
-		return
+		return "", errors.New("No block")
 	}
 
-	gp := info.(*groupsInfo)
+	bis := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
 
-	ci, ok := gp.buckets.Load()
-	k.lManager.deleteBlockMeta(qid, blockID)
+	bui, ok := gri.(*groupsInfo).buckets.Load(bis[0])
+	if !ok {
+		return "", errors.New("No block")
+	}
+
+	sti, ok := bui.(*bucketInfo).stripes.Load(bis[1])
+	if !ok {
+		return "", errors.New("No block")
+	}
+
+	st := sti.(*cidInfo)
+	return st.storedOn, nil
+}
+
+func (k *Info) deleteBlockMeta(qid, blockID string) {
+	pid, err := k.getBlockPos(qid, blockID)
+	if err != nil {
+		return
+	}
+	k.lManager.deleteBlockMeta(qid, pid, blockID)
+	k.ukpManager.deleteBlockMeta(pid, blockID)
 }

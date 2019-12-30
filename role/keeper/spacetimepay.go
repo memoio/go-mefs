@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"encoding/base64"
 	"log"
 	"math/big"
 	"sort"
@@ -35,24 +34,24 @@ func (k *Info) stPayRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			spaceTimePay()
+			k.spaceTimePay()
 		}
 	}
 }
 
-func spaceTimePay() {
-	pus := getPUKeysFromukpInfo()
+func (k *Info) spaceTimePay() {
+	pus := k.ukpManager.getPUKeys()
 	for _, pu := range pus {
 		//only master pay
-		if !isMasterKeeper(pu.uid, pu.pid) {
+		if !k.ukpManager.isMasterKeeper(pu.qid, pu.pid) {
 			continue
 		}
 
 		log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
 		defer log.Println("========spacetimepay========")
 
-		log.Printf("userid:%s:\npid:%s\n", pu.uid, pu.pid)
-		ukItem, err := getUpkeeping(pu.uid)
+		log.Printf("userid:%s:\npid:%s\n", pu.qid, pu.pid)
+		ukItem, err := k.ukpManager.getUpkeeping(pu.qid)
 		if err != nil {
 			log.Println("contracts.GetUKItem err: ", err)
 			return
@@ -77,7 +76,7 @@ func spaceTimePay() {
 
 		// PosAdd
 		if !found {
-			if pu.uid == pos.GetPosId() {
+			if pu.qid == pos.GetPosId() {
 				providerAddr, err := ad.GetAddressFromID(pu.pid)
 				if err != nil {
 					return
@@ -93,41 +92,34 @@ func spaceTimePay() {
 					return
 				}
 
-				saveUpkeeping(pu.uid, true)
+				k.ukpManager.saveUpkeeping(pu.qid, true)
 			} else {
 				continue
 			}
 		}
 
 		price := ukItem.Price
-		if pu.uid == pos.GetPosId() {
+		if pu.qid == pos.GetPosId() {
 			price = pos.GetPosPrice()
 		}
 
-		startTime := checkLastPayTime(pu)
-		spaceTime, lastTime := resultSummary(pu, startTime, utils.GetUnixNow())
+		startTime := k.lManager.checkLastPayTime(pu)
+		spaceTime, lastTime := k.lManager.resultSummary(pu, startTime, utils.GetUnixNow())
 		amount := convertSpacetime(spaceTime, price)
 		if amount.Sign() > 0 {
 			pAddr, _ := ad.GetAddressFromID(pu.pid) //providerAddress
-			scGroupid, _ := ad.GetAddressFromID(pu.uid)
+			scGroupid, _ := ad.GetAddressFromID(pu.qid)
 			ukAddr := common.HexToAddress(ukItem.UpKeepingAddr[2:])
-			skByte, _ := localNode.PrivateKey.Bytes()
-			ipfsSk := base64.StdEncoding.EncodeToString(skByte)
-			hexSk, err := utils.IPFSskToEthsk(ipfsSk)
-			if err != nil {
-				log.Println("GetHexSk failed: ", err)
-				return
-			}
 			log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-			err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, hexSk, amount) //进行支付
+			err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, k.sk, amount) //进行支付
 			if err != nil {
 				log.Println("contracts.SpaceTimePay() failed: ", err)
 				return
 			}
 		}
 
-		_, _, err = saveLastPay(pu, "signature", "proof", startTime, lastTime, spaceTime)
+		_, _, err = k.lManager.saveLastPay(pu, "signature", "proof", startTime, lastTime, spaceTime)
 		if err != nil {
 			log.Println("saveLastPay() failed: ", err)
 			return
@@ -155,12 +147,41 @@ func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func resultSummary(thisPU pqKey, timeStart int64, timeEnd int64) (*big.Int, int64) {
-	timeList, lenghList := fetchChalresult(thisPU, timeStart, timeEnd) //取数据
+func (l *ledger) resultSummary(thisPU pqKey, timeStart int64, timeEnd int64) (*big.Int, int64) {
+	var timeList []int64  //存放挑战时间序列
+	var lenghList []int64 //存放与挑战时间同序的数据长度序列
+	var tsl timesortlist  //用来对挑战时间排序
 	spacetime := big.NewInt(0)
+
+	thischalinfo, ok := l.getChalinfo(thisPU)
+	if !ok {
+		log.Println("fetchChalresult(),getchalinfo error!")
+		return spacetime, 0
+	}
+	thischalinfo.chalMap.Range(func(key, value interface{}) bool {
+		// remove paid challenges
+		if key.(int64) < timeStart {
+			thischalinfo.chalMap.Delete(key)
+		} else if key.(int64) < timeEnd {
+			tsl = append(tsl, key.(int64))
+		}
+
+		return true
+	})
+	sort.Sort(tsl) //取出传入的时间区间内的时间数据，进行排序
+	for _, key := range tsl {
+		chalres, ok := thischalinfo.chalMap.Load(key)
+		if !ok {
+			log.Println("fetch challenge results err, time:", utils.UnixToTime(key))
+		}
+		timeList = append(timeList, key)
+		lengthtemp := chalres.(*chalresult).length
+		lenghList = append(lenghList, lengthtemp)
+	}
+
 	if len(timeList) <= 1 || len(lenghList) <= 1 {
 		log.Println("no enough challenge data")
-		return big.NewInt(0), 0
+		return spacetime, 0
 	}
 	timepre := timeList[0]
 	lengthpre := lenghList[0]
@@ -182,61 +203,27 @@ func (p timesortlist) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p timesortlist) Len() int           { return len(p) }
 func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
 
-//get from ledger chalMap
-func fetchChalresult(thisPU pqKey, timestart int64, timeend int64) ([]int64, []int64) {
-	var timeList []int64  //存放挑战时间序列
-	var lenghList []int64 //存放与挑战时间同序的数据长度序列
-	var tsl timesortlist  //用来对挑战时间排序
-
-	thischalinfo, ok := getChalinfo(thisPU)
-	if !ok {
-		log.Println("fetchChalresult(),getchalinfo error!")
-		return timeList, lenghList
-	}
-	thischalinfo.chalMap.Range(func(key, value interface{}) bool {
-		// remove paid challenges
-		if key.(int64) < timestart {
-			thischalinfo.chalMap.Delete(key)
-		} else if key.(int64) < timeend {
-			tsl = append(tsl, key.(int64))
-		}
-
-		return true
-	})
-	sort.Sort(tsl) //取出传入的时间区间内的时间数据，进行排序
-	for _, key := range tsl {
-		chalres, ok := thischalinfo.chalMap.Load(key)
-		if !ok {
-			log.Println("fetch challenge results err, time:", utils.UnixToTime(key))
-		}
-		timeList = append(timeList, key)
-		lengthtemp := chalres.(*chalresult).length
-		lenghList = append(lenghList, lengthtemp)
-	} //用排好序的key，整理出时间与长度的列表
-	return timeList, lenghList
-}
-
-func saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
+func (l *ledger) saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
 	//key: `lastpay"/uid/pid`
 	//value: `beginTime/endTime/spacetime/signature/proof`
 	//for get
-	kmLast, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.LastPay, thisPU.pid)
+	kmLast, err := metainfo.NewKeyMeta(thisPU.qid, metainfo.LastPay, thisPU.pid)
 	if err != nil {
 		log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
 		return nil, "", err
 	}
 	valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-	localNode.Data.PutKey(context.Background(), kmLast.ToString(), []byte(valueLast), "local")
+	l.ds.PutKey(context.Background(), kmLast.ToString(), []byte(valueLast), "local")
 	//key: `"chalpay"/uid/pid/beginTime/endTime`
 	//value: `spacetime/signature/proof`
 	//for storing
-	km, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.ChalPay, thisPU.pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
+	km, err := metainfo.NewKeyMeta(thisPU.qid, metainfo.ChalPay, thisPU.pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 	if err != nil {
 		log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
 		return nil, "", err
 	}
 	metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-	localNode.Data.PutKey(context.Background(), km.ToString(), []byte(metaValue), "local")
+	l.ds.PutKey(context.Background(), km.ToString(), []byte(metaValue), "local")
 
 	//将此次支付作为最近一次支付，保存在内存中
 	thisChalPay := &chalpay{
@@ -247,7 +234,7 @@ func saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64
 		spacetime: spaceTime,
 	}
 
-	thisChalinfo, ok := getChalinfo(thisPU)
+	thisChalinfo, ok := l.getChalinfo(thisPU)
 	if ok {
 		thisChalinfo.lastPay = thisChalPay
 	}
@@ -256,28 +243,28 @@ func saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64
 }
 
 //获得最后一次支付的信息,最后一次的支付信息由master进行同步，会同时保存在内存和本地，先检查内存中的保存结果，若没有，则检查本地
-func checkLastPayTime(thisPU pqKey) int64 {
+func (l *ledger) checkLastPayTime(thisPU pqKey) int64 {
 	failtime := int64(0)
 
-	thisChalinfo, ok := getChalinfo(thisPU)
+	thisChalinfo, ok := l.getChalinfo(thisPU)
 	if !ok {
 		return failtime
 	}
 
 	if thisChalinfo.lastPay == nil {
-		kmLast, err := metainfo.NewKeyMeta(thisPU.uid, metainfo.LastPay, thisPU.uid)
+		kmLast, err := metainfo.NewKeyMeta(thisPU.pid, metainfo.LastPay, thisPU.qid)
 		if err != nil {
 			log.Println(err)
 			return failtime
 		}
 		// get from leveldb
-		valueByte, err := localNode.Data.GetKey(context.Background(), kmLast.ToString(), "local")
+		valueByte, err := l.ds.GetKey(context.Background(), kmLast.ToString(), "local")
 		if err != nil {
 			log.Println("no lastTime data, return Unix(0)")
 			return failtime
 		}
 		valueString := string(valueByte)
-		_, thisChalPay, err := parseLastPayKV(kmLast, valueString)
+		_, thisChalPay, err := l.parseLastPayKV(kmLast, valueString)
 		if err != nil {
 			log.Println("checkLastPayTime() parseLastPayKV() err: ", err)
 			return failtime
@@ -290,20 +277,20 @@ func checkLastPayTime(thisPU pqKey) int64 {
 
 //parseLastPayKV 传入lastPay的KV，解析成 PU和*chalpay结构体
 //`uid/"local"/"lastpay"/pid` ,`beginTime/endTime/spacetime/signature/proof`
-func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (pqKey, *chalpay, error) {
+func (l *ledger) parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (pqKey, *chalpay, error) {
 	splitedValue := strings.Split(value, metainfo.DELIMITER)
 	if len(splitedValue) < 5 {
-		return puKey{}, nil, errParaseMetaFailed
+		return pqKey{}, nil, errParaseMetaFailed
 	}
 	uidString := keyMeta.GetMid()
 	options := keyMeta.GetOptions()
 	if len(options) < 2 {
-		return puKey{}, nil, metainfo.ErrIllegalKey
+		return pqKey{}, nil, metainfo.ErrIllegalKey
 	}
 	pidString := options[1]
-	thisPU := puKey{
+	thisPU := pqKey{
 		pid: pidString,
-		uid: uidString,
+		qid: uidString,
 	}
 	st, ok := big.NewInt(0).SetString(splitedValue[2], 0)
 	if !ok {
@@ -313,7 +300,7 @@ func parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (pqKey, *chalpay, e
 	endtime := utils.StringToUnix(splitedValue[1])
 	if begintime == 0 || endtime == 0 {
 		log.Println("key:", keyMeta.ToString(), "\nvalue:", value)
-		return puKey{}, nil, metainfo.ErrIllegalValue
+		return pqKey{}, nil, metainfo.ErrIllegalValue
 	}
 	thischalPay := &chalpay{
 		beginTime: begintime,

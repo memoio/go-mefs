@@ -289,8 +289,8 @@ func (fs *Datastore) encode(key datastore.Key) (dir, file string) {
 		fmt.Printf("get block meta in encode error :", err)
 		return "", ""
 	}
-	uid := blkInfo.GetUid()
-	gid := blkInfo.GetGid()
+	uid := blkInfo.GetQid()
+	gid := blkInfo.GetBid()
 	//dir = fs.path
 	dir1 := filepath.Join(fs.path, uid)
 	fs.makeDir(dir1)

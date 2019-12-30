@@ -34,18 +34,17 @@ type pInfo struct {
 
 // store user information
 type uInfo struct {
-	userID    string
-	querys    []string
-	queryItem *contracts.QueryItem // latest?
+	userID string
+	querys []string
 }
 
 func (k *Info) getUInfo(pid string) (*uInfo, error) {
-	thisInfoI, ok := u.users.Load(pid)
+	thisInfoI, ok := k.users.Load(pid)
 	if !ok {
 		tempInfo := &uInfo{
 			userID: pid,
 		}
-		u.users.Store(pid, tempInfo)
+		k.users.Store(pid, tempInfo)
 		return tempInfo, nil
 	}
 
@@ -128,7 +127,7 @@ func (k *Info) checkPeers(ctx context.Context) {
 	log.Println("Check connected peer start!")
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
-	checkConnectedPeer(ctx)
+	k.checkConnectedPeer(ctx)
 	ticker := time.NewTicker(CONPEERTIME)
 	defer ticker.Stop()
 	for {
@@ -144,7 +143,7 @@ func (k *Info) checkPeers(ctx context.Context) {
 
 // check connectness
 func (k *Info) checkLocalPeers(ctx context.Context) {
-	tmpKeepers, _ = k.GetKeepers()
+	tmpKeepers, _ := k.GetKeepers()
 
 	ntime := utils.GetUnixNow()
 	for _, kid := range tmpKeepers {
@@ -186,12 +185,11 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 }
 
 func (k *Info) checkConnectedPeer(ctx context.Context) error {
-	connPeers := n.ds.GetPeers() //the list of peers we are connected to
-
+	connPeers := k.ds.GetPeers() //the list of peers we are connected to
 	for _, pid := range connPeers {
 		id := pid.Pretty() //连接结点id的base58编码
 
-		thisInfoI, exist := l.keepers.Load(id)
+		thisInfoI, exist := k.keepers.Load(id)
 
 		if exist {
 			thisInfoI.(*kInfo).online = true
@@ -223,12 +221,12 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 			}
 			if isKeeper {
 				log.Println("Connect to new keeper: ", id)
-				thisInfoI, err := getKInfo(id)
+				thiskInfo, err := k.getKInfo(id)
 				if err != nil {
 					continue
 				}
-				thisInfoI.online = true
-				thisInfoI.lastAvailTime = utils.GetUnixNow()
+				thiskInfo.online = true
+				thiskInfo.availTime = utils.GetUnixNow()
 			}
 		} else if string(val) == metainfo.RoleProvider {
 			addr, err := address.GetAddressFromID(id)
@@ -241,13 +239,13 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 			}
 			if isProvider {
 				log.Println("Connect to new provider: ", id)
-				thisInfoP, err := getPInfo(id)
+				thispInfo, err := k.getPInfo(id)
 				if err != nil {
 					continue
 				}
-				thisInfoP.online = true
-				thisInfoP.lastAvailTime = utils.GetUnixNow()
-				saveOffer(id, false)
+				thispInfo.online = true
+				thispInfo.availTime = utils.GetUnixNow()
+				k.saveOffer(id, false)
 			}
 		}
 	}
@@ -293,7 +291,7 @@ func (k *Info) GetProviders() ([]string, error) {
 	}
 
 	var res []string
-	k.providersI.Range(func(k, v interface{}) bool {
+	k.providers.Range(func(k, v interface{}) bool {
 		res = append(res, k.(string))
 		return true
 	})
@@ -317,5 +315,5 @@ func (k *Info) GetKeepers() ([]string, error) {
 
 // Flush is
 func (k *Info) Flush(ctx context.Context) error {
-	return checkConnectedPeer(ctx)
+	return k.checkConnectedPeer(ctx)
 }

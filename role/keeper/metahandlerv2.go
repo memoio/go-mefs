@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -40,19 +39,19 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue []byte, f
 			go k.lManager.handleProof(km, metaValue, from, mkey)
 		}
 	case metainfo.Repair: //provider 修复回复
-		go handleRepairResult(km, metaValue, from)
+		go k.handleRepairResult(km, metaValue, from)
 	case metainfo.Storage:
-		go handleStorage(km, metaValue, from)
+		go k.handleStorage(km, metaValue, from)
 	case metainfo.ExternalAddress:
-		return handleExternalAddr(km)
+		return k.handleExternalAddr(km)
 	case metainfo.ChalTime:
-		return handleChalTime(km)
+		return k.handleChalTime(km)
 	case metainfo.Pos:
 		switch opType {
 		case metainfo.Put:
-			go handlePosAdd(km, metaValue, from)
+			go k.handlePosAdd(km, metaValue, from)
 		case metainfo.Delete:
-			go handlePosDelete(km, metaValue, from)
+			go k.handlePosDelete(km, metaValue, from)
 		}
 	default: //没有匹配的信息，丢弃
 		return nil, errors.New("Beyond the capacity")
@@ -62,31 +61,26 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue []byte, f
 
 func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from string) {
 	blockID := km.GetMid()
-	bm, err := metainfo.GetBlockMeta(blockID)
+
+	err := k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
 	if err != nil {
 		log.Println("handleBlockPos err: ", err)
 		return
 	}
 
-	err = k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
-	if err != nil {
-		log.Println("handleBlockPos err: ", err)
-		return
-	}
-
-	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
-	if len(splitedValue) < 2 {
+	sValue := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(sValue) < 2 {
 		log.Println("handleBlockPos err: ", metainfo.ErrIllegalValue)
 		return
 	}
-	offset, err := strconv.Atoi(splitedValue[1])
+	offset, err := strconv.Atoi(sValue[1])
 	if err != nil {
 		log.Println("handleBlockPos err: ", err)
 		return
 	}
-	pid := splitedValue[0]
 
-	err = k.addBlockMeta(bm.GetQid(), pid, bm.ToShortStr(), offset)
+	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
+	err = k.addBlockMeta(bids[0], sValue[0], bids[1], offset)
 	if err != nil {
 		log.Println("handleBlockPos err: ", err)
 	}
@@ -95,18 +89,14 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 
 func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
 	blockID := km.GetMid()
-	bm, err := metainfo.GetBlockMeta(blockID)
-	if err != nil {
-		log.Println("handleDeleteBlockMeta err: ", err)
-		return
-	}
 
+	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
 	// send to other keepers?
-
-	k.deleteBlockMeta(bm.GetQid(), bm.ToShortStr())
+	k.deleteBlockMeta(bids[0], bids[1])
 }
 
-func handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
+// key: "Storage"/pid; value: total/used
+func (k *Info) handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
 	vals := strings.Split(string(value), metainfo.DELIMITER)
 	if len(vals) < 2 {
 		return
@@ -117,13 +107,14 @@ func handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
 		log.Println("handleStorageSync err: ", err)
 		return
 	}
+
 	used, err := strconv.ParseUint(vals[1], 10, 64)
 	if err != nil {
 		log.Println("handleStorageSync err: ", err)
 		return
 	}
 
-	thisInfo, err := getPInfo(pid)
+	thisInfo, err := k.getPInfo(pid)
 	if err != nil {
 		return
 	}
@@ -131,54 +122,32 @@ func handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
 	thisInfo.usedSpace = used
 }
 
-func handleExternalAddr(km *metainfo.KeyMeta) ([]byte, error) {
+func (k *Info) handleExternalAddr(km *metainfo.KeyMeta) ([]byte, error) {
 	peerID := km.GetMid()
-	conns := localNode.PeerHost.Network().Conns()
-	for _, c := range conns {
-		pid := c.RemotePeer()
-		if pid.Pretty() == peerID {
-			addr := c.RemoteMultiaddr()
-			log.Println("handlePeerAddr: ", addr.String())
-			return addr.Bytes(), nil
-		}
-	}
-	return nil, errors.New("Donot have this peer")
+	return k.ds.GetExternalAddr(peerID)
 }
 
-func handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {
+func (k *Info) handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {
 	blockID := km.GetMid()
 	log.Println("handle get last challenge time of block: ", blockID)
 	if len(blockID) < utils.IDLength {
 		return nil, errUnmatchedPeerID
 	}
-	userIDstr := blockID[:utils.IDLength]
-	kmReq, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
-	if err != nil {
-		return nil, errBlockNotExist
-	}
 
-	value, err := localNode.Data.GetKey(context.Background(), kmReq.ToString(), "local")
-	if err != nil || value == nil {
-		return nil, errBlockNotExist
-	}
+	sValue := strings.SplitN(string(blockID), metainfo.BLOCK_DELIMITER, 2)
 
-	proIDspl := strings.Split(string(value), metainfo.DELIMITER)
-	if len(proIDspl) < 2 {
-		return nil, errBlockNotExist
-	}
-	proID := proIDspl[0]
-	pu := puKey{
-		pid: proID,
-		uid: userIDstr,
-	}
-
-	cidString, err := metainfo.GetCidFromBlock(blockID)
+	pid, err := k.getBlockPos(sValue[0], sValue[1])
 	if err != nil {
 		return nil, err
 	}
 
-	if thischalinfo, ok := getChalinfo(pu); ok {
-		if thiscidinfo, ok := thischalinfo.cidMap.Load(cidString); ok {
+	pu := pqKey{
+		pid: pid,
+		qid: sValue[0],
+	}
+
+	if thischalinfo, ok := k.lManager.getChalinfo(pu); ok {
+		if thiscidinfo, ok := thischalinfo.cidMap.Load(sValue[1]); ok {
 			return []byte(utils.UnixToString(thiscidinfo.(*cidInfo).availtime)), nil
 		}
 	}

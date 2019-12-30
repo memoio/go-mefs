@@ -411,19 +411,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	switch value {
 	case metainfo.RoleKeeper:
-		fmt.Println("started as a keeper")
-		enableTendermint, _ := req.Options[enableTendermintKwd].(bool)
-		err = keeper.StartKeeperService(req.Context, node, enableTendermint)
+		ins, err := keeper.New(node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
-			fmt.Println("Start keeperService failed:", err)
-			return err
+			fmt.Println("Start keeper service fails; please restart")
 		}
-		err = node.Routing.(*dht.KadDHT).AssignmetahandlerV2(&keeper.HandlerV2{Role: metainfo.RoleKeeper})
-		if err != nil {
-			return err
-		}
+		node.Inst = ins
 	case metainfo.RoleUser:
-		fmt.Println("Starting as a user")
 		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start user daemon fails; please restart")

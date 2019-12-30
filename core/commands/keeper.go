@@ -1,10 +1,12 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/role/keeper"
 )
 
@@ -17,7 +19,6 @@ var KeeperCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"info_user":      KeeperInfoUserCmd,
 		"list_users":     KeeperListUsersCmd,
 		"list_providers": KeeperListProvidersCmd,
 		"list_keepers":   KeeperListKeepersCmd,
@@ -35,7 +36,15 @@ var KeeperListUsersCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		users, err := keeper.GetUsers()
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		users, err := node.Inst.(*keeper.Info).GetUsers()
 		if err != nil {
 			return err
 		}
@@ -63,7 +72,16 @@ var KeeperListProvidersCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		providers, err := keeper.GetProviders()
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		providers, err := node.Inst.(*keeper.Info).GetProviders()
+
 		if err != nil {
 			return err
 		}
@@ -91,7 +109,15 @@ var KeeperListKeepersCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		keepers, err := keeper.GetKeepers()
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		keepers, err := node.Inst.(*keeper.Info).GetKeepers()
 		if err != nil {
 			return err
 		}
@@ -119,6 +145,14 @@ var KeeperFlushCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		return keeper.FlushKeepersAndProviders()
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		return node.Inst.(*keeper.Info).Flush(context.Background())
 	},
 }

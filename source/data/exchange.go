@@ -401,3 +401,19 @@ func (n *impl) Itererate(prefix string) ([]dsq.Entry, error) {
 func (n *impl) GetPeers() []peer.ID {
 	return n.ph.Network().Peers()
 }
+
+func (n *impl) GetExternalAddr(p string) ([]byte, error) {
+	pid, err := peer.IDB58Decode(p)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range n.ph.Network().ConnsToPeer(pid) {
+		rid := c.RemotePeer()
+		if rid.Pretty() == p {
+			addr := c.RemoteMultiaddr()
+			return addr.Bytes(), nil
+		}
+	}
+
+	return nil, errors.New("No remote address")
+}

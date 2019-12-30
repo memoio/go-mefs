@@ -27,6 +27,6 @@ func (u *Info) HandleMetaMessage(dt int, metaKey string, metaValue []byte, from 
 }
 
 // GetRole gets role
-func (u *Info) GetRole() (string, error) {
-	return u.role, nil
+func (u *Info) GetRole() string {
+	return u.role
 }

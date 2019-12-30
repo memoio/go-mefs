@@ -32,9 +32,9 @@ func handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 
 	isMyuser := false
 	// 保存合约
-	upItem, err := getUpkeeping(bmeta.GetUid())
+	upItem, err := getUpkeeping(bmeta.GetQid())
 	if err != nil {
-		go saveUpkeeping(bmeta.GetUid())
+		go saveUpkeeping(bmeta.GetQid())
 	} else {
 		localID := localNode.Identity.Pretty()
 		for _, proID := range upItem.ProviderIDs {
@@ -84,9 +84,9 @@ func handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
 
 	isMyuser := false
 	// 保存合约
-	upItem, err := getUpkeeping(bmeta.GetUid())
+	upItem, err := getUpkeeping(bmeta.GetQid())
 	if err != nil {
-		go saveUpkeeping(bmeta.GetUid())
+		go saveUpkeeping(bmeta.GetQid())
 	} else {
 		localID := localNode.Identity.Pretty()
 		for _, proID := range upItem.ProviderIDs {

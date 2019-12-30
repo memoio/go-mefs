@@ -101,7 +101,7 @@ func PosService(ctx context.Context, gc bool) {
 			if err != nil {
 				log.Println("get block meta in posRegular error :", err)
 			} else {
-				curGid, err = strconv.Atoi(cidInfo.GetGid()[utils.IDLength:])
+				curGid, err = strconv.Atoi(cidInfo.GetBid()[utils.IDLength:])
 				if err != nil {
 					log.Println("strconv.Atoi Gid in posReguar error :", err)
 				}

@@ -16,6 +16,7 @@ type Service interface {
 	// AppendKey key is dtype/id/op1/op2
 	AppendKey(ctx context.Context, key string, data []byte, to string) error
 	DeleteKey(ctx context.Context, key, to string) error
+	Itererate(prefix string) ([]dsq.Entry, error)
 
 	GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error)
 	PutBlock(ctx context.Context, key string, data []byte, to string) error
@@ -26,9 +27,9 @@ type Service interface {
 	SendMetaMessage(ctx context.Context, typ int32, key string, data, sig []byte, to string) error
 	SendMetaRequest(ctx context.Context, typ int32, key string, data, sig []byte, to string) ([]byte, error)
 	BroadcastMessage(ctx context.Context, key string) error
-	Connect(ctx context.Context, to string) bool
-	TestConnect() error
 
-	Itererate(prefix string) ([]dsq.Entry, error)
+	TestConnect() error
+	Connect(ctx context.Context, to string) bool
 	GetPeers() []peer.ID
+	GetExternalAddr(p string) ([]byte, error)
 }

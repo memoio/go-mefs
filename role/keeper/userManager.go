@@ -1,13 +1,17 @@
 package keeper
 
 import (
+	"errors"
 	"log"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/source/data"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 type ukp struct {
@@ -20,23 +24,23 @@ type ukp struct {
 type groupsInfo struct {
 	groupID      string // is queryID
 	owner        string // is userID
-	keepers      []string
-	providers    []string
 	localKeeper  string
 	masterKeeper string
-	buckets      sync.Map // key is bucket id; value is *bucketInfo
+	keepers      []string
+	providers    []string
 	upkeeping    *contracts.UpKeepingItem
 	query        *contracts.QueryItem
 	blsPubKey    *mcl.PublicKey
+	buckets      sync.Map // key is bucketID; value is *bucketInfo
 }
 
 type bucketInfo struct {
-	bucketID       int
-	dataCount      int
-	parityCount    int
-	chunkNum       int // = dataCount+parityCount; which is largest chunkID
-	largestStripes int
-	stripes        sync.Map // key is stripeID_chunkID, value is *cidInfo
+	bucketID    int
+	dataCount   int
+	parityCount int
+	chunkNum    int      // = dataCount+parityCount; which is largest chunkID
+	curStripes  int      // largest stripeID
+	stripes     sync.Map // key is stripeID_chunkID, value is *cidInfo
 }
 
 func (u *ukp) getPUKeys() []pqKey {
@@ -52,7 +56,7 @@ func (u *ukp) getPUKeys() []pqKey {
 			return true
 		}
 		for _, proID := range value.providers {
-			tmpPU := puKey{
+			tmpPU := pqKey{
 				qid: key,
 				pid: proID,
 			}
@@ -79,11 +83,11 @@ func (u *ukp) getUnpaidUsers() []string {
 
 //getGroupsInfo wrap get and set if not exist
 func (u *ukp) getGroupsInfo(groupid string) (*groupsInfo, bool) {
-	thisGroupinfo, ok := ukpInfo.Load(groupid)
+	thisGroupinfo, ok := u.gMap.Load(groupid)
 	if !ok {
 		tempInfo := &groupsInfo{
 			groupID:      groupid,
-			queryID:      groupid,
+			owner:        groupid,
 			localKeeper:  u.localID,
 			masterKeeper: groupid,
 		}
@@ -92,7 +96,7 @@ func (u *ukp) getGroupsInfo(groupid string) (*groupsInfo, bool) {
 			return nil, false
 		}
 
-		ukpInfo.Store(groupid, tempInfo)
+		u.gMap.Store(groupid, tempInfo)
 		return tempInfo, true
 	}
 
@@ -100,7 +104,7 @@ func (u *ukp) getGroupsInfo(groupid string) (*groupsInfo, bool) {
 }
 
 func (u *ukp) getBucketInfo(groupID, bucketID string) (*bucketInfo, bool) {
-	thisGroupinfo, ok := ukpInfo.Load(groupID)
+	thisGroupinfo, ok := u.gMap.Load(groupID)
 	if !ok {
 		return nil, false
 	}
@@ -134,8 +138,8 @@ func (u *ukp) addBlockMeta(gid, bid string, ci *cidInfo) error {
 		return err
 	}
 
-	if int32(snum) > thisBucketinfo.largestStripes {
-		thisBucketinfo.largestStripes = int32(snum)
+	if snum > thisBucketinfo.curStripes {
+		thisBucketinfo.curStripes = snum
 	}
 
 	cnum, err := strconv.Atoi(chunkID)
@@ -143,30 +147,27 @@ func (u *ukp) addBlockMeta(gid, bid string, ci *cidInfo) error {
 		return err
 	}
 
-	if int32(cnum) > thisBucketinfo.chunkNum {
-		thisBucketinfo.chunkNum = int32(cnum)
+	if cnum > thisBucketinfo.chunkNum {
+		thisBucketinfo.chunkNum = cnum
 	}
 
 	return nil
 }
 
 func (u *ukp) deleteBlockMeta(gid, bid string) {
-	bucketID, _, _, err := metainfo.GetIDsFromBlock(bid)
-	if err != nil {
-		return
-	}
-
-	thisGroupinfo, ok := u.gMap.Load(groupid)
+	gri, ok := u.gMap.Load(gid)
 	if !ok {
 		return
 	}
 
-	thisgroup := thisGroupinfo.(*groupsInfo)
+	bis := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
 
-	thisbucket, ok := thisgroup.buckets.Load(bid)
-	if ok {
-		thisbucket.(*bucketInfo).stripes.Delete(bid)
+	bui, ok := gri.(*groupsInfo).buckets.Load(bis[0])
+	if !ok {
+		return
 	}
+
+	bui.(*bucketInfo).stripes.Delete(bis[1])
 }
 
 func (u *ukp) getLocalKeeperInGroup(groupid string) (string, error) {
@@ -184,7 +185,7 @@ func (u *ukp) getLocalKeeperInGroup(groupid string) (string, error) {
 	}
 	if thisGroupInfo.localKeeper == groupid {
 		// not my user
-		ukpInfo.Delete(groupid)
+		u.gMap.Delete(groupid)
 		return "", errNotKeeperInThisGroup
 	}
 	return thisGroupInfo.localKeeper, nil
@@ -243,7 +244,7 @@ func (u *ukp) isMasterKeeper(groupid string, pid string) bool {
 			}
 		}
 		if len(mymaster) > 0 {
-			return getMasterID(mymaster) == localNode.Identity.Pretty()
+			return getMasterID(mymaster) == u.localID
 		}
 	}
 
