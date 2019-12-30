@@ -11,9 +11,11 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/memoio/go-mefs/contracts"
 	pb "github.com/memoio/go-mefs/role/pb"
 	"github.com/memoio/go-mefs/source/data"
+	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
@@ -49,7 +51,7 @@ type Info struct {
 
 // New is
 // TODO:Keeper出问题重启后，应该能自动将所有user的信息恢复到内存中
-func New(ctx context.Context, nid, sk string, d data.Service) instance.Service {
+func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	m := &Info{
 		netID: nid,
 		sk:    sk,
@@ -61,13 +63,18 @@ func New(ctx context.Context, nid, sk string, d data.Service) instance.Service {
 	err := m.load(ctx) //连接节点
 	if err != nil {
 		log.Println("searchAllKeepersAndProviders err:", err)
-		return nil
+		return nil, err
 	}
 
 	//tendermint启动相关
 	m.enableBft = false
 	if !m.enableBft {
 		log.Println("Use simple mode")
+	}
+
+	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	if err != nil {
+		return nil, err
 	}
 
 	go m.persistRegular(ctx)
@@ -80,7 +87,7 @@ func New(ctx context.Context, nid, sk string, d data.Service) instance.Service {
 	go m.getKpMapRegular(ctx)
 	m.state = true
 	log.Println("Keeper Service is ready")
-	return m
+	return m, nil
 }
 
 func (k *Info) Online() bool {

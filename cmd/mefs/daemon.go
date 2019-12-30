@@ -409,9 +409,10 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
+	var sk string
 	switch value {
 	case metainfo.RoleKeeper:
-		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.Data, node.Routing)
+		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), sk, node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start keeper service fails; please restart")
 		}
