@@ -314,6 +314,6 @@ func (k *Info) GetKeepers() ([]string, error) {
 }
 
 // Flush is
-func (k *Info) Flush(ctx context.Context) error {
+func (k *Info) FlushPeers(ctx context.Context) error {
 	return k.checkConnectedPeer(ctx)
 }

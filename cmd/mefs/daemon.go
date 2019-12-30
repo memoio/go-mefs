@@ -327,7 +327,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		switch value {
 		case metainfo.RoleKeeper:
 			fmt.Println("Keeper-persisting before shut down")
-			err := keeper.PersistlocalPeerInfo()
+			err := node.Inst.(*user.Info).Stop()
 			if err != nil {
 				fmt.Println("Sorry, something wrong in persisting:", err)
 			} else {
@@ -411,7 +411,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	switch value {
 	case metainfo.RoleKeeper:
-		ins, err := keeper.New(node.Identity.Pretty(), node.Data, node.Routing)
+		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start keeper service fails; please restart")
 		}

@@ -153,6 +153,6 @@ var KeeperFlushCmd = &cmds.Command{
 			return ErrNotOnline
 		}
 
-		return node.Inst.(*keeper.Info).Flush(context.Background())
+		return node.Inst.(*keeper.Info).FlushPeers(context.Background())
 	},
 }

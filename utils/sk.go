@@ -15,7 +15,7 @@ import (
 //EthSkLength implements the length of privatekey in Ethereum format with prefix "0x"
 const (
 	EthSkLength  = 66
-	IpfsSkLength = 48
+	IpfsSkLength = 48 // base64 code
 )
 
 var (
