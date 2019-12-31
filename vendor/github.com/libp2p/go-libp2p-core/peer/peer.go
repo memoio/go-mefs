@@ -173,7 +173,7 @@ func IDHexEncode(id ID) string {
 // The encoded peer ID can either be a CID of a key or a raw multihash (identity
 // or sha256-256).
 func Decode(s string) (ID, error) {
-	if strings.HasPrefix(s, "Qm") || strings.HasPrefix(s, "1") {
+	if strings.HasPrefix(s, "8M") || strings.HasPrefix(s, "Qm") || strings.HasPrefix(s, "1") {
 		// base58 encoded sha256 or identity multihash
 		m, err := mh.FromB58String(s)
 		if err != nil {

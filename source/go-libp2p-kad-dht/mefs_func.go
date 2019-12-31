@@ -122,7 +122,10 @@ func (dht *KadDHT) PutTo(ctx context.Context, key string, value []byte, id strin
 
 	pmes := pb.NewMessage(pb.Message_PUT_VALUE, rec.Key, 0)
 	pmes.Record = rec
-	p, _ := peer.IDB58Decode(id)
+	p, err := peer.IDB58Decode(id)
+	if err != nil {
+		return err
+	}
 	rpmes, err := dht.sendRequest(ctx, p, pmes)
 	if err != nil {
 		log.Println("sendRequest to: ", p.Pretty(), ", err: ", err)

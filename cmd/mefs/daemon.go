@@ -28,7 +28,6 @@ import (
 	"github.com/memoio/go-mefs/role/keeper"
 	"github.com/memoio/go-mefs/role/provider"
 	"github.com/memoio/go-mefs/role/user"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -318,7 +317,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	}
 	value := cfg.Role //角色信息的value
-	err = node.Routing.(*dht.KadDHT).PutTo(node.Context(), keystring, []byte(value), "local")
+	err = node.Data.PutKey(node.Context(), keystring, []byte(value), "local")
 	if err != nil {
 		fmt.Println("node.Routing.CmdPut falied: ", err)
 	}

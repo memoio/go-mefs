@@ -515,6 +515,8 @@ func (n *MefsNode) loadID() error {
 		return errors.New("no peer ID in config! (was 'mefs init' run?)")
 	}
 
+	fmt.Println(cid)
+
 	id, err := peer.IDB58Decode(cid)
 	if err != nil {
 		return fmt.Errorf("peer ID invalid: %s", err)
