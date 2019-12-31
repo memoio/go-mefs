@@ -256,9 +256,16 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
 	if err != nil {
-		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\ncaller:%s\n", err, metaKey, p.Pretty(), string(pmes.GetKey()))
+		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\n", err, metaKey, p.Pretty())
 	}
-	rpmes.Record.Value = []byte(res) //role层回调函数的返回值放在返回信息中，一般会返回"complete"
+
+	if rec == nil {
+		rec = MakePutRecord(metaKey, res)
+		rpmes.Record = rec
+	} else {
+		rpmes.Record.Value = []byte(res)
+	}
+
 	return rpmes, err
 }
 
