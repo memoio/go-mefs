@@ -146,13 +146,13 @@ func GetKeyMeta(key string) (*KeyMeta, error) {
 		return nil, ErrIllegalKey
 	}
 
-	dt, err := strconv.Atoi(splitedKey[0])
+	dt, err := strconv.Atoi(splitedKey[1])
 	if err != nil {
 		return nil, ErrWrongType
 	}
 
 	km := &KeyMeta{
-		mid:   splitedKey[1],
+		mid:   splitedKey[0],
 		dType: dt,
 	}
 
