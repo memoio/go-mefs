@@ -80,6 +80,7 @@ func (dht *KadDHT) SendRequest(ctx context.Context, typ int32, metaKey string, m
 
 	rpmes, err := dht.sendRequest(ctx, p, pmes) //得到返回信息
 	if err != nil {
+		log.Println("Send metainfo error: ", err)
 		return nil, err
 	}
 	response := rpmes.Record.GetValue()
@@ -241,11 +242,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 	rpmes := pmes
 	rec := pmes.GetRecord() //获得record信息
-	if rec == nil {
-		logger.Infof("Got nil record from: %s", p.Pretty())
-		return nil, errors.New("nil record")
-	}
-	metaKey := string(rec.GetKey())
+	metaKey := string(pmes.GetKey())
 	metaValue := rec.GetValue()
 
 	// append/iter can be done here

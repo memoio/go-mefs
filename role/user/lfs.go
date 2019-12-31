@@ -95,9 +95,9 @@ func (l *LfsInfo) Start() error {
 		err = l.loadBLS12Config()
 		if err != nil {
 			log.Println("load bls config err: ", err)
-			return err
 		}
-	} else {
+	}
+	if !has || err != nil {
 		mkey, err := initBLS12Config()
 		if err != nil {
 			log.Println("init bls config err: ", err)
