@@ -12,8 +12,8 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func (u *ukp) saveUpkeeping(qid string, update bool) error {
-	gp, ok := u.getGroupsInfo(qid)
+func (u *ukp) saveUpkeeping(uid, gid string, update bool) error {
+	gp, ok := u.getGroupsInfo(uid, gid)
 	if !ok {
 		log.Println("saveUpkeeping getGroupsInfo() error")
 		return errNoGroupsInfo
@@ -26,7 +26,7 @@ func (u *ukp) saveUpkeeping(qid string, update bool) error {
 	return nil
 }
 
-func saveUpkeepingToGP(qid string, gp *groupsInfo) error {
+func saveUpkeepingToGP(gp *groupsInfo) error {
 	// get upkkeeping addr
 	userAddr, err := ad.GetAddressFromID(gp.owner)
 	if err != nil {
@@ -65,15 +65,15 @@ func saveUpkeepingToGP(qid string, gp *groupsInfo) error {
 	return nil
 }
 
-func (u *ukp) getUpkeeping(qid string) (*contracts.UpKeepingItem, error) {
-	gp, ok := u.getGroupsInfo(qid)
+func (u *ukp) getUpkeeping(uid, gid string) (*contracts.UpKeepingItem, error) {
+	gp, ok := u.getGroupsInfo(uid, gid)
 	if !ok {
 		log.Println("saveUpkeeping getGroupsInfo() error")
 		return nil, errNoGroupsInfo
 	}
 
 	if gp.upkeeping == nil {
-		err := saveUpkeepingToGP(qid, gp)
+		err := saveUpkeepingToGP(gp)
 		if err != nil {
 			return nil, errGetContractItem
 		}

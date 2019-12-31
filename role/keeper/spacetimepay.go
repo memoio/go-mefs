@@ -147,7 +147,7 @@ func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func (l *ledger) resultSummary(thisPU pqKey, timeStart int64, timeEnd int64) (*big.Int, int64) {
+func (u *ukp) resultSummary(thisPU pqKey, timeStart int64, timeEnd int64) (*big.Int, int64) {
 	var timeList []int64  //存放挑战时间序列
 	var lenghList []int64 //存放与挑战时间同序的数据长度序列
 	var tsl timesortlist  //用来对挑战时间排序
@@ -203,7 +203,7 @@ func (p timesortlist) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p timesortlist) Len() int           { return len(p) }
 func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
 
-func (l *ledger) saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
+func (u *ukp) saveLastPay(thisPU pqKey, signature, proof string, beginTime, endTime int64, spaceTime *big.Int) (*metainfo.KeyMeta, string, error) {
 	//key: `lastpay"/uid/pid`
 	//value: `beginTime/endTime/spacetime/signature/proof`
 	//for get
@@ -243,7 +243,7 @@ func (l *ledger) saveLastPay(thisPU pqKey, signature, proof string, beginTime, e
 }
 
 //获得最后一次支付的信息,最后一次的支付信息由master进行同步，会同时保存在内存和本地，先检查内存中的保存结果，若没有，则检查本地
-func (l *ledger) checkLastPayTime(thisPU pqKey) int64 {
+func (u *ukp) checkLastPayTime(thisPU pqKey) int64 {
 	failtime := int64(0)
 
 	thisChalinfo, ok := l.getChalinfo(thisPU)
@@ -277,7 +277,7 @@ func (l *ledger) checkLastPayTime(thisPU pqKey) int64 {
 
 //parseLastPayKV 传入lastPay的KV，解析成 PU和*chalpay结构体
 //`uid/"local"/"lastpay"/pid` ,`beginTime/endTime/spacetime/signature/proof`
-func (l *ledger) parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (pqKey, *chalpay, error) {
+func (u *ukp) parseLastPayKV(keyMeta *metainfo.KeyMeta, value string) (pqKey, *chalpay, error) {
 	splitedValue := strings.Split(value, metainfo.DELIMITER)
 	if len(splitedValue) < 5 {
 		return pqKey{}, nil, errParaseMetaFailed

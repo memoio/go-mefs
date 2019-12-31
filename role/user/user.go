@@ -79,6 +79,8 @@ func (u *Info) NewFS(uid, queryID, sk string, capacity, duration, price int64, k
 		qid, _ := ad.GetIDFromAddress(qItem.QueryAddr)
 		queryID = qid
 		ginfo.groupID = queryID
+	} else {
+		ginfo.groupID = uid
 	}
 
 	_, ok = u.qMap.Load(uid)

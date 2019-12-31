@@ -397,7 +397,20 @@ var lfsStartUserCmd = &cmds.Command{
 
 		hexSk := utils.EthSkByteToEthString(userkey.PrivateKey)
 
-		lfs, err := node.Inst.(*user.Info).NewFS(uid, "", hexSk, capacity, duration, price, ks, ps, rdo)
+		cfg, err := node.Repo.Config()
+		if err != nil {
+			return err
+		}
+
+		var qid string
+
+		if cfg.Test {
+			qid = uid
+		} else {
+			qid = ""
+		}
+
+		lfs, err := node.Inst.(*user.Info).NewFS(uid, qid, hexSk, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			node.Inst.(*user.Info).KillUser(uid)
 			return err

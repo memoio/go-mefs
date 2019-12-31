@@ -237,7 +237,7 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 }
 
 func (k *Info) handleContracts(km *metainfo.KeyMeta, from string) {
-	log.Println("NewUserDeployedContracts", km.ToString(), "From:", from)
+	log.Println("New User", km.ToString(), "From:", from)
 	qid := km.GetMid()
 	ops := km.GetOptions()
 	if len(ops) != 1 {

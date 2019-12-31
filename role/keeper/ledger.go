@@ -1,27 +1,14 @@
 package keeper
 
 import (
-	"errors"
 	"log"
 	"sync"
 
 	df "github.com/memoio/go-mefs/data-format"
-	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 )
 
-type ledger struct {
-	localID string
-	ds      data.Service
-	lMap    sync.Map //key:pqKey，value:*groupsInfo
-}
-
-type pqKey struct {
-	pid string // providerID
-	qid string // queryID
-}
-
-//chalinfo 作为LedgerInfo的value key是PU对
+//chalinfo
 type chalinfo struct {
 	chalMap      sync.Map // key is challenge time(int64),value is *chalresult
 	cidMap       sync.Map // key is bucketid_stripeid_blockid, value is *cidInfo
@@ -55,28 +42,9 @@ type chalresult struct {
 	proof         string //挑战结果的证据
 }
 
-func (l *ledger) getChalinfo(thisPU pqKey) (*chalinfo, bool) {
-	thischalinfo, ok := l.lMap.Load(thisPU)
-	if !ok {
-		return nil, false
-	}
-
-	return thischalinfo.(*chalinfo), true
-}
-
 // bid is bucketID_stripeID_chunkID
-func (l *ledger) addBlockMeta(qid, pid, bid string, offset int) (*cidInfo, error) {
+func (c *chalinfo) addBlockMeta(pid, bid string, offset int) (*cidInfo, error) {
 	log.Println("add block: ", bid, "for query: ", qid, " and provider: ", pid)
-
-	pu := pqKey{
-		pid: pid,
-		qid: qid,
-	}
-
-	thisChal, ok := l.getChalinfo(pu)
-	if !ok {
-		return nil, errors.New("cannot create chalinfo")
-	}
 
 	newcidinfo := &cidInfo{
 		availtime: utils.GetUnixNow(),
@@ -86,7 +54,7 @@ func (l *ledger) addBlockMeta(qid, pid, bid string, offset int) (*cidInfo, error
 	}
 
 	oldOffset := -1
-	v, ok := thisChal.cidMap.Load(bid)
+	v, ok := c.cidMap.Load(bid)
 	if ok {
 		newcidinfo = v.(*cidInfo)
 		oldOffset = newcidinfo.offset
@@ -98,26 +66,18 @@ func (l *ledger) addBlockMeta(qid, pid, bid string, offset int) (*cidInfo, error
 			newcidinfo.storedOn = pid
 		}
 	} else {
-		thisChal.cidMap.Store(bid, newcidinfo)
+		c.cidMap.Store(bid, newcidinfo)
 	}
 
-	thisChal.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
+	c.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
 
 	return newcidinfo, nil
 }
 
-func (l *ledger) deleteBlockMeta(qid, pid, bid string) {
-	pu := pqKey{
-		pid: pid,
-		qid: qid,
-	}
-
-	if thischalinfo, ok := l.lMap.Load(pu); ok {
-		thischal := thischalinfo.(*chalinfo)
-		thiscid, ok := thischal.cidMap.Load(bid)
-		if ok {
-			thischal.maxlength -= (int64(thiscid.(*cidInfo).offset+1) * df.DefaultSegmentSize)
-			thischal.cidMap.Delete(bid)
-		}
+func (c *chalinfo) deleteBlockMeta(bid string) {
+	thiscid, ok := c.cidMap.Load(bid)
+	if ok {
+		thischal.maxlength -= (int64(thiscid.(*cidInfo).offset+1) * df.DefaultSegmentSize)
+		thischal.cidMap.Delete(bid)
 	}
 }

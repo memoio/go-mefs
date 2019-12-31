@@ -31,7 +31,8 @@ type groupsInfo struct {
 	upkeeping    *contracts.UpKeepingItem
 	query        *contracts.QueryItem
 	blsPubKey    *mcl.PublicKey
-	buckets      sync.Map // key is bucketID; value is *bucketInfo
+	buckets      sync.Map // key:bucketID; value: *bucketInfo
+	ledgerMap    sync.Map // key:proID，value:*chalInfo
 }
 
 type bucketInfo struct {
@@ -41,6 +42,11 @@ type bucketInfo struct {
 	chunkNum    int      // = dataCount+parityCount; which is largest chunkID
 	curStripes  int      // largest stripeID
 	stripes     sync.Map // key is stripeID_chunkID, value is *cidInfo
+}
+
+type pqKey struct {
+	qid string
+	pid string
 }
 
 func (u *ukp) getPUKeys() []pqKey {
@@ -81,17 +87,26 @@ func (u *ukp) getUnpaidUsers() []string {
 	return res
 }
 
+func (u *ukp) getChalinfo(thisPU pqKey) (*chalinfo, bool) {
+	thischalinfo, ok := l.lMap.Load(thisPU)
+	if !ok {
+		return nil, false
+	}
+
+	return thischalinfo.(*chalinfo), true
+}
+
 //getGroupsInfo wrap get and set if not exist
-func (u *ukp) getGroupsInfo(groupid string) (*groupsInfo, bool) {
-	thisGroupinfo, ok := u.gMap.Load(groupid)
+func (u *ukp) getGroupsInfo(userID, groupID string) (*groupsInfo, bool) {
+	thisGroupinfo, ok := u.gMap.Load(groupID)
 	if !ok {
 		tempInfo := &groupsInfo{
-			groupID:      groupid,
-			owner:        groupid,
+			groupID:      groupID,
+			owner:        userID,
 			localKeeper:  u.localID,
-			masterKeeper: groupid,
+			masterKeeper: groupID,
 		}
-		err := saveUpkeepingToGP(groupid, tempInfo)
+		err := saveUpkeepingToGP(tempInfo)
 		if err != nil {
 			return nil, false
 		}

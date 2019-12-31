@@ -99,7 +99,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 	}
 }
 
-func (l *ledger) doChallengeBLS12(ctx context.Context, pu pqKey, hByte []byte, chaltime int64) {
+func (u *ukp) doChallengeBLS12(ctx context.Context, pu pqKey, hByte []byte, chaltime int64) {
 	fail := false
 	// clean before return
 	defer func() {
@@ -124,7 +124,7 @@ func (l *ledger) doChallengeBLS12(ctx context.Context, pu pqKey, hByte []byte, c
 	return
 }
 
-func (l *ledger) cleanLastChallenge(pu pqKey) {
+func (u *ukp) cleanLastChallenge(pu pqKey) {
 	thischalinfo, ok := l.getChalinfo(pu)
 	if !ok {
 		log.Println("getChalinfo error!pu: ", pu)
@@ -151,7 +151,7 @@ func (l *ledger) cleanLastChallenge(pu pqKey) {
 
 //handleProof handles the challenge result from provider
 //key: uid/"proof"/chaltime,value: proof[/FaultBlocks]
-func (l *ledger) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blskey *mcl.PublicKey) bool {
+func (u *ukp) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blskey *mcl.PublicKey) bool {
 	ops := km.GetOptions()
 	if len(ops) < 1 {
 		return false

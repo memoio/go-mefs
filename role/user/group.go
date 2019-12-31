@@ -173,7 +173,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return ErrNoEnoughProvider
 	}
 
-	// 构造key告诉keeper和provider自己已经启动
+	// key: queryID/"Contract"/userID
 	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.Contract, g.owner)
 	if err != nil {
 		log.Println("Construct Deployed key error", err)

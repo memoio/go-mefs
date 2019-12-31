@@ -45,8 +45,7 @@ type Info struct {
 	keepers    sync.Map // keepers except self
 	providers  sync.Map // providers
 	users      sync.Map // users
-	ukpManager *ukp
-	lManager   *ledger // key: PU，value: *chalinfo
+	ukpManager *ukp     // manage user-keeper-provider group
 }
 
 // New is
@@ -66,13 +65,6 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	}
 
 	m.ukpManager = u
-
-	l := &ledger{
-		localID: nid,
-		ds:      d,
-	}
-
-	m.lManager = l
 
 	err := m.load(ctx) //连接节点
 	if err != nil {
@@ -114,10 +106,6 @@ func (k *Info) GetRole() string {
 
 func (k *Info) Stop() error {
 	return k.save(context.Background())
-}
-
-func (k *Info) GetLedger() *ledger {
-	return k.lManager
 }
 
 func (k *Info) GetUKP() *ukp {

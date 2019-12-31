@@ -23,8 +23,8 @@ var (
 )
 
 //---config----
-func (u *ukp) getUserBLS12Config(gid string) (*mcl.PublicKey, error) {
-	thisInfo, ok := u.getGroupsInfo(gid)
+func (u *ukp) getUserBLS12Config(uid, gid string) (*mcl.PublicKey, error) {
+	thisInfo, ok := u.getGroupsInfo(uid, gid)
 	if !ok {
 		return nil, errors.New("No Bls Key")
 	}
