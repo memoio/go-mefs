@@ -280,7 +280,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			return 0, ErrCannotGetEnoughBlock
 		}
 
-		bm.SetBid(strconv.Itoa(i))
+		bm.SetCid(strconv.Itoa(i))
 		ncid := bm.ToString()
 		provider, _, err := ds.group.getBlockProviders(ncid)
 		if err != nil || provider == ds.fsID {

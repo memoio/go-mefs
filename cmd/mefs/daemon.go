@@ -8,6 +8,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path"
 	"runtime"
 	"sort"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	utilmain "github.com/memoio/go-mefs/cmd/mefs/util"
 	oldcmds "github.com/memoio/go-mefs/commands"
+	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/core/commands"
@@ -409,7 +411,22 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
-	var sk string
+	// 读keystore下uid文件
+	keypath, err := config.Path("", path.Join("keystore", node.Identity.Pretty()))
+	if err != nil {
+		return errRepoExists
+	}
+	_, err = os.Stat(keypath)
+	if os.IsNotExist(err) {
+		return errRepoExists
+	}
+	userkey, err := fsrepo.GetPrivateKeyFromKeystore(node.Identity.Pretty(), keypath, node.Password)
+	if err != nil {
+		return err
+	}
+
+	sk := utils.EthSkByteToEthString(userkey.PrivateKey)
+
 	switch value {
 	case metainfo.RoleKeeper:
 		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), sk, node.Data, node.Routing)

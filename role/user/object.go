@@ -239,7 +239,7 @@ func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
 		return "", err
 	}
 	for i := 0; i < int(blockCount); i++ {
-		bm.SetBid(strconv.Itoa(i))
+		bm.SetCid(strconv.Itoa(i))
 		blockID := bm.ToString()
 		blockAvailTime, err := l.getLastChalTime(blockID)
 		if err != nil {

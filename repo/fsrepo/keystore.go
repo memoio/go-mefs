@@ -33,7 +33,7 @@ type Key struct {
 	PeerID string
 	// we only store privkey as pubkey/address can be derived from it
 	// privkey in this struct is always in plaintext
-	// eth format
+	// Eth format: 66btes
 	PrivateKey []byte
 }
 

@@ -59,6 +59,8 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue []byte, f
 	return []byte(instance.MetaHandlerComplete), nil
 }
 
+// key: blockID/"BlockPos"
+// value: pid/offset
 func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from string) {
 	blockID := km.GetMid()
 
@@ -90,6 +92,14 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
 	blockID := km.GetMid()
 
+	// delete from local
+	err := k.ds.DeleteKey(context.Background(), km.ToString(), "local")
+	if err != nil {
+		log.Println("handleBlockPos err: ", err)
+		return
+	}
+
+	// delete from mem
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
 	// send to other keepers?
 	k.deleteBlockMeta(bids[0], bids[1])

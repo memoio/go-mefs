@@ -179,9 +179,11 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	return b, nil
 }
 
+// key: blockID/"Block"
 func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string) error {
+	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
-		bcid := cid.NewCidV2([]byte(key))
+		bcid := cid.NewCidV2([]byte(bids[0]))
 		b, err := blocks.NewBlockWithCid(data, bcid)
 		if err != nil {
 			return err
@@ -193,6 +195,11 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 		return nil
 	}
 
+	if len(bids) == 1 {
+		km, _ := metainfo.NewKeyMeta(bids[0], metainfo.Block)
+		key = km.ToString()
+	}
+
 	_, err := n.SendMetaRequest(ctx, int32(metainfo.Put), key, data, nil, to)
 	if err != nil {
 		return err
@@ -201,13 +208,13 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	return nil
 }
 
+// key: blockID/"Block"/start/offset
 func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to string) error {
+	skey := strings.Split(key, metainfo.DELIMITER)
+	if len(skey) < 4 {
+		return metainfo.ErrIllegalKey
+	}
 	if to == "local" {
-		skey := strings.Split(key, metainfo.DELIMITER)
-		if len(skey) < 4 {
-			return metainfo.ErrIllegalKey
-		}
-
 		s, err := strconv.Atoi(skey[2])
 		if err != nil {
 			return err
@@ -229,23 +236,27 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 		return nil
 	}
 
-	if n.rt != nil {
-		_, err := n.SendMetaRequest(ctx, int32(metainfo.Put), key, data, nil, to)
-		if err != nil {
-			return err
-		}
-
-		return nil
+	_, err := n.SendMetaRequest(ctx, int32(metainfo.Append), key, data, nil, to)
+	if err != nil {
+		return err
 	}
+
+	return nil
 
 	return errors.New("Routing is nil")
 }
 
 // DeleteBlock deletes a block in the blockservice from the datastore
 func (n *impl) DeleteBlock(ctx context.Context, key, to string) error {
+	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
-		bcid := cid.NewCidV2([]byte(key))
+		bcid := cid.NewCidV2([]byte(bids[0]))
 		return n.bstore.DeleteBlock(bcid)
+	}
+
+	if len(bids) == 1 {
+		km, _ := metainfo.NewKeyMeta(bids[0], metainfo.Block)
+		key = km.ToString()
 	}
 
 	_, err := n.SendMetaRequest(ctx, int32(metainfo.Delete), key, nil, nil, to)

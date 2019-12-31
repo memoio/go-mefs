@@ -16,7 +16,7 @@ import (
 )
 
 // handleUserInit collect keepers and providers for user
-// return kv, key: "UserInit"/queryID/userID/keepercount/providercount;
+// return kv, key: queryID/"UserInit"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	log.Println("NewUserInit: ", km.ToString(), " From: ", from)
@@ -132,7 +132,8 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 	return newResponse.String(), nil
 }
 
-// handleUserNotify return kv, key: "UserNotify"/queryID/userID/keepercount/providercount;
+// handleUserNotify return kv,
+// key: queryID/"UserNotify"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
 	log.Println("NewUserNotify: ", km.ToString(), metaValue, "From:", from)

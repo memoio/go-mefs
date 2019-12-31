@@ -239,7 +239,7 @@ Loop:
 			var count int
 			var provider string
 			for i := 0; i < bc; i++ {
-				bm.SetBid(strconv.Itoa(i))
+				bm.SetCid(strconv.Itoa(i))
 				ncid := bm.ToString()
 				var km *metainfo.KeyMeta
 

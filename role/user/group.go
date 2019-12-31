@@ -202,9 +202,11 @@ func (g *groupInfo) connect(ctx context.Context) error {
 }
 
 // user init
+// key: queryID/"UserInit"/userID/keeperCount/providerCount
+// for test: queryID = userID
 func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
-	kmInit, err := metainfo.NewKeyMeta(g.owner, metainfo.UserInit, g.groupID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmInit, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserInit, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("gp connect: NewKeyMeta error!")
 		return err
@@ -230,7 +232,6 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 				if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
 					//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
 					g.state = collectCompleted
-					kmInit.SetDType(metainfo.UserNotify)
 					g.notify(ctx)
 				} else {
 					log.Printf("No enough keepers and providers, have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
@@ -299,6 +300,7 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 }
 
 //userInitNotIf 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
+// key: queryID/"UserNotify"/userID/kc/pc
 func (g *groupInfo) notify(ctx context.Context) {
 	if g.state != collectCompleted {
 		return
@@ -380,7 +382,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 	//构造发给keeper的初始化确认信息并发送给自己的所有keeper
 	assignedKP := assignedKeeper + metainfo.DELIMITER + assignedProvider
 
-	kmNotify, err := metainfo.NewKeyMeta(g.owner, metainfo.UserNotify, g.groupID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmNotify, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserNotify, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("gp notify: NewKeyMeta error!")
 		return
@@ -415,7 +417,6 @@ func (g *groupInfo) notify(ctx context.Context) {
 }
 
 // confirm 第四次握手 确认Keeper启动完毕
-// queryID/"UserNotify"/userID/ks/ps, "ok"
 func (g *groupInfo) confirm(keeper, res string) {
 	g.initResMutex.Lock()
 	defer g.initResMutex.Unlock()

@@ -115,13 +115,13 @@ func (km *KeyMeta) ToByte() []byte {
 }
 
 // ToString 将KeyMeta结构体转换成字符串格式，进行传输
-// datatype/mid/op1/op2/...
+// mid/datatype/op1/op2/...
 func (km *KeyMeta) ToString() string {
 	var res strings.Builder
 
-	res.WriteString(strconv.Itoa(km.dType))
-	res.WriteString(DELIMITER)
 	res.WriteString(km.mid)
+	res.WriteString(DELIMITER)
+	res.WriteString(strconv.Itoa(km.dType))
 
 	for _, option := range km.options {
 		res.WriteString(DELIMITER)

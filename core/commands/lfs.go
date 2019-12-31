@@ -381,7 +381,23 @@ var lfsStartUserCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		lfs, err := node.Inst.(*user.Info).NewFS(uid, "", sk, capacity, duration, price, ks, ps, rdo)
+		// 读keystore下uid文件
+		keypath, err := config.Path("", path.Join("keystore", uid))
+		if err != nil {
+			return err
+		}
+		_, err = os.Stat(keypath)
+		if os.IsNotExist(err) {
+			return err
+		}
+		userkey, err := fsrepo.GetPrivateKeyFromKeystore(uid, keypath, pwd)
+		if err != nil {
+			return err
+		}
+
+		hexSk := utils.EthSkByteToEthString(userkey.PrivateKey)
+
+		lfs, err := node.Inst.(*user.Info).NewFS(uid, "", hexSk, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			node.Inst.(*user.Info).KillUser(uid)
 			return err

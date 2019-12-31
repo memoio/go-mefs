@@ -41,11 +41,11 @@ func (bm *BlockMeta) GetCid() string {
 	return bm.chunkID
 }
 
-func (bm *BlockMeta) SetBid(bid string) {
+func (bm *BlockMeta) SetCid(cid string) {
 	if bm == nil {
 		return
 	}
-	bm.bucketID = bid
+	bm.chunkID = cid
 }
 
 // ToString 将BlockMeta结构体转换成字符串格式，进行传输

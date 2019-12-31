@@ -19,13 +19,13 @@ import (
 )
 
 func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
-	// key is "block"/blockID
+	// key is blockID/"block"
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
 		return errors.New("Wrong value for put block")
 	}
 
-	bmeta, err := metainfo.GetBlockMeta(splitedNcid[1])
+	bmeta, err := metainfo.GetBlockMeta(splitedNcid[0])
 	if err != nil {
 		return nil
 	}
@@ -71,7 +71,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 }
 
 func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
-	// key is "block"/cid/begin/end
+	// key is blockID/"Block"/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 4 {
 		return errors.New("Wrong value for put block")
@@ -230,8 +230,7 @@ func (p *Info) verify(mes []byte) (bool, string, string, *big.Int, error) {
 }
 
 func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
-	blockID := km.GetMid()
-	err := p.ds.DeleteBlock(context.Background(), blockID, "local")
+	err := p.ds.DeleteBlock(context.Background(), km.ToString(), "local")
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}

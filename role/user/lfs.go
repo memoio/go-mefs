@@ -387,7 +387,7 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 	ctx := context.Background()
 
 	for j := 0; j < len(providers); j++ { //
-		bm.SetBid(strconv.Itoa(j))
+		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
 
 		km, err := metainfo.NewKeyMeta(ncid, metainfo.Block)
@@ -486,7 +486,7 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	ctx := context.Background()
 
 	for j := 0; j < int(MetaBackupCount); j++ { //
-		bm.SetBid(strconv.Itoa(j))
+		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
 		if err != nil {
 			return err
@@ -647,7 +647,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 				return err
 			}
 			for j := 0; j < len(providers); j++ {
-				bm.SetBid(strconv.Itoa(j))
+				bm.SetCid(strconv.Itoa(j))
 				ncid := bm.ToString()
 				km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
 
@@ -687,7 +687,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 			return err
 		}
 		for j := 0; j < len(providers); j++ {
-			bm.SetBid(strconv.Itoa(j))
+			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
 			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
 			err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
@@ -743,7 +743,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		}
 		log.Printf("Try to get it from remote servers.\n", ncidlocal)
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
-			bm.SetBid(strconv.Itoa(j))
+			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
 			provider, _, err := l.gInfo.getBlockProviders(ncid) //获取数据块的保存位置
 			if (provider == "" || err != nil) && j < int(defaultMetaBackupCount)-1 {
@@ -752,8 +752,11 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				log.Println("Cannot load Lfs superblock.", err)
 				return nil, ErrCannotLoadMetaBlock
 			}
-			b, err = l.ds.GetBlock(ctx, ncid, sig, provider) //向指定provider查询超级块
-			if err != nil {                                  //*错误处理
+
+			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+
+			b, err = l.ds.GetBlock(ctx, km.ToString(), sig, provider) //向指定provider查询超级块
+			if err != nil {                                           //*错误处理
 				log.Printf("Get metablock %s from %s failed: %s.\n", ncid, provider, err)
 				continue
 			}
@@ -907,13 +910,14 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			}
 			log.Printf("Cannot Get ObjectInfo in block %s from local datastore. Maybe block is lost or broken.\n", ncidlocal)
 			for j := 0; j < int(l.meta.sb.MetaBackupCount); j++ {
-				bm.SetBid(strconv.Itoa(j))
+				bm.SetCid(strconv.Itoa(j))
 				ncid := bm.ToString()
 				provider, _, err := l.gInfo.getBlockProviders(ncid)
 				if err != nil && j == int(l.meta.sb.MetaBackupCount)-1 {
 					return ErrCannotLoadMetaBlock
 				}
-				b, err = l.ds.GetBlock(ctx, ncid, sig, provider)
+				km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+				b, err = l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 				if b != nil && err == nil {
 					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)
