@@ -1,27 +1,15 @@
 package keeper
 
 import (
-	"errors"
-	"log"
-	"sort"
-	"strconv"
-	"strings"
+	"math/big"
 	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/source/data"
-	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-type ukp struct {
-	localID string
-	ds      data.Service
-	gMap    sync.Map //key:queryid，value:*groupsInfo
-}
-
 // user-keeper-provider map
-type groupsInfo struct {
+type groupInfo struct {
 	groupID      string // is queryID
 	owner        string // is userID
 	localKeeper  string
@@ -44,230 +32,104 @@ type bucketInfo struct {
 	stripes     sync.Map // key is stripeID_chunkID, value is *cidInfo
 }
 
-type pqKey struct {
-	qid string
-	pid string
+//lInfo
+type lInfo struct {
+	chalMap      sync.Map // key:challenge time,value:*chalresult
+	blockMap     sync.Map // key:bucketid_stripeid_blockid, value: *blockInfo
+	chalCid      []string // value is []bucketid_stripeid_blockid
+	inChallenge  bool     // during challenge or not
+	maxlength    int64
+	lastChalTime int64
+	lastPay      *chalpay // stores result of last pay
 }
 
-func (u *ukp) getPUKeys() []pqKey {
-	var res []pqKey
-	localKeeper := u.localID
-	u.gMap.Range(func(k, v interface{}) bool {
+type blockInfo struct {
+	repair    int // need repair
+	availtime int64
+	offset    int    // length - 1
+	storedOn  string // stored on which provider
+}
+
+//chalresult 挑战结果在内存中的结构
+//作为chalInfo的value 记录单次挑战的各项信息
+type chalresult struct {
+	kid        string //挑战发起者
+	pid        string //挑战对象
+	qid        string //挑战的数据所属对象
+	chalTime   int64  //挑战发起时间 使用unix时间戳
+	totalSpace int64  //the amount of this user's data on the provider
+	sum        int64  //挑战总空间
+	length     int64  //挑战成功空间
+	h          int    //挑战的随机数
+	res        bool   //挑战是否成功
+	proof      string //挑战结果的证据
+}
+
+//chalpay: for one pay informations
+type chalpay struct {
+	beginTime int64    // last end
+	endTime   int64    // this end
+	spacetime *big.Int // space time value
+	signature string   // signature of spacetime
+	proof     string
+}
+type uqKey struct {
+	uid string
+	qid string
+}
+
+func (k *Info) getUQKeys() []uqKey {
+	var res []uqKey
+	k.ukpGroup.Range(func(k, v interface{}) bool {
 		key := k.(string)
-		if key == localKeeper {
-			return true
-		}
-		value := v.(*groupsInfo)
+		value := v.(*groupInfo)
+		// filter test user
 		if value.upkeeping == nil {
 			return true
 		}
-		for _, proID := range value.providers {
-			tmpPU := pqKey{
-				qid: key,
-				pid: proID,
-			}
-			res = append(res, tmpPU)
+
+		if key == value.owner {
+			return true
 		}
+
+		tmpUQ := uqKey{
+			uid: value.owner,
+			qid: key,
+		}
+		res = append(res, tmpUQ)
+
 		return true
 	})
 	return res
 }
 
-func (u *ukp) getUnpaidUsers() []string {
+func (k *Info) getUnpaidUsers() []string {
 	var res []string
-	u.gMap.Range(func(k, v interface{}) bool {
+	k.ukpGroup.Range(func(k, v interface{}) bool {
 		key := k.(string)
-		value := v.(*groupsInfo)
-		if value.upkeeping != nil {
+		value := v.(*groupInfo)
+		// filter test user
+		if value.upkeeping == nil || key == value.owner {
 			return true
 		}
+
 		res = append(res, key)
 		return true
 	})
 	return res
 }
 
-func (u *ukp) getChalinfo(thisPU pqKey) (*chalinfo, bool) {
-	thischalinfo, ok := l.lMap.Load(thisPU)
-	if !ok {
-		return nil, false
-	}
-
-	return thischalinfo.(*chalinfo), true
-}
-
 //getGroupsInfo wrap get and set if not exist
-func (u *ukp) getGroupsInfo(userID, groupID string) (*groupsInfo, bool) {
+func (k *Info) getGroupsInfo(userID, groupID string) (*groupInfo, error) {
 	thisGroupinfo, ok := u.gMap.Load(groupID)
 	if !ok {
-		tempInfo := &groupsInfo{
-			groupID:      groupID,
-			owner:        userID,
-			localKeeper:  u.localID,
-			masterKeeper: groupID,
-		}
-		err := saveUpkeepingToGP(tempInfo)
+		ginfo, err := newGroup(k.netID, groupID, userID, []string{groupID}, []string{groupID})
 		if err != nil {
-			return nil, false
+			return nil, err
 		}
-
-		u.gMap.Store(groupid, tempInfo)
-		return tempInfo, true
+		u.gMap.Store(groupID, ginfo)
+		return ginfo, nil
 	}
 
-	return thisGroupinfo.(*groupsInfo), true
-}
-
-func (u *ukp) getBucketInfo(groupID, bucketID string) (*bucketInfo, bool) {
-	thisGroupinfo, ok := u.gMap.Load(groupID)
-	if !ok {
-		return nil, false
-	}
-
-	thisgroup := thisGroupinfo.(*groupsInfo)
-
-	thisbucket, ok := thisgroup.buckets.Load(bucketID)
-	if !ok {
-		newBucket := &bucketInfo{}
-		thisgroup.buckets.Store(bucketID, newBucket)
-		return newBucket, true
-	}
-	return thisbucket.(*bucketInfo), true
-}
-
-func (u *ukp) addBlockMeta(gid, bid string, ci *cidInfo) error {
-	bucketID, stripeID, chunkID, err := metainfo.GetIDsFromBlock(bid)
-	if err != nil {
-		return err
-	}
-
-	thisBucketinfo, ok := u.getBucketInfo(gid, bucketID)
-	if !ok {
-		return errors.New("cannot create bucket info")
-	}
-
-	thisBucketinfo.stripes.Store(bid, ci)
-
-	snum, err := strconv.Atoi(stripeID)
-	if err != nil {
-		return err
-	}
-
-	if snum > thisBucketinfo.curStripes {
-		thisBucketinfo.curStripes = snum
-	}
-
-	cnum, err := strconv.Atoi(chunkID)
-	if err != nil {
-		return err
-	}
-
-	if cnum > thisBucketinfo.chunkNum {
-		thisBucketinfo.chunkNum = cnum
-	}
-
-	return nil
-}
-
-func (u *ukp) deleteBlockMeta(gid, bid string) {
-	gri, ok := u.gMap.Load(gid)
-	if !ok {
-		return
-	}
-
-	bis := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
-
-	bui, ok := gri.(*groupsInfo).buckets.Load(bis[0])
-	if !ok {
-		return
-	}
-
-	bui.(*bucketInfo).stripes.Delete(bis[1])
-}
-
-func (u *ukp) getLocalKeeperInGroup(groupid string) (string, error) {
-	thisGroupInfo, ok := u.getGroupsInfo(groupid)
-	if !ok {
-		log.Println("getGroupsInfo err! groupid:", groupid)
-		return "", errNoGroupsInfo
-	}
-	if thisGroupInfo.localKeeper == groupid {
-		for _, keeperID := range thisGroupInfo.keepers {
-			if keeperID == u.localID {
-				thisGroupInfo.localKeeper = keeperID
-			}
-		}
-	}
-	if thisGroupInfo.localKeeper == groupid {
-		// not my user
-		u.gMap.Delete(groupid)
-		return "", errNotKeeperInThisGroup
-	}
-	return thisGroupInfo.localKeeper, nil
-}
-
-func (u *ukp) getMasterKeeperInGroup(groupid string) (string, error) {
-	thisGroupInfo, ok := u.getGroupsInfo(groupid)
-	if !ok {
-		log.Println("getGroupsInfo err! groupid:", groupid)
-		return "", errNoGroupsInfo
-	}
-
-	if thisGroupInfo.masterKeeper == groupid {
-		thisGroupInfo.masterKeeper = getMasterID(thisGroupInfo.keepers)
-	}
-
-	if thisGroupInfo.masterKeeper == groupid {
-		return "", errNotKeeperInThisGroup
-	}
-	return thisGroupInfo.masterKeeper, nil
-}
-
-func (u *ukp) localKeeperIsMaster(groupid string) bool {
-	masterID, err := u.getMasterKeeperInGroup(groupid)
-	if err != nil {
-		log.Println("getMasterKeeperInGroup err.", err)
-		return false
-	}
-
-	localID, err := u.getLocalKeeperInGroup(groupid)
-	if err != nil {
-		log.Println("getLocalKeeperInGroup err.", err)
-		return false
-	}
-
-	return masterID == localID
-}
-
-// if this provider belongs to this keeper, then this keeper is master
-// else call localKeeperIsMaster
-func (u *ukp) isMasterKeeper(groupid string, pid string) bool {
-	thisGroupsInfo, ok := u.getGroupsInfo(groupid)
-	if !ok {
-		log.Println("localkeeperIsMaster err! There is no information in Pinfo,groupid:", groupid)
-		return false
-	}
-	var mymaster []string
-	mykids, ok := contracts.GetKeepersOfPro(pid)
-	if ok {
-		for _, keeperID := range thisGroupsInfo.keepers {
-			for _, nkid := range mykids {
-				if nkid == keeperID {
-					mymaster = append(mymaster, keeperID)
-					break
-				}
-			}
-		}
-		if len(mymaster) > 0 {
-			return getMasterID(mymaster) == u.localID
-		}
-	}
-
-	return u.localKeeperIsMaster(groupid)
-}
-
-//getMasterID choose the middle nodes
-func getMasterID(kidlist []string) string {
-	sort.Strings(kidlist)
-	return kidlist[len(kidlist)/2]
+	return thisGroupinfo.(*groupInfo), nil
 }

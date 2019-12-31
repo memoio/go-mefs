@@ -35,17 +35,17 @@ const (
 
 //Info implements user service
 type Info struct {
-	netID      string
-	role       string
-	sk         string
-	state      bool
-	enableBft  bool
-	repch      chan string
-	ds         data.Service
-	keepers    sync.Map // keepers except self
-	providers  sync.Map // providers
-	users      sync.Map // users
-	ukpManager *ukp     // manage user-keeper-provider group
+	netID     string
+	role      string
+	sk        string
+	state     bool
+	enableBft bool
+	repch     chan string
+	ds        data.Service
+	keepers   sync.Map // keepers except self; value: *kInfo
+	providers sync.Map // value: *pInfo
+	users     sync.Map // value: *uInfo
+	ukpGroup  sync.Map // manage user-keeper-provider group, value: *group
 }
 
 // New is
@@ -108,9 +108,7 @@ func (k *Info) Stop() error {
 	return k.save(context.Background())
 }
 
-func (k *Info) GetUKP() *ukp {
-	return k.ukpManager
-}
+/*====================Save and Load========================*/
 
 func (k *Info) persistRegular(ctx context.Context) {
 	log.Println("Persist LocalPeerInfo start!")
@@ -229,6 +227,8 @@ func (k *Info) save(ctx context.Context) error {
 		}
 	}
 
+	// save last pay
+
 	// persist ledgerInfos
 	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.LedgerMap)
 	if err != nil {
@@ -283,6 +283,47 @@ func (k *Info) save(ctx context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+func (k *Info) savePay(qid, pid string) error {
+
+	thisIg, ok := k.ukpGroup.Load(qid)
+	if !ok {
+		return errors.New("No such user")
+	}
+
+	thisIlinfo, ok := thisIg.(*groupInfo).ledgerMap.Load(pid)
+	if !ok {
+		return errors.New("No such user")
+	}
+
+	thisLinfo := thisIlinfo.(*lInfo)
+
+	if thisLinfo.lastPay != nil {
+		beginTime := thisLinfo.lastPay.beginTime
+		endTime := thisLinfo.lastPay.endTime
+		spaceTime := thisLinfo.lastPay.spacetime
+		//key: qid/`lastpay"/pid`
+		//value: `beginTime/endTime/spacetime/signature/proof`
+		kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
+		if err != nil {
+			log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
+			return nil, "", err
+		}
+		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
+		k.ds.PutKey(context.Background(), kmLast.ToString(), []byte(valueLast), "local")
+		//key: `qid/"chalpay"/pid/beginTime/endTime`
+		//value: `spacetime/signature/proof`
+		//for storing
+		km, err := metainfo.NewKeyMeta(qid, metainfo.ChalPay, thisPU.pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
+		if err != nil {
+			log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
+			return nil, "", err
+		}
+		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
+		k.ds.PutKey(context.Background(), km.ToString(), []byte(metaValue), "local")
+	}
 	return nil
 }
 
@@ -381,48 +422,6 @@ func (k *Info) loadUser(ctx context.Context) error {
 	wg.Wait()
 
 	return nil
-}
-
-func (k *Info) fillGroup(qid, uid string, keepers, providers []string) (*groupsInfo, error) {
-	tempInfo := &groupsInfo{
-		keepers:      keepers,
-		providers:    providers,
-		groupID:      qid,
-		owner:        uid,
-		localKeeper:  k.netID,
-		masterKeeper: qid,
-	}
-
-	if qid != uid {
-		err := saveUpkeepingToGP(qid, tempInfo)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		flag := false
-		for _, keeperID := range tempInfo.keepers {
-			if k.netID == keeperID {
-				flag = true
-			}
-		}
-
-		// not my user
-		if !flag {
-			log.Println(uid, "is not my user")
-			return nil, errors.New("Not my user")
-		}
-	}
-
-	return tempInfo, nil
-}
-
-func (k *Info) addBlockMeta(qid, pid, bid string, offset int) error {
-
-	newCidInfo, err := k.lManager.addBlockMeta(qid, pid, bid, offset)
-	if err != nil {
-		return err
-	}
-	return k.ukpManager.addBlockMeta(qid, bid, newCidInfo)
 }
 
 func (k *Info) loadUserBlock(qid string) error {
@@ -525,6 +524,8 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	return nil
 }
 
+/*====================Group Ops========================*/
+
 //clean unpaid users
 func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 	log.Println("Clean Test Users start!")
@@ -541,107 +542,202 @@ func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 			//在一点和五点之间，清理testUsers
 			if tNow.After(t1) && tNow.Before(t2) {
 				log.Println("Begin to clean test users")
-				k.cleanTestUsers(ctx)
+				unpaids := k.ukpManager.getUnpaidUsers()
+				for uid, qid := range unpaids {
+					k.deleteGroup(ctx, qid)
+					k.users.Delete(uid)
+				}
 			}
 		}
 	}
 }
 
-func (k *Info) cleanTestUsers(ctx context.Context) {
-	unpaids := k.ukpManager.getUnpaidUsers()
-	for _, userID := range unpaids {
-		thisKPInfo, ok := k.ukpManager.gMap.Load(userID)
+func (k *Info) createGroup(qid, uid string, keepers, providers []string) error {
+	_, ok := k.ukpGroup.Load(qid)
+	if !ok {
+		gInfo, err := newGroup(k.netID, qid, uid, keepers, providers)
+		if err != nil {
+			return err
+		}
+		k.ukpGroup.Store(qid, gInfo)
+		ctx := context.Background()
+		for _, pid := range gInfo {
+			lin := &lInfo{
+				inChallenge:  false,
+				lastChalTime: utils.GetUnixNow(),
+			}
+
+			gInfo.ledgerMap.Store(pid, lin)
+
+			kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
+			if err != nil {
+				log.Println(err)
+				return err
+			}
+
+			kms := kmLast.ToString()
+			// get from leveldb
+			res, err := k.ds.GetKey(ctx, kms, "local")
+			if err != nil {
+				log.Println("no lastTime data, return Unix(0)")
+				return err
+			}
+			err = lin.parseLastPayKV(res)
+			if err != nil {
+				log.Println("checkLastPayTime() parseLastPayKV() err: ", err)
+				return err
+			}
+		}
+	}
+
+	// init userConfig
+
+	return nil
+}
+
+func (k *Info) deleteGroup(ctx context.Context, qid string) {
+	thisIgroup, ok := k.ukpManager.gMap.Load(qid)
+	if !ok {
+		return
+	}
+
+	thisGroup := thisIgroup.(*groupInfo)
+
+	//recheck the user's status
+	addr, err := address.GetAddressFromID(thisGroup.owner)
+	if err != nil {
+		return
+	}
+
+	_, _, err = contracts.GetUKFromResolver(addr)
+	if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
+		saveUpkeepingToGP(thisGroup)
+		return
+	}
+
+	log.Println(qid, "is a test userID, clean its data")
+	for _, proID := range thisGroup.providers {
+		thisIlinfo, ok := thisGroup.ledgerMap.Load(proID)
 		if !ok {
 			continue
 		}
 
-		thiskp := thisKPInfo.(*groupsInfo)
+		thisLinfo := thisIlinfo.(*lInfo)
 
-		//recheck the user's status
-		addr, err := address.GetAddressFromID(userID)
-		if err != nil {
-			continue
-		}
-
-		_, _, err = contracts.GetUKFromResolver(addr)
-		if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
-			saveUpkeepingToGP(userID, thiskp)
-			continue
-		}
-
-		for _, proID := range thiskp.providers {
-			pu := pqKey{
-				pid: proID,
-				qid: userID,
+		thisLinfo.blockMap.Range(func(key, value interface{}) bool {
+			blockID := qid + metainfo.BLOCK_DELIMITER + key.(string)
+			log.Println("Delete testUser block-", blockID)
+			//先通知Provider删除块
+			km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
+			if err != nil {
+				log.Println("construct delete block KV error :", err)
+				return false
+			}
+			err = k.ds.DeleteBlock(ctx, km.ToString(), proID)
+			if err != nil {
+				log.Println("Delete testUser block failed-", blockID, "error:", err)
 			}
 
-			thisInfo, ok := k.lManager.lMap.Load(pu)
-			if !ok {
-				continue
+			kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+			if err != nil {
+				log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
 			}
 
-			thischalinfo := thisInfo.(*chalinfo)
+			//delete from local
+			err = k.ds.DeleteKey(ctx, kmBlock.ToString(), "local")
+			if err != nil {
+				log.Println("Delete local key error:", err)
+			}
 
-			log.Println(pu.qid, "is a test userID, clean its data")
-			thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-				blockID := key.(string)
-				log.Println("Delete testUser block-", blockID)
-				//先通知Provider删除块
-				km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
-				if err != nil {
-					log.Println("construct delete block KV error :", err)
-					return false
-				}
-				err = k.ds.DeleteBlock(ctx, km.ToString(), pu.pid)
-				if err != nil {
-					log.Println("Delete testUser block failed-", blockID, "error:", err)
-				}
-
-				//再在本地删除记录
-				kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
-				if err != nil {
-					log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
-				}
-				err = k.ds.DeleteKey(ctx, kmBlock.ToString(), "local")
-				if err != nil {
-					log.Println("Delete local Message error:", err)
-				}
-				return true
-			})
-
-			k.ukpManager.gMap.Delete(pu.qid)
-			k.lManager.lMap.Delete(pu)
-		}
+			return true
+		})
 	}
+
+	// delete group
+	k.ukpGroup.Delete(qid)
 }
 
-func (k *Info) getBlockPos(qid, blockID string) (string, error) {
-	gri, ok := k.ukpManager.gMap.Load(qid)
-	if !ok {
-		return "", errors.New("No block")
+/*====================Block Meta Ops=========================*/
+
+func (k *Info) getBlockPos(qid, bid string) (string, error) {
+	thisIgroup, ok := k.ukpGroup.Load(qid)
+	if ok {
+		return thisIgroup.(*groupInfo).getBlockPos(qid, bid)
 	}
 
-	bis := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
-
-	bui, ok := gri.(*groupsInfo).buckets.Load(bis[0])
-	if !ok {
-		return "", errors.New("No block")
-	}
-
-	sti, ok := bui.(*bucketInfo).stripes.Load(bis[1])
-	if !ok {
-		return "", errors.New("No block")
-	}
-
-	st := sti.(*cidInfo)
-	return st.storedOn, nil
+	return "", errors.New("No block")
 }
 
-func (k *Info) deleteBlockMeta(qid, blockID string) {
-	pid, err := k.getBlockPos(qid, blockID)
+func (k *Info) addBlockMeta(qid, pid, bid string, offset int) error {
+	blockID := qid + metainfo.BLOCK_DELIMITER + bid
+
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
-		return
+		log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
 	}
-	k.lManager.deleteBlockMeta(qid, pid, blockID)
-	k.ukpManager.deleteBlockMeta(pid, blockID)
+
+	ctx := context.Background()
+	//delete from local
+	err = k.ds.PutKey(ctx, kmBlock.ToString(), "local")
+	if err != nil {
+		log.Println("Delete local key error:", err)
+	}
+
+	thisIgroup, ok := k.ukpGroup.Load(qid)
+	if ok {
+		return thisIgroup.(*groupInfo).addBlockMeta(pid, bid, offset)
+	}
+
+	return errors.New("Not my user")
+}
+
+// flag: weather noyify provider to actual delete
+func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
+	blockID := qid + metainfo.BLOCK_DELIMITER + bid
+
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+	if err != nil {
+		log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
+	}
+
+	ctx := context.Background()
+	//delete from local
+	err = k.ds.DeleteKey(ctx, kmBlock.ToString(), "local")
+	if err != nil {
+		log.Println("Delete local key error:", err)
+	}
+
+	var pid string
+	thisIgroup, ok := k.ukpGroup.Load(qid)
+	if ok {
+		thisGroup := thisIgroup.(*groupInfo)
+		pid = thisGroup.getBlockPos(bid)
+		if pid == "" {
+			// need to get from local kv
+			res, err := k.ds.GetKey(ctx, kmBlock.ToString(), "local")
+			if err != nil {
+				return
+			}
+			po := strings.Split(string(res), metainfo.DELIMITER)
+			pid = po[0]
+			return
+		}
+		// delete from mem
+		thisGroup.deleteBlockMeta(pid, bid)
+	}
+
+	if flag {
+		// notify provider, to delete block
+		km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
+		if err != nil {
+			log.Println("construct delete block KV error :", err)
+			return false
+		}
+		err = k.ds.DeleteBlock(ctx, km.ToString(), pid)
+		if err != nil {
+			log.Println("Delete testUser block failed-", blockID, "error:", err)
+		}
+	}
+
+	return
 }

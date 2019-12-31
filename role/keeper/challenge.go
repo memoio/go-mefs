@@ -26,117 +26,109 @@ func (k *Info) challengeRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			log.Println("Challenge start at: ", utils.GetTimeNow())
-			pus := k.ukpManager.getPUKeys()
+			pus := k.getUQKeys()
 			for _, pu := range pus {
-				thisInfo, ok := k.lManager.lMap.Load(pu)
+				thisIgroup, ok := k.ukpGroup.Load(pu.qid)
 				if !ok {
 					continue
 				}
-				thischalinfo := thisInfo.(*chalinfo)
+				thisGroup := thisIgroup.(*groupInfo)
 
-				// last chanllenge has not complete
-				if thischalinfo.inChallenge {
-					k.lManager.cleanLastChallenge(pu)
-				}
-
-				thischalinfo.inChallenge = true
-
-				// at most challenge 100 blocks
-				ret := make([]string, 0, 100)
-				psum := 0
-				chalnum := 0
-				thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-					cInfo := value.(*cidInfo)
-					ret = append(ret, key.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(cInfo.offset))
-					psum += cInfo.offset + 1
-					chalnum++
-					if chalnum >= 100 {
-						return false
+				for _, proID := range thisGroup.providers {
+					thisIl, ok := thisGroup.ledgerMap.Load(proID)
+					if !ok {
+						continue
 					}
-					return true
-				})
-
-				// no data
-				if len(ret) == 0 || psum == 0 {
-					thischalinfo.inChallenge = false
-					continue
+					thisLinfo := thisIl.(*lInfo)
+					key, value, err := thisLinfo.genChallengeBLS(k.netID, pu.qid, proID)
+					if err != nil {
+						continue
+					}
+					go k.ds.SendMetaRequest(ctx, int32(metainfo.Get), key, value, nil, proID)
 				}
 
-				challengetime := utils.GetUnixNow()
-				// timestamp as random source
-				// need more parameters to securely generate random source
-				chal := mcl.GenChallenge(challengetime, ret)
-
-				thischalresult := &chalresult{
-					kid:           k.netID,
-					pid:           pu.pid,
-					uid:           pu.qid,
-					challengeTime: challengetime,
-					sum:           int64(psum) * df.DefaultSegmentSize,
-					totalSpace:    thischalinfo.maxlength,
-					h:             chal.C,
-				}
-
-				hProto := &pb.Chalnum{
-					PubC:    int64(chal.C),
-					Indices: chal.Indices,
-				}
-				hByte, err := proto.Marshal(hProto)
-				if err != nil {
-					log.Println("marshal h failed, err: ", err)
-					thischalinfo.inChallenge = false
-					continue
-				}
-
-				thischalinfo.chalMap.Store(challengetime, thischalresult)
-				thischalinfo.chalCid = ret
-				thischalinfo.lastChalTime = challengetime
 				// in case povider cannot get it
-				go k.ukpManager.getUserBLS12Config(pu.qid)
-				go k.lManager.doChallengeBLS12(ctx, pu, hByte, challengetime)
+				go k.getUserBLS12Config(pu.uid, pu.qid)
 			}
 		}
 	}
 }
 
-func (u *ukp) doChallengeBLS12(ctx context.Context, pu pqKey, hByte []byte, chaltime int64) {
-	fail := false
-	// clean before return
-	defer func() {
-		if fail {
-			l.cleanLastChallenge(pu)
-		}
-	}()
+func (l *lInfo) genChallengeBLS(localID, qid, proID string) (string, []byte, error) {
+	// last chanllenge has not complete
+	if l.inChallenge {
+		l.cleanLastChallenge()
+	}
 
-	km, err := metainfo.NewKeyMeta(pu.qid, metainfo.Challenge, utils.UnixToString(chaltime))
+	l.inChallenge = true
+
+	// at most challenge 100 blocks
+	ret := make([]string, 0, 100)
+	psum := 0
+	chalnum := 0
+	l.blockMap.Range(func(key, value interface{}) bool {
+		cInfo := value.(*blockInfo)
+		ret = append(ret, key.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(cInfo.offset))
+		psum += cInfo.offset + 1
+		chalnum++
+		if chalnum >= 100 {
+			return false
+		}
+		return true
+	})
+
+	// no data
+	if len(ret) == 0 || psum == 0 {
+		l.inChallenge = false
+		return "", nil, nil
+	}
+
+	challengetime := utils.GetUnixNow()
+	// timestamp as random source
+	// need more parameters to securely generate random source
+	chal := mcl.GenChallenge(challengetime, ret)
+
+	thischalresult := &chalresult{
+		kid:        localID,
+		pid:        proID,
+		qid:        qid,
+		chalTime:   challengetime,
+		sum:        int64(psum) * df.DefaultSegmentSize,
+		totalSpace: l.maxlength,
+		h:          chal.C,
+	}
+
+	hProto := &pb.Chalnum{
+		PubC:    int64(chal.C),
+		Indices: chal.Indices,
+	}
+	hByte, err := proto.Marshal(hProto)
+	if err != nil {
+		l.inChallenge = false
+		return "", nil, err
+	}
+
+	l.chalMap.Store(challengetime, thischalresult)
+	l.chalCid = ret
+	l.lastChalTime = challengetime
+
+	// key: qid/"Challenge"/proID/chalTime
+	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, proID, utils.UnixToString(challengetime))
 	if err != nil {
 		log.Println("construct challenge KV error :", err)
-		fail = true
-		return
+		return "", nil, err
 	}
-
-	_, err = l.ds.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), hByte, nil, pu.pid)
-	if err != nil {
-		log.Println("DoChallengeBLS12 error :", err)
-		fail = true
-		return
-	}
-	return
+	return km.ToString(), hByte, nil
 }
 
-func (u *ukp) cleanLastChallenge(pu pqKey) {
-	thischalinfo, ok := l.getChalinfo(pu)
-	if !ok {
-		log.Println("getChalinfo error!pu: ", pu)
+func (l *lInfo) cleanLastChallenge() {
+
+	if !l.inChallenge {
 		return
 	}
 
-	if !thischalinfo.inChallenge {
-		return
-	}
-
-	failChallTime := thischalinfo.lastChalTime
-	thischalresult, ok := thischalinfo.chalMap.Load(failChallTime)
+	failChallTime := l.lastChalTime
+	thischalresult, ok := l.chalMap.Load(failChallTime)
 	if !ok {
 		log.Println("thischalinfo.chalMap.Load error!challengetime: ", failChallTime)
 		return
@@ -146,27 +138,18 @@ func (u *ukp) cleanLastChallenge(pu pqKey) {
 	chalResult.res = false
 	chalResult.length = 0
 
-	thischalinfo.inChallenge = false
+	l.inChallenge = false
 }
 
 //handleProof handles the challenge result from provider
-//key: uid/"proof"/chaltime,value: proof[/FaultBlocks]
-func (u *ukp) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blskey *mcl.PublicKey) bool {
+//key: qid/"Challenge"/pid/chaltime,value: proof[/FaultBlocks]
+func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blskey *mcl.PublicKey) bool {
 	ops := km.GetOptions()
 	if len(ops) < 1 {
 		return false
 	}
 
 	chaltime := ops[0]
-
-	pu := pqKey{
-		pid: pid,
-		qid: km.GetMid(),
-	}
-
-	defer func() {
-		l.cleanLastChallenge(pu)
-	}()
 
 	thischalinfo, ok := l.getChalinfo(pu)
 	if !ok {

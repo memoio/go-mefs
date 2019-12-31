@@ -106,7 +106,7 @@ func (k *Info) repairRegular(ctx context.Context) {
 // 1.search a new provider,we do it in func SearchNewProvider
 // 2.put chunk to this provider
 // 3.change metainfo and sync
-func (u *ukp) repairBlock(ctx context.Context, blockID string) {
+func (k *Info) repairBlock(ctx context.Context, blockID string) {
 
 	var response string
 	// uid_bid_sid_bid
@@ -243,7 +243,7 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 }
 
 //searchNewProvider find a NEW provider for user
-func (u *ukp) searchNewProvider(ctx context.Context, gid string, ugid []string) string {
+func (k *Info) searchNewProvider(ctx context.Context, gid string, ugid []string) string {
 	response := ""
 	gp, ok := u.getGroupsInfo(gid)
 	if !ok {

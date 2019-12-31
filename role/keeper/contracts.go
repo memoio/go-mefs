@@ -12,7 +12,7 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func (u *ukp) saveUpkeeping(uid, gid string, update bool) error {
+func (k *Info) saveUpkeeping(uid, gid string, update bool) error {
 	gp, ok := u.getGroupsInfo(uid, gid)
 	if !ok {
 		log.Println("saveUpkeeping getGroupsInfo() error")
@@ -26,9 +26,9 @@ func (u *ukp) saveUpkeeping(uid, gid string, update bool) error {
 	return nil
 }
 
-func saveUpkeepingToGP(gp *groupsInfo) error {
+func (g *groupInfo) saveUpkeeping() error {
 	// get upkkeeping addr
-	userAddr, err := ad.GetAddressFromID(gp.owner)
+	userAddr, err := ad.GetAddressFromID(g.owner)
 	if err != nil {
 		return err
 	}
@@ -45,27 +45,27 @@ func saveUpkeepingToGP(gp *groupsInfo) error {
 
 	flag := false
 	for _, keeperID := range item.KeeperIDs {
-		if gp.localKeeper == keeperID {
+		if g.localKeeper == keeperID {
 			flag = true
 		}
 	}
 
 	// not my user
 	if !flag {
-		log.Println(gp.owner, "is not my user")
+		log.Println(g.owner, "is not my user")
 		return errors.New("Not my user")
 	}
 
-	gp.providers = item.ProviderIDs
-	gp.keepers = item.KeeperIDs
-	item.UserID = gp.owner
+	g.providers = item.ProviderIDs
+	g.keepers = item.KeeperIDs
+	item.UserID = g.owner
 	item.UpKeepingAddr = ukAddr
-	gp.upkeeping = &item
+	g.upkeeping = &item
 
 	return nil
 }
 
-func (u *ukp) getUpkeeping(uid, gid string) (*contracts.UpKeepingItem, error) {
+func (k *Info) getUpkeeping(uid, gid string) (*contracts.UpKeepingItem, error) {
 	gp, ok := u.getGroupsInfo(uid, gid)
 	if !ok {
 		log.Println("saveUpkeeping getGroupsInfo() error")
@@ -86,7 +86,7 @@ func (u *ukp) getUpkeeping(uid, gid string) (*contracts.UpKeepingItem, error) {
 	return gp.upkeeping, nil
 }
 
-func (u *ukp) saveQuery(qid string, update bool) error {
+func (k *Info) saveQuery(qid string, update bool) error {
 	gp, ok := u.getGroupsInfo(qid)
 	if !ok {
 		return errNoGroupsInfo
@@ -99,7 +99,7 @@ func (u *ukp) saveQuery(qid string, update bool) error {
 	return nil
 }
 
-func saveQueryToGP(qid string, gp *groupsInfo) error {
+func saveQueryToGP(qid string, gp *groupInfo) error {
 	userAddr, err := ad.GetAddressFromID(gp.owner)
 	if err != nil {
 		return err
@@ -121,7 +121,7 @@ func saveQueryToGP(qid string, gp *groupsInfo) error {
 	return nil
 }
 
-func (u *ukp) getQuery(qid string) (queryItem *contracts.QueryItem, err error) {
+func (k *Info) getQuery(qid string) (queryItem *contracts.QueryItem, err error) {
 	gp, ok := u.getGroupsInfo(qid)
 	if !ok {
 		log.Println("saveUpkeeping getGroupsInfo() error")
@@ -199,7 +199,7 @@ func (k *Info) getOffer(providerID string) (offerItem *contracts.OfferItem, err 
 }
 
 // addProvider 将传入pid加入posuser的upkeeping合约
-func (u *ukp) ukAddProvider(uid, pid, sk string) error {
+func (k *Info) ukAddProvider(uid, pid, sk string) error {
 	uk, err := u.getUpkeeping(uid)
 	if err != nil {
 		log.Println("ukAddProvider getUpkeeping() error", err)

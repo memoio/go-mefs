@@ -13,7 +13,7 @@ var (
 	errKeeperServiceNotReady = errors.New("keeper service is not ready")
 	errUnmatchedPeerID       = errors.New("peer ID is not match")
 	errBlockNotExist         = errors.New("block does not exist")
-	errNoGroupsInfo          = errors.New("can not find groupsInfo")
+	errNoGroupsInfo          = errors.New("can not find groupInfo")
 	errParaseMetaFailed      = errors.New("no enough data in metainfo")
 	errNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
 	errPInfoTypeAssert       = errors.New("type asserts err in ukpInfo")
@@ -23,7 +23,7 @@ var (
 )
 
 //---config----
-func (u *ukp) getUserBLS12Config(uid, gid string) (*mcl.PublicKey, error) {
+func (k *Info) getUserBLS12Config(uid, gid string) (*mcl.PublicKey, error) {
 	thisInfo, ok := u.getGroupsInfo(uid, gid)
 	if !ok {
 		return nil, errors.New("No Bls Key")
@@ -48,7 +48,7 @@ func (u *ukp) getUserBLS12Config(uid, gid string) (*mcl.PublicKey, error) {
 	return mkey.Pk, nil
 }
 
-func (u *ukp) getUserBLS12ConfigByte(qid string) ([]byte, error) {
+func (k *Info) getUserBLS12ConfigByte(qid string) ([]byte, error) {
 	kmBls12, err := metainfo.NewKeyMeta(qid, metainfo.Config)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (u *ukp) getUserBLS12ConfigByte(qid string) ([]byte, error) {
 		return nil, errors.New("no groupinfo")
 	}
 
-	for _, keeperID := range gp.(*groupsInfo).keepers {
+	for _, keeperID := range gp.(*groupInfo).keepers {
 		userconfigbyte, err = u.ds.GetKey(ctx, userconfigkey, keeperID)
 		if err == nil && userconfigbyte != nil {
 			return userconfigbyte, nil

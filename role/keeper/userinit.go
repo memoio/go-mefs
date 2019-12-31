@@ -118,7 +118,7 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 		return newResponse.String(), nil
 	}
 
-	thisGroupsInfo := thisInfo.(*groupsInfo)
+	thisGroupsInfo := thisInfo.(*groupInfo)
 	// user has init
 	for _, pid := range thisGroupsInfo.keepers {
 		newResponse.WriteString(pid)
@@ -163,7 +163,7 @@ func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from str
 	return []byte("ok"), nil
 }
 
-// fillPinfo fill user's uInfo, groupsInfo in ukpMap
+// fillPinfo fill user's uInfo, groupInfo in ukpMap
 func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, from string) {
 	//将value切分，生成好对应的keepers和providers列表
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)

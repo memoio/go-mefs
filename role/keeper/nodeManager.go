@@ -263,7 +263,7 @@ func (k *Info) GetUsers() ([]string, error) {
 		if !ok {
 			return false
 		}
-		thisGroupsInfo, ok := v.(*groupsInfo)
+		thisGroupsInfo, ok := v.(*groupInfo)
 		if !ok {
 			return false
 		}
