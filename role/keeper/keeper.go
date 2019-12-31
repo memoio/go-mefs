@@ -60,6 +60,20 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		repch: make(chan string, 1024),
 	}
 
+	u := &ukp{
+		localID: nid,
+		ds:      d,
+	}
+
+	m.ukpManager = u
+
+	l := &ledger{
+		localID: nid,
+		ds:      d,
+	}
+
+	m.lManager = l
+
 	err := m.load(ctx) //连接节点
 	if err != nil {
 		log.Println("searchAllKeepersAndProviders err:", err)

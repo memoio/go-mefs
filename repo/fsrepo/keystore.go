@@ -228,7 +228,7 @@ func GetPrivateKeyFromKeystore(peerID string, filepath string, password string) 
 	}
 	// Make sure we're really operating on the requested key (no swap attacks)
 	if key.PeerID != peerID {
-		return nil, fmt.Errorf("key content mismatch: have peer %s, want %s", key.PeerID, peerID)
+		return nil, fmt.Errorf("key content mismatch: have peer %x, want %x", key.PeerID, peerID)
 	}
 	return key, nil
 }
