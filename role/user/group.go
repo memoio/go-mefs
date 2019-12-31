@@ -195,9 +195,6 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	log.Println("Group Service is ready for: ", g.owner)
 
 	g.state = groupStarted
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

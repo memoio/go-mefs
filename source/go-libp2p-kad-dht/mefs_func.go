@@ -133,7 +133,7 @@ func (dht *KadDHT) PutTo(ctx context.Context, key string, value []byte, id strin
 	}
 
 	if !bytes.Equal(rpmes.GetRecord().GetValue(), rec.GetValue()) {
-		log.Println("putValueToPeer: value not put correctly. (%v != %v)", pmes, rpmes)
+		log.Println("PutTo: value not put correctly. (%v != %v)", pmes, rpmes)
 		return errors.New("value not put correctly")
 	}
 	return nil
@@ -173,12 +173,10 @@ func (dht *KadDHT) GetFrom(ctx context.Context, key string, to string) ([]byte, 
 	}
 
 	if !bytes.Equal(rpmes.GetRecord().GetKey(), []byte(key)) {
-		log.Println("putValueToPeer: value not put correctly. (%v != %v)", pmes, rpmes)
 		return nil, routing.ErrNotFound
 	}
 
-	return rpmes.GetRecord().GetValue(), routing.ErrNotFound
-
+	return rpmes.GetRecord().GetValue(), nil
 }
 
 //IterFrom 指定节点前缀查找
@@ -253,8 +251,12 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 	// append/iter can be done here
 
 	if dht.metahandler == nil {
+		log.Println("No MetaHandler")
 		return nil, instance.ErrMetaHandlerNotAssign
 	}
+
+	log.Println("hanle metakey:", metaKey)
+
 	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
 	if err != nil {
 		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\ncaller:%s\n", err, metaKey, p.Pretty(), string(pmes.GetKey()))

@@ -99,7 +99,12 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 
 	n.Connect(ctx, to)
 
-	return n.rt.(*dht.KadDHT).GetFrom(ctx, key, to)
+	res, err := n.rt.(*dht.KadDHT).GetFrom(ctx, key, to)
+	if err != nil {
+		log.Println("GetKey err:", err, "key is: ", key, "from: ", to)
+		return nil, err
+	}
+	return res, nil
 }
 
 func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) error {
