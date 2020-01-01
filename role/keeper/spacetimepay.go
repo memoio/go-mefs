@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"errors"
 	"log"
 	"math/big"
 	"sort"
@@ -27,15 +28,15 @@ func (k *Info) stPayRegular(ctx context.Context) {
 		case <-ticker.C:
 			uqs := k.getUQKeys()
 			for _, uq := range uqs {
-				thisIGroup, ok := k.ukpGroup.Load(uq.pid)
-				if !ok {
+				qid := uq.qid
+
+				thisGroup := k.getGroupInfo(qid, uq.uid, false)
+				if thisGroup == nil {
 					continue
 				}
 
-				thisGroup := thisIGroup.(*groupInfo)
-
 				for _, proID := range thisGroup.providers {
-					err := thisGroup.spaceTimePay(proID)
+					err := thisGroup.spaceTimePay(proID, k.sk)
 					if err != nil {
 						continue
 					}
@@ -47,7 +48,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 	}
 }
 
-func (g *groupInfo) spaceTimePay(proID string) error {
+func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
 	defer log.Println("========spacetimepay========")
@@ -65,14 +66,14 @@ func (g *groupInfo) spaceTimePay(proID string) error {
 		log.Println("contracts.QueryBalance() err: ", err)
 		return err
 	}
-	log.Printf("ukaddr:%s has balance:%s\n", ukItem.UpKeepingAddr, ukBalance.String())
+	log.Printf("ukaddr:%s has balance:%s\n", g.upkeeping.UpKeepingAddr, ukBalance.String())
 
 	price := g.upkeeping.Price
 
 	// check again
 	found := false
 	for _, pid := range g.upkeeping.ProviderIDs {
-		if pid == ProID {
+		if pid == proID {
 			found = true
 			break
 		}
@@ -80,7 +81,7 @@ func (g *groupInfo) spaceTimePay(proID string) error {
 
 	// PosAdd
 	if !found {
-		if g.groupID == pos.GetPosId() {
+		if g.owner == pos.GetPosId() {
 			providerAddr, err := ad.GetAddressFromID(proID)
 			if err != nil {
 				return err
@@ -99,7 +100,7 @@ func (g *groupInfo) spaceTimePay(proID string) error {
 			g.saveUpkeeping()
 			price = pos.GetPosPrice()
 		} else {
-			return
+			return errors.New("fail to pay")
 		}
 	}
 
@@ -110,20 +111,20 @@ func (g *groupInfo) spaceTimePay(proID string) error {
 
 	thisLinfo := thisIlinfo.(*lInfo)
 
-	startTime := utils.StringToTime(g.upkeeping.StartTime)
+	startTime := utils.StringToUnix(g.upkeeping.StartTime)
 	if thisLinfo.lastPay != nil {
-		startTime = thisLinfo.checkLastPayTime()
+		startTime = thisLinfo.lastPay.endTime
 	}
 
 	spaceTime, lastTime := thisLinfo.resultSummary(startTime, utils.GetUnixNow())
 	amount := convertSpacetime(spaceTime, price)
 	if amount.Sign() > 0 {
-		pAddr, _ := ad.GetAddressFromID(pu.pid) //providerAddress
-		scGroupid, _ := ad.GetAddressFromID(pu.qid)
-		ukAddr := common.HexToAddress(ukItem.UpKeepingAddr[2:])
+		pAddr, _ := ad.GetAddressFromID(proID) //providerAddress
+		scGroupid, _ := ad.GetAddressFromID(g.owner)
+		ukAddr := common.HexToAddress(g.upkeeping.UpKeepingAddr[2:])
 		log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, k.sk, amount) //进行支付
+		err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, localSk, amount) //进行支付
 		if err != nil {
 			log.Println("contracts.SpaceTimePay() failed: ", err)
 			return err
@@ -159,7 +160,7 @@ func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func (l *lInfo) resultSummary(proID string, start, end int64) (*big.Int, int64) {
+func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 	var timeList []int64  //存放挑战时间序列
 	var lenghList []int64 //存放与挑战时间同序的数据长度序列
 	var tsl timesortlist  //用来对挑战时间排序
@@ -170,9 +171,9 @@ func (l *lInfo) resultSummary(proID string, start, end int64) (*big.Int, int64) 
 	l.chalMap.Range(func(k, value interface{}) bool {
 		// remove paid challenges
 		key := k.(int64)
-		if key < timeStart {
+		if key < start {
 			deletes = append(deletes, key)
-		} else if key < timeEnd {
+		} else if key < end {
 			tsl = append(tsl, key)
 		}
 
@@ -218,17 +219,12 @@ func (p timesortlist) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p timesortlist) Len() int           { return len(p) }
 func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
 
-//parseLastPayKV 传入lastPay的KV，解析成 PU和*chalpay结构体
+// parseLastPayKV from value to payInfo
 //`qid/"lastpay"/pid` ,`beginTime/endTime/spacetime/signature/proof`
 func (l *lInfo) parseLastPayKV(value []byte) error {
 	splitedValue := strings.Split(string(value), metainfo.DELIMITER)
 	if len(splitedValue) < 5 {
 		return errParaseMetaFailed
-	}
-
-	splitedKey := strings.Split(key, metainfo.DELIMITER)
-	if len(splitedKey) < 3 {
-		return metainfo.ErrIllegalKey
 	}
 
 	st, ok := big.NewInt(0).SetString(splitedValue[2], 10)
@@ -238,7 +234,6 @@ func (l *lInfo) parseLastPayKV(value []byte) error {
 	begintime := utils.StringToUnix(splitedValue[0])
 	endtime := utils.StringToUnix(splitedValue[1])
 	if begintime == 0 || endtime == 0 {
-		log.Println("key:", keyMeta.ToString(), "\nvalue:", value)
 		return metainfo.ErrIllegalValue
 	}
 	l.lastPay = &chalpay{

@@ -34,9 +34,8 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue []byte, f
 			go k.handleDeleteBlockPos(km)
 		}
 	case metainfo.Challenge:
-		mkey, err := k.ukpManager.getUserBLS12Config(km.GetMid())
 		if err != nil {
-			go k.lManager.handleProof(km, metaValue, from, mkey)
+			go k.handleProof(km, metaValue)
 		}
 	case metainfo.Repair: //provider 修复回复
 		go k.handleRepairResult(km, metaValue, from)
@@ -82,7 +81,7 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 	}
 
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
-	err = k.addBlockMeta(bids[0], sValue[0], bids[1], offset)
+	err = k.addBlockMeta(bids[0], bids[1], sValue[0], offset)
 	if err != nil {
 		log.Println("handleBlockPos err: ", err)
 	}
@@ -102,7 +101,7 @@ func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
 	// delete from mem
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
 	// send to other keepers?
-	k.deleteBlockMeta(bids[0], bids[1])
+	k.deleteBlockMeta(bids[0], bids[1], false)
 }
 
 // key: "Storage"/pid; value: total/used
@@ -145,21 +144,20 @@ func (k *Info) handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {
 	}
 
 	sValue := strings.SplitN(string(blockID), metainfo.BLOCK_DELIMITER, 2)
-
-	pid, err := k.getBlockPos(sValue[0], sValue[1])
+	qid := sValue[0]
+	bid := sValue[1]
+	pid, err := k.getBlockPos(qid, bid)
 	if err != nil {
 		return nil, err
 	}
 
-	pu := pqKey{
-		pid: pid,
-		qid: sValue[0],
-	}
-
-	if thischalinfo, ok := k.lManager.getChalinfo(pu); ok {
-		if thiscidinfo, ok := thischalinfo.cidMap.Load(sValue[1]); ok {
-			return []byte(utils.UnixToString(thiscidinfo.(*cidInfo).availtime)), nil
+	thisl := k.getLInfo(qid, qid, pid, false)
+	if thisl != nil {
+		thiscidinfo, ok := thisl.blockMap.Load(bid)
+		if ok {
+			return []byte(utils.UnixToString(thiscidinfo.(*blockInfo).availtime)), nil
 		}
 	}
+
 	return nil, errBlockNotExist
 }

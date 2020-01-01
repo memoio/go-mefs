@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -12,15 +11,16 @@ import (
 	ad "github.com/memoio/go-mefs/utils/address"
 )
 
-func (k *Info) saveUpkeeping(uid, gid string, update bool) error {
-	gp, ok := u.getGroupsInfo(uid, gid)
-	if !ok {
+// force update when mode is true
+func (k *Info) saveUpkeeping(gid, uid string, mode bool) error {
+	gp := k.getGroupInfo(gid, uid, false)
+	if gp == nil {
 		log.Println("saveUpkeeping getGroupsInfo() error")
 		return errNoGroupsInfo
 	}
 
-	if gp.upkeeping == nil || update {
-		return saveUpkeepingToGP(qid, gp)
+	if gp.upkeeping == nil || (mode && gid != uid) {
+		return gp.saveUpkeeping()
 	}
 
 	return nil
@@ -34,7 +34,7 @@ func (g *groupInfo) saveUpkeeping() error {
 	}
 	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
 	if err != nil {
-		log.Println(gp.owner, "has not deployed upkeeping")
+		log.Println(g.owner, "has not deployed upkeeping")
 		return err
 	}
 	// get upkkeeping params
@@ -65,15 +65,14 @@ func (g *groupInfo) saveUpkeeping() error {
 	return nil
 }
 
-func (k *Info) getUpkeeping(uid, gid string) (*contracts.UpKeepingItem, error) {
-	gp, ok := u.getGroupsInfo(uid, gid)
-	if !ok {
-		log.Println("saveUpkeeping getGroupsInfo() error")
+func (k *Info) getUpkeeping(gid, uid string) (*contracts.UpKeepingItem, error) {
+	gp := k.getGroupInfo(gid, uid, false)
+	if gp == nil {
 		return nil, errNoGroupsInfo
 	}
 
 	if gp.upkeeping == nil {
-		err := saveUpkeepingToGP(gp)
+		err := gp.saveUpkeeping()
 		if err != nil {
 			return nil, errGetContractItem
 		}
@@ -86,21 +85,21 @@ func (k *Info) getUpkeeping(uid, gid string) (*contracts.UpKeepingItem, error) {
 	return gp.upkeeping, nil
 }
 
-func (k *Info) saveQuery(qid string, update bool) error {
-	gp, ok := u.getGroupsInfo(qid)
-	if !ok {
+func (k *Info) saveQuery(qid, uid string, mode bool) error {
+	gp := k.getGroupInfo(qid, uid, false)
+	if gp == nil {
 		return errNoGroupsInfo
 	}
 
-	if gp.query == nil || update {
-		return saveQueryToGP(qid, gp)
+	if gp.query == nil || mode {
+		return gp.saveQuery()
 	}
 
 	return nil
 }
 
-func saveQueryToGP(qid string, gp *groupInfo) error {
-	userAddr, err := ad.GetAddressFromID(gp.owner)
+func (g *groupInfo) saveQuery() error {
+	userAddr, err := ad.GetAddressFromID(g.owner)
 	if err != nil {
 		return err
 	}
@@ -113,23 +112,22 @@ func saveQueryToGP(qid string, gp *groupInfo) error {
 	if err != nil {
 		return err
 	}
-	queryItem.UserID = gp.owner
+	queryItem.UserID = g.owner
 	queryItem.QueryAddr = queryAddr.String()
 
-	gp.query = &queryItem
+	g.query = &queryItem
 
 	return nil
 }
 
-func (k *Info) getQuery(qid string) (queryItem *contracts.QueryItem, err error) {
-	gp, ok := u.getGroupsInfo(qid)
-	if !ok {
-		log.Println("saveUpkeeping getGroupsInfo() error")
+func (k *Info) getQuery(qid, uid string) (queryItem *contracts.QueryItem, err error) {
+	gp := k.getGroupInfo(qid, uid, false)
+	if gp == nil {
 		return nil, errNoGroupsInfo
 	}
 
 	if gp.query == nil {
-		err := saveQueryToGP(qid, gp)
+		err := gp.saveQuery()
 		if err != nil {
 			return nil, errGetContractItem
 		}
@@ -199,19 +197,21 @@ func (k *Info) getOffer(providerID string) (offerItem *contracts.OfferItem, err 
 }
 
 // addProvider 将传入pid加入posuser的upkeeping合约
-func (k *Info) ukAddProvider(uid, pid, sk string) error {
-	uk, err := u.getUpkeeping(uid)
-	if err != nil {
-		log.Println("ukAddProvider getUpkeeping() error", err)
-		return err
+func (k *Info) ukAddProvider(qid, uid, pid, sk string) error {
+	gp := k.getGroupInfo(qid, uid, false)
+	if gp == nil || gp.upkeeping == nil {
+		return errors.New("No upkeeping")
 	}
+
 	providerAddr, err := ad.GetAddressFromID(pid)
 	if err != nil {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
-	for _, localPid := range uk.ProviderIDs { //判断该provider是否为新,如果存在，直接返回
-		if strings.Compare(localPid, pid) == 0 {
+
+	// check pid belongs to this group or not
+	for _, gpid := range gp.providers {
+		if gpid == pid {
 			return nil
 		}
 	}
@@ -222,7 +222,7 @@ func (k *Info) ukAddProvider(uid, pid, sk string) error {
 		return err
 	}
 
-	if u.isMasterKeeper(uid, pid) {
+	if gp.isMaster(pid) {
 		log.Println("add provider to: ", userAddr)
 
 		err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
@@ -233,7 +233,7 @@ func (k *Info) ukAddProvider(uid, pid, sk string) error {
 	}
 
 	// update uk info
-	uk.ProviderIDs = append(uk.ProviderIDs, pid)
+	gp.saveUpkeeping()
 
 	return nil
 }

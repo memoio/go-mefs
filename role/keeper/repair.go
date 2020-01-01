@@ -23,65 +23,70 @@ func (k *Info) checkLedger(ctx context.Context) {
 			return
 		case <-ticker.C:
 			log.Println("Repair starts!")
-			pus := k.ukpManager.getPUKeys()
+			pus := k.getUQKeys()
 			for _, pu := range pus {
 				// not repair pos blocks
-				if pu.qid == pos.GetPosId() {
+				if pu.uid == pos.GetPosId() {
 					continue
 				}
 
-				// only master repair
-				if !k.ukpManager.isMasterKeeper(pu.qid, pu.pid) {
+				gp := k.getGroupInfo(pu.qid, pu.uid, false)
+				if gp == nil {
 					continue
 				}
 
-				thisInfo, ok := k.lManager.lMap.Load(pu)
-				if !ok {
-					continue
-				}
+				for _, proID := range gp.providers {
+					// only master repair
+					if !gp.isMaster(proID) {
+						continue
+					}
 
-				thischalinfo := thisInfo.(*chalinfo)
+					thislinfo := gp.getLInfo(proID, false)
+					if thislinfo == nil {
+						continue
+					}
 
-				thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-					thisinfo := value.(*cidInfo)
-					eclasped := utils.GetUnixNow() - thisinfo.availtime
-					switch thisinfo.repair {
-					case 0:
-						if EXPIRETIME < eclasped {
-							cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-							log.Println("Need repair cid first time: ", cid)
-							thisinfo.repair++
-							k.repch <- cid
-						}
-					case 1:
-						if 4*EXPIRETIME < eclasped {
-							cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-							log.Println("Need repair cid second time: ", cid)
-							thisinfo.repair++
-							k.repch <- cid
-						}
-					case 2:
-						if 16*EXPIRETIME < eclasped {
-							cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-							log.Println("Need repair cid third time: ", cid)
-							thisinfo.repair++
-							k.repch <- cid
-						}
-					default:
-						// > 30 days; we donnot repair
-						if 480*EXPIRETIME >= eclasped {
-							// try every 32 hours
-							if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+					thislinfo.blockMap.Range(func(key, value interface{}) bool {
+						thisinfo := value.(*blockInfo)
+						eclasped := utils.GetUnixNow() - thisinfo.availtime
+						switch thisinfo.repair {
+						case 0:
+							if EXPIRETIME < eclasped {
 								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-								log.Println("Need repair cid tried: ", cid)
+								log.Println("Need repair cid first time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
+						case 1:
+							if 4*EXPIRETIME < eclasped {
+								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+								log.Println("Need repair cid second time: ", cid)
+								thisinfo.repair++
+								k.repch <- cid
+							}
+						case 2:
+							if 16*EXPIRETIME < eclasped {
+								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+								log.Println("Need repair cid third time: ", cid)
+								thisinfo.repair++
+								k.repch <- cid
+							}
+						default:
+							// > 30 days; we donnot repair
+							if 480*EXPIRETIME >= eclasped {
+								// try every 32 hours
+								if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+									cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+									log.Println("Need repair cid tried: ", cid)
+									thisinfo.repair++
+									k.repch <- cid
+								}
+							}
 						}
-					}
 
-					return true
-				})
+						return true
+					})
+				}
 			}
 		}
 	}
@@ -94,7 +99,7 @@ func (k *Info) repairRegular(ctx context.Context) {
 			select {
 			case cid := <-k.repch:
 				log.Println("repairing cid: ", cid)
-				k.ukpManager.repairBlock(ctx, cid)
+				k.repairBlock(ctx, cid)
 			case <-ctx.Done():
 				return
 			}
@@ -105,20 +110,26 @@ func (k *Info) repairRegular(ctx context.Context) {
 // repairBlock works in 3 steps:
 // 1.search a new provider,we do it in func SearchNewProvider
 // 2.put chunk to this provider
-// 3.change metainfo and sync
+// key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
+// value: chunkID1_pid1_offset1/chunkID2_pid2_offset2/...
 func (k *Info) repairBlock(ctx context.Context, blockID string) {
 
 	var response string
-	// uid_bid_sid_bid
+	// qid_bid_sid_bid
 	blkinfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
 	if len(blkinfo) < 4 {
 		return
 	}
 
-	userID := blkinfo[0]
+	qid := blkinfo[0]
 
-	thisbucket, ok := u.getBucketInfo(userID, blkinfo[1])
-	if !ok {
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp == nil {
+		return
+	}
+
+	thisbucket := k.getBucketInfo(qid, qid, blkinfo[1], false)
+	if thisbucket == nil {
 		return
 	}
 
@@ -138,12 +149,16 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 			continue
 		}
 
-		offset := thisinfo.(*cidInfo).offset
-		pid := thisinfo.(*cidInfo).storedOn
+		res.Reset()
+		res.WriteString(strconv.Itoa(i))
+		res.WriteString(metainfo.BLOCK_DELIMITER)
+
+		offset := thisinfo.(*blockInfo).offset
+		pid := thisinfo.(*blockInfo).storedOn
 
 		// recheck the status
 		if strconv.Itoa(i) == blkinfo[3] {
-			if thisinfo.(*cidInfo).repair == 0 {
+			if thisinfo.(*blockInfo).repair == 0 {
 				return
 			}
 			response = pid
@@ -163,14 +178,14 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 	}
 
 	if len(response) > 0 {
-		if !u.ds.Connect(ctx, response) {
+		if !k.ds.Connect(ctx, response) {
 			log.Println("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
 	}
 
 	if len(response) == 0 || response == "" {
-		response = u.searchNewProvider(ctx, userID, ugid)
+		response = k.searchNewProvider(ctx, qid, ugid)
 		if response == "" {
 			log.Println("Repair failed, no available provider")
 			return
@@ -187,38 +202,40 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 	}
 
 	log.Println("cpids: ", cpids, ",repairs on: ", response)
-	_, err = u.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
+	_, err = k.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
 	if err != nil {
 		log.Println("err: ", err)
 	}
 }
 
+// key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
+// value: "ok" or "fail"/pid/offset
 func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provider string) {
 	blockID := km.GetMid()
 	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
-	if len(splitedValue) != 4 {
-		log.Println("handleRepairResponse err: ", metainfo.ErrIllegalValue, metaValue)
+	if len(splitedValue) != 3 {
 		return
 	}
-	// old provider
-	oldPid := splitedValue[2]
-	offset, err := strconv.Atoi(splitedValue[3])
-	if err != nil {
-		log.Println("strconv.Atoi offset error: ", err)
-		return
-	}
+	splitedKey := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
+	qid := splitedKey[0]
+	bid := splitedKey[1]
 
-	uid := blockID[:utils.IDLength]
-	oldpu := pqKey{
-		pid: oldPid,
-		qid: uid,
-	}
-
-	if strings.Compare(splitedValue[0], "RepairSuccess") == 0 {
+	if strings.Compare(splitedValue[0], "ok") == 0 {
 		log.Println("repair success, cid is: ", blockID)
+		newPid := splitedValue[1]
+		newOffset, err := strconv.Atoi(splitedValue[2])
+		if err != nil {
+			log.Println("strconv.Atoi offset error: ", err)
+			return
+		}
 
-		k.deleteBlockMeta(oldpu.qid, blockID)
-		k.addBlockMeta(uid, provider, blockID, offset)
+		splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
+		if len(splitedValue) != 3 {
+			return
+		}
+
+		k.deleteBlockMeta(qid, bid, false)
+		k.addBlockMeta(qid, bid, newPid, newOffset)
 
 		//更新block的meta信息
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
@@ -226,7 +243,7 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 			log.Println("construct Syncblock KV error :", err)
 			return
 		}
-		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
+		metaValue := newPid + metainfo.DELIMITER + strconv.Itoa(newOffset)
 
 		err = k.ds.PutKey(context.Background(), kmBlock.ToString(), []byte(metaValue), "local")
 		if err != nil {
@@ -236,7 +253,7 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 		return
 	}
 
-	log.Println("repair failed, cid is: ", blockID)
+	log.Println("repair failed, block is: ", blockID)
 
 	return
 
@@ -245,9 +262,8 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 //searchNewProvider find a NEW provider for user
 func (k *Info) searchNewProvider(ctx context.Context, gid string, ugid []string) string {
 	response := ""
-	gp, ok := u.getGroupsInfo(gid)
-	if !ok {
-		log.Println("SearchNewProvider getGroupsInfo() error")
+	gp := k.getGroupInfo(gid, gid, false)
+	if gp == nil {
 		return response
 	}
 
@@ -267,7 +283,7 @@ func (k *Info) searchNewProvider(ctx context.Context, gid string, ugid []string)
 		}
 
 		if flag == len(ugid) {
-			if u.ds.Connect(ctx, tmpPro) {
+			if k.ds.Connect(ctx, tmpPro) {
 				response = tmpPro
 				break
 			}

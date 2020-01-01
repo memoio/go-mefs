@@ -28,19 +28,18 @@ func (k *Info) challengeRegular(ctx context.Context) {
 			log.Println("Challenge start at: ", utils.GetTimeNow())
 			pus := k.getUQKeys()
 			for _, pu := range pus {
-				thisIgroup, ok := k.ukpGroup.Load(pu.qid)
-				if !ok {
+				thisGroup := k.getGroupInfo(pu.qid, pu.uid, false)
+				if thisGroup == nil {
 					continue
 				}
-				thisGroup := thisIgroup.(*groupInfo)
 
 				for _, proID := range thisGroup.providers {
-					thisIl, ok := thisGroup.ledgerMap.Load(proID)
-					if !ok {
+					thisLinfo := thisGroup.getLInfo(proID, false)
+					if thisLinfo == nil {
 						continue
 					}
-					thisLinfo := thisIl.(*lInfo)
-					key, value, err := thisLinfo.genChallengeBLS(k.netID, pu.qid, proID)
+
+					key, value, err := thisLinfo.genChallengeBLS(k.netID, pu.qid, proID, thisGroup.owner)
 					if err != nil {
 						continue
 					}
@@ -54,7 +53,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 	}
 }
 
-func (l *lInfo) genChallengeBLS(localID, qid, proID string) (string, []byte, error) {
+func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []byte, error) {
 	// last chanllenge has not complete
 	if l.inChallenge {
 		l.cleanLastChallenge()
@@ -112,8 +111,8 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID string) (string, []byte, err
 	l.chalCid = ret
 	l.lastChalTime = challengetime
 
-	// key: qid/"Challenge"/proID/chalTime
-	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, proID, utils.UnixToString(challengetime))
+	// key: qid/"Challenge"/uid/pid/kid/chaltime
+	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, userID, proID, localID, utils.UnixToString(challengetime))
 	if err != nil {
 		log.Println("construct challenge KV error :", err)
 		return "", nil, err
@@ -142,26 +141,38 @@ func (l *lInfo) cleanLastChallenge() {
 }
 
 //handleProof handles the challenge result from provider
-//key: qid/"Challenge"/pid/chaltime,value: proof[/FaultBlocks]
-func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blskey *mcl.PublicKey) bool {
+//key: qid/"Challenge"/uid/pid/kid/chaltime,value: proof[/FaultBlocks]
+func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	ops := km.GetOptions()
-	if len(ops) < 1 {
+	if len(ops) != 4 {
 		return false
 	}
 
-	chaltime := ops[0]
+	qid := km.GetMid()
+	userID := ops[0]
+	proID := ops[1]
+	kid := ops[2]
+	chaltime := ops[3]
 
-	thischalinfo, ok := l.getChalinfo(pu)
-	if !ok {
-		log.Println("getChalinfo error!pu: ", pu)
+	if kid != k.netID {
+		return false
+	}
+
+	thisGroup := k.getGroupInfo(userID, qid, false)
+	if thisGroup == nil {
+		return false
+	}
+
+	thisLinfo := thisGroup.getLInfo(proID, false)
+	if thisLinfo == nil {
 		return false
 	}
 
 	defer func() {
-		thischalinfo.inChallenge = false
+		thisLinfo.inChallenge = false
 	}()
 
-	spliteProof := strings.Split(string(proof), metainfo.DELIMITER)
+	spliteProof := strings.Split(string(value), metainfo.DELIMITER)
 	if len(spliteProof) < 3 {
 		return false
 	}
@@ -173,11 +184,11 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blske
 	}
 
 	challengetime := utils.StringToUnix(chaltime)
-	if thischalinfo.lastChalTime != challengetime {
+	if thisLinfo.lastChalTime != challengetime {
 		return false
 	}
 
-	thischalresult, ok := thischalinfo.chalMap.Load(challengetime)
+	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
 	if !ok {
 		log.Println("thischalinfo.chalMap.Load error!challengetime:", challengetime)
 		return false
@@ -197,7 +208,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blske
 	// key: bucketid_stripeid_blockid
 	cset := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
-		log.Println("Fault or NotFound blocks :", pu.qid, metainfo.BLOCK_DELIMITER, splitedindex)
+		log.Println("Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
 		for _, s := range splitedindex {
 			if len(s) == 0 {
 				continue
@@ -212,7 +223,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blske
 		}
 	}
 
-	for _, index := range thischalinfo.chalCid {
+	for _, index := range thisLinfo.chalCid {
 		_, ok := set[index]
 		if ok {
 			continue
@@ -232,7 +243,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blske
 			continue
 		}
 
-		buf.WriteString(pu.qid)
+		buf.WriteString(qid)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(chcid)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
@@ -251,22 +262,22 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blske
 
 	blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
 
-	res, err := mcl.VerifyProof(blskey, chal, blsProof)
+	res, err := mcl.VerifyProof(thisGroup.blsPubKey, chal, blsProof)
 	if err != nil {
-		log.Println("handle proof of ", pu.qid, "from provider: ", pid, "verify err:", err)
+		log.Println("handle proof of ", qid, "from provider: ", proID, "verify err:", err)
 		return false
 	}
 	if res {
-		log.Println("handle proof of ", pu.qid, "from provider: ", pid, " verify success.")
+		log.Println("handle proof of ", qid, "from provider: ", proID, " verify success.")
 
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
-		thischalinfo.cidMap.Range(func(k, v interface{}) bool {
+		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
 			_, ok := cset[k.(string)]
 			if ok {
 				return true
 			}
-			cInfo := v.(*cidInfo)
+			cInfo := v.(*blockInfo)
 			cInfo.repair = 0
 			cInfo.availtime = challengetime
 			return true
@@ -278,7 +289,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, proof []byte, pid string, blske
 		chalResult.length = int64((float64(slength) / float64(chalResult.sum)) * float64(chalResult.totalSpace))
 		return true
 	} else {
-		log.Println("handle proof of ", pu.qid, "from provider: ", pid, " verify fail.")
+		log.Println("handle proof of ", qid, "from provider: ", proID, " verify fail.")
 	}
 
 	return false

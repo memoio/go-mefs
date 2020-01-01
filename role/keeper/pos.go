@@ -16,7 +16,7 @@ import (
 // value is
 func (k *Info) handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string) {
 	// add provider to upkeeping if it is not in upkeeping
-	err := k.ukpManager.ukAddProvider(pos.GetPosId(), from, pos.PosSkStr)
+	err := k.ukAddProvider(pos.GetPosId(), pos.GetPosId(), from, pos.PosSkStr)
 	if err != nil {
 		log.Println("handlePosAdd err:", err)
 	}
@@ -50,7 +50,7 @@ func (k *Info) handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string)
 			log.Println(err)
 			return
 		}
-		err = k.addBlockMeta(bm.GetQid(), from, blockID, off)
+		err = k.addBlockMeta(bm.GetQid(), blockID, from, off)
 		if err != nil {
 			log.Println(err)
 			return
@@ -82,6 +82,6 @@ func (k *Info) handlePosDelete(km *metainfo.KeyMeta, metaValue []byte, from stri
 			log.Println(err)
 			return
 		}
-		k.deleteBlockMeta(bm.GetQid(), blockID)
+		k.deleteBlockMeta(bm.GetQid(), blockID, false)
 	}
 }

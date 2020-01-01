@@ -13,7 +13,6 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/role/pb"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
@@ -58,13 +57,6 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		ds:    d,
 		repch: make(chan string, 1024),
 	}
-
-	u := &ukp{
-		localID: nid,
-		ds:      d,
-	}
-
-	m.ukpManager = u
 
 	err := m.load(ctx) //连接节点
 	if err != nil {
@@ -215,7 +207,7 @@ func (k *Info) save(ctx context.Context) error {
 		return err
 	}
 
-	k.ukpManager.gMap.Range(func(qid, groupsinfo interface{}) bool {
+	k.ukpGroup.Range(func(qid, groupsinfo interface{}) bool {
 		pids.WriteString(qid.(string))
 		return true
 	})
@@ -228,101 +220,51 @@ func (k *Info) save(ctx context.Context) error {
 	}
 
 	// save last pay
-
-	// persist ledgerInfos
-	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.LedgerMap)
-	if err != nil {
-		return err
-	}
-
-	tmpLedgerinfo := make(map[string]*pb.Chalin)
-
-	pus := k.ukpManager.getPUKeys()
+	pus := k.getUQKeys()
 	for _, pu := range pus {
-		thisInfo, ok := k.lManager.lMap.Load(pu)
-		if !ok {
+		gp := k.getGroupInfo(pu.qid, pu.uid, false)
+		if gp == nil {
 			continue
 		}
-		thischalinfo := thisInfo.(*chalinfo)
-		tmpCid := make(map[string]*pb.Cidin)
-		puProto := &pb.Pu{
-			Provider: pu.pid,
-			User:     pu.qid,
-		}
-		puByte, err := proto.Marshal(puProto) //*格式修改
-		if err != nil {
-			log.Println("proto.Marshal error:", err)
-		}
-		thischalinfo.cidMap.Range(func(k, v interface{}) bool {
-			tmpCidin := &pb.Cidin{
-				Res:      v.(*cidInfo).res,
-				Repair:   v.(*cidInfo).repair,
-				Offset:   int64(v.(*cidInfo).offset),
-				Avaltime: utils.UnixToString(v.(*cidInfo).availtime),
-			}
-			tmpCid[k.(string)] = tmpCidin
-			return true
-		})
-		chalinProto := &pb.Chalin{
-			Cidin:     tmpCid,
-			Maxlength: thischalinfo.maxlength,
-		}
-		tmpLedgerinfo[string(puByte)] = chalinProto
-	}
 
-	ledgerin := &pb.LedgerInfo{
-		Chalinfo: tmpLedgerinfo,
-	}
-	ledgerByte, err := proto.Marshal(ledgerin) //*格式修改
-	if err != nil {
-		log.Println("proto.Marshal error:", err)
-	}
+		for _, proID := range gp.providers {
+			k.savePay(pu.qid, proID)
+		}
 
-	err = k.ds.PutKey(ctx, kmLedger.ToString(), ledgerByte, "local")
-	if err != nil {
-		return err
 	}
 
 	return nil
 }
 
 func (k *Info) savePay(qid, pid string) error {
+	thisLinfo := k.getLInfo(qid, qid, pid, false)
 
-	thisIg, ok := k.ukpGroup.Load(qid)
-	if !ok {
-		return errors.New("No such user")
-	}
-
-	thisIlinfo, ok := thisIg.(*groupInfo).ledgerMap.Load(pid)
-	if !ok {
-		return errors.New("No such user")
-	}
-
-	thisLinfo := thisIlinfo.(*lInfo)
-
-	if thisLinfo.lastPay != nil {
+	if thisLinfo != nil && thisLinfo.lastPay != nil {
 		beginTime := thisLinfo.lastPay.beginTime
 		endTime := thisLinfo.lastPay.endTime
 		spaceTime := thisLinfo.lastPay.spacetime
+		ctx := context.Background()
+
 		//key: qid/`lastpay"/pid`
 		//value: `beginTime/endTime/spacetime/signature/proof`
 		kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
 		if err != nil {
 			log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
-			return nil, "", err
+			return err
 		}
 		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(context.Background(), kmLast.ToString(), []byte(valueLast), "local")
+		k.ds.PutKey(ctx, kmLast.ToString(), []byte(valueLast), "local")
+
 		//key: `qid/"chalpay"/pid/beginTime/endTime`
 		//value: `spacetime/signature/proof`
 		//for storing
-		km, err := metainfo.NewKeyMeta(qid, metainfo.ChalPay, thisPU.pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
+		km, err := metainfo.NewKeyMeta(qid, metainfo.ChalPay, pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 		if err != nil {
 			log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
-			return nil, "", err
+			return err
 		}
 		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(context.Background(), km.ToString(), []byte(metaValue), "local")
+		k.ds.PutKey(ctx, km.ToString(), []byte(metaValue), "local")
 	}
 	return nil
 }
@@ -372,53 +314,16 @@ func (k *Info) loadUser(ctx context.Context) error {
 					if err != nil {
 						continue
 					}
-					k.fillGroup(qid, userID, []string{qid}, []string{qid})
+					err = k.createGroup(qid, userID, []string{qid}, []string{qid})
+					if err != nil {
+						continue
+					}
 					k.loadUserBlock(qid)
 				}
 			}(userID)
 		}
 	}
 
-	// load ledgerinfo
-	kmLedger, err := metainfo.NewKeyMeta(localID, metainfo.LedgerMap)
-	if err != nil {
-		return err
-	}
-
-	if ledgers, err := k.ds.GetKey(ctx, kmLedger.ToString(), "local"); ledgers != nil && err == nil {
-		ledgerinProto := &pb.LedgerInfo{}
-		err = proto.Unmarshal(ledgers, ledgerinProto)
-		if err != nil {
-			return err
-		}
-		for pustr, thischalinfoinProto := range ledgerinProto.Chalinfo {
-			puinProto := &pb.Pu{}
-			err = proto.Unmarshal([]byte(pustr), puinProto)
-			if err != nil {
-				return err
-			}
-			newpu := pqKey{
-				pid: puinProto.Provider,
-				qid: puinProto.User,
-			}
-
-			for blockid, thiscidinfoinProto := range thischalinfoinProto.Cidin {
-				err = k.addBlockMeta(newpu.qid, newpu.pid, blockid, int(thiscidinfoinProto.Offset))
-				if err != nil {
-					continue
-				}
-			}
-
-			thisChal, ok := k.lManager.lMap.Load(newpu)
-			if !ok {
-				continue
-			}
-
-			if thischalinfoinProto.Maxlength != thisChal.(*chalinfo).maxlength {
-				log.Println(newpu.qid, "stores on pid: ", newpu.pid, " calculate length and stored length is: ", thisChal.(*chalinfo).maxlength, thischalinfoinProto.Maxlength)
-			}
-		}
-	}
 	wg.Wait()
 
 	return nil
@@ -457,7 +362,7 @@ func (k *Info) loadUserBlock(qid string) error {
 			}
 		}
 
-		k.addBlockMeta(qid, pids[0], km.GetMid(), off)
+		k.addBlockMeta(qid, km.GetMid(), pids[0], off)
 	}
 	return nil
 }
@@ -542,7 +447,7 @@ func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 			//在一点和五点之间，清理testUsers
 			if tNow.After(t1) && tNow.Before(t2) {
 				log.Println("Begin to clean test users")
-				unpaids := k.ukpManager.getUnpaidUsers()
+				unpaids := k.getUnpaidUsers()
 				for uid, qid := range unpaids {
 					k.deleteGroup(ctx, qid)
 					k.users.Delete(uid)
@@ -561,7 +466,7 @@ func (k *Info) createGroup(qid, uid string, keepers, providers []string) error {
 		}
 		k.ukpGroup.Store(qid, gInfo)
 		ctx := context.Background()
-		for _, pid := range gInfo {
+		for _, pid := range gInfo.providers {
 			lin := &lInfo{
 				inChallenge:  false,
 				lastChalTime: utils.GetUnixNow(),
@@ -596,12 +501,10 @@ func (k *Info) createGroup(qid, uid string, keepers, providers []string) error {
 }
 
 func (k *Info) deleteGroup(ctx context.Context, qid string) {
-	thisIgroup, ok := k.ukpManager.gMap.Load(qid)
-	if !ok {
+	thisGroup := k.getGroupInfo(qid, qid, false)
+	if thisGroup == nil {
 		return
 	}
-
-	thisGroup := thisIgroup.(*groupInfo)
 
 	//recheck the user's status
 	addr, err := address.GetAddressFromID(thisGroup.owner)
@@ -611,7 +514,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 
 	_, _, err = contracts.GetUKFromResolver(addr)
 	if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
-		saveUpkeepingToGP(thisGroup)
+		thisGroup.saveUpkeeping()
 		return
 	}
 
@@ -660,15 +563,17 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 /*====================Block Meta Ops=========================*/
 
 func (k *Info) getBlockPos(qid, bid string) (string, error) {
-	thisIgroup, ok := k.ukpGroup.Load(qid)
-	if ok {
-		return thisIgroup.(*groupInfo).getBlockPos(qid, bid)
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp == nil {
+		return "", errors.New("No block")
 	}
 
-	return "", errors.New("No block")
+	return gp.getBlockPos(bid)
 }
 
-func (k *Info) addBlockMeta(qid, pid, bid string, offset int) error {
+func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {
+	log.Println("add block: ", bid, "for query: ", qid, " and provider: ", pid)
+
 	blockID := qid + metainfo.BLOCK_DELIMITER + bid
 
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
@@ -677,15 +582,16 @@ func (k *Info) addBlockMeta(qid, pid, bid string, offset int) error {
 	}
 
 	ctx := context.Background()
-	//delete from local
-	err = k.ds.PutKey(ctx, kmBlock.ToString(), "local")
+	//put to local
+	value := pid + metainfo.DELIMITER + strconv.Itoa(offset)
+	err = k.ds.PutKey(ctx, kmBlock.ToString(), []byte(value), "local")
 	if err != nil {
 		log.Println("Delete local key error:", err)
 	}
 
-	thisIgroup, ok := k.ukpGroup.Load(qid)
-	if ok {
-		return thisIgroup.(*groupInfo).addBlockMeta(pid, bid, offset)
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp != nil {
+		return gp.addBlockMeta(bid, pid, offset)
 	}
 
 	return errors.New("Not my user")
@@ -708,11 +614,10 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 	}
 
 	var pid string
-	thisIgroup, ok := k.ukpGroup.Load(qid)
-	if ok {
-		thisGroup := thisIgroup.(*groupInfo)
-		pid = thisGroup.getBlockPos(bid)
-		if pid == "" {
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp != nil {
+		pid, err = gp.getBlockPos(bid)
+		if err != nil || pid == "" {
 			// need to get from local kv
 			res, err := k.ds.GetKey(ctx, kmBlock.ToString(), "local")
 			if err != nil {
@@ -723,7 +628,7 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 			return
 		}
 		// delete from mem
-		thisGroup.deleteBlockMeta(pid, bid)
+		gp.deleteBlockMeta(pid, bid)
 	}
 
 	if flag {
@@ -731,7 +636,7 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 		km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 		if err != nil {
 			log.Println("construct delete block KV error :", err)
-			return false
+			return
 		}
 		err = k.ds.DeleteBlock(ctx, km.ToString(), pid)
 		if err != nil {

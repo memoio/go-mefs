@@ -258,7 +258,7 @@ func (k *Info) GetUsers() ([]string, error) {
 		return nil, errKeeperServiceNotReady
 	}
 	var res []string
-	k.ukpManager.gMap.Range(func(uid, v interface{}) bool {
+	k.ukpGroup.Range(func(uid, v interface{}) bool {
 		thisuid, ok := uid.(string)
 		if !ok {
 			return false

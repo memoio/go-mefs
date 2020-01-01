@@ -1,8 +1,13 @@
 package keeper
 
 import (
+	"errors"
 	"log"
+	"sort"
+	"strconv"
+	"strings"
 
+	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -10,16 +15,16 @@ import (
 
 func newGroup(localID, qid, uid string, keepers, providers []string) (*groupInfo, error) {
 	tempInfo := &groupInfo{
-		keepers:      keepers,
-		providers:    providers,
 		groupID:      qid,
 		owner:        uid,
 		localKeeper:  qid,
 		masterKeeper: qid,
+		keepers:      keepers,
+		providers:    providers,
 	}
 
 	if qid != uid {
-		err := saveUpkeepingToGP(qid, tempInfo)
+		err := tempInfo.saveUpkeeping()
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +61,7 @@ func (g *groupInfo) isMaster(pid string) bool {
 			}
 		}
 		if len(mymaster) > 0 {
-			return getMasterID(mymaster) == u.localID
+			return getMasterID(mymaster) == g.localKeeper
 		}
 	}
 
@@ -69,17 +74,48 @@ func getMasterID(kidlist []string) string {
 	return kidlist[len(kidlist)/2]
 }
 
+func (g *groupInfo) getLInfo(proID string, mode bool) *lInfo {
+	if g == nil {
+		return nil
+	}
+
+	thisIl, ok := g.ledgerMap.Load(proID)
+	if !ok {
+		if mode {
+			templInfo := &lInfo{}
+			g.ledgerMap.Store(proID, templInfo)
+			return templInfo
+		}
+		return nil
+	}
+
+	return thisIl.(*lInfo)
+}
+
+func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
+	if g == nil {
+		return nil
+	}
+
+	thisIb, ok := g.buckets.Load(bucketID)
+	if !ok {
+		if mode {
+			tempInfo := &bucketInfo{}
+			g.buckets.Store(bucketID, tempInfo)
+			return tempInfo
+		}
+		return nil
+	}
+
+	return thisIb.(*bucketInfo)
+}
+
 // bid is bucketID_stripeID_chunkID
-func (g *groupInfo) addBlockMeta(pid, bid string, offset int) error {
-	log.Println("add block: ", bid, "for query: ", qid, " and provider: ", pid)
+func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 
-	thisLinfo := &lInfo{}
-
-	thisILinfo, ok := g.ledgerMap.Load(pid)
-	if ok {
-		thisLinfo = thisILinfo.(*lInfo)
-	} else {
-		g.ledgerMap.Store(pid, thisLinfo)
+	thisLinfo := g.getLInfo(pid, true)
+	if thisLinfo == nil {
+		return errors.New("group addBlockMeta err")
 	}
 
 	newcidinfo := &blockInfo{
@@ -91,7 +127,7 @@ func (g *groupInfo) addBlockMeta(pid, bid string, offset int) error {
 
 	// store in cidMap
 	oldOffset := -1
-	v, ok := thisLinfo.cidMap.Load(bid)
+	v, ok := thisLinfo.blockMap.Load(bid)
 	if ok {
 		newcidinfo = v.(*blockInfo)
 		oldOffset = newcidinfo.offset
@@ -103,7 +139,7 @@ func (g *groupInfo) addBlockMeta(pid, bid string, offset int) error {
 			newcidinfo.storedOn = pid
 		}
 	} else {
-		thisLinfo.cidMap.Store(bid, newcidinfo)
+		thisLinfo.blockMap.Store(bid, newcidinfo)
 	}
 
 	thisLinfo.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
@@ -116,7 +152,7 @@ func (g *groupInfo) addBlockMeta(pid, bid string, offset int) error {
 
 	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
 
-	thisIBucket, ok := thisLinfo.buckets.Load(bucketID)
+	thisIBucket, ok := g.buckets.Load(bucketID)
 	if !ok {
 		return errors.New("cannot create bucket info")
 	}
@@ -148,12 +184,10 @@ func (g *groupInfo) addBlockMeta(pid, bid string, offset int) error {
 }
 
 func (g *groupInfo) deleteBlockMeta(pid, bid string) {
-	thisILinfo, ok := g.ledgerMap.Load(pid)
-	if !ok {
+	thisLinfo := g.getLInfo(pid, false)
+	if thisLinfo == nil {
 		return
 	}
-
-	thisLinfo = thisILinfo.(*lInfo)
 
 	// delete from blockMap
 	thisICid, ok := thisLinfo.blockMap.Load(bid)
@@ -166,9 +200,9 @@ func (g *groupInfo) deleteBlockMeta(pid, bid string) {
 	// delete from buckets
 	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
 
-	bui, ok := thisLinfo.buckets.Load(bids[0])
+	bui, ok := g.buckets.Load(bids[0])
 	if ok {
-		bui.(*bucketInfo).stripes.Delete(bis[1])
+		bui.(*bucketInfo).stripes.Delete(bids[1])
 	}
 
 	return
@@ -178,11 +212,13 @@ func (g *groupInfo) deleteBlockMeta(pid, bid string) {
 func (g *groupInfo) getBlockPos(bid string) (string, error) {
 	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
 
-	bui, ok := gri.(*groupInfo).buckets.Load(bis[0])
+	bui, ok := g.buckets.Load(bids[0])
 	if ok {
-		sti, ok := bui.(*bucketInfo).stripes.Load(bis[1])
+		sti, ok := bui.(*bucketInfo).stripes.Load(bids[1])
 		if ok {
-			return sti.(*cidInfo).storedOn, nil
+			return sti.(*blockInfo).storedOn, nil
 		}
 	}
+
+	return "", errors.New("No such block")
 }

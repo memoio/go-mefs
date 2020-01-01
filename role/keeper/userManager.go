@@ -119,17 +119,40 @@ func (k *Info) getUnpaidUsers() []string {
 	return res
 }
 
-//getGroupsInfo wrap get and set if not exist
-func (k *Info) getGroupsInfo(userID, groupID string) (*groupInfo, error) {
-	thisGroupinfo, ok := u.gMap.Load(groupID)
+// getGroupsInfo wrap get and create if "mode" is true
+func (k *Info) getGroupInfo(groupID, userID string, mode bool) *groupInfo {
+	thisIgroup, ok := k.ukpGroup.Load(groupID)
 	if !ok {
-		ginfo, err := newGroup(k.netID, groupID, userID, []string{groupID}, []string{groupID})
-		if err != nil {
-			return nil, err
+		if mode {
+			ginfo, err := newGroup(k.netID, groupID, userID, []string{groupID}, []string{groupID})
+			if err != nil {
+				return nil
+			}
+			k.ukpGroup.Store(groupID, ginfo)
+			return ginfo
 		}
-		u.gMap.Store(groupID, ginfo)
-		return ginfo, nil
+		return nil
+
 	}
 
-	return thisGroupinfo.(*groupInfo), nil
+	return thisIgroup.(*groupInfo)
+}
+
+// getLInfo wrap get and create if "mode" is true
+func (k *Info) getLInfo(groupID, userID, proID string, mode bool) *lInfo {
+	thisGroup := k.getGroupInfo(groupID, userID, mode)
+	if thisGroup != nil {
+		return thisGroup.getLInfo(proID, mode)
+	}
+	return nil
+}
+
+// getBucketInfo wrap get and create if "mode" is true
+func (k *Info) getBucketInfo(groupID, userID, bucketID string, mode bool) *bucketInfo {
+	thisGroup := k.getGroupInfo(groupID, userID, mode)
+	if thisGroup != nil {
+		return thisGroup.getBucketInfo(bucketID, mode)
+	}
+
+	return nil
 }

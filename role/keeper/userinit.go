@@ -74,8 +74,8 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error) {
 	var newResponse strings.Builder
 
-	thisInfo, ok := k.ukpManager.gMap.Load(qid)
-	if !ok {
+	gp := k.getGroupInfo(qid, uid, false)
+	if gp == nil {
 		localID := k.netID
 		// fill self
 		newResponse.WriteString(localID)
@@ -118,15 +118,14 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 		return newResponse.String(), nil
 	}
 
-	thisGroupsInfo := thisInfo.(*groupInfo)
 	// user has init
-	for _, pid := range thisGroupsInfo.keepers {
+	for _, pid := range gp.keepers {
 		newResponse.WriteString(pid)
 	}
 
 	newResponse.WriteString(metainfo.DELIMITER)
 
-	for _, pid := range thisGroupsInfo.providers {
+	for _, pid := range gp.providers {
 		newResponse.WriteString(pid)
 	}
 	return newResponse.String(), nil
@@ -195,7 +194,7 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 		providers = append(providers, providerID)
 	}
 
-	tempInfo, err := k.fillGroup(groupID, userID, keepers, providers)
+	err := k.createGroup(groupID, userID, keepers, providers)
 	if err != nil {
 		return
 	}
@@ -212,26 +211,10 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 		return
 	}
 
-	var pidstrings strings.Builder
-	for _, keeperID := range tempInfo.keepers {
-		pidstrings.WriteString(keeperID)
-	}
 	ctx := context.Background()
-	k.ds.PutKey(ctx, kmKid.ToString(), []byte(pidstrings.String()), "local")
+	k.ds.PutKey(ctx, kmKid.ToString(), []byte(kids), "local")
 
-	pidstrings.Reset()
-	for _, proID := range tempInfo.providers {
-		pidstrings.WriteString(proID)
-		// replace ledgerinfo
-		thisPU := pqKey{
-			qid: groupID,
-			pid: proID,
-		}
-		newChal := &chalinfo{}
-		k.lManager.lMap.Store(thisPU, newChal)
-	}
-
-	k.ds.PutKey(ctx, kmPid.ToString(), []byte(pidstrings.String()), "local")
+	k.ds.PutKey(ctx, kmPid.ToString(), []byte(pids), "local")
 
 	return
 }
@@ -244,18 +227,14 @@ func (k *Info) handleContracts(km *metainfo.KeyMeta, from string) {
 		return
 	}
 
-	err := k.ukpManager.saveUpkeeping(qid, false)
-	if err != nil {
-		log.Println("Save ", qid, "'s Upkeeping err", err)
-	}
-	log.Println("Save ", qid, "'s Upkeeping success")
-
-	err = k.ukpManager.saveQuery(qid, false)
-	if err != nil {
-		log.Println("Save ", qid, "'s Query err", err)
-	}
-	log.Println("Save ", qid, "'s Query success")
-
 	uid := ops[0]
-	k.setQuery(uid, qid)
+
+	gp := k.getGroupInfo(qid, uid, true)
+
+	if gp != nil && qid != uid {
+		gp.saveQuery()
+		gp.saveUpkeeping()
+	}
+
+	return
 }
