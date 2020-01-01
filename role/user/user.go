@@ -16,7 +16,7 @@ import (
 
 //Info implements user service
 type Info struct {
-	netID string
+	localID string
 	role  string
 	ds    data.Service
 	fsMap sync.Map // now key is queryID, value is *lfsInfo
@@ -31,7 +31,7 @@ type userInfo struct {
 func New(nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	us := &Info{
 		role:  metainfo.RoleUser,
-		netID: nid,
+		localID: nid,
 		ds:    d,
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(us)

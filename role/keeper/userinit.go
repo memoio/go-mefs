@@ -76,7 +76,7 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 
 	gp := k.getGroupInfo(qid, uid, false)
 	if gp == nil {
-		localID := k.netID
+		localID := k.localID
 		// fill self
 		newResponse.WriteString(localID)
 		kc--
@@ -135,31 +135,65 @@ func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error
 // key: queryID/"UserNotify"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	log.Println("NewUserNotify: ", km.ToString(), metaValue, "From:", from)
+	log.Println("NewUserNotify: ", km.ToString(), "From:", from)
 
-	options := km.GetOptions()
-	if len(options) != 3 {
-		return nil, errors.New("Wrong key")
+	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splited) < 2 {
+		log.Println("UserNotif value is not correct: ", metaValue)
+		return []byte("no"), nil
 	}
 
-	kc, err := strconv.Atoi(options[1])
-	if err != nil {
-		log.Println("handleUserInitReq: ", err)
-		return nil, err
+	kids := splited[0]
+	for i := 0; i < len(kids)/utils.IDLength; i++ {
+		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+		if keeper == k.localID {
+			return []byte("ok"), nil
+		}
 	}
-
-	pc, err := strconv.Atoi(options[2])
-	if err != nil {
-		log.Println("handleUserInitReq: ", err)
-		return nil, err
-	}
-
-	uid := options[0]
-	qid := km.GetMid()
-
-	go k.fillPinfo(qid, uid, pc, kc, metaValue, from)
 
 	return []byte("ok"), nil
+}
+
+// key: queryID/"UserStart"/userID/keepercount/providercount;
+// value: kid1kid2../pid1pid2..
+func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+	log.Println("NewUser Start: ", km.ToString(), "From:", from)
+	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splited) < 2 {
+		log.Println("UserNotif value is not correct: ", metaValue)
+		return nil, errors.New("value is not right")
+	}
+
+	ops := km.GetOptions()
+	if len(ops) != 3 {
+		return nil, errors.New("value is not right")
+	}
+
+	kc, err := strconv.Atoi(ops[1])
+	if err != nil {
+		log.Println("handleUserInitReq: ", err)
+		return nil, err
+	}
+
+	pc, err := strconv.Atoi(ops[2])
+	if err != nil {
+		log.Println("handleUserInitReq: ", err)
+		return nil, err
+	}
+
+	uid := ops[0]
+	qid := km.GetMid()
+
+	k.fillPinfo(qid, uid, pc, kc, metaValue, from)
+
+	gp := k.getGroupInfo(qid, uid, true)
+
+	if gp != nil && qid != uid {
+		gp.saveQuery()
+		gp.saveUpkeeping()
+	}
+
+	return gp.sessionID.NodeID(), nil
 }
 
 // fillPinfo fill user's uInfo, groupInfo in ukpMap
@@ -215,26 +249,6 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 	k.ds.PutKey(ctx, kmKid.ToString(), []byte(kids), "local")
 
 	k.ds.PutKey(ctx, kmPid.ToString(), []byte(pids), "local")
-
-	return
-}
-
-func (k *Info) handleContracts(km *metainfo.KeyMeta, from string) {
-	log.Println("New User", km.ToString(), "From:", from)
-	qid := km.GetMid()
-	ops := km.GetOptions()
-	if len(ops) != 1 {
-		return
-	}
-
-	uid := ops[0]
-
-	gp := k.getGroupInfo(qid, uid, true)
-
-	if gp != nil && qid != uid {
-		gp.saveQuery()
-		gp.saveUpkeeping()
-	}
 
 	return
 }

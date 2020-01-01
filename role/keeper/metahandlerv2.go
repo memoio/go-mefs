@@ -24,8 +24,8 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue []byte, f
 		go k.handleUserInit(km, from)
 	case metainfo.UserNotify: //user初始化确认
 		return k.handleUserNotify(km, metaValue, from)
-	case metainfo.Contract: //user部署好合约
-		go k.handleContracts(km, from)
+	case metainfo.UserStart: //user部署好合约
+		go k.handleUserStart(km, metaValue, from)
 	case metainfo.BlockPos:
 		switch opType {
 		case metainfo.Put:

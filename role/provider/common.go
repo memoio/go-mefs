@@ -3,10 +3,8 @@ package provider
 import (
 	"context"
 	"errors"
-	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -22,57 +20,86 @@ var (
 	errGetContractItem         = errors.New("Can't get contract Item")
 )
 
-type pContracts struct {
-	upKeepingBook sync.Map // K-user的id, V-upkeeping
-	channelBook   sync.Map // K-user的id, V-Channel
-	queryBook     sync.Map // K-user的id, V-Query
-	offer         contracts.OfferItem
-	proInfo       contracts.ProviderItem
-}
-
-func (p *Info) getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
-	pubKeyI, ok := p.blsConfigs.Load(userID)
-	if ok {
-		return pubKeyI.(*mcl.PublicKey), nil
+func (p *Info) getNewUserConfig(groupID, userID string) (*mcl.PublicKey, error) {
+	gp := p.getGroupInfo(groupID, userID, false)
+	if gp != nil || gp.blsPubKey != nil {
+		return gp.blsPubKey, nil
 	}
 
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
+	kmBls12, err := metainfo.NewKeyMeta(groupID, metainfo.Config, userID)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx := context.Background()
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := p.ds.GetKey(context.Background(), userconfigkey, keeperID)
+	userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, "local")
 	if err != nil {
 		return nil, err
 	}
 
 	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
-	if err != nil {
-		return nil, err
+	if err == nil && mkey != nil {
+		gp.blsPubKey = mkey.Pk
+		return mkey.Pk, nil
 	}
 
-	p.blsConfigs.Store(userID, mkey.Pk)
+	for _, kid := range gp.keepers {
+		userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, kid)
+		if err != nil {
+			return nil, err
+		}
+		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
+		if err != nil {
+			return nil, err
+		}
+		gp.blsPubKey = mkey.Pk
+		return mkey.Pk, nil
+	}
 
-	return mkey.Pk, nil
+	return nil, errors.New("No bls config")
 }
 
-func (p *Info) getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Config)
+func (p *Info) getUserPrivateKey(groupID, userID string) (*mcl.SecretKey, error) {
+	gp := p.getGroupInfo(groupID, userID, true)
+	if gp != nil {
+		return nil, errors.New("No user")
+	}
+
+	kmBls12, err := metainfo.NewKeyMeta(groupID, metainfo.Config, userID)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx := context.Background()
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := p.ds.GetKey(context.Background(), userconfigkey, keeperID)
+	userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, "local")
 	if err != nil {
 		return nil, err
 	}
 
 	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
-	if err != nil {
-		return nil, err
+	if err == nil && mkey != nil {
+		gp.blsPubKey = mkey.Pk
+		return mkey.Sk, nil
 	}
 
-	return mkey.Sk, nil
+	for _, kid := range gp.keepers {
+		userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, kid)
+		if err != nil {
+			return nil, err
+		}
+		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
+		if err != nil {
+			return nil, err
+		}
+
+		p.ds.PutKey(ctx, userconfigkey, userconfigbyte, "local")
+
+		return mkey.Sk, nil
+	}
+
+	return nil, errors.New("No bls config")
 }
 
 // getDiskUsage gets the disk usage
@@ -81,16 +108,12 @@ func (p *Info) getDiskUsage() (uint64, error) {
 }
 
 // getDiskTotal gets the disk total space which is set in config
+// default is 10TB
 func (p *Info) getDiskTotal() uint64 {
-	var maxSpaceInByte uint64
-	proItem, err := p.getProInfo()
-	if err != nil {
-		maxSpaceInByte = 10 * 1024 * 1024 * 1024
-	} else {
-		if proItem.Capacity == 0 {
-			maxSpaceInByte = 10 * 1024 * 1024 * 1024
-		} else {
-			maxSpaceInByte = uint64(proItem.Capacity) * 1024 * 1024
+	maxSpaceInByte := uint64(1024 * 1024 * 1024 * 1024)
+	if p.proContract != nil {
+		if p.proContract.Capacity != 0 {
+			maxSpaceInByte = uint64(p.proContract.Capacity) * 1024 * 1024
 		}
 	}
 	return maxSpaceInByte

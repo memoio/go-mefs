@@ -4,14 +4,16 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/google/uuid"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 )
 
 // user-keeper-provider map
 type groupInfo struct {
-	groupID      string // is queryID
-	owner        string // is userID
+	sessionID    uuid.UUID // for user
+	groupID      string    // is queryID
+	owner        string    // is userID
 	localKeeper  string
 	masterKeeper string
 	keepers      []string
@@ -124,7 +126,7 @@ func (k *Info) getGroupInfo(groupID, userID string, mode bool) *groupInfo {
 	thisIgroup, ok := k.ukpGroup.Load(groupID)
 	if !ok {
 		if mode {
-			ginfo, err := newGroup(k.netID, groupID, userID, []string{groupID}, []string{groupID})
+			ginfo, err := newGroup(k.localID, groupID, userID, []string{groupID}, []string{groupID})
 			if err != nil {
 				return nil
 			}

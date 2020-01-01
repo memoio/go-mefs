@@ -39,7 +39,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 						continue
 					}
 
-					key, value, err := thisLinfo.genChallengeBLS(k.netID, pu.qid, proID, thisGroup.owner)
+					key, value, err := thisLinfo.genChallengeBLS(k.localID, pu.qid, proID, thisGroup.owner)
 					if err != nil {
 						continue
 					}
@@ -154,7 +154,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	kid := ops[2]
 	chaltime := ops[3]
 
-	if kid != k.netID {
+	if kid != k.localID {
 		return false
 	}
 

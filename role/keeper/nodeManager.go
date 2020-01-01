@@ -70,7 +70,7 @@ func (k *Info) setQuery(uid, qid string) {
 }
 
 func (k *Info) getKInfo(pid string) (*kInfo, error) {
-	if k.netID == pid {
+	if k.localID == pid {
 		return nil, errors.New("is local keeper")
 	}
 

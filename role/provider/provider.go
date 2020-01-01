@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/routing"
+	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -15,28 +17,45 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
+// Info tracks provider's information
 type Info struct {
-	netID      string
-	sk         string
-	state      bool
-	ds         data.Service
-	conManager *pContracts
-	blsConfigs sync.Map
+	localID      string
+	sk           string
+	state        bool
+	ds           data.Service
+	storageUsed  uint64
+	storageTotal uint64
+	users        sync.Map // key: queryID, value: *groupInfo
+	offers       []*contracts.OfferItem
+	proContract  *contracts.ProviderItem
+}
+
+type groupInfo struct {
+	sessionID    uuid.UUID
+	userID       string
+	groupID      string
+	storageUsed  uint64
+	storageTotal uint64
+	keepers      []string
+	blsPubKey    *mcl.PublicKey
+	upkeeping    *contracts.UpKeepingItem
+	channel      *contracts.ChannelItem
+	query        *contracts.QueryItem
 }
 
 //New start provider service
 func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price int64, reDeployOffer bool) (instance.Service, error) {
 	m := &Info{
-		netID: id,
-		sk:    sk,
-		ds:    ds,
+		localID: id,
+		sk:      sk,
+		ds:      ds,
+		offers:  make([]*contracts.OfferItem, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
 		return nil, err
 	}
 
-	m.conManager = &pContracts{}
 	for {
 		err = providerDeployResolverAndOffer(id, sk, capacity, duration, price, reDeployOffer)
 		if err != nil {
@@ -47,23 +66,24 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		}
 	}
 
-	err = m.saveProInfo()
+	err = m.saveProvider()
 	if err != nil {
-		log.Println("Save ", m.netID, "'s provider info err", err)
+		log.Println("Save ", m.localID, "'s provider info err", err)
 		return nil, err
 	}
 
-	log.Println("Save ", m.netID, "'s provider info success")
+	log.Println("Save ", m.localID, "'s provider info success")
 
 	err = m.saveOffer()
 	if err != nil {
-		log.Println("Save ", m.netID, "'s Offer err", err)
+		log.Println("Save ", m.localID, "'s Offer err", err)
 		return nil, err
 	}
-	log.Println("Save ", m.netID, "'s Offer success")
+	log.Println("Save ", m.localID, "'s Offer success")
 
 	go m.getKpMapRegular(ctx)
 	go m.sendStorageRegular(ctx)
+	go m.saveRegular(ctx)
 
 	m.state = true
 
@@ -83,24 +103,76 @@ func (p *Info) Stop() error {
 	return p.save(context.Background())
 }
 
+func newGroup(localID, gid, uid string, kps []string) *groupInfo {
+	g := &groupInfo{
+		userID:  uid,
+		groupID: gid,
+		keepers: kps,
+	}
+
+	if gid != uid {
+		g.saveUpkeeping()
+		g.saveQuery()
+		g.saveChannel(localID)
+	}
+
+	return g
+}
+
+func (p *Info) getGroupInfo(groupID, userID string, mode bool) *groupInfo {
+	groupI, ok := p.users.Load(groupID)
+	if !ok {
+		if mode {
+			return newGroup(p.localID, groupID, userID, []string{userID})
+		}
+	}
+
+	return groupI.(*groupInfo)
+}
+
+type quKey struct {
+	uid string
+	qid string
+}
+
+func (p *Info) getGroups() []quKey {
+	var res []quKey
+	p.users.Range(func(key, value interface{}) bool {
+		tmp := quKey{
+			uid: value.(*groupInfo).userID,
+			qid: key.(string),
+		}
+		res = append(res, tmp)
+		return true
+	})
+
+	return res
+}
+
+func (p *Info) saveRegular(ctx context.Context) {
+	time.Sleep(time.Minute)
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			p.save(ctx)
+		}
+	}
+}
+
 func (p *Info) save(ctx context.Context) error {
 	if !p.state {
 		return errProviderServiceNotReady
 	}
-	channels := p.getChannels()
-	for _, channel := range channels {
-		// 保存本地形式：K-userID，V-channel此时的value
-		km, err := metainfo.NewKeyMeta(channel.ChannelAddr, metainfo.Channel)
-		if err != nil {
-			return err
-		}
-		err = p.ds.PutKey(context.Background(), km.ToString(), []byte(channel.Value.String()), "local")
-		if err != nil {
-			return err
-		}
-		log.Println("持久化channel:", channel.ChannelAddr, channel.Value.String())
+
+	res := p.getGroups()
+	for _, qu := range res {
+		p.saveChannelValue(qu.qid, qu.uid, p.localID)
 	}
-	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+	posKM, err := metainfo.NewKeyMeta(groupID, metainfo.PosMeta)
 	if err != nil {
 		return err
 	}
@@ -116,7 +188,7 @@ func (p *Info) save(ctx context.Context) error {
 
 func (p *Info) getKpMapRegular(ctx context.Context) {
 	log.Println("Get kpMap from chain start!")
-	peerID := p.netID
+	peerID := p.localID
 	contracts.SaveKpMap(peerID)
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
@@ -158,12 +230,12 @@ func (p *Info) storageSync(ctx context.Context) error {
 
 	maxSpace := p.getDiskTotal()
 
-	klist, ok := contracts.GetKeepersOfPro(p.netID)
+	klist, ok := contracts.GetKeepersOfPro(p.localID)
 	if !ok {
 		return nil
 	}
 
-	km, err := metainfo.NewKeyMeta(p.netID, metainfo.Storage)
+	km, err := metainfo.NewKeyMeta(p.localID, metainfo.Storage)
 	if err != nil {
 		log.Println("construct StorageSync KV error :", err)
 		return err

@@ -48,5 +48,5 @@ type group interface {
 	notify()
 	// confirm all keepers
 	confirm(ctx context.Context)
-	done(ctx context.Context)
+	deployContract(ctx context.Context)
 }

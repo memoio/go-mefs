@@ -10,7 +10,6 @@ import (
 	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
@@ -32,6 +31,7 @@ const (
 var curGid = -1024
 var curSid = -1
 var posID string
+var groupID string
 var posAddr string
 var posCidPrefix string
 var inGenerate int
@@ -52,41 +52,25 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 	posID = pos.GetPosId()
 	posAddr = pos.GetPosAddr()
 	posSkByte = pos.GetPosSkByte()
+	groupID := pos.GetPosGID()
 
-	retryCount := 0
-	for {
-		if retryCount > 10 {
-			log.Println("Save upkeeping in posService error, exit from pos mode.")
-			return
-		}
-		err := p.saveUpkeeping(posID)
-		if err == nil {
-			break
-		}
-		retryCount++
+	gp := p.getGroupInfo(groupID, posID, true)
+	if gp == nil {
+		return
 	}
-
-	if value, ok := p.conManager.upKeepingBook.Load(posID); ok {
-		keeperIDs = value.(contracts.UpKeepingItem).KeeperIDs
+	err := gp.saveUpkeeping()
+	if err == nil {
+		return
 	}
 
 	//填充opt.KeySet
-	getConfig := false
-
-	for _, tmpKeeper := range keeperIDs {
-		if err := p.getUserConifg(posID, tmpKeeper); err == nil {
-			getConfig = true
-			break
-		}
-	}
-
-	if !getConfig {
-		log.Println("Cannot get userconfig, start pos fails")
+	err = p.getUserConifg(groupID, posID)
+	if err != nil {
 		return
 	}
 
 	//从磁盘读取存储的Cidprefix
-	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+	posKM, err := metainfo.NewKeyMeta(groupID, metainfo.PosMeta)
 	if err != nil {
 		log.Println("NewKeyMeta posKM error :", err)
 	} else {
@@ -150,7 +134,7 @@ func (p *Info) traversePath(gc bool) {
 		sid := 0
 		for sid = 0; sid < 1024; sid++ {
 			for i := 0; i < 5; i++ {
-				posCid := posID + "_" + p.netID + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
+				posCid := posID + "_" + p.localID + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
 				ncid := cid.NewCidV2([]byte(posCid))
 				exist, err := p.ds.BlockStore().Has(ncid)
 				if err != nil {
@@ -186,7 +170,7 @@ func (p *Info) traversePath(gc bool) {
 			}
 		}
 
-		posCidPrefix = posID + "_" + p.netID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 
 		break
 	}
@@ -217,7 +201,7 @@ func (p *Info) doGenerateOrDelete() {
 func (p *Info) uploadMulpolicy(data []byte) ([][]byte, int, error) {
 	opt.Policy = df.MulPolicy
 	// 构建加密秘钥
-	buckid := p.netID + strconv.Itoa(curGid)
+	buckid := p.localID + strconv.Itoa(curGid)
 	tmpkey := []byte(string(posSkByte) + buckid)
 	skey := sha256.Sum256(tmpkey)
 	// 加密、Encode
@@ -260,7 +244,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 			curGid += 1024
 		}
 
-		posCidPrefix = posID + "_" + p.netID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		data, _, err := p.uploadMulpolicy(tmpData)
 		if err != nil {
 			log.Println("UploadMulpolicy in generate Pos Blocks error :", err)
@@ -291,7 +275,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 
 		// 向keeper发送元数据
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
-		km, err := metainfo.NewKeyMeta(p.netID, metainfo.Pos)
+		km, err := metainfo.NewKeyMeta(p.localID, metainfo.Pos)
 		for _, keeper := range keeperIDs {
 			p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(metaValue), nil, keeper)
 		}
@@ -352,7 +336,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 			curSid = -1
 		}
 
-		posCidPrefix = posID + "_" + p.netID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
@@ -365,7 +349,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
 		if j < 5 {
-			km, err := metainfo.NewKeyMeta(p.netID, metainfo.Pos)
+			km, err := metainfo.NewKeyMeta(p.localID, metainfo.Pos)
 			if err != nil {
 				log.Println("construct put blockMeta KV error :", err)
 				return
@@ -378,11 +362,11 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 	}
 }
 
-func (p *Info) getUserConifg(userID, keeperID string) error {
+func (p *Info) getUserConifg(groupID, userID string) error {
 	// 需要用私钥decode出bls的私钥，用user中的方法
 	//获取公钥
 	opt.KeySet = new(mcl.KeySet)
-	pubKey, err := p.getNewUserConfig(userID, keeperID)
+	pubKey, err := p.getNewUserConfig(groupID, userID)
 	if err != nil {
 		log.Println("getNewUserConfig in get userconfig error :", err)
 		return err
@@ -391,7 +375,7 @@ func (p *Info) getUserConifg(userID, keeperID string) error {
 	opt.KeySet.Pk = pubKey
 
 	//获取私钥
-	opt.KeySet.Sk, err = p.getUserPrivateKey(userID, keeperID)
+	opt.KeySet.Sk, err = p.getUserPrivateKey(groupID, userID)
 	if err != nil {
 		log.Println("getUserPrivateKey in get userconfig error ", err)
 		return err

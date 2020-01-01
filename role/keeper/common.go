@@ -49,7 +49,7 @@ func (k *Info) getUserBLS12Config(groupID, userID string) (*mcl.PublicKey, error
 }
 
 func (k *Info) getUserBLS12ConfigByte(qid, uid string) ([]byte, error) {
-	kmBls12, err := metainfo.NewKeyMeta(qid, metainfo.Config)
+	kmBls12, err := metainfo.NewKeyMeta(qid, metainfo.Config, uid)
 	if err != nil {
 		return nil, err
 	}

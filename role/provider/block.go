@@ -13,7 +13,6 @@ import (
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
@@ -25,41 +24,18 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 		return errors.New("Wrong value for put block")
 	}
 
-	bmeta, err := metainfo.GetBlockMeta(splitedNcid[0])
-	if err != nil {
-		return nil
-	}
+	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	qid := bids[0]
 
-	isMyuser := false
-	// 保存合约
-	upItem, err := p.getUpkeeping(bmeta.GetQid())
-	if err != nil {
-		go p.saveUpkeeping(bmeta.GetQid())
-	} else {
-		localID := p.netID
-		for _, proID := range upItem.ProviderIDs {
-			if localID == proID {
-				isMyuser = true
-				offerItem, err := p.getOffer()
-				if err != nil {
-					return err
-				}
-				if upItem.Price < offerItem.Price {
-					return errors.New("price is lower now")
-				}
-				break
-			}
-		}
-	}
-
-	if !isMyuser {
+	gp := p.getGroupInfo(qid, qid, false)
+	if gp == nil {
 		return errors.New("NotMyUser")
 	}
 
 	ctx := context.Background()
 
 	go func() {
-		err = p.ds.PutBlock(ctx, km.ToString(), value, "local")
+		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {
 			log.Printf("Error writing block to datastore: %s", err)
 			return
@@ -77,40 +53,17 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 		return errors.New("Wrong value for put block")
 	}
 
-	bmeta, err := metainfo.GetBlockMeta(splitedNcid[1])
-	if err != nil {
-		return nil
-	}
+	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	qid := bids[0]
 
-	isMyuser := false
-	// 保存合约
-	upItem, err := p.getUpkeeping(bmeta.GetQid())
-	if err != nil {
-		go p.saveUpkeeping(bmeta.GetQid())
-	} else {
-		localID := p.netID
-		for _, proID := range upItem.ProviderIDs {
-			if localID == proID {
-				isMyuser = true
-				offerItem, err := p.getOffer()
-				if err != nil {
-					return err
-				}
-				if upItem.Price < offerItem.Price {
-					return errors.New("price is lower now")
-				}
-				break
-			}
-		}
-	}
-
-	if !isMyuser {
+	gp := p.getGroupInfo(qid, qid, false)
+	if gp == nil {
 		return errors.New("NotMyUser")
 	}
 
 	ctx := context.Background()
 	go func() {
-		err = p.ds.AppendBlock(ctx, km.ToString(), value, "local")
+		err := p.ds.AppendBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {
 			log.Printf("Error append field to block %s: %s", km.ToString(), err)
 			return
@@ -126,12 +79,19 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error)
 		return nil, errors.New("Key is too short")
 	}
 
+	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	qid := bids[0]
+	gp := p.getGroupInfo(qid, qid, false)
+	if gp == nil {
+		return nil, errors.New("NotMyUser")
+	}
+
 	sigByte, err := b58.Decode(splitedNcid[2])
 	if err != nil {
 		return nil, errors.New("Signature format is wrong")
 	}
 
-	res, userID, key, value, err := p.verify(sigByte)
+	res, value, sig, err := p.verify(gp.channel.ChannelAddr, gp.channel.Value, sigByte)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 		return nil, err
@@ -145,20 +105,20 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error)
 		if err != nil {
 			return nil, errors.New("Block is not found")
 		}
-		if key != "" {
-			channelItem, err := p.getChannel(userID)
-			if err != nil {
-				return nil, errors.New("Find channelItem in channelBook error")
-			}
 
-			log.Println("Downlaod success，change channel.value and persist: ", value.String())
-			channelItem.Value = value
-			p.conManager.channelBook.Store(userID, channelItem)
-			err = p.ds.PutKey(context.Background(), key, []byte(value.String()), "local")
-			if err != nil {
-				log.Println("cmdPutErr:", err)
-			}
+		key, err := metainfo.NewKeyMeta(gp.channel.ChannelAddr, metainfo.Channel) // HexChannelAddress|13|channelValue
+		if err != nil {
+			return nil, err
 		}
+
+		err = p.ds.PutKey(context.Background(), key.ToString(), value.Bytes(), "local")
+		if err != nil {
+			log.Println("cmdPutErr:", err)
+		}
+
+		gp.channel.Value = value
+		gp.channel.Sig = sig
+
 		return b.RawData(), nil
 	}
 
@@ -168,65 +128,41 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error)
 }
 
 // verify verifies the transaction
-func (p *Info) verify(mes []byte) (bool, string, string, *big.Int, error) {
+func (p *Info) verify(cAddr string, oldValue *big.Int, mes []byte) (bool, *big.Int, []byte, error) {
 	signForChannel := &pb.SignForChannel{}
 	err := proto.Unmarshal(mes, signForChannel)
 	if err != nil {
 		log.Println("proto.Unmarshal when provider verify err:", err)
-		return false, "", "", nil, err
+		return false, nil, nil, err
 	}
 
 	//解析传过来的参数
 	var money = new(big.Int)
 	money = money.SetBytes(signForChannel.GetMoney())
-	userAddr := common.HexToAddress(signForChannel.GetUserAddress())
-	providerAddr := common.HexToAddress(signForChannel.GetProviderAddress())
-	sig := signForChannel.GetSig() //传过来的签名信息如果是空，就表明是测试环境，直接返回true
+	sig := signForChannel.GetSig()
 	log.Println("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
 	if sig == nil {
-		return true, "", "", nil, nil
+		return true, nil, nil, nil
 	}
 
-	// 从内存获得value
-	userID, err := address.GetIDFromAddress(userAddr.String())
-	if err != nil {
-		return false, "", "", nil, err
-	}
-	item, ok := p.conManager.channelBook.Load(userID)
-	if !ok {
-		log.Println("Not find ", userID, "'s channelItem in channelBook.")
-		return false, "", "", nil, errors.New("Find channelItem in channelBook error")
-	}
-	channelItem, ok := item.(contracts.ChannelItem)
-	if !ok {
-		log.Println("Can't transfer item to channelItem.")
-		return false, "", "", nil, errors.New("Transfer item to channelItem error")
-	}
-	//在Value的基础上再加上此次下载需要支付的money，就是此次验证签名的value
+	//verify value： value ?= oldValue + 100
 	addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-	// 默认100 + Value
 	value := big.NewInt(0)
-	value = value.Add(channelItem.Value, big.NewInt(addValue))
-
-	if money.Cmp(value) < 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
-		log.Println("value is different from money,  value is: ", value.String())
-		//return false, "", "", nil, nil
+	value = value.Add(oldValue, big.NewInt(addValue))
+	if money.Cmp(value) < 0 {
+		log.Println("value is less than money,  value is: ", value.String())
+		// to test
+		//return false, nil, nil, nil
 	}
 
 	//判断签名是否正确
-	channelAddr, _, err := contracts.GetChannelAddr(providerAddr, providerAddr, userAddr)
-	if err != nil {
-		return false, "", "", nil, err
-	}
-	channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Channel) // HexChannelAddress|13|channelValue
-	if err != nil {
-		return false, "", "", nil, err
-	}
+	channelAddr := common.HexToAddress(cAddr[2:])
+
 	res, err := contracts.VerifySig(signForChannel.GetUserPK(), sig, channelAddr, money)
 	if err != nil {
-		return false, "", "", nil, err
+		return false, nil, nil, err
 	}
-	return res, userID, channelValueKeyMeta.ToString(), value, nil
+	return res, value, sig, nil
 }
 
 func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {

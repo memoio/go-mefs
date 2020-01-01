@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/source/data"
@@ -17,23 +18,25 @@ import (
 )
 
 const (
-	errState int8 = iota
-	starting
-	collecting
-	collectCompleted
-	onDeploy
-	groupStarted
+	starting     int8 = iota
+	collecting        // broadcast UserInit
+	collectDone       // notify keeper
+	deploying         // deploy contracts
+	depoyDone         // connect
+	groupStarted      // done
 )
 
 //keeperInfo 此结构体记录Keeper的信息，存储Tendermint地址，让user也能访问链上数据
 type keeperInfo struct {
 	keeperID  string
+	sessionID uuid.UUID // for user
 	connected bool
 }
 
 type providerInfo struct {
 	providerID string
 	connected  bool
+	sessionID  uuid.UUID // for user
 	chanItem   *contracts.ChannelItem
 	offerItem  *contracts.OfferItem
 }
@@ -68,7 +71,7 @@ func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redep
 		owner:       uid,
 		privKey:     sk,
 		ds:          d,
-		state:       errState,
+		state:       starting,
 		storeDays:   duration,
 		storeSize:   capacity,
 		storePrice:  price,
@@ -79,11 +82,10 @@ func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redep
 }
 
 // startGroupService starts group
-// step1: deploy query contract
-// step2: send init message(query address) to keeper
-// step3: handle init message from keeper
-// step4: sync send notify to keeper and hanle keeper's notify
-// step5: init userconfig, deploy upkeeping contract and channel contracts(need modify)
+// step1: broadcast init message(query address) to keeper
+// step2: handle init message from keeper
+// step3: sync send notify to keeper and handle keeper's notify
+// step4: deploy upkeeping contract and channel contracts(need modify)
 func (g *groupInfo) start(ctx context.Context) (bool, error) {
 	// getUK
 	if g.upKeepingItem != nil {
@@ -93,6 +95,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		g.providerSLA = int(uItem.ProviderSLA)
 		g.tempKeepers = uItem.KeeperIDs
 		g.tempProviders = uItem.ProviderIDs
+		g.state = depoyDone
 		err := g.connect(ctx)
 		if err != nil {
 			return true, err
@@ -110,6 +113,10 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 }
 
 func (g *groupInfo) connect(ctx context.Context) error {
+	if g.state != depoyDone {
+		return errors.New("Wrong state")
+	}
+
 	log.Println("Connect for user: ", g.owner)
 	for _, kid := range g.tempKeepers {
 		tempKeeper := &keeperInfo{
@@ -173,25 +180,50 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return ErrNoEnoughProvider
 	}
 
-	// key: queryID/"Contract"/userID
-	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.Contract, g.owner)
+	// key: queryID/"UserStart"/userID/kc/pc
+	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("Construct Deployed key error", err)
 		return err
 	}
 
+	var res strings.Builder
+	for _, keeper := range g.keepers {
+		res.WriteString(keeper.keeperID)
+	}
+
+	res.WriteString(metainfo.DELIMITER)
+
+	for _, provider := range g.providers {
+		res.WriteString(provider.providerID)
+	}
+
 	for _, kinfo := range g.keepers {
-		_, err = g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, kinfo.keeperID)
+		res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, kinfo.keeperID)
 		if err != nil {
 			log.Println("Send keeper", kinfo.keeperID, " err:", err)
+			continue
 		}
+		uuidtmp, err := uuid.FromBytes(res)
+		if err != nil {
+			continue
+		}
+		kinfo.sessionID = uuidtmp
 	}
+
 	for _, pinfo := range g.providers {
-		_, err = g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, pinfo.providerID)
+		res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, pinfo.providerID)
 		if err != nil {
 			log.Println("Send provider", pinfo.providerID, " err:", err)
 		}
+
+		uuidtmp, err := uuid.FromBytes(res)
+		if err != nil {
+			continue
+		}
+		pinfo.sessionID = uuidtmp
 	}
+
 	log.Println("Group Service is ready for: ", g.owner)
 
 	g.state = groupStarted
@@ -228,13 +260,13 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 				timeOutCount++
 				if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
 					//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
-					g.state = collectCompleted
+					g.state = collectDone
 					g.notify(ctx)
 				} else {
 					log.Printf("No enough keepers and providers, have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
 					go g.ds.BroadcastMessage(ctx, kmes)
 				}
-			case collectCompleted:
+			case collectDone:
 				timeOutCount++
 				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
 				log.Printf("Timeout, waiting keeper response\n")
@@ -243,8 +275,10 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 						log.Printf("Keeper %s not response, waiting...", keeperInfo.keeperID)
 					}
 				}
-			case onDeploy:
-				g.done(ctx)
+			case deploying:
+				g.deployContract(ctx)
+			case depoyDone:
+				return g.connect(ctx)
 			default:
 				return nil
 			}
@@ -296,10 +330,10 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 	}
 }
 
-//userInitNotIf 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
+//userInitNotify 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
 // key: queryID/"UserNotify"/userID/kc/pc
 func (g *groupInfo) notify(ctx context.Context) {
-	if g.state != collectCompleted {
+	if g.state != collectDone {
 		return
 	}
 
@@ -315,7 +349,6 @@ func (g *groupInfo) notify(ctx context.Context) {
 	log.Println("Has enough Keeper and Providers, choosing...")
 	g.keepers = make([]*keeperInfo, 0, g.keeperSLA)
 	g.providers = make([]*providerInfo, 0, g.providerSLA)
-	//选择keeper
 	g.tempKeepers = utils.DisorderArray(g.tempKeepers)
 	i := 0
 	for _, kidStr := range g.tempKeepers {
@@ -339,7 +372,6 @@ func (g *groupInfo) notify(ctx context.Context) {
 		return
 	}
 
-	//选择provider
 	g.tempProviders = utils.DisorderArray(g.tempProviders)
 	i = 0
 	for _, pidStr := range g.tempProviders {
@@ -364,20 +396,22 @@ func (g *groupInfo) notify(ctx context.Context) {
 		return
 	}
 
-	g.initResMutex.Unlock()
 	log.Println("Choose completed")
 
-	//构造本节点keeper信息和provider信息 放入硬盘 id1id2id3.......(无分隔符)
-	var assignedKeeper, assignedProvider string
+	var res strings.Builder
+	var tmpKps []string
 	for _, keeper := range g.keepers {
-		assignedKeeper += keeper.keeperID
+		res.WriteString(keeper.keeperID)
+		tmpKps = append(tmpKps, keeper.keeperID)
 	}
 
+	res.WriteString(metainfo.DELIMITER)
+
 	for _, provider := range g.providers {
-		assignedProvider += provider.providerID
+		res.WriteString(provider.providerID)
 	}
-	//构造发给keeper的初始化确认信息并发送给自己的所有keeper
-	assignedKP := assignedKeeper + metainfo.DELIMITER + assignedProvider
+
+	g.initResMutex.Unlock()
 
 	kmNotify, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserNotify, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
@@ -387,25 +421,25 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	kmes := kmNotify.ToString()
 	var wg sync.WaitGroup
-	for _, keeper := range g.keepers { //循环发消息
+	for _, kid := range tmpKps { //循环发消息
 		wg.Add(1)
-		log.Println("Notify keeper:", keeper.keeperID)
+		log.Println("Notify keeper:", kid)
 		go func(kid string) {
 			defer wg.Done()
 			retry := 0
 			// retry
 			for retry < 10 {
-				res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmes, []byte(assignedKP), nil, kid) //发送确认信息
+				res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmes, []byte(res.String()), nil, kid)
 				if err != nil || string(res) != "ok" {
 					retry++
 					time.Sleep(30 * time.Second)
 				} else {
-					g.confirm(kid, string(res))
+					g.confirm(kid)
 					return
 				}
 			}
 
-		}(keeper.keeperID)
+		}(kid)
 
 	}
 	wg.Wait()
@@ -413,14 +447,13 @@ func (g *groupInfo) notify(ctx context.Context) {
 	log.Println("Waiting for keepers' response")
 }
 
-// confirm 第四次握手 确认Keeper启动完毕
-func (g *groupInfo) confirm(keeper, res string) {
+func (g *groupInfo) confirm(kid string) {
 	g.initResMutex.Lock()
 	defer g.initResMutex.Unlock()
 	var count int
-	//将发来信息的keeper记录为连接成功
+	//keeper is online
 	for _, kp := range g.keepers {
-		if strings.Compare(kp.keeperID, keeper) == 0 && !kp.connected {
+		if strings.Compare(kp.keeperID, kid) == 0 && !kp.connected {
 			kp.connected = true
 			log.Printf("Receive %s's response, waiting for other keepers\n", kp.keeperID)
 		}
@@ -428,19 +461,18 @@ func (g *groupInfo) confirm(keeper, res string) {
 			count++
 		}
 	}
-	//与所有keeper都连接成功了
+	//all keepers are online
 	if count == g.keeperSLA {
 		log.Println("Receive all keepers' response")
-		g.state = onDeploy
+		g.state = deploying
 	}
 	return
 }
 
-func (g *groupInfo) done(ctx context.Context) error {
-	if g.state != onDeploy {
+func (g *groupInfo) deployContract(ctx context.Context) error {
+	if g.state != deploying {
 		return errors.New("State is wrong")
 	}
-	//部署合约userID string, sk []byte, ks []keeperInfo, ps []providerInfo, storeDays int64, storeSize int64, storePrice int64
 
 	g.tempKeepers = g.tempKeepers[:0]
 	for _, kinfo := range g.keepers {
@@ -459,28 +491,8 @@ func (g *groupInfo) done(ctx context.Context) error {
 
 	g.saveContracts()
 
-	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.Contract, g.owner)
-	if err != nil {
-		log.Println("Construct Deployed key error", err)
-		return err
-	}
+	g.state = depoyDone
 
-	kmes := kmc.ToString()
-
-	for _, keeper := range g.tempKeepers {
-		_, err = g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmes, nil, nil, keeper)
-		if err != nil {
-			log.Println("Send keeper", keeper, " err:", err)
-		}
-	}
-	for _, provider := range g.tempProviders {
-		_, err = g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmes, nil, nil, provider)
-		if err != nil {
-			log.Println("Send provider", provider, " err:", err)
-		}
-	}
-	log.Println("Group is ready for: ", g.owner)
-	g.state = groupStarted
 	return nil
 }
 

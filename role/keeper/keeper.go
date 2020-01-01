@@ -34,7 +34,7 @@ const (
 
 //Info implements user service
 type Info struct {
-	netID     string
+	localID     string
 	role      string
 	sk        string
 	state     bool
@@ -51,7 +51,7 @@ type Info struct {
 // TODO:Keeper出问题重启后，应该能自动将所有user的信息恢复到内存中
 func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	m := &Info{
-		netID: nid,
+		localID: nid,
 		sk:    sk,
 		state: false,
 		ds:    d,
@@ -120,7 +120,7 @@ func (k *Info) persistRegular(ctx context.Context) {
 }
 
 func (k *Info) save(ctx context.Context) error {
-	localID := k.netID
+	localID := k.localID
 
 	// persist keepers
 	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
@@ -278,7 +278,7 @@ func (k *Info) load(ctx context.Context) error {
 //重启后重新恢复User现场 读取本地存储的U-K-P信息，构建PInfo结构
 func (k *Info) loadUser(ctx context.Context) error {
 	log.Println("Load All userID's Information")
-	localID := k.netID //本地id
+	localID := k.localID //本地id
 	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
 	if err != nil {
 		return err
@@ -369,7 +369,7 @@ func (k *Info) loadUserBlock(qid string) error {
 
 //查找本地持久化保存的U-K-P信息，并与这些节点尝试连接
 func (k *Info) loadPeers(ctx context.Context) error {
-	localID := k.netID
+	localID := k.localID
 	// load keepers
 	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
 	if err != nil {
@@ -460,7 +460,7 @@ func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 func (k *Info) createGroup(qid, uid string, keepers, providers []string) error {
 	_, ok := k.ukpGroup.Load(qid)
 	if !ok {
-		gInfo, err := newGroup(k.netID, qid, uid, keepers, providers)
+		gInfo, err := newGroup(k.localID, qid, uid, keepers, providers)
 		if err != nil {
 			return err
 		}

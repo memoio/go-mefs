@@ -53,7 +53,7 @@ const (
 	ManagedUsers
 	UserInit
 	UserNotify
-	Contract
+	UserStart
 	Query
 	Offer
 	UpKeeping

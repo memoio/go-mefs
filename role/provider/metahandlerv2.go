@@ -1,9 +1,13 @@
 package provider
 
 import (
+	"errors"
 	"log"
+	"strings"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -16,8 +20,8 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue []byte, f
 	}
 	dtype := km.GetDType()
 	switch dtype {
-	case metainfo.Contract:
-		go p.handleUserDeployedContracts(km, metaKey, from)
+	case metainfo.UserStart:
+		go p.handleUserStart(km, metaKey, from)
 	case metainfo.Challenge:
 		go p.handleChallengeBls12(km, metaValue, from)
 	case metainfo.Repair:
@@ -50,4 +54,38 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue []byte, f
 		return nil, metainfo.ErrWrongType
 	}
 	return []byte(instance.MetaHandlerComplete), nil
+}
+
+func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, from string) ([]byte, error) {
+	gid := km.GetMid()
+	ops := km.GetOptions()
+	if len(ops) != 3 {
+		return nil, errors.New("wrong key")
+	}
+
+	splitValue := strings.Split(string(metaValue), metainfo.DELIMITER)
+
+	if len(splitValue) != 2 {
+		return nil, errors.New("wrong value")
+	}
+
+	var keepers []string
+	kids := splitValue[0]
+	for i := 0; i < len(kids)/utils.IDLength; i++ {
+		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+		_, err := peer.IDB58Decode(keeper)
+		if err != nil {
+			continue
+		}
+		keepers = append(keepers, keeper)
+	}
+
+	uid := ops[0]
+	gp := newGroup(p.localID, gid, uid, keepers)
+
+	p.users.Store(gid, gp)
+
+	p.loadChannelValue(gid, uid)
+
+	return []byte("ok"), nil
 }

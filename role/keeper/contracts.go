@@ -241,7 +241,7 @@ func (k *Info) ukAddProvider(qid, uid, pid, sk string) error {
 func (k *Info) getKpMapRegular(ctx context.Context) {
 	log.Println("Get kpMap from chain start!")
 
-	peerID := k.netID
+	peerID := k.localID
 	contracts.SaveKpMap(peerID)
 	ticker := time.NewTicker(KPMAPTIME)
 	defer ticker.Stop()
