@@ -91,7 +91,13 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 			if err != nil {
 				return err
 			}
-			err = contracts.AddProvider(pos.PosSkStr, userAddr, []common.Address{providerAddr})
+
+			queryAddr, err := ad.GetAddressFromID(pos.GetPosGID())
+			if err != nil {
+				return err
+			}
+
+			err = contracts.AddProvider(pos.PosSkStr, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 			if err != nil {
 				log.Println("st AddProvider() error", err)
 				return err
@@ -120,11 +126,10 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	amount := convertSpacetime(spaceTime, price)
 	if amount.Sign() > 0 {
 		pAddr, _ := ad.GetAddressFromID(proID) //providerAddress
-		scGroupid, _ := ad.GetAddressFromID(g.owner)
 		ukAddr := common.HexToAddress(g.upkeeping.UpKeepingAddr[2:])
 		log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err = contracts.SpaceTimePay(ukAddr, scGroupid, pAddr, localSk, amount) //进行支付
+		err = contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount) //进行支付
 		if err != nil {
 			log.Println("contracts.SpaceTimePay() failed: ", err)
 			return err

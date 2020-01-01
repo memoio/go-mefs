@@ -32,7 +32,13 @@ func (g *groupInfo) saveUpkeeping() error {
 	if err != nil {
 		return err
 	}
-	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
+
+	queryAddr, err := ad.GetAddressFromID(g.groupID)
+	if err != nil {
+		return err
+	}
+
+	ukAddr, uk, err := contracts.GetUpkeeping(userAddr, userAddr, queryAddr.String())
 	if err != nil {
 		log.Println(g.owner, "has not deployed upkeeping")
 		return err
@@ -222,10 +228,15 @@ func (k *Info) ukAddProvider(qid, uid, pid, sk string) error {
 		return err
 	}
 
+	queryAddr, err := ad.GetAddressFromID(qid)
+	if err != nil {
+		log.Println("ukAddProvider GetAddressFromID() error", err)
+		return err
+	}
+
 	if gp.isMaster(pid) {
 		log.Println("add provider to: ", userAddr)
-
-		err = contracts.AddProvider(sk, userAddr, []common.Address{providerAddr})
+		err = contracts.AddProvider(sk, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 		if err != nil {
 			log.Println("ukAddProvider AddProvider() error", err)
 			return err

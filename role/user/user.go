@@ -17,10 +17,10 @@ import (
 //Info implements user service
 type Info struct {
 	localID string
-	role  string
-	ds    data.Service
-	fsMap sync.Map // now key is queryID, value is *lfsInfo
-	qMap  sync.Map // key is userID, value is *userInfo
+	role    string
+	ds      data.Service
+	fsMap   sync.Map // now key is queryID, value is *lfsInfo
+	qMap    sync.Map // key is userID, value is *userInfo
 }
 
 type userInfo struct {
@@ -30,9 +30,9 @@ type userInfo struct {
 // New constructs a new user service
 func New(nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	us := &Info{
-		role:  metainfo.RoleUser,
+		role:    metainfo.RoleUser,
 		localID: nid,
-		ds:    d,
+		ds:      d,
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(us)
 	if err != nil {
@@ -92,7 +92,7 @@ func (u *Info) NewFS(uid, queryID, sk string, capacity, duration, price int64, k
 		u.qMap.Store(uid, uq)
 	}
 
-	uItem := getUpKeeping(uaddr)
+	uItem := getUpKeeping(ginfo.owner, ginfo.groupID)
 	if uItem != nil {
 		ginfo.upKeepingItem = uItem
 	}

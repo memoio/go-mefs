@@ -52,8 +52,13 @@ func deployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	return nil
 }
 
-func deployUpKeepingAndChannel(userID, hexSk string, ks, ps []string, storeDays, storeSize, storePrice int64) error {
+func deployUpKeepingAndChannel(userID, queryID, hexSk string, ks, ps []string, storeDays, storeSize, storePrice int64) error {
 	localAddress, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return err
+	}
+
+	queryAddress, err := address.GetAddressFromID(queryID)
 	if err != nil {
 		return err
 	}
@@ -82,17 +87,12 @@ func deployUpKeepingAndChannel(userID, hexSk string, ks, ps []string, storeDays,
 
 	log.Println("Begin to dploy upkeeping contract...")
 
-	err = contracts.DeployUpkeeping(hexSk, localAddress, keepers, providers, storeDays, storeSize, storePrice, moneyAccount)
+	_, err = contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, storeDays, storeSize, storePrice, moneyAccount, true)
 	if err != nil {
 		return err
 	}
 
-	//部署好upKeeping合约后，将user部署的query合约的completed参数设为true
-	queryAddr, err := contracts.GetMarketAddr(localAddress, localAddress, contracts.Query)
-	if err != nil {
-		return err
-	}
-	err = contracts.SetQueryCompleted(hexSk, queryAddr)
+	err = contracts.SetQueryCompleted(hexSk, queryAddress)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func deployUpKeepingAndChannel(userID, hexSk string, ks, ps []string, storeDays,
 		providerAddr := proAddr
 		go func() {
 			defer wg.Done()
-			_, err := contracts.DeployChannelContract(hexSk, localAddress, providerAddr, timeOut, moneyToChannel)
+			_, err := contracts.DeployChannelContract(hexSk, localAddress, queryAddress, providerAddr, timeOut, moneyToChannel, true)
 			if err != nil {
 				return
 			}
@@ -127,12 +127,17 @@ func (g *groupInfo) saveContracts() error {
 		return err
 	}
 
+	queryAddr, err := address.GetAddressFromID(g.groupID)
+	if err != nil {
+		return err
+	}
+
 	if g.queryItem == nil {
 		g.queryItem = getQuery(userAddr)
 	}
 
 	if g.upKeepingItem == nil {
-		g.upKeepingItem = getUpKeeping(userAddr)
+		g.upKeepingItem = getUpKeeping(g.owner, g.groupID)
 	}
 
 	ctx := context.Background()
@@ -150,7 +155,7 @@ func (g *groupInfo) saveContracts() error {
 		}
 
 		if proInfo.chanItem == nil {
-			item, err := contracts.GetChannelInfo(userAddr, proAddr, userAddr)
+			item, err := contracts.GetChannelInfo(userAddr, userAddr, proAddr, queryAddr)
 			if err != nil {
 				return err
 			}
@@ -190,6 +195,11 @@ func (g *groupInfo) getChannel(proID string) *contracts.ChannelItem {
 		return nil
 	}
 
+	queryAddr, err := address.GetAddressFromID(g.groupID)
+	if err != nil {
+		return nil
+	}
+
 	ctx := context.Background()
 
 	for _, proInfo := range g.providers {
@@ -205,7 +215,7 @@ func (g *groupInfo) getChannel(proID string) *contracts.ChannelItem {
 				return nil
 			}
 
-			item, err := contracts.GetChannelInfo(userAddr, proAddr, userAddr)
+			item, err := contracts.GetChannelInfo(userAddr, userAddr, proAddr, queryAddr)
 			if err != nil {
 				return nil
 			}
@@ -254,8 +264,18 @@ func getQuery(userAddr common.Address) *contracts.QueryItem {
 	return &item
 }
 
-func getUpKeeping(userAddr common.Address) *contracts.UpKeepingItem {
-	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
+func getUpKeeping(userID, groupID string) *contracts.UpKeepingItem {
+	userAddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return nil
+	}
+
+	queryAddr, err := address.GetAddressFromID(groupID)
+	if err != nil {
+		return nil
+	}
+
+	ukAddr, uk, err := contracts.GetUpkeeping(userAddr, userAddr, queryAddr.String())
 	if err != nil {
 		return nil
 	}

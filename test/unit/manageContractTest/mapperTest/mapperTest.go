@@ -64,7 +64,7 @@ func main() {
 
 	//部署mapper
 	log.Println("start deploy mapper")
-	mapperAddr, _, err := contracts.DeployMapper(localAddr, localAddr, resolver, userSk)
+	mapperAddr, _, err := contracts.DeployMapperToResolver(localAddr, localAddr, resolver, userSk)
 	if err != nil {
 		log.Fatal("deploy mapper fails", err)
 	}
@@ -72,7 +72,7 @@ func main() {
 	//从另一条链查询mapper地址
 	log.Println("start get mapperAddress from remote")
 	contracts.EndPoint = qethEndPoint
-	mapperAddrRemote, err := contracts.GetMapperAddr(localAddr, localAddr, resolver)
+	mapperAddrRemote, err := contracts.GetMapperAddrFromResolver(localAddr, localAddr, resolver)
 	if err != nil {
 		log.Fatal("can't get mapperAddress from remote")
 	}

@@ -34,7 +34,7 @@ const (
 
 //Info implements user service
 type Info struct {
-	localID     string
+	localID   string
 	role      string
 	sk        string
 	state     bool
@@ -52,10 +52,10 @@ type Info struct {
 func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	m := &Info{
 		localID: nid,
-		sk:    sk,
-		state: false,
-		ds:    d,
-		repch: make(chan string, 1024),
+		sk:      sk,
+		state:   false,
+		ds:      d,
+		repch:   make(chan string, 1024),
 	}
 
 	err := m.load(ctx) //连接节点
@@ -512,7 +512,12 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 		return
 	}
 
-	_, _, err = contracts.GetUKFromResolver(addr)
+	qaddr, err := address.GetAddressFromID(thisGroup.groupID)
+	if err != nil {
+		return
+	}
+
+	_, _, err = contracts.GetUpkeeping(addr, addr, qaddr.String())
 	if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
 		thisGroup.saveUpkeeping()
 		return

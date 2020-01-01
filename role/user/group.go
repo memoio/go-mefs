@@ -484,7 +484,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		g.tempProviders = append(g.tempProviders, pinfo.providerID)
 	}
 
-	err := deployUpKeepingAndChannel(g.owner, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice)
+	err := deployUpKeepingAndChannel(g.owner, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice)
 	if err != nil {
 		log.Println("deployUpKeepingAndChannel failed :", err)
 	}

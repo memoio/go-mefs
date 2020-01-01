@@ -25,13 +25,6 @@ func providerDeployResolverAndOffer(id, sk string, capacity, duration, price int
 	//获得用户的账户余额
 	balance, _ := contracts.QueryBalance(localAddress.Hex())
 	log.Println("balance is: ", balance)
-	//先部署resolver-for-channel
-	//如果部署过resolver-for-channel，那接下来就可以直接检查是否部署过offer合约，没有的话就部署
-	//DeployResolver()函数内部会进行判断是否部署过
-	_, err = contracts.DeployResolverForChannel(localAddress, sk)
-	if err != nil {
-		return err
-	}
 
 	//获得用户的账户余额
 	balance, _ = contracts.QueryBalance(localAddress.Hex())
@@ -126,7 +119,13 @@ func (g *groupInfo) saveUpkeeping() error {
 	if err != nil {
 		return err
 	}
-	ukAddr, uk, err := contracts.GetUKFromResolver(userAddr)
+
+	queryAddr, err := address.GetAddressFromID(g.groupID)
+	if err != nil {
+		return err
+	}
+
+	ukAddr, uk, err := contracts.GetUpkeeping(userAddr, userAddr, queryAddr.String())
 	if err != nil {
 		return err
 	}
@@ -170,12 +169,17 @@ func (g *groupInfo) saveChannel(proID string) error {
 		return err
 	}
 
+	queryAddr, err := address.GetAddressFromID(g.groupID)
+	if err != nil {
+		return err
+	}
+
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return err
 	}
 
-	chanItem, err := contracts.GetChannelInfo(proAddr, proAddr, userAddr)
+	chanItem, err := contracts.GetChannelInfo(proAddr, userAddr, proAddr, queryAddr)
 	if err != nil {
 		return err
 	}
