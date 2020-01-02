@@ -32,14 +32,14 @@ type pInfo struct {
 	credit     int
 	online     bool
 	availTime  int64
-	offerItem  map[string]*role.OfferItem // need lock
+	offerItem  map[string]*role.OfferItem // key is offerID, and "latest",need lock?
 	proItem    *role.ProviderItem
 }
 
 // store user information
 type uInfo struct {
 	userID string
-	querys []string
+	querys map[string]struct{} // key is queryID
 }
 
 func (k *Info) getUInfo(pid string) (*uInfo, error) {
@@ -61,15 +61,9 @@ func (k *Info) setQuery(uid, qid string) {
 		return
 	}
 
-	has := false
-	for _, q := range uinfo.querys {
-		if q == qid {
-			has = true
-		}
-	}
-
+	_, has := uinfo.querys[qid]
 	if !has {
-		uinfo.querys = append(uinfo.querys, qid)
+		uinfo.querys[qid] = struct{}{}
 	}
 }
 
@@ -316,7 +310,7 @@ func (k *Info) GetKeepers() ([]string, error) {
 	return res, nil
 }
 
-// Flush is
+// FlushPeers is
 func (k *Info) FlushPeers(ctx context.Context) error {
 	return k.checkConnectedPeer(ctx)
 }

@@ -188,7 +188,7 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	gp := k.getGroupInfo(uid, qid, true)
 
 	if gp != nil && qid != uid {
-		gp.getContracts()
+		gp.getContracts(false)
 	}
 
 	return gp.sessionID.NodeID(), nil

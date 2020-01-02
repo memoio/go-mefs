@@ -12,13 +12,13 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 )
 
-func (k *Info) getContracts() {
-
-}
-
-func (g *groupInfo) getContracts() error {
+// force update if mode is set true
+func (g *groupInfo) getContracts(mode bool) error {
+	if g.groupID == g.userID {
+		return errors.New("not deploying contracts")
+	}
 	// get upkkeeping addr
-	if g.query == nil {
+	if g.query == nil || mode {
 		qItem, err := role.GetQueryInfo(g.userID, g.groupID)
 		if err != nil {
 			return err
@@ -26,7 +26,7 @@ func (g *groupInfo) getContracts() error {
 		g.query = &qItem
 	}
 
-	if g.upkeeping == nil {
+	if g.upkeeping == nil || mode {
 		uItem, err := role.GetUpKeeping(g.userID, g.groupID)
 		if err != nil {
 			return err
@@ -96,7 +96,7 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 	}
 
 	// update uk info
-	gp.getContracts()
+	gp.getContracts(true)
 
 	return nil
 }

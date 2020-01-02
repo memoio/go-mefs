@@ -87,14 +87,17 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	return m, nil
 }
 
+// Online is
 func (k *Info) Online() bool {
 	return k.state
 }
 
+// GetRole is
 func (k *Info) GetRole() string {
 	return metainfo.RoleKeeper
 }
 
+// Stop is
 func (k *Info) Stop() error {
 	return k.save(context.Background())
 }
@@ -176,7 +179,7 @@ func (k *Info) save(ctx context.Context) error {
 			return true
 		}
 
-		for _, qid := range value.(*uInfo).querys {
+		for qid := range value.(*uInfo).querys {
 			res.WriteString(qid)
 		}
 
@@ -508,7 +511,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 		return
 	}
 
-	err := thisGroup.getContracts()
+	err := thisGroup.getContracts(true)
 	if err == nil {
 		return
 	}
