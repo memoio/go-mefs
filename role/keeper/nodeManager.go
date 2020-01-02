@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -16,9 +17,11 @@ import (
 
 // store keeper information
 type kInfo struct {
+	// need lock
 	keeperID  string
 	online    bool
 	availTime int64
+	keepItem  *role.KeeperItem
 }
 
 // store provider information
@@ -29,7 +32,8 @@ type pInfo struct {
 	credit     int
 	online     bool
 	availTime  int64
-	offerItem  *contracts.OfferItem // latest?
+	offerItem  map[string]*role.OfferItem // need lock
+	proItem    *role.ProviderItem
 }
 
 // store user information
@@ -229,24 +233,23 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 				thiskInfo.availTime = utils.GetUnixNow()
 			}
 		} else if string(val) == metainfo.RoleProvider {
-			addr, err := address.GetAddressFromID(id)
+			log.Println("Connect to new provider: ", id)
+			thispInfo, err := k.getPInfo(id)
 			if err != nil {
-				return err
+				continue
 			}
-			isProvider, err := contracts.IsProvider(addr)
-			if err != nil {
-				return err
-			}
-			if isProvider {
-				log.Println("Connect to new provider: ", id)
-				thispInfo, err := k.getPInfo(id)
+
+			if len(thispInfo.offerItem) == 0 {
+				oItem, err := role.GetLatestOffer(id, id)
 				if err != nil {
 					continue
 				}
-				thispInfo.online = true
-				thispInfo.availTime = utils.GetUnixNow()
-				k.saveOffer(id, false)
+				thispInfo.offerItem[oItem.OfferID] = &oItem
 			}
+
+			thispInfo.online = true
+			thispInfo.availTime = utils.GetUnixNow()
+
 		}
 	}
 	return nil

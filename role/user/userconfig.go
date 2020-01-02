@@ -30,7 +30,7 @@ func parseBLS12ConfigMeta(privKey, userBLS12config []byte) (*mcl.KeySet, error) 
 }
 
 func (l *LfsInfo) putUserConfig() {
-	kmBls, err := metainfo.NewKeyMeta(l.fsID, metainfo.Config, l.owner)
+	kmBls, err := metainfo.NewKeyMeta(l.fsID, metainfo.Config, l.userID)
 	if err != nil {
 		return
 	}
@@ -68,7 +68,7 @@ func (l *LfsInfo) putUserConfig() {
 }
 
 func (l *LfsInfo) loadBLS12Config() error {
-	kmBls, err := metainfo.NewKeyMeta(l.fsID, metainfo.Config, l.owner)
+	kmBls, err := metainfo.NewKeyMeta(l.fsID, metainfo.Config, l.userID)
 	if err != nil {
 		return err
 	}
@@ -118,6 +118,6 @@ func (l *LfsInfo) loadBLS12Config() error {
 		}
 	}
 
-	log.Println("BlS12 SK and Pk is loaded for ", l.owner)
+	log.Println("BlS12 SK and Pk is loaded for ", l.userID)
 	return nil
 }

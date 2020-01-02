@@ -58,7 +58,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 	if gp == nil {
 		return
 	}
-	err := gp.saveUpkeeping()
+	err := gp.getContracts(p.localID)
 	if err == nil {
 		return
 	}
@@ -362,11 +362,11 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 	}
 }
 
-func (p *Info) getUserConifg(groupID, userID string) error {
+func (p *Info) getUserConifg(userID, groupID string) error {
 	// 需要用私钥decode出bls的私钥，用user中的方法
 	//获取公钥
 	opt.KeySet = new(mcl.KeySet)
-	pubKey, err := p.getNewUserConfig(groupID, userID)
+	pubKey, err := p.getNewUserConfig(userID, groupID)
 	if err != nil {
 		log.Println("getNewUserConfig in get userconfig error :", err)
 		return err
@@ -375,7 +375,7 @@ func (p *Info) getUserConifg(groupID, userID string) error {
 	opt.KeySet.Pk = pubKey
 
 	//获取私钥
-	opt.KeySet.Sk, err = p.getUserPrivateKey(groupID, userID)
+	opt.KeySet.Sk, err = p.getUserPrivateKey(userID, groupID)
 	if err != nil {
 		log.Println("getUserPrivateKey in get userconfig error ", err)
 		return err

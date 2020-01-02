@@ -81,11 +81,11 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, from string) ([]
 	}
 
 	uid := ops[0]
-	gp := newGroup(p.localID, gid, uid, keepers)
+	gp := newGroup(p.localID, uid, gid, keepers)
 
 	p.users.Store(gid, gp)
 
-	p.loadChannelValue(gid, uid)
+	p.loadChannelValue(uid, gid)
 
 	return []byte("ok"), nil
 }

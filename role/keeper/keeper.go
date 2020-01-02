@@ -12,13 +12,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -222,7 +221,7 @@ func (k *Info) save(ctx context.Context) error {
 	// save last pay
 	pus := k.getUQKeys()
 	for _, pu := range pus {
-		gp := k.getGroupInfo(pu.qid, pu.uid, false)
+		gp := k.getGroupInfo(pu.uid, pu.qid, false)
 		if gp == nil {
 			continue
 		}
@@ -419,10 +418,13 @@ func (k *Info) loadPeers(ctx context.Context) error {
 				thisPinfo.online = true
 			}
 
-			err = saveOfferToPinfo(tmpKid, thisPinfo)
+			oItem, err := role.GetLatestOffer(tmpKid, tmpKid)
 			if err != nil {
 				log.Println("Save ", tmpKid, "'s Offer error: ", err)
+				continue
 			}
+
+			thisPinfo.offerItem[oItem.OfferID] = &oItem
 		}
 	}
 
@@ -457,10 +459,10 @@ func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 	}
 }
 
-func (k *Info) createGroup(qid, uid string, keepers, providers []string) error {
+func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 	_, ok := k.ukpGroup.Load(qid)
 	if !ok {
-		gInfo, err := newGroup(k.localID, qid, uid, keepers, providers)
+		gInfo, err := newGroup(k.localID, uid, qid, keepers, providers)
 		if err != nil {
 			return err
 		}
@@ -506,20 +508,8 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 		return
 	}
 
-	//recheck the user's status
-	addr, err := address.GetAddressFromID(thisGroup.owner)
-	if err != nil {
-		return
-	}
-
-	qaddr, err := address.GetAddressFromID(thisGroup.groupID)
-	if err != nil {
-		return
-	}
-
-	_, _, err = contracts.GetUpkeeping(addr, addr, qaddr.String())
-	if err != contracts.ErrNotDeployedMapper && err != contracts.ErrNotDeployedUk {
-		thisGroup.saveUpkeeping()
+	err := thisGroup.getContracts()
+	if err == nil {
 		return
 	}
 

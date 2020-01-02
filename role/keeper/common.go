@@ -23,8 +23,8 @@ var (
 )
 
 //---config----
-func (k *Info) getUserBLS12Config(groupID, userID string) (*mcl.PublicKey, error) {
-	thisGroup := k.getGroupInfo(groupID, userID, false)
+func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.PublicKey, error) {
+	thisGroup := k.getGroupInfo(userID, groupID, false)
 	if thisGroup == nil {
 		return nil, errors.New("No Bls Key")
 	}
@@ -33,7 +33,7 @@ func (k *Info) getUserBLS12Config(groupID, userID string) (*mcl.PublicKey, error
 		return thisGroup.blsPubKey, nil
 	}
 
-	userconfigbyte, err := k.getUserBLS12ConfigByte(groupID, userID)
+	userconfigbyte, err := k.getUserBLS12ConfigByte(userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (k *Info) getUserBLS12Config(groupID, userID string) (*mcl.PublicKey, error
 	return mkey.Pk, nil
 }
 
-func (k *Info) getUserBLS12ConfigByte(qid, uid string) ([]byte, error) {
+func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
 	kmBls12, err := metainfo.NewKeyMeta(qid, metainfo.Config, uid)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (k *Info) getUserBLS12ConfigByte(qid, uid string) ([]byte, error) {
 	if err == nil && userconfigbyte != nil {
 		return userconfigbyte, nil
 	}
-	gp := k.getGroupInfo(qid, uid, false)
+	gp := k.getGroupInfo(uid, qid, false)
 	if gp == nil {
 		return nil, errors.New("no groupinfo")
 	}

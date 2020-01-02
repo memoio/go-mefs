@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -37,20 +37,20 @@ type providerInfo struct {
 	providerID string
 	connected  bool
 	sessionID  uuid.UUID // for user
-	chanItem   *contracts.ChannelItem
-	offerItem  *contracts.OfferItem
+	chanItem   *role.ChannelItem
+	offerItem  *role.OfferItem
 }
 
 // group stores use's groupinfo
 type groupInfo struct {
 	groupID string // query address
-	owner   string // user address
+	userID  string // user address
 	privKey string // utils.EthSkByteToEthString(getSk(userID))
 	state   int8   // atomic?
 	ds      data.Service
 
-	keepers   []*keeperInfo
-	providers []*providerInfo
+	keepers   map[string]*keeperInfo
+	providers map[string]*providerInfo
 
 	storeDays     int64    //表示部署合约时的存储数据时间，单位是“天”
 	storeSize     int64    //表示部署合约时的存储数据大小，单位是“MB”
@@ -61,14 +61,14 @@ type groupInfo struct {
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
 
-	upKeepingItem *contracts.UpKeepingItem
-	queryItem     *contracts.QueryItem
+	upKeepingItem *role.UpKeepingItem
+	queryItem     *role.QueryItem
 	initResMutex  sync.Mutex //目前同一时间只回复一个Keeper避免冲突
 }
 
 func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redeploy bool, d data.Service) *groupInfo {
 	return &groupInfo{
-		owner:       uid,
+		userID:      uid,
 		privKey:     sk,
 		ds:          d,
 		state:       starting,
@@ -78,6 +78,8 @@ func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redep
 		keeperSLA:   ks,
 		providerSLA: ps,
 		reDeploy:    redeploy,
+		keepers:     make(map[string]*keeperInfo, ks),
+		providers:   make(map[string]*providerInfo, ps),
 	}
 }
 
@@ -90,7 +92,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 	// getUK
 	if g.upKeepingItem != nil {
 		uItem := g.upKeepingItem
-		log.Println("start user:", g.owner, "'s lfs:", g.groupID)
+		log.Println("start user:", g.userID, "'s lfs:", g.groupID)
 		g.keeperSLA = int(uItem.KeeperSLA)
 		g.providerSLA = int(uItem.ProviderSLA)
 		g.tempKeepers = uItem.KeeperIDs
@@ -103,7 +105,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	log.Println("init user:", g.owner, "'s lfs:", g.groupID)
+	log.Println("init user:", g.userID, "'s lfs:", g.groupID)
 	err := g.initGroup(ctx)
 	if err != nil {
 		return false, err
@@ -117,12 +119,12 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return errors.New("Wrong state")
 	}
 
-	log.Println("Connect for user: ", g.owner)
+	log.Println("Connect for user: ", g.userID)
 	for _, kid := range g.tempKeepers {
 		tempKeeper := &keeperInfo{
 			keeperID: kid,
 		}
-		g.keepers = append(g.keepers, tempKeeper)
+		g.keepers[kid] = tempKeeper
 	}
 
 	connectTryCount := 5
@@ -181,7 +183,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	// key: queryID/"UserStart"/userID/kc/pc
-	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("Construct Deployed key error", err)
 		return err
@@ -224,7 +226,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		pinfo.sessionID = uuidtmp
 	}
 
-	log.Println("Group Service is ready for: ", g.owner)
+	log.Println("Group Service is ready for: ", g.userID)
 
 	g.state = groupStarted
 	return nil
@@ -235,7 +237,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 // for test: queryID = userID
 func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
-	kmInit, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserInit, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmInit, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserInit, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("gp connect: NewKeyMeta error!")
 		return err
@@ -339,16 +341,10 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	// in case other change temp
 	g.initResMutex.Lock()
-	defer func() {
-		if g.state == collecting {
-			g.keepers = g.keepers[:0]
-			g.providers = g.providers[:0]
-		}
-	}()
 
 	log.Println("Has enough Keeper and Providers, choosing...")
-	g.keepers = make([]*keeperInfo, 0, g.keeperSLA)
-	g.providers = make([]*providerInfo, 0, g.providerSLA)
+	keepers := make(map[string]*keeperInfo, g.keeperSLA)
+	providers := make(map[string]*providerInfo, g.providerSLA)
 	g.tempKeepers = utils.DisorderArray(g.tempKeepers)
 	i := 0
 	for _, kidStr := range g.tempKeepers {
@@ -365,7 +361,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 			connected: false, // set true when receive notify response
 		}
 		i++
-		g.keepers = append(g.keepers, tempK)
+		keepers[kidStr] = tempK
 	}
 	if len(g.keepers) < g.keeperSLA {
 		g.state = collecting
@@ -388,7 +384,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 			connected:  true,
 		}
 		i++
-		g.providers = append(g.providers, tempP)
+		providers[pidStr] = tempP
 	}
 
 	if len(g.providers) < g.providerSLA {
@@ -397,6 +393,9 @@ func (g *groupInfo) notify(ctx context.Context) {
 	}
 
 	log.Println("Choose completed")
+
+	g.providers = providers
+	g.keepers = keepers
 
 	var res strings.Builder
 	var tmpKps []string
@@ -413,7 +412,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	g.initResMutex.Unlock()
 
-	kmNotify, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserNotify, g.owner, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmNotify, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserNotify, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		log.Println("gp notify: NewKeyMeta error!")
 		return
@@ -484,12 +483,39 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		g.tempProviders = append(g.tempProviders, pinfo.providerID)
 	}
 
-	err := deployUpKeepingAndChannel(g.owner, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice)
+	ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
 	if err != nil {
-		log.Println("deployUpKeepingAndChannel failed :", err)
+		log.Println("deploy UpKeeping failed :", err)
 	}
 
-	g.saveContracts()
+	uItem, err := role.GetUpkeepingInfo(g.userID, ukID)
+	if err != nil {
+		log.Println("get UpKeeping failed :", err)
+	}
+
+	g.upKeepingItem = &uItem
+
+	var wg sync.WaitGroup
+	for _, proInfo := range g.providers {
+		wg.Add(1)
+		proID := proInfo.providerID
+		go func(proID string) {
+			defer wg.Done()
+			channelID, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+			if err != nil {
+				return
+			}
+			cItem, err := role.GetChannelInfo(g.userID, channelID)
+			if err != nil {
+				return
+			}
+			proInfo.chanItem = &cItem
+			// need persist
+		}(proID)
+	}
+	wg.Wait()
+
+	g.loadChannelValue()
 
 	g.state = depoyDone
 

@@ -10,17 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/market"
-	"github.com/memoio/go-mefs/contracts/resolver"
-)
-
-//MarketType 类型声明
-type MarketType int32
-
-const (
-	//Query 用来构造metaKey
-	Query MarketType = iota
-	//Offer 用来构造metaKey
-	Offer
 )
 
 //DeployQuery user use it to deploy query-contract
@@ -93,6 +82,55 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	return queryAddr, nil
 }
 
+//GetQueryAddrs get all querys
+func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common.Address, err error) {
+	//获得userIndexer, key is userAddr
+	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
+	if err != nil {
+		fmt.Println("GetResolverErr:", err)
+		return nil, err
+	}
+
+	//获得mapper, key is upkeeping
+	_, mapperInstance, err := getMapperFromIndexer(localAddress, "query", indexerInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	return getAllFromMapper(localAddress, mapperInstance)
+}
+
+//GetLatestQuery get latest query
+func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.Address, queryInstance *market.Query, err error) {
+	//获得userIndexer, key is userAddr
+	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
+	if err != nil {
+		fmt.Println("GetResolverErr:", err)
+		return queryAddr, queryInstance, err
+	}
+
+	//获得mapper, key is upkeeping
+	_, mapperInstance, err := getMapperFromIndexer(localAddress, "query", indexerInstance)
+	if err != nil {
+		return queryAddr, queryInstance, err
+	}
+
+	querys, err := getAllFromMapper(localAddress, mapperInstance)
+	if err != nil {
+		return queryAddr, queryInstance, err
+	}
+
+	queryAddr = querys[len(querys)-1]
+
+	queryInstance, err = market.NewQuery(queryAddr, GetClient(EndPoint))
+	if err != nil {
+		fmt.Println("newQueryErr:", err)
+		return queryAddr, queryInstance, err
+	}
+
+	return queryAddr, queryInstance, nil
+}
+
 //SetQueryCompleted when user has found providers and keepers needed, user call this function
 func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 	query, err := market.NewQuery(queryAddress, GetClient(EndPoint))
@@ -123,43 +161,6 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 	}
 
 	return nil
-}
-
-//GetQueryInfo get user's query-info
-// 分别返回申请的容量、持久化时间、价格、keeper数量、provider数量、是否成功放进upkeeping中
-func GetQueryInfo(localAddress common.Address, queryAddress common.Address) (QueryItem, error) {
-	var item QueryItem
-	query, err := market.NewQuery(queryAddress, GetClient(EndPoint))
-	if err != nil {
-		fmt.Println("newQueryErr:", err)
-		return item, err
-	}
-	retryCount := 0
-	for {
-		retryCount++
-		capacity, duration, price, ks, ps, completed, err := query.Get(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("getQueryParamsErr:", err)
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		item = QueryItem{
-			Capacity:     capacity.Int64(),
-			Duration:     duration.Int64(),
-			Price:        price.Int64(),
-			KeeperNums:   int32(ks.Int64()),
-			ProviderNums: int32(ps.Int64()),
-			Completed:    completed,
-		}
-		break
-	}
-
-	return item, nil
 }
 
 //DeployOffer provider use it to deploy offer-contract
@@ -233,73 +234,51 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 	return offerAddr, nil
 }
 
-//GetOfferInfo get provider's offer-info
-func GetOfferInfo(localAddress common.Address, offerAddress common.Address) (OfferItem, error) {
-	var item OfferItem
-	offer, err := market.NewOffer(offerAddress, GetClient(EndPoint))
+//GetOfferAddrs get all offers
+func GetOfferAddrs(localAddress, ownerAddress common.Address) ([]common.Address, error) {
+	//获得userIndexer, key is userAddr
+	_, indexerInstance, err := GetRoleIndexer(localAddress, ownerAddress)
 	if err != nil {
-		fmt.Println("newOfferErr:", err)
-		return item, err
+		fmt.Println("GetResolverErr:", err)
+		return nil, err
 	}
 
-	retryCount := 0
-	for {
-		retryCount++
-		capacity, duration, price, err := offer.Get(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("getOfferParamsErr:", err)
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		item = OfferItem{
-			Capacity:  capacity.Int64(),
-			Duration:  duration.Int64(),
-			Price:     price.Int64(),
-			OfferAddr: offerAddress.String(),
-		}
-		break
+	//获得mapper, key is upkeeping
+	_, mapperInstance, err := getMapperFromIndexer(localAddress, "offer", indexerInstance)
+	if err != nil {
+		return nil, err
 	}
 
-	return item, nil
+	return getAllFromMapper(localAddress, mapperInstance)
 }
 
-// GetMarketAddr get query/offer address by MarketType
-func GetMarketAddr(localAddr, ownerAddr common.Address, addrType MarketType) (common.Address, error) {
-	var marketAddr common.Address
-	var resolverInstance *resolver.Resolver
-	var err error
-	switch addrType {
-	case Offer:
-		_, resolverInstance, err = GetResolverFromIndexer(localAddr, "offer")
-		if err != nil {
-			fmt.Println("GetResolverErr:", err)
-			return marketAddr, err
-		}
-	case Query:
-		_, resolverInstance, err = GetResolverFromIndexer(localAddr, "query")
-		if err != nil {
-			fmt.Println("GetResolverErr:", err)
-			return marketAddr, err
-		}
-	default:
-		return marketAddr, ErrMarketType
+//GetLatestOffer get latest query
+func GetLatestOffer(localAddress, userAddress common.Address) (offerAddr common.Address, offerInstance *market.Offer, err error) {
+	//获得userIndexer, key is userAddr
+	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
+	if err != nil {
+		fmt.Println("GetResolverErr:", err)
+		return offerAddr, offerInstance, err
 	}
 
-	_, mapperInstance, err := getMapperFromResolver(localAddr, ownerAddr, resolverInstance)
+	//获得mapper, key is upkeeping
+	_, mapperInstance, err := getMapperFromIndexer(localAddress, "offer", indexerInstance)
 	if err != nil {
-		fmt.Println("getMapperErr:", err)
-		return marketAddr, err
+		return offerAddr, offerInstance, err
 	}
 
-	marketAddr, err = getLatestFromMapper(ownerAddr, mapperInstance)
+	offers, err := getAllFromMapper(localAddress, mapperInstance)
 	if err != nil {
-		fmt.Println("getMarketAddressesErr:", err)
-		return marketAddr, err
+		return offerAddr, offerInstance, err
 	}
-	return marketAddr, nil
+
+	offerAddr = offers[len(offers)-1]
+
+	offerInstance, err = market.NewOffer(offerAddr, GetClient(EndPoint))
+	if err != nil {
+		fmt.Println("newQueryErr:", err)
+		return offerAddr, offerInstance, err
+	}
+
+	return offerAddr, offerInstance, nil
 }

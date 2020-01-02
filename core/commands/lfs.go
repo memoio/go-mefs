@@ -19,6 +19,7 @@ import (
 	"github.com/memoio/go-mefs/core/commands/e"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/role/user"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -407,7 +408,12 @@ var lfsStartUserCmd = &cmds.Command{
 		if cfg.Test {
 			qid = uid
 		} else {
-			qid = ""
+			qitem, err := role.GetLatestQuery(uid)
+			if err != nil {
+				return err
+			}
+			qid = qitem.QueryID
+
 		}
 
 		lfs, err := node.Inst.(*user.Info).NewFS(uid, qid, hexSk, capacity, duration, price, ks, ps, rdo)

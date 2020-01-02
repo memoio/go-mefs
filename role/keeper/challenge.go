@@ -28,7 +28,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 			log.Println("Challenge start at: ", utils.GetTimeNow())
 			pus := k.getUQKeys()
 			for _, pu := range pus {
-				thisGroup := k.getGroupInfo(pu.qid, pu.uid, false)
+				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
 				if thisGroup == nil {
 					continue
 				}
@@ -39,7 +39,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 						continue
 					}
 
-					key, value, err := thisLinfo.genChallengeBLS(k.localID, pu.qid, proID, thisGroup.owner)
+					key, value, err := thisLinfo.genChallengeBLS(k.localID, pu.qid, proID, thisGroup.userID)
 					if err != nil {
 						continue
 					}

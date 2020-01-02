@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
-	"github.com/memoio/go-mefs/utils"
 )
 
-func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
+func GetKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
 	keeperContractAddr, _, err := GetResolverFromIndexer(localAddress, "keeper")
 	if err != nil {
 		fmt.Println("get keeper Contract Err:", err)
@@ -32,7 +30,7 @@ func getKeeperContractFromIndexer(localAddress common.Address) (keeperContract *
 
 //IsKeeper judge if an account is keeper
 func IsKeeper(localAddress common.Address) (bool, error) {
-	keeperContract, err := getKeeperContractFromIndexer(localAddress)
+	keeperContract, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		fmt.Println("keeperContracterr:", err)
 		return false, err
@@ -47,7 +45,7 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 	return isKeeper, nil
 }
 
-func getProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
+func GetProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
 	providerContractAddr, _, err := GetResolverFromIndexer(localAddress, "provider")
 	if err != nil {
 		fmt.Println("get provider Contract Err:", err)
@@ -64,7 +62,7 @@ func getProviderContractFromIndexer(localAddress common.Address) (providerContra
 
 //IsProvider judge if an account is provider
 func IsProvider(localaddress common.Address) (bool, error) {
-	providerContract, err := getProviderContractFromIndexer(localaddress)
+	providerContract, err := GetProviderContractFromIndexer(localaddress)
 	if err != nil {
 		fmt.Println("providerContracterr:", err)
 		return false, err
@@ -77,39 +75,6 @@ func IsProvider(localaddress common.Address) (bool, error) {
 		return false, err
 	}
 	return isProvider, nil
-}
-
-// GetProviderInfo returns provider info
-func GetProviderInfo(localAddress, proAddress common.Address) (ProviderItem, error) {
-	var item ProviderItem
-	proContract, err := getProviderContractFromIndexer(localAddress)
-	if err != nil {
-		return item, nil
-	}
-
-	retryCount := 0
-	for {
-		retryCount++
-		isProvider, money, size, stime, err := proContract.Info(&bind.CallOpts{From: localAddress}, proAddress)
-		if err != nil {
-			if retryCount > 10 {
-				return item, nil
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		if isProvider {
-			item = ProviderItem{
-				Money:     money,
-				StartTime: utils.UnixToTime(stime.Int64()).Format(utils.SHOWTIME),
-				Capacity:  size.Int64(),
-			}
-			return item, nil
-		}
-		break
-	}
-
-	return item, errors.New("is not a provider")
 }
 
 // KeeperContract deploy a keeper contract
@@ -141,7 +106,7 @@ func KeeperContract(hexKey string) (err error) {
 
 //SetKeeper set "localAddress" keeper in contract if isKeeper is true
 func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err error) {
-	keeper, err := getKeeperContractFromIndexer(localAddress)
+	keeper, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		fmt.Println("keeperContracterr:", err)
 		return err
@@ -188,7 +153,7 @@ func ProviderContract(hexKey string) (err error) {
 
 //SetProvider set "localAddress" provider in contract if isProvider is true
 func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (err error) {
-	provider, err := getProviderContractFromIndexer(localAddress)
+	provider, err := GetProviderContractFromIndexer(localAddress)
 	if err != nil {
 		return err
 	}

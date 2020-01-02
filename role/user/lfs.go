@@ -29,7 +29,7 @@ const metaTagFlag = dataformat.BLS12
 
 // LfsInfo has lfs info
 type LfsInfo struct {
-	owner      string
+	userID     string
 	fsID       string // use query addr as fsID
 	privateKey []byte
 	gInfo      *groupInfo
@@ -144,7 +144,7 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 			log.Println("objects in bucket-", bucket.Name, "is loaded")
 		}
 	}
-	log.Println("Lfs Service is ready for: ", l.owner)
+	log.Println("Lfs Service is ready for: ", l.userID)
 	l.online = true
 	go l.persistMetaBlock(ctx)
 	return nil
@@ -239,7 +239,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			l.meta.sb.RUnlock()
 			return err
 		}
-		log.Println("Flush Superblock to local finish. The uid is ", l.owner)
+		log.Println("Flush Superblock to local finish. The uid is ", l.userID)
 	}
 	l.meta.sb.RUnlock()
 
@@ -253,7 +253,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("Flush %s BucketInfo and objects Info to local finish. The uid is %s\n", bucket.Name, l.owner)
+			log.Printf("Flush %s BucketInfo and objects Info to local finish. The uid is %s\n", bucket.Name, l.userID)
 		}
 	}
 
@@ -265,7 +265,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			return err
 		}
 		l.meta.sb.dirty = false
-		log.Println("Flush Superblock to provider finish. The uid is ", l.owner)
+		log.Println("Flush Superblock to provider finish. The uid is ", l.userID)
 	}
 	l.meta.sb.RUnlock()
 
@@ -280,7 +280,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 				return err
 			}
 			bucket.dirty = false
-			log.Printf("Flush %s BucketInfo and objects Info to provider finish. The uid is %s\n", bucket.Name, l.owner)
+			log.Printf("Flush %s BucketInfo and objects Info to provider finish. The uid is %s\n", bucket.Name, l.userID)
 		}
 	}
 	return nil
@@ -713,7 +713,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 //lfs启动时加载超级块操作，返回结构体Meta,主要填充其中的superblock字段
 //先从本地查找超级快信息，若没找到，就找自己的provider获取
 func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
-	log.Println("Begin to load superblock : ", l.fsID, "for user:", l.owner)
+	log.Println("Begin to load superblock : ", l.fsID, "for user:", l.userID)
 	var b blocks.Block
 	var err error
 	sig, err := BuildSignMessage()

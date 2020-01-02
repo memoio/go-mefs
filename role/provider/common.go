@@ -20,8 +20,8 @@ var (
 	errGetContractItem         = errors.New("Can't get contract Item")
 )
 
-func (p *Info) getNewUserConfig(groupID, userID string) (*mcl.PublicKey, error) {
-	gp := p.getGroupInfo(groupID, userID, false)
+func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.PublicKey, error) {
+	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil || gp.blsPubKey != nil {
 		return gp.blsPubKey, nil
 	}
@@ -60,8 +60,8 @@ func (p *Info) getNewUserConfig(groupID, userID string) (*mcl.PublicKey, error) 
 	return nil, errors.New("No bls config")
 }
 
-func (p *Info) getUserPrivateKey(groupID, userID string) (*mcl.SecretKey, error) {
-	gp := p.getGroupInfo(groupID, userID, true)
+func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error) {
+	gp := p.getGroupInfo(userID, groupID, true)
 	if gp != nil {
 		return nil, errors.New("No user")
 	}

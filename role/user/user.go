@@ -7,30 +7,28 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
-	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 //Info implements user service
 type Info struct {
 	localID string
-	role    string
 	ds      data.Service
 	fsMap   sync.Map // now key is queryID, value is *lfsInfo
 	qMap    sync.Map // key is userID, value is *userInfo
 }
 
 type userInfo struct {
-	querys []string // now, only one
+	querys map[string]struct{} // now, only one
 }
 
 // New constructs a new user service
 func New(nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	us := &Info{
-		role:    metainfo.RoleUser,
 		localID: nid,
 		ds:      d,
 	}
@@ -42,65 +40,64 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 }
 
 // NewFS add a new user
-func (u *Info) NewFS(uid, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
-	uinfo, ok := u.qMap.Load(uid)
-	if ok {
-		queryID := uinfo.(*userInfo).querys[0]
+func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
+	// check stats
+	if queryID != "" {
 		fs, ok := u.fsMap.Load(queryID)
 		if ok {
 			return fs.(*LfsInfo), errors.New("user exists")
 		}
 	}
 
-	// getUK
-	uaddr, err := ad.GetAddressFromID(uid)
-	if err != nil {
-		return nil, err
-	}
+	ginfo := newGroup(userID, sk, capacity, duration, price, ks, ps, rdo, u.ds)
 
-	ginfo := newGroup(uid, sk, capacity, duration, price, ks, ps, rdo, u.ds)
-
-	// queryID == uid indicats this is a testuser
-	if queryID != uid {
-		qItem := getQuery(uaddr)
-		if qItem != nil {
-			ginfo.queryItem = qItem
+	// queryID == userID indicats this is a testuser
+	if queryID != userID {
+		qItem, err := role.GetQueryInfo(userID, queryID)
+		if err == nil {
+			ginfo.queryItem = &qItem
 		} else {
-			err := deployQuery(uid, sk, capacity, duration, price, ks, ps, rdo)
+			qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
 			if err != nil {
 				return nil, err
 			}
-			qItem = getQuery(uaddr)
-			if qItem == nil {
+			qItem, err := role.GetQueryInfo(userID, queryID)
+			if err != nil {
 				return nil, errors.New("fail to get query from chain, please restart")
 			}
-			ginfo.queryItem = qItem
+			queryID = qid
+			ginfo.queryItem = &qItem
 		}
-		qid, _ := ad.GetIDFromAddress(qItem.QueryAddr)
-		queryID = qid
 		ginfo.groupID = queryID
 	} else {
-		ginfo.groupID = uid
+		ginfo.groupID = userID
 	}
 
-	_, ok = u.qMap.Load(uid)
-	if !ok {
-		uq := &userInfo{
-			querys: make([]string, 1),
+	uInfo, ok := u.qMap.Load(userID)
+	if ok {
+		_, has := uInfo.(*userInfo).querys[queryID]
+		if !has {
+			uInfo.(*userInfo).querys[queryID] = struct{}{}
 		}
-		uq.querys = append(uq.querys, queryID)
-		u.qMap.Store(uid, uq)
+	} else {
+		uq := &userInfo{
+			querys: make(map[string]struct{}),
+		}
+		uq.querys[queryID] = struct{}{}
+		u.qMap.Store(userID, uq)
 	}
 
-	uItem := getUpKeeping(ginfo.owner, ginfo.groupID)
-	if uItem != nil {
-		ginfo.upKeepingItem = uItem
+	uItem, err := role.GetUpKeeping(ginfo.userID, ginfo.groupID)
+	if err != nil {
+		log.Println("get upkeeping fails")
+	} else {
+		ginfo.upKeepingItem = &uItem
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	lInfo := &LfsInfo{
-		owner:      uid,
+		userID:     userID,
 		fsID:       queryID,
 		context:    ctx,
 		cancelFunc: cancel,
@@ -114,6 +111,12 @@ func (u *Info) NewFS(uid, queryID, sk string, capacity, duration, price int64, k
 	return lInfo, nil
 }
 
+// GetRole gets role
+func (u *Info) GetRole() string {
+	return metainfo.RoleUser
+}
+
+// Stop stops service after persist
 func (u *Info) Stop() error {
 	u.fsMap.Range(func(key, value interface{}) bool {
 		uInfo := value.(*LfsInfo)
@@ -122,9 +125,9 @@ func (u *Info) Stop() error {
 		}
 		err := uInfo.Fsync(true)
 		if err != nil {
-			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.owner, err)
+			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
 		} else {
-			log.Printf("User %s Persist completed\n", uInfo.owner)
+			log.Printf("User %s Persist completed\n", uInfo.userID)
 		}
 		uInfo.cancelFunc() //释放资源
 		return true
@@ -135,11 +138,12 @@ func (u *Info) Stop() error {
 func (u *Info) KillUser(userID string) error {
 	uinfo, ok := u.qMap.Load(userID)
 	if ok {
-		queryID := uinfo.(*userInfo).querys[0]
-		fs, ok := u.fsMap.Load(queryID)
-		if ok {
-			fs.(*LfsInfo).Stop()
-			u.fsMap.Delete(queryID)
+		for queryID := range uinfo.(*userInfo).querys {
+			fs, ok := u.fsMap.Load(queryID)
+			if ok {
+				fs.(*LfsInfo).Stop()
+				u.fsMap.Delete(queryID)
+			}
 		}
 	}
 	return nil
@@ -149,10 +153,11 @@ func (u *Info) KillUser(userID string) error {
 func (u *Info) GetUser(userID string) FileSyetem {
 	uinfo, ok := u.qMap.Load(userID)
 	if ok {
-		queryID := uinfo.(*userInfo).querys[0]
-		fs, ok := u.fsMap.Load(queryID)
-		if ok {
-			return fs.(*LfsInfo)
+		for queryID := range uinfo.(*userInfo).querys {
+			fs, ok := u.fsMap.Load(queryID)
+			if ok {
+				return fs.(*LfsInfo)
+			}
 		}
 	}
 	return nil
@@ -176,9 +181,9 @@ func (u *Info) Fsync() error {
 		}
 		err := uInfo.Fsync(true)
 		if err != nil {
-			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.owner, err)
+			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
 		} else {
-			log.Printf("User %s Persist completed\n", uInfo.owner)
+			log.Printf("User %s Persist completed\n", uInfo.userID)
 		}
 		return true
 	})

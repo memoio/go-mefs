@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/routing"
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
@@ -26,8 +26,8 @@ type Info struct {
 	storageUsed  uint64
 	storageTotal uint64
 	users        sync.Map // key: queryID, value: *groupInfo
-	offers       []*contracts.OfferItem
-	proContract  *contracts.ProviderItem
+	offers       []*role.OfferItem
+	proContract  *role.ProviderItem
 }
 
 type groupInfo struct {
@@ -38,9 +38,9 @@ type groupInfo struct {
 	storageTotal uint64
 	keepers      []string
 	blsPubKey    *mcl.PublicKey
-	upkeeping    *contracts.UpKeepingItem
-	channel      *contracts.ChannelItem
-	query        *contracts.QueryItem
+	upkeeping    *role.UpKeepingItem
+	channel      *role.ChannelItem
+	query        *role.QueryItem
 }
 
 //New start provider service
@@ -49,7 +49,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		localID: id,
 		sk:      sk,
 		ds:      ds,
-		offers:  make([]*contracts.OfferItem, 1),
+		offers:  make([]*role.OfferItem, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
@@ -57,7 +57,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}
 
 	for {
-		err = providerDeployResolverAndOffer(id, sk, capacity, duration, price, reDeployOffer)
+		_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
 		if err != nil {
 			log.Println("provider deploying resolver and offer failed!")
 			time.Sleep(2 * time.Minute)
@@ -66,20 +66,13 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		}
 	}
 
-	err = m.saveProvider()
+	err = m.getContracts()
 	if err != nil {
 		log.Println("Save ", m.localID, "'s provider info err", err)
 		return nil, err
 	}
 
-	log.Println("Save ", m.localID, "'s provider info success")
-
-	err = m.saveOffer()
-	if err != nil {
-		log.Println("Save ", m.localID, "'s Offer err", err)
-		return nil, err
-	}
-	log.Println("Save ", m.localID, "'s Offer success")
+	log.Println("Get ", m.localID, "'s contract info success")
 
 	go m.getKpMapRegular(ctx)
 	go m.sendStorageRegular(ctx)
@@ -103,7 +96,7 @@ func (p *Info) Stop() error {
 	return p.save(context.Background())
 }
 
-func newGroup(localID, gid, uid string, kps []string) *groupInfo {
+func newGroup(localID, uid, gid string, kps []string) *groupInfo {
 	g := &groupInfo{
 		userID:  uid,
 		groupID: gid,
@@ -111,19 +104,17 @@ func newGroup(localID, gid, uid string, kps []string) *groupInfo {
 	}
 
 	if gid != uid {
-		g.saveUpkeeping()
-		g.saveQuery()
-		g.saveChannel(localID)
+		g.getContracts(localID)
 	}
 
 	return g
 }
 
-func (p *Info) getGroupInfo(groupID, userID string, mode bool) *groupInfo {
+func (p *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 	groupI, ok := p.users.Load(groupID)
 	if !ok {
 		if mode {
-			return newGroup(p.localID, groupID, userID, []string{userID})
+			return newGroup(p.localID, userID, groupID, []string{userID})
 		}
 	}
 
@@ -189,7 +180,7 @@ func (p *Info) save(ctx context.Context) error {
 func (p *Info) getKpMapRegular(ctx context.Context) {
 	log.Println("Get kpMap from chain start!")
 	peerID := p.localID
-	contracts.SaveKpMap(peerID)
+	role.SaveKpMap(peerID)
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -198,7 +189,7 @@ func (p *Info) getKpMapRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				contracts.SaveKpMap(peerID)
+				role.SaveKpMap(peerID)
 			}()
 		}
 	}
@@ -230,7 +221,7 @@ func (p *Info) storageSync(ctx context.Context) error {
 
 	maxSpace := p.getDiskTotal()
 
-	klist, ok := contracts.GetKeepersOfPro(p.localID)
+	klist, ok := role.GetKeepersOfPro(p.localID)
 	if !ok {
 		return nil
 	}

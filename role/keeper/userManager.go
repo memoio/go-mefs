@@ -6,20 +6,20 @@ import (
 
 	"github.com/google/uuid"
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 )
 
 // user-keeper-provider map
 type groupInfo struct {
 	sessionID    uuid.UUID // for user
 	groupID      string    // is queryID
-	owner        string    // is userID
+	userID       string    // is userID
 	localKeeper  string
 	masterKeeper string
 	keepers      []string
 	providers    []string
-	upkeeping    *contracts.UpKeepingItem
-	query        *contracts.QueryItem
+	upkeeping    *role.UpKeepingItem
+	query        *role.QueryItem
 	blsPubKey    *mcl.PublicKey
 	buckets      sync.Map // key:bucketID; value: *bucketInfo
 	ledgerMap    sync.Map // key:proID，value:*chalInfo
@@ -90,12 +90,12 @@ func (k *Info) getUQKeys() []uqKey {
 			return true
 		}
 
-		if key == value.owner {
+		if key == value.userID {
 			return true
 		}
 
 		tmpUQ := uqKey{
-			uid: value.owner,
+			uid: value.userID,
 			qid: key,
 		}
 		res = append(res, tmpUQ)
@@ -111,7 +111,7 @@ func (k *Info) getUnpaidUsers() []string {
 		key := k.(string)
 		value := v.(*groupInfo)
 		// filter test user
-		if value.upkeeping == nil || key == value.owner {
+		if value.upkeeping == nil || key == value.userID {
 			return true
 		}
 
@@ -122,11 +122,11 @@ func (k *Info) getUnpaidUsers() []string {
 }
 
 // getGroupsInfo wrap get and create if "mode" is true
-func (k *Info) getGroupInfo(groupID, userID string, mode bool) *groupInfo {
+func (k *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 	thisIgroup, ok := k.ukpGroup.Load(groupID)
 	if !ok {
 		if mode {
-			ginfo, err := newGroup(k.localID, groupID, userID, []string{groupID}, []string{groupID})
+			ginfo, err := newGroup(k.localID, userID, groupID, []string{groupID}, []string{groupID})
 			if err != nil {
 				return nil
 			}
@@ -141,8 +141,8 @@ func (k *Info) getGroupInfo(groupID, userID string, mode bool) *groupInfo {
 }
 
 // getLInfo wrap get and create if "mode" is true
-func (k *Info) getLInfo(groupID, userID, proID string, mode bool) *lInfo {
-	thisGroup := k.getGroupInfo(groupID, userID, mode)
+func (k *Info) getLInfo(userID, groupID, proID string, mode bool) *lInfo {
+	thisGroup := k.getGroupInfo(userID, groupID, mode)
 	if thisGroup != nil {
 		return thisGroup.getLInfo(proID, mode)
 	}
@@ -150,8 +150,8 @@ func (k *Info) getLInfo(groupID, userID, proID string, mode bool) *lInfo {
 }
 
 // getBucketInfo wrap get and create if "mode" is true
-func (k *Info) getBucketInfo(groupID, userID, bucketID string, mode bool) *bucketInfo {
-	thisGroup := k.getGroupInfo(groupID, userID, mode)
+func (k *Info) getBucketInfo(userID, groupID, bucketID string, mode bool) *bucketInfo {
+	thisGroup := k.getGroupInfo(userID, groupID, mode)
 	if thisGroup != nil {
 		return thisGroup.getBucketInfo(bucketID, mode)
 	}

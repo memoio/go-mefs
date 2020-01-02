@@ -7,12 +7,12 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
@@ -91,7 +91,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error)
 		return nil, errors.New("Signature format is wrong")
 	}
 
-	res, value, sig, err := p.verify(gp.channel.ChannelAddr, gp.channel.Value, sigByte)
+	res, value, sig, err := p.verify(gp.channel.ChannelID, gp.channel.Value, sigByte)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 		return nil, err
@@ -106,7 +106,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error)
 			return nil, errors.New("Block is not found")
 		}
 
-		key, err := metainfo.NewKeyMeta(gp.channel.ChannelAddr, metainfo.Channel) // HexChannelAddress|13|channelValue
+		key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
 		if err != nil {
 			return nil, err
 		}
@@ -128,11 +128,16 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error)
 }
 
 // verify verifies the transaction
-func (p *Info) verify(cAddr string, oldValue *big.Int, mes []byte) (bool, *big.Int, []byte, error) {
+func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.Int, []byte, error) {
 	signForChannel := &pb.SignForChannel{}
 	err := proto.Unmarshal(mes, signForChannel)
 	if err != nil {
 		log.Println("proto.Unmarshal when provider verify err:", err)
+		return false, nil, nil, err
+	}
+
+	channelAddr, err := address.GetAddressFromID(chanID)
+	if err != nil {
 		return false, nil, nil, err
 	}
 
@@ -156,8 +161,6 @@ func (p *Info) verify(cAddr string, oldValue *big.Int, mes []byte) (bool, *big.I
 	}
 
 	//判断签名是否正确
-	channelAddr := common.HexToAddress(cAddr[2:])
-
 	res, err := contracts.VerifySig(signForChannel.GetUserPK(), sig, channelAddr, money)
 	if err != nil {
 		return false, nil, nil, err

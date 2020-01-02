@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"io"
 	"log"
 	"math/big"
@@ -314,10 +315,13 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 
 		//下载数据成功，将内存的channel的value更改
-		cItem := ds.group.getChannel(provider)
-		if cItem != nil {
-			cItem.Value = money
-			log.Println("download success，change channel.value", cItem.ChannelAddr, money.String())
+		pinfo, ok := ds.group.providers[provider]
+		if !ok {
+			continue
+		}
+		if pinfo.chanItem != nil {
+			pinfo.chanItem.Value = money
+			log.Println("download success，change channel.value", pinfo.chanItem.ChannelID, money.String())
 		}
 
 		if ds.decoder.Policy == dataformat.RsPolicy {
@@ -399,7 +403,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.Int, error) {
 	money := big.NewInt(0)
 	//user给channel合约签名，发给provider
-	userID := ds.group.owner
+	userID := ds.group.userID
 	hexSK := ds.group.privKey
 
 	providerAddress, err := address.GetAddressFromID(provider)
@@ -416,12 +420,15 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 
 	var channelAddr common.Address
 
-	cItem := ds.group.getChannel(provider)
-	if cItem != nil {
-		channelAddr = common.HexToAddress(cItem.ChannelAddr)
+	pinfo, ok := ds.group.providers[provider]
+	if !ok {
+		return nil, nil, errors.New("No provider")
+	}
+	if pinfo.chanItem != nil {
+		channelAddr, _ = address.GetAddressFromID(pinfo.chanItem.ChannelID)
 		// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
 		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-		money = money.Add(cItem.Value, big.NewInt(addValue)) //100 + valueBase
+		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 	moneyByte := money.Bytes()
 

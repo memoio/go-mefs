@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/utils"
-	ad "github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
@@ -30,7 +30,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 			for _, uq := range uqs {
 				qid := uq.qid
 
-				thisGroup := k.getGroupInfo(qid, uq.uid, false)
+				thisGroup := k.getGroupInfo(uq.uid, qid, false)
 				if thisGroup == nil {
 					continue
 				}
@@ -61,12 +61,6 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	}
 
 	// TODO: exit when balance is too low
-	ukBalance, err := contracts.QueryBalance(g.upkeeping.UpKeepingAddr)
-	if err != nil {
-		log.Println("contracts.QueryBalance() err: ", err)
-		return err
-	}
-	log.Printf("ukaddr:%s has balance:%s\n", g.upkeeping.UpKeepingAddr, ukBalance.String())
 
 	price := g.upkeeping.Price
 
@@ -81,18 +75,18 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	// PosAdd
 	if !found {
-		if g.owner == pos.GetPosId() {
-			providerAddr, err := ad.GetAddressFromID(proID)
+		if g.userID == pos.GetPosId() {
+			providerAddr, err := address.GetAddressFromID(proID)
 			if err != nil {
 				return err
 			}
 
-			userAddr, err := ad.GetAddressFromID(pos.GetPosId())
+			userAddr, err := address.GetAddressFromID(pos.GetPosId())
 			if err != nil {
 				return err
 			}
 
-			queryAddr, err := ad.GetAddressFromID(pos.GetPosGID())
+			queryAddr, err := address.GetAddressFromID(pos.GetPosGID())
 			if err != nil {
 				return err
 			}
@@ -103,7 +97,6 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 				return err
 			}
 
-			g.saveUpkeeping()
 			price = pos.GetPosPrice()
 		} else {
 			return errors.New("fail to pay")
@@ -117,7 +110,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	thisLinfo := thisIlinfo.(*lInfo)
 
-	startTime := utils.StringToUnix(g.upkeeping.StartTime)
+	startTime := g.upkeeping.StartTime
 	if thisLinfo.lastPay != nil {
 		startTime = thisLinfo.lastPay.endTime
 	}
@@ -125,11 +118,11 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	spaceTime, lastTime := thisLinfo.resultSummary(startTime, utils.GetUnixNow())
 	amount := convertSpacetime(spaceTime, price)
 	if amount.Sign() > 0 {
-		pAddr, _ := ad.GetAddressFromID(proID) //providerAddress
-		ukAddr := common.HexToAddress(g.upkeeping.UpKeepingAddr[2:])
+		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
+		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
 		log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err = contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount) //进行支付
+		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount) //进行支付
 		if err != nil {
 			log.Println("contracts.SpaceTimePay() failed: ", err)
 			return err

@@ -2,190 +2,126 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"log"
 	"math/big"
+	"strings"
 
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/address"
-	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	"github.com/memoio/go-mefs/utils/pos"
+	b58 "github.com/mr-tron/base58/base58"
 )
 
-var errBalance = errors.New("your account's balance is insufficient, we will not deploy resolver")
-
-func providerDeployResolverAndOffer(id, sk string, capacity, duration, price int64, reDeployOffer bool) error {
-	localAddress, err := ad.GetAddressFromID(id)
-	if err != nil {
-		log.Println("getLocalAddr err: ", err)
-		return err
-	}
-
-	//获得用户的账户余额
-	balance, _ := contracts.QueryBalance(localAddress.Hex())
-	log.Println("balance is: ", balance)
-
-	//获得用户的账户余额
-	balance, _ = contracts.QueryBalance(localAddress.Hex())
-	log.Println("after deploying resolver for channel, balance is: ", balance)
-	//再开始部署offer合约
-	if reDeployOffer { //用户想要重新部署offer合约
-		log.Println("provider wants to redeploy offer-contract")
-	}
-	_, err = contracts.DeployOffer(localAddress, sk, capacity, duration, price, reDeployOffer)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (p *Info) saveProvider() error {
+func (p *Info) getContracts() error {
 	proID := p.localID
-	proAddr, err := address.GetAddressFromID(proID)
+	proItem, err := role.GetProviderInfo(proID, proID)
 	if err != nil {
 		return err
 	}
-	proItem, err := contracts.GetProviderInfo(proAddr, proAddr)
-	if err != nil {
-		return err
-	}
-	proItem.ProviderID = proID
 	p.proContract = &proItem
-	return nil
-}
 
-func (p *Info) saveOffer() error {
-	proID := p.localID
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return err
 	}
-	offerAddr, err := contracts.GetMarketAddr(proAddr, proAddr, contracts.Offer)
+
+	offers, err := contracts.GetOfferAddrs(proAddr, proAddr)
 	if err != nil {
 		return err
 	}
-	offerItem, err := contracts.GetOfferInfo(proAddr, offerAddr)
-	if err != nil {
-		return err
+
+	for _, offAddr := range offers {
+		offerID, err := address.GetIDFromAddress(offAddr.String())
+		if err != nil {
+			continue
+		}
+		oItem, err := role.GetOfferInfo(proID, offerID)
+		if err != nil {
+			continue
+		}
+		p.offers = append(p.offers, &oItem)
 	}
-	offerItem.ProviderID = proID
-	offerItem.OfferAddr = offerAddr.String()
-	p.offers = append(p.offers, &offerItem)
+
 	return nil
 }
 
-func (p *Info) saveChannelValue(groupID, userID, proID string) error {
-	gp := p.getGroupInfo(groupID, userID, false)
+func (p *Info) saveChannelValue(userID, groupID, proID string) error {
+	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.channel != nil {
-		km, err := metainfo.NewKeyMeta(gp.channel.ChannelAddr, metainfo.Channel)
+		ctx := context.Background()
+		km, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
 		if err != nil {
 			return err
 		}
 
-		// in future value: value/sig
-		p.ds.PutKey(context.Background(), km.ToString(), gp.channel.Value.Bytes(), "local")
+		sig := b58.Encode(gp.channel.Sig)
+		value := gp.channel.Value.String()
+
+		metavalue := value + metainfo.DELIMITER + sig
+		p.ds.PutKey(ctx, km.ToString(), []byte(metavalue), "local")
 	}
 
 	return nil
 }
 
-func (p *Info) loadChannelValue(groupID, userID string) error {
-	gp := p.getGroupInfo(groupID, userID, false)
-	if gp != nil {
-		gp.saveChannel(p.localID)
-		if gp.channel != nil {
-			km, err := metainfo.NewKeyMeta(gp.channel.ChannelAddr, metainfo.Channel)
-			if err != nil {
-				return err
-			}
+func (p *Info) loadChannelValue(userID, groupID string) error {
+	gp := p.getGroupInfo(userID, groupID, false)
+	if gp != nil && gp.channel != nil {
+		ctx := context.Background()
+		km, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
+		if err != nil {
+			return err
+		}
 
-			valueByte, err := p.ds.GetKey(context.Background(), km.ToString(), "local")
-			if err != nil {
-				log.Println("Can't get channel value in local,err :", err, ", set channel value to 0")
-				gp.channel.Value = big.NewInt(0)
-			} else {
-				gp.channel.Value = new(big.Int).SetBytes(valueByte)
-			}
+		valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
+		if err != nil {
+			log.Println("try to get channel value from: ", gp.userID)
+			valueByte, _ = p.ds.GetKey(ctx, km.ToString(), gp.userID)
+		}
+
+		value := big.NewInt(0)
+		var sig []byte
+		vals := strings.Split(string(valueByte), metainfo.DELIMITER)
+		if len(vals) == 2 {
+			value.SetString(vals[0], 10)
+			sig, _ = b58.Decode(vals[1])
+		}
+
+		log.Println("channel value are:", value.String())
+		if value.Cmp(gp.channel.Value) > 0 {
+			gp.channel.Value = value
+			gp.channel.Sig = sig
 		}
 	}
 
 	return nil
 }
 
-func (g *groupInfo) saveUpkeeping() error {
-	userAddr, err := address.GetAddressFromID(g.userID)
-	if err != nil {
-		return err
+func (g *groupInfo) getContracts(proID string) error {
+	if g.query == nil {
+		qItem, err := role.GetQueryInfo(g.userID, g.groupID)
+		if err != nil {
+			return err
+		}
+		g.query = &qItem
 	}
 
-	queryAddr, err := address.GetAddressFromID(g.groupID)
-	if err != nil {
-		return err
+	if g.upkeeping == nil {
+		uItem, err := role.GetUpKeeping(g.userID, g.groupID)
+		if err != nil {
+			return err
+		}
+		g.upkeeping = &uItem
 	}
 
-	ukAddr, uk, err := contracts.GetUpkeeping(userAddr, userAddr, queryAddr.String())
-	if err != nil {
-		return err
+	if g.channel == nil {
+		cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
+		if err != nil {
+			return err
+		}
+		g.channel = &cItem
 	}
 
-	item, err := contracts.GetUpkeepingInfo(userAddr, uk)
-	if err != nil {
-		return err
-	}
-	item.UserID = g.userID
-	item.UpKeepingAddr = ukAddr
-	g.upkeeping = &item
-	return nil
-}
-
-func (g *groupInfo) saveQuery() error {
-	userAddr, err := address.GetAddressFromID(g.userID)
-	if err != nil {
-		return err
-	}
-	queryAddr, err := contracts.GetMarketAddr(userAddr, userAddr, contracts.Query)
-	if err != nil {
-		return err
-	}
-	queryItem, err := contracts.GetQueryInfo(userAddr, queryAddr)
-	if err != nil {
-		return err
-	}
-	queryItem.UserID = g.userID
-	queryItem.QueryAddr = queryAddr.String()
-	g.query = &queryItem
-	return nil
-}
-
-func (g *groupInfo) saveChannel(proID string) error {
-	if pos.GetPosId() == g.userID {
-		return nil
-	}
-
-	userAddr, err := address.GetAddressFromID(g.userID)
-	if err != nil {
-		return err
-	}
-
-	queryAddr, err := address.GetAddressFromID(g.groupID)
-	if err != nil {
-		return err
-	}
-
-	proAddr, err := address.GetAddressFromID(proID)
-	if err != nil {
-		return err
-	}
-
-	chanItem, err := contracts.GetChannelInfo(proAddr, userAddr, proAddr, queryAddr)
-	if err != nil {
-		return err
-	}
-
-	chanItem.UserID = g.userID
-	chanItem.ProID = proID
-	g.channel = &chanItem
 	return nil
 }

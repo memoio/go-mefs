@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/memoio/go-mefs/contracts"
+
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
-	ad "github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
@@ -43,8 +43,7 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	var response string
 	if qid != uid {
 		log.Println("Get k/p numbers from query contract of user: ", uid)
-		queryAddr, _ := ad.GetAddressFromID(qid)
-		item, err := contracts.GetQueryInfo(queryAddr, queryAddr)
+		item, err := role.GetQueryInfo(uid, qid)
 		if item.Completed || err != nil {
 			log.Println("complete:", item.Completed, "error:", err)
 			return
@@ -58,7 +57,7 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 		price = int64(utils.STOREPRICEPEDOLLAR)
 	}
 
-	response, err = k.initUser(qid, uid, kc, pc, price)
+	response, err = k.initUser(uid, qid, kc, pc, price)
 	if err != nil {
 		if err != nil {
 			log.Println("handleUserInitReq err: ", err)
@@ -71,10 +70,10 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 }
 
 //response: kid1kid2../pid1pid2..
-func (k *Info) initUser(qid, uid string, kc, pc int, price int64) (string, error) {
+func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error) {
 	var newResponse strings.Builder
 
-	gp := k.getGroupInfo(qid, uid, false)
+	gp := k.getGroupInfo(uid, gid, false)
 	if gp == nil {
 		localID := k.localID
 		// fill self
@@ -184,20 +183,19 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	uid := ops[0]
 	qid := km.GetMid()
 
-	k.fillPinfo(qid, uid, pc, kc, metaValue, from)
+	k.fillPinfo(uid, qid, pc, kc, metaValue, from)
 
-	gp := k.getGroupInfo(qid, uid, true)
+	gp := k.getGroupInfo(uid, qid, true)
 
 	if gp != nil && qid != uid {
-		gp.saveQuery()
-		gp.saveUpkeeping()
+		gp.getContracts()
 	}
 
 	return gp.sessionID.NodeID(), nil
 }
 
 // fillPinfo fill user's uInfo, groupInfo in ukpMap
-func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, from string) {
+func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, from string) {
 	//将value切分，生成好对应的keepers和providers列表
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
@@ -228,7 +226,7 @@ func (k *Info) fillPinfo(groupID, userID string, kc, pc int, metaValue []byte, f
 		providers = append(providers, providerID)
 	}
 
-	err := k.createGroup(groupID, userID, keepers, providers)
+	err := k.createGroup(userID, groupID, keepers, providers)
 	if err != nil {
 		return
 	}

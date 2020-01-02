@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"sync"
 	"time"
-
-	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -20,7 +18,6 @@ import (
 	"github.com/memoio/go-mefs/contracts/mapper"
 	"github.com/memoio/go-mefs/contracts/resolver"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 // EndPoint config中的ETH，在daemon中赋值
@@ -57,68 +54,6 @@ var (
 	// ErrNotDeployedKPMap is
 	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
 )
-
-// UpKeepingItem has upkeeping information
-type UpKeepingItem struct {
-	UserID        string // 部署upkeeping的userid
-	QueryID       string // 部署upkeeping的queryID
-	UpKeepingAddr string // 合约地址
-	KeeperIDs     []string
-	ProviderIDs   []string
-	KeeperSLA     int32
-	ProviderSLA   int32
-	Duration      int64
-	Capacity      int64
-	Price         int64  // 部署的价格
-	StartTime     string // 部署的时间
-}
-
-// ChannelItem has channel information
-type ChannelItem struct {
-	UserID      string // 部署Channel的userid
-	ProID       string
-	ChannelAddr string
-	Value       *big.Int
-	Sig         []byte   // signature(channel addr, value)
-	Money       *big.Int // channel has
-	StartTime   string   // 部署的时间
-	Duration    int64    // timeout
-}
-
-// QueryItem has query information
-type QueryItem struct {
-	UserID       string // 部署Query的userid
-	QueryAddr    string
-	Capacity     int64
-	Duration     int64
-	Price        int64 // 合约给出的单价
-	KeeperNums   int32
-	ProviderNums int32
-	Completed    bool
-}
-
-// OfferItem has offer information
-type OfferItem struct {
-	ProviderID string // 部署Offer的providerid
-	OfferAddr  string
-	Capacity   int64
-	Duration   int64
-	Price      int64 // 合约给出的单价
-}
-
-// ProviderItem has provider's info
-type ProviderItem struct {
-	ProviderID string   // providerid
-	Capacity   int64    // MB
-	Money      *big.Int // pledge time
-	StartTime  string   // start time
-}
-
-type kpItem struct {
-	keeperIDs []string
-}
-
-var kpMap sync.Map
 
 func init() {
 	EndPoint = "http://212.64.28.207:8101"
@@ -941,51 +876,4 @@ func GetTransactionReceipt(hash common.Hash) *types.Receipt {
 	}
 	receipt, err := client.TransactionReceipt(context.Background(), hash)
 	return receipt
-}
-
-// SaveKpMap saves kpmap
-func SaveKpMap(peerID string) error {
-	localAddr, err := address.GetAddressFromID(peerID)
-	if err != nil {
-		log.Println("saveKpMap GetAddressFromID() error", err)
-		return err
-	}
-	kps, err := GetAllKeeperInKPMap(localAddr)
-	if err != nil {
-		log.Println("saveKpMap GetAllKeepers() error", err)
-		return err
-	}
-
-	for _, kpaddr := range kps {
-		pids, err := GetProviderInKPMap(localAddr, kpaddr)
-		if err != nil {
-			log.Println("get provider from kpmap err:", err)
-		}
-		if len(pids) > 0 {
-			keeperID, _ := address.GetIDFromAddress(kpaddr.String())
-			kidList := []string{keeperID}
-			for _, paddr := range pids {
-				pid, _ := address.GetIDFromAddress(paddr.String())
-				res, ok := kpMap.Load(pid)
-				if ok {
-					res.(*kpItem).keeperIDs = append(res.(*kpItem).keeperIDs, keeperID)
-				} else {
-					kidres := &kpItem{
-						keeperIDs: kidList,
-					}
-					kpMap.Store(keeperID, kidres)
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// GetKeepersOfPro get keepers of some provider
-func GetKeepersOfPro(peerID string) ([]string, bool) {
-	res, ok := kpMap.Load(peerID)
-	if !ok {
-		return nil, false
-	}
-	return res.(*kpItem).keeperIDs, true
 }

@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -27,7 +26,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		return channelAddr, err
 	}
 
-	key := queryAddress.String() + "query" + providerAddress.String()
+	key := queryAddress.String() + "channel" + providerAddress.String()
 	_, mapperInstance, err := DeployMapperToIndexer(userAddress, key, hexKey, indexerInstance)
 	if err != nil {
 		return channelAddr, err
@@ -86,8 +85,26 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	return channelAddr, nil
 }
 
-//GetChannelAddr get the channel contract's address
-func GetChannelAddr(localAddress, userAddress, providerAddress, queryAddress common.Address) (common.Address, *channel.Channel, error) {
+//GetChannelAddrs get the channel contract's address
+func GetChannelAddrs(localAddress, userAddress, providerAddress, queryAddress common.Address) ([]common.Address, error) {
+	//获得userIndexer, key is userAddr
+	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
+	if err != nil {
+		fmt.Println("GetResolverErr:", err)
+		return nil, err
+	}
+
+	key := queryAddress.String() + "channel" + providerAddress.String()
+	_, mapperInstance, err := getMapperFromIndexer(localAddress, key, indexerInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	return getAllFromMapper(localAddress, mapperInstance)
+}
+
+//GetLatestChannel get the channel contract's address
+func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress common.Address) (common.Address, *channel.Channel, error) {
 	var channelAddr common.Address
 
 	//获得userIndexer, key is userAddr
@@ -97,7 +114,7 @@ func GetChannelAddr(localAddress, userAddress, providerAddress, queryAddress com
 		return channelAddr, nil, err
 	}
 
-	key := queryAddress.String() + "query" + providerAddress.String()
+	key := queryAddress.String() + "channel" + providerAddress.String()
 	_, mapperInstance, err := getMapperFromIndexer(localAddress, key, indexerInstance)
 	if err != nil {
 		return channelAddr, nil, err
@@ -117,10 +134,10 @@ func GetChannelAddr(localAddress, userAddress, providerAddress, queryAddress com
 }
 
 //ChannelTimeout called by user to discontinue the channel-contract
-func ChannelTimeout(userAddress, providerAddress, queryAddress common.Address, hexKey string) (err error) {
-	_, channelInstance, err := GetChannelAddr(userAddress, userAddress, providerAddress, queryAddress)
+func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
+	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
 	if err != nil {
-		return nil
+		return err
 	}
 
 	key, _ := crypto.HexToECDSA(hexKey)
@@ -137,16 +154,15 @@ func ChannelTimeout(userAddress, providerAddress, queryAddress common.Address, h
 }
 
 //CloseChannel called by provider to stop the channel-contract,the ownerAddress implements the mapper
-func CloseChannel(userAddress, providerAddress, queryAddress common.Address, hexKey string, sig []byte, value *big.Int) (err error) {
-	channelAddr, channelInstance, err := GetChannelAddr(providerAddress, userAddress, providerAddress, queryAddress)
+func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, value *big.Int) (err error) {
+	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
 	if err != nil {
-		return nil
+		return err
 	}
-
 	//(channelAddress, value)的哈希值
 	var hashNew [32]byte
 	valueNew := common.LeftPadBytes(value.Bytes(), 32)
-	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew) //32Byte
+	hash := crypto.Keccak256(channelAddress.Bytes(), valueNew) //32Byte
 	copy(hashNew[:], hash[:32])
 
 	//用user的签名来触发closeChannel()
@@ -195,57 +211,4 @@ func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.In
 	//验证签名
 	verify = crypto.VerifySignature(userPubKey, hash, sig[:64])
 	return verify, nil
-}
-
-//GetChannelInfo used to get the startDate of channel-contract
-func GetChannelInfo(localAddr, userAddr, providerAddr, queryAddr common.Address) (ChannelItem, error) {
-	var item ChannelItem
-	channelAddr, channelContract, err := GetChannelAddr(localAddr, userAddr, providerAddr, queryAddr)
-	if err != nil {
-		return item, err
-	}
-	retryCount := 0
-	for {
-		retryCount++
-		startDate, timeOut, sender, receiver, err := channelContract.GetInfo(&bind.CallOpts{
-			From: localAddr,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("Get Channel Info:", err)
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		if sender.String() != userAddr.String() || receiver.String() != providerAddr.String() {
-			return item, errors.New("sender and receiver is not compatabile")
-		}
-
-		item = ChannelItem{
-			StartTime:   utils.UnixToTime(startDate.Int64()).Format(utils.SHOWTIME),
-			Duration:    timeOut.Int64(),
-			ChannelAddr: channelAddr.String(),
-		}
-		break
-	}
-
-	retryCount = 0
-	for {
-		retryCount++
-		balance, err := QueryBalance(channelAddr.String())
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("Get Channel Balance: ", err)
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		item.Money = balance
-		break
-	}
-
-	return item, nil
 }

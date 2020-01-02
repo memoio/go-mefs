@@ -7,16 +7,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func newGroup(localID, qid, uid string, keepers, providers []string) (*groupInfo, error) {
+func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo, error) {
 	tempInfo := &groupInfo{
 		groupID:      qid,
-		owner:        uid,
+		userID:       uid,
 		localKeeper:  qid,
 		masterKeeper: qid,
 		keepers:      keepers,
@@ -24,7 +24,7 @@ func newGroup(localID, qid, uid string, keepers, providers []string) (*groupInfo
 	}
 
 	if qid != uid {
-		err := tempInfo.saveUpkeeping()
+		err := tempInfo.getContracts()
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +50,7 @@ func newGroup(localID, qid, uid string, keepers, providers []string) (*groupInfo
 // if this provider belongs to this keeper, then this keeper is master
 func (g *groupInfo) isMaster(pid string) bool {
 	var mymaster []string
-	mykids, ok := contracts.GetKeepersOfPro(pid)
+	mykids, ok := role.GetKeepersOfPro(pid)
 	if ok {
 		for _, keeperID := range g.keepers {
 			for _, nkid := range mykids {

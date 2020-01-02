@@ -30,7 +30,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 					continue
 				}
 
-				gp := k.getGroupInfo(pu.qid, pu.uid, false)
+				gp := k.getGroupInfo(pu.uid, pu.qid, false)
 				if gp == nil {
 					continue
 				}

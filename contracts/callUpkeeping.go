@@ -11,8 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
-	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
@@ -88,39 +86,58 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	return ukAddr, nil
 }
 
-//GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
-func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
+//GetUpkeepingAddrs get all upKeeping address
+func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
 	if err != nil {
 		fmt.Println("GetResolverErr:", err)
-		return InvalidAddr, uk, err
+		return nil, err
 	}
 
 	//获得mapper, key is upkeeping
 	_, mapperInstance, err := getMapperFromIndexer(localAddress, "upkeeping", indexerInstance)
 	if err != nil {
-		return InvalidAddr, uk, err
+		return nil, err
+	}
+
+	return getAllFromMapper(localAddress, mapperInstance)
+}
+
+//GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
+func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
+	//获得userIndexer, key is userAddr
+	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
+	if err != nil {
+		fmt.Println("GetResolverErr:", err)
+		return ukaddr, uk, err
+	}
+
+	//获得mapper, key is upkeeping
+	_, mapperInstance, err := getMapperFromIndexer(localAddress, "upkeeping", indexerInstance)
+	if err != nil {
+		return ukaddr, uk, err
 	}
 
 	uks, err := getAllFromMapper(localAddress, mapperInstance)
 	if err != nil {
-		return InvalidAddr, uk, err
+		return ukaddr, uk, err
 	}
 
 	client := GetClient(EndPoint)
 
 	if key == "latest" {
-		ukAddr := uks[len(uks)-1]
-		uk, err := upKeeping.NewUpKeeping(ukAddr, client)
+		ukaddr = uks[len(uks)-1]
+		uk, err := upKeeping.NewUpKeeping(ukaddr, client)
 		if err != nil {
 			fmt.Println("newUkErr:", err)
-			return InvalidAddr, uk, err
+			return ukaddr, uk, err
 		}
-		return ukAddr.String(), uk, nil
+		return ukaddr, uk, nil
 	}
 
 	for _, ukAddr := range uks {
+		ukaddr = ukAddr
 		retryCount := 0
 		for {
 			retryCount++
@@ -129,7 +146,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 				break
 			}
 
-			uk, err = upKeeping.NewUpKeeping(ukAddr, client)
+			uk, err = upKeeping.NewUpKeeping(ukaddr, client)
 			if err != nil {
 				continue
 			}
@@ -142,13 +159,13 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 			}
 
 			if queryAddr.String() == key {
-				return ukAddr.String(), uk, nil
+				return ukaddr, uk, nil
 			}
 			break
 		}
 	}
 
-	return InvalidAddr, uk, err
+	return ukaddr, uk, errors.New("No upkeeping")
 }
 
 // SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
@@ -182,57 +199,6 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, money *big
 	return nil
 }
 
-// GetUpkeepingInfo get Upkeeping-contract's params
-func GetUpkeepingInfo(localAddress common.Address, uk *upKeeping.UpKeeping) (UpKeepingItem, error) {
-	var item UpKeepingItem
-
-	retryCount := 0
-	for {
-		retryCount++
-		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, err := uk.GetOrder(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("GetUpkeepingInfo:", err)
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		var keepers []string
-		var providers []string
-		for _, keeper := range keeperAddrs {
-			kid, err := address.GetIDFromAddress(keeper.String())
-			if err != nil {
-				return item, err
-			}
-			keepers = append(keepers, kid)
-		}
-		for _, provider := range providerAddrs {
-			pid, err := address.GetIDFromAddress(provider.String())
-			if err != nil {
-				return item, err
-			}
-			providers = append(providers, pid)
-		}
-		item = UpKeepingItem{
-			QueryID:     queryAddr.String(),
-			KeeperIDs:   keepers,
-			KeeperSLA:   int32(len(keeperAddrs)),
-			ProviderIDs: providers,
-			ProviderSLA: int32(len(providerAddrs)),
-			Duration:    duration.Int64(),
-			Capacity:    capacity.Int64(),
-			Price:       price.Int64(),
-			StartTime:   utils.UnixToTime(startTime.Int64()).Format(utils.SHOWTIME),
-		}
-		break
-	}
-
-	return item, nil
-}
-
 //AddProvider add a provider to upKeeping
 func AddProvider(hexKey string, localAddress, userAddress common.Address, providerAddress []common.Address, key string) error {
 	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
@@ -257,12 +223,13 @@ func AddProvider(hexKey string, localAddress, userAddress common.Address, provid
 		break
 	}
 
-	pid, _ := address.GetIDFromAddress(providerAddress[0].String())
 	retryCount = 0
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		upItem, err := GetUpkeepingInfo(userAddress, uk)
+		_, _, proAddr, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+			From: localAddress,
+		})
 		if err != nil {
 			if retryCount > 5 {
 				return err
@@ -271,8 +238,8 @@ func AddProvider(hexKey string, localAddress, userAddress common.Address, provid
 		}
 
 		found := false
-		for _, proID := range upItem.ProviderIDs {
-			if proID == pid {
+		for _, pro := range proAddr {
+			if pro.String() == providerAddress[0].String() {
 				found = true
 				break
 			}
