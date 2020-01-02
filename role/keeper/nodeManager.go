@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -14,6 +15,32 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/mgutz/ansi"
 )
+
+// store user information
+type uInfo struct {
+	sync.RWMutex
+	userID string
+	querys map[string]struct{} // key is queryID
+}
+
+func (u *uInfo) setQuery(qid string) {
+	u.Lock()
+	defer u.Unlock()
+	_, ok := u.querys[qid]
+	if !ok {
+		u.querys[qid] = struct{}{}
+	}
+}
+
+func (u *uInfo) getQuery() string {
+	u.RLock()
+	defer u.RUnlock()
+	for id := range u.querys {
+		return id
+	}
+
+	return ""
+}
 
 // store keeper information
 type kInfo struct {
@@ -26,20 +53,21 @@ type kInfo struct {
 
 // store provider information
 type pInfo struct {
+	sync.RWMutex
 	providerID string
 	maxSpace   uint64 //Bytes from contract
 	usedSpace  uint64 //Bytes
 	credit     int
 	online     bool
 	availTime  int64
-	offerItem  map[string]*role.OfferItem // key is offerID, and "latest",need lock?
+	offerItem  *role.OfferItem // "latest"
 	proItem    *role.ProviderItem
 }
 
-// store user information
-type uInfo struct {
-	userID string
-	querys map[string]struct{} // key is queryID
+func (p *pInfo) setOffer() {
+	p.Lock()
+	defer p.Unlock()
+
 }
 
 func (k *Info) getUInfo(pid string) (*uInfo, error) {
@@ -53,18 +81,6 @@ func (k *Info) getUInfo(pid string) (*uInfo, error) {
 	}
 
 	return thisInfoI.(*uInfo), nil
-}
-
-func (k *Info) setQuery(uid, qid string) {
-	uinfo, err := k.getUInfo(uid)
-	if err != nil {
-		return
-	}
-
-	_, has := uinfo.querys[qid]
-	if !has {
-		uinfo.querys[qid] = struct{}{}
-	}
 }
 
 func (k *Info) getKInfo(pid string) (*kInfo, error) {
@@ -95,30 +111,6 @@ func (k *Info) getPInfo(pid string) (*pInfo, error) {
 	}
 
 	return thisInfoI.(*pInfo), nil
-}
-
-func (k *Info) addCredit(provider string) {
-	thisInfo, err := k.getPInfo(provider)
-	if err != nil {
-		return
-	}
-	thisInfo.credit += 100
-}
-
-func (k *Info) setCredit(provider string, val int) {
-	thisInfo, err := k.getPInfo(provider)
-	if err != nil {
-		return
-	}
-	thisInfo.credit = val
-}
-
-func (k *Info) reduceCredit(provider string) {
-	thisInfo, err := k.getPInfo(provider)
-	if err != nil {
-		return
-	}
-	thisInfo.credit -= 100
 }
 
 func (k *Info) checkPeers(ctx context.Context) {
@@ -233,12 +225,12 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 				continue
 			}
 
-			if len(thispInfo.offerItem) == 0 {
+			if thispInfo.offerItem == nil {
 				oItem, err := role.GetLatestOffer(id, id)
 				if err != nil {
 					continue
 				}
-				thispInfo.offerItem[oItem.OfferID] = &oItem
+				thispInfo.offerItem = &oItem
 			}
 
 			thispInfo.online = true

@@ -427,7 +427,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 				continue
 			}
 
-			thisPinfo.offerItem[oItem.OfferID] = &oItem
+			thisPinfo.offerItem = &oItem
 		}
 	}
 

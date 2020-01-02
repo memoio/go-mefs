@@ -234,22 +234,9 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 			return
 		}
 
-		k.deleteBlockMeta(qid, bid, false)
+		k.deleteBlockMeta(qid, bid, true)
 		k.addBlockMeta(qid, bid, newPid, newOffset)
 
-		//更新block的meta信息
-		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
-		if err != nil {
-			log.Println("construct Syncblock KV error :", err)
-			return
-		}
-		metaValue := newPid + metainfo.DELIMITER + strconv.Itoa(newOffset)
-
-		err = k.ds.PutKey(context.Background(), kmBlock.ToString(), []byte(metaValue), "local")
-		if err != nil {
-			log.Println("construct SyncPidsK error :", err)
-			return
-		}
 		return
 	}
 
