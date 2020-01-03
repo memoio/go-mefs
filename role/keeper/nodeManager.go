@@ -179,8 +179,12 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 	for _, pid := range connPeers {
 		id := pid.Pretty() //连接结点id的base58编码
 
-		thisInfoI, exist := k.keepers.Load(id)
+		_, exist := k.users.Load(id)
+		if exist {
+			continue
+		}
 
+		thisInfoI, exist := k.keepers.Load(id)
 		if exist {
 			thisInfoI.(*kInfo).online = true
 			thisInfoI.(*kInfo).availTime = utils.GetUnixNow()
