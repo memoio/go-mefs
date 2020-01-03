@@ -115,12 +115,6 @@ func (dht *KadDHT) checkLocalDatastore(k []byte) (*pb.Record, error) {
 	// NOTE: We do not verify the record here beyond checking these timestamps.
 	// we put the burden of checking the records on the requester as checking a record
 	// may be computationally expensive
-
-	err = dht.datastore.Delete(dskey)
-	if err != nil {
-		logger.Error("Failed to delete bad record from datastore: ", err)
-	}
-
 	return rec, nil
 }
 

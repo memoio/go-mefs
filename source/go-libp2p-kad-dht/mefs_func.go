@@ -121,6 +121,10 @@ func (dht *KadDHT) PutTo(ctx context.Context, key string, value []byte, id strin
 
 	rec := MakePutRecord(key, value)
 
+	if id == "local" {
+		dht.putLocal(key, rec)
+	}
+
 	pmes := pb.NewMessage(pb.Message_PUT_VALUE, rec.Key, 0)
 	pmes.Record = rec
 	p, err := peer.IDB58Decode(id)
@@ -140,7 +144,7 @@ func (dht *KadDHT) PutTo(ctx context.Context, key string, value []byte, id strin
 	return nil
 }
 
-//CmdGetFrom 从指定节点获得kv对 id为local时，在本地查找
+//GetFrom 从指定节点获得kv对 id为local时，在本地查找
 func (dht *KadDHT) GetFrom(ctx context.Context, key string, to string) ([]byte, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -155,6 +159,7 @@ func (dht *KadDHT) GetFrom(ctx context.Context, key string, to string) ([]byte, 
 		if err != nil {
 			return nil, err
 		}
+
 		keyrec := string(rec.GetKey())
 		if strings.Compare(keyrec, key) == 0 {
 			return rec.GetValue(), nil

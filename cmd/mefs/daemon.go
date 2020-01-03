@@ -321,6 +321,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if err != nil {
 		fmt.Println("node.Routing.CmdPut falied: ", err)
 	}
+	fmt.Println("role is:", value)
+	kvalue, _ := node.Data.GetKey(node.Context(), keystring, "local")
+	fmt.Println(string(kvalue))
 
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children

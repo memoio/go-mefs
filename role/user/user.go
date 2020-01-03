@@ -22,8 +22,27 @@ type Info struct {
 	qMap    sync.Map // key is userID, value is *userInfo
 }
 
-type userInfo struct {
+type queryInfo struct {
+	sync.RWMutex
 	querys map[string]struct{} // now, only one
+}
+
+func (q *queryInfo) setQuery(qid string) {
+	q.Lock()
+	defer q.Unlock()
+	_, ok := q.querys[qid]
+	if !ok {
+		q.querys[qid] = struct{}{}
+	}
+}
+
+func (q *queryInfo) getQuery() string {
+	q.RLock()
+	defer q.RUnlock()
+	for qid := range q.querys {
+		return qid
+	}
+	return ""
 }
 
 // New constructs a new user service
@@ -36,6 +55,7 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 	if err != nil {
 		return nil, err
 	}
+
 	return us, nil
 }
 
@@ -73,17 +93,14 @@ func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64
 		ginfo.groupID = userID
 	}
 
-	uInfo, ok := u.qMap.Load(userID)
+	qInfo, ok := u.qMap.Load(userID)
 	if ok {
-		_, has := uInfo.(*userInfo).querys[queryID]
-		if !has {
-			uInfo.(*userInfo).querys[queryID] = struct{}{}
-		}
+		qInfo.(*queryInfo).setQuery(queryID)
 	} else {
-		uq := &userInfo{
+		uq := &queryInfo{
 			querys: make(map[string]struct{}),
 		}
-		uq.querys[queryID] = struct{}{}
+		uq.setQuery(queryID)
 		u.qMap.Store(userID, uq)
 	}
 
@@ -138,12 +155,11 @@ func (u *Info) Stop() error {
 func (u *Info) KillUser(userID string) error {
 	uinfo, ok := u.qMap.Load(userID)
 	if ok {
-		for queryID := range uinfo.(*userInfo).querys {
-			fs, ok := u.fsMap.Load(queryID)
-			if ok {
-				fs.(*LfsInfo).Stop()
-				u.fsMap.Delete(queryID)
-			}
+		queryID := uinfo.(*queryInfo).getQuery()
+		fs, ok := u.fsMap.Load(queryID)
+		if ok {
+			fs.(*LfsInfo).Stop()
+			u.fsMap.Delete(queryID)
 		}
 	}
 	return nil
@@ -153,11 +169,10 @@ func (u *Info) KillUser(userID string) error {
 func (u *Info) GetUser(userID string) FileSyetem {
 	uinfo, ok := u.qMap.Load(userID)
 	if ok {
-		for queryID := range uinfo.(*userInfo).querys {
-			fs, ok := u.fsMap.Load(queryID)
-			if ok {
-				return fs.(*LfsInfo)
-			}
+		queryID := uinfo.(*queryInfo).getQuery()
+		fs, ok := u.fsMap.Load(queryID)
+		if ok {
+			return fs.(*LfsInfo)
 		}
 	}
 	return nil

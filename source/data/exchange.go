@@ -88,16 +88,13 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 }
 
 func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error) {
-	if to == "local" {
-		return n.dstore.Get(ds.NewKey(key))
-
-	}
-
 	if n.ph == nil || n.rt == nil {
 		return nil, ErrNoRouting
 	}
 
-	n.Connect(ctx, to)
+	if to != "local" && to != "" {
+		n.Connect(ctx, to)
+	}
 
 	res, err := n.rt.(*dht.KadDHT).GetFrom(ctx, key, to)
 	if err != nil {
@@ -108,15 +105,13 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 }
 
 func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) error {
-	if to == "local" {
-		return n.dstore.Put(ds.NewKey(key), data)
-	}
-
 	if n.ph == nil || n.rt == nil {
 		return ErrNoRouting
 	}
 
-	n.Connect(ctx, to)
+	if to != "local" && to != "" {
+		n.Connect(ctx, to)
+	}
 
 	return n.rt.(*dht.KadDHT).PutTo(ctx, key, data, to)
 }
