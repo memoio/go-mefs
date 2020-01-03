@@ -225,14 +225,6 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 				continue
 			}
 
-			if thispInfo.offerItem == nil {
-				oItem, err := role.GetLatestOffer(id, id)
-				if err != nil {
-					continue
-				}
-				thispInfo.offerItem = &oItem
-			}
-
 			thispInfo.online = true
 			thispInfo.availTime = utils.GetUnixNow()
 		}
