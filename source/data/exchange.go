@@ -97,7 +97,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 	}
 
 	res, err := n.rt.(*dht.KadDHT).GetFrom(ctx, key, to)
-	if err != nil {
+	if err != nil && err != routing.ErrNotFound {
 		log.Println("GetKey err:", err, "key is: ", key, "from: ", to)
 		return nil, err
 	}

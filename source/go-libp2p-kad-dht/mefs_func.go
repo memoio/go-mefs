@@ -122,7 +122,7 @@ func (dht *KadDHT) PutTo(ctx context.Context, key string, value []byte, id strin
 	rec := MakePutRecord(key, value)
 
 	if id == "local" {
-		dht.putLocal(key, rec)
+		return dht.putLocal(key, rec)
 	}
 
 	pmes := pb.NewMessage(pb.Message_PUT_VALUE, rec.Key, 0)
