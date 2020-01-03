@@ -741,7 +741,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		if err != nil && err != bs.ErrNotFound {
 			return nil, err
 		}
-		log.Printf("Try to get it from remote servers.\n", ncidlocal)
+		log.Println("Try to get it from remote servers:", ncidlocal)
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()

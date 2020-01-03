@@ -71,7 +71,6 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, from string) ([]
 	}
 
 	splitValue := strings.Split(string(metaValue), metainfo.DELIMITER)
-
 	if len(splitValue) != 2 {
 		return nil, errors.New("wrong value")
 	}
@@ -85,6 +84,23 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, from string) ([]
 			continue
 		}
 		keepers = append(keepers, keeper)
+	}
+
+	pids := splitValue[1]
+	has := false
+	for i := 0; i < len(pids)/utils.IDLength; i++ {
+		pid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+		_, err := peer.IDB58Decode(pid)
+		if err != nil {
+			continue
+		}
+		if pid == p.localID {
+			has = true
+		}
+	}
+
+	if !has {
+		return nil, errors.New("Not my user")
 	}
 
 	uid := ops[0]

@@ -80,7 +80,7 @@ func (dht *KadDHT) SendRequest(ctx context.Context, typ int32, metaKey string, m
 
 	rpmes, err := dht.sendRequest(ctx, p, pmes) //得到返回信息
 	if err != nil {
-		log.Println("Send metainfo error: ", err)
+		log.Println("Send metainfo to:", p.Pretty(), "error: ", err)
 		return nil, err
 	}
 	response := rpmes.Record.GetValue()
@@ -257,7 +257,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 		return nil, instance.ErrMetaHandlerNotAssign
 	}
 
-	log.Println("hanle metakey:", metaKey)
+	log.Println("handle metakey:", metaKey)
 
 	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
 	if err != nil {

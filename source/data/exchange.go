@@ -154,6 +154,8 @@ func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 // GetBlock retrieves a particular block from the service,
 // Getting it from the datastore using the key (hash).
 func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error) {
+	log.Println("get block from:", to)
+
 	if to == "local" {
 		block, err := n.bstore.Get(cid.NewCidV2([]byte(key)))
 		if err == nil {
@@ -315,13 +317,8 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 		return true
 	}
 
-	var retry = false
-	connectTryCount := 3
-	for i := 0; i <= connectTryCount; i++ {
-		if retry { // retry three times
-			ctx = context.WithValue(ctx, "ExternIP", true)
-		}
-
+	connectTryCount := 1
+	for i := 0; i < connectTryCount; i++ {
 		pi, err := n.rt.FindPeer(ctx, id)
 		if err != nil {
 			fmt.Printf("findpeer err: %s\n", err)
@@ -336,10 +333,9 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 		if err == nil {
 			return true
 		}
-		retry = true
 	}
 
-	for i := 0; i <= connectTryCount; i++ {
+	for i := 0; i < connectTryCount; i++ {
 		res := n.getAddrAndConnect(ctx, to)
 		if res {
 			return true
@@ -355,26 +351,55 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to string) bool {
 	}
 
 	for _, defaultBootstrapAddress := range config.DefaultBootstrapAddresses {
-		addr := strings.Split(defaultBootstrapAddress, "/")
-		peerID := addr[len(addr)-1]
-		res, err := n.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, peerID)
+		bi, err := ma.NewMultiaddr(defaultBootstrapAddress)
 		if err != nil {
 			continue
 		}
-		paddr := string(res) + "/p2p/" + to
 
-		fmt.Println("try to connect: ", paddr)
-
-		pai, err := peersWithAddresses(paddr)
+		pi, err := peer.AddrInfoFromP2pAddr(bi)
 		if err != nil {
 			continue
 		}
+
+		npi := peer.AddrInfo{
+			ID:    pi.ID,
+			Addrs: pi.Addrs,
+		}
+
+		err = n.ph.Connect(ctx, npi)
+		if err != nil {
+			continue
+		}
+
+		res, err := n.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, pi.ID.Pretty())
+		if err != nil {
+			continue
+		}
+
+		pai := ma.Cast(res)
+
+		pi, err = peer.AddrInfoFromP2pAddr(pai)
+		if err != nil {
+			continue
+		}
+
+		npi = peer.AddrInfo{
+			ID:    pi.ID,
+			Addrs: pi.Addrs,
+		}
+
+		err = n.ph.Connect(ctx, npi)
+		if err != nil {
+			continue
+		}
+
+		fmt.Println("try to connect: ", npi.String())
 
 		if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
-			swrm.Backoff().Clear(pai.ID)
+			swrm.Backoff().Clear(npi.ID)
 		}
 
-		err = n.ph.Connect(ctx, pai)
+		err = n.ph.Connect(ctx, npi)
 		if err == nil {
 			return true
 		}
