@@ -67,7 +67,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 
 func (p *Info) loadChannelValue(userID, groupID string) error {
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil && gp.channel != nil {
+	if gp != nil && gp.userID != gp.groupID && gp.channel != nil {
 		ctx := context.Background()
 		km, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
 		if err != nil {

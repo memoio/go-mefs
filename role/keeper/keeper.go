@@ -404,7 +404,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	}
 
 	if pids, err := k.ds.GetKey(ctx, kmPID.ToString(), "local"); pids != nil && err == nil {
-		log.Println(localID, "has keepers:", string(pids))
+		log.Println(localID, "has providers:", string(pids))
 		for i := 0; i < len(pids)/utils.IDLength; i++ {
 			tmpKid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)

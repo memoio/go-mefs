@@ -116,6 +116,7 @@ func (p *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 		if mode {
 			return newGroup(p.localID, userID, groupID, []string{userID})
 		}
+		return nil
 	}
 
 	return groupI.(*groupInfo)

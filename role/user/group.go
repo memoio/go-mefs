@@ -363,8 +363,10 @@ func (g *groupInfo) notify(ctx context.Context) {
 		i++
 		keepers[kidStr] = tempK
 	}
-	if len(g.keepers) < g.keeperSLA {
+	if len(keepers) < g.keeperSLA {
 		g.state = collecting
+		g.initResMutex.Unlock()
+		log.Println("Keeper is not enough, collecting...")
 		return
 	}
 
@@ -387,8 +389,10 @@ func (g *groupInfo) notify(ctx context.Context) {
 		providers[pidStr] = tempP
 	}
 
-	if len(g.providers) < g.providerSLA {
+	if len(providers) < g.providerSLA {
 		g.state = collecting
+		g.initResMutex.Unlock()
+		log.Println("Provider is not enough, collecting...")
 		return
 	}
 
@@ -483,40 +487,41 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		g.tempProviders = append(g.tempProviders, pinfo.providerID)
 	}
 
-	ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
-	if err != nil {
-		log.Println("deploy UpKeeping failed :", err)
+	if g.userID != g.groupID {
+		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
+		if err != nil {
+			log.Println("deploy UpKeeping failed :", err)
+		}
+
+		uItem, err := role.GetUpkeepingInfo(g.userID, ukID)
+		if err != nil {
+			log.Println("get UpKeeping failed :", err)
+		}
+
+		g.upKeepingItem = &uItem
+
+		var wg sync.WaitGroup
+		for _, proInfo := range g.providers {
+			wg.Add(1)
+			proID := proInfo.providerID
+			go func(proID string) {
+				defer wg.Done()
+				channelID, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+				if err != nil {
+					return
+				}
+				cItem, err := role.GetChannelInfo(g.userID, channelID)
+				if err != nil {
+					return
+				}
+				proInfo.chanItem = &cItem
+				// need persist
+			}(proID)
+		}
+		wg.Wait()
+
+		g.loadChannelValue()
 	}
-
-	uItem, err := role.GetUpkeepingInfo(g.userID, ukID)
-	if err != nil {
-		log.Println("get UpKeeping failed :", err)
-	}
-
-	g.upKeepingItem = &uItem
-
-	var wg sync.WaitGroup
-	for _, proInfo := range g.providers {
-		wg.Add(1)
-		proID := proInfo.providerID
-		go func(proID string) {
-			defer wg.Done()
-			channelID, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
-			if err != nil {
-				return
-			}
-			cItem, err := role.GetChannelInfo(g.userID, channelID)
-			if err != nil {
-				return
-			}
-			proInfo.chanItem = &cItem
-			// need persist
-		}(proID)
-	}
-	wg.Wait()
-
-	g.loadChannelValue()
-
 	g.state = depoyDone
 
 	return nil
