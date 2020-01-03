@@ -22,7 +22,7 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue []byte, f
 	switch dtype {
 	case metainfo.UserStart:
 		log.Println("handle user start: ", metaKey)
-		go p.handleUserStart(km, metaKey, from)
+		return p.handleUserStart(km, metaKey, from)
 	case metainfo.Challenge:
 		log.Println("handle challenge: ", metaKey)
 		go p.handleChallengeBls12(km, metaValue, from)
@@ -104,9 +104,12 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, from string) ([]
 	}
 
 	uid := ops[0]
-	gp := newGroup(p.localID, uid, gid, keepers)
 
-	p.users.Store(gid, gp)
+	_, ok := p.users.Load(gid)
+	if ok {
+		gp := newGroup(p.localID, uid, gid, keepers)
+		p.users.Store(gid, gp)
+	}
 
 	p.loadChannelValue(uid, gid)
 
