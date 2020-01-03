@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	providers "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/providers"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var logger = logging.Logger("dht")
@@ -212,9 +215,15 @@ func (dht *KadDHT) getValueSingle(ctx context.Context, p peer.ID, key string) (*
 	eip := logger.EventBegin(ctx, "getValueSingle", meta)
 	defer eip.Done()
 
-	bkey := []byte(key)
 	pmes := new(pb.Message)
-	pmes = pb.NewMessage(pb.Message_GET_VALUE, []byte(bkey), 0)
+	pmes = pb.NewMessage(pb.Message_GET_VALUE, []byte(key), 0)
+
+	bkey := strings.SplitN(key, metainfo.DELIMITER, 3)
+	if len(bkey) == 3 {
+		if bkey[1] == strconv.Itoa(metainfo.UserInit) {
+			pmes = pb.NewMessage(pb.Message_MetaInfo, []byte(key), 0)
+		}
+	}
 
 	resp, err := dht.sendRequest(ctx, p, pmes)
 	switch err {

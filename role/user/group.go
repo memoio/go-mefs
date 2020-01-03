@@ -298,7 +298,7 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 	defer g.initResMutex.Unlock()
 
 	if g.state == collecting { //收集信息阶段，才继续
-		log.Println("Receive InitResponse，from：", from, ", value is：", metaValue)
+		log.Println("Receive InitResponse，from：", from, ", value is：", string(metaValue))
 		splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
 		if len(splitedMeta) != 2 {
 			return

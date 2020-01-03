@@ -116,6 +116,7 @@ func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) e
 	return n.rt.(*dht.KadDHT).PutTo(ctx, key, data, to)
 }
 
+// to modify
 func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string) error {
 	if to == "local" {
 		skey := strings.Split(key, metainfo.DELIMITER)

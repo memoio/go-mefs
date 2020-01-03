@@ -78,7 +78,7 @@ type objectInfo struct {
 // Start starts user's info
 func (l *LfsInfo) Start() error {
 	// 证明该user已经启动
-	if l.online || (l.gInfo != nil && l.gInfo.state >= starting) {
+	if l.online || (l.gInfo != nil && l.gInfo.state > starting) {
 		return errors.New("The user is running")
 	}
 

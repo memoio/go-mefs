@@ -331,7 +331,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		switch value {
 		case metainfo.RoleKeeper:
 			fmt.Println("Keeper-persisting before shut down")
-			err := node.Inst.(*user.Info).Stop()
+			err := node.Inst.(*keeper.Info).Stop()
 			if err != nil {
 				fmt.Println("Sorry, something wrong in persisting:", err)
 			} else {
@@ -436,6 +436,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			fmt.Println("Start keeper service fails; please restart")
 		}
 		node.Inst = ins
+
+		fmt.Println("Keeper daemon is ready")
+
 	case metainfo.RoleUser:
 		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
@@ -454,6 +457,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 
 		node.Inst = ins
+
+		fmt.Println("Provider daemon is ready")
 
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)

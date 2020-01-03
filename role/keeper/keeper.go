@@ -12,7 +12,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
@@ -380,6 +379,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	}
 
 	if kids, err := k.ds.GetKey(ctx, kmKID.ToString(), "local"); kids != nil && err == nil {
+		log.Println(localID, "has keepers:", string(kids))
 		for i := 0; i < len(kids)/utils.IDLength; i++ {
 			tmpKid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)
@@ -404,6 +404,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	}
 
 	if pids, err := k.ds.GetKey(ctx, kmPID.ToString(), "local"); pids != nil && err == nil {
+		log.Println(localID, "has keepers:", string(pids))
 		for i := 0; i < len(pids)/utils.IDLength; i++ {
 			tmpKid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)
@@ -420,14 +421,6 @@ func (k *Info) loadPeers(ctx context.Context) error {
 				thisPinfo.availTime = utils.GetUnixNow()
 				thisPinfo.online = true
 			}
-
-			oItem, err := role.GetLatestOffer(tmpKid, tmpKid)
-			if err != nil {
-				log.Println("Save ", tmpKid, "'s Offer error: ", err)
-				continue
-			}
-
-			thisPinfo.offerItem = &oItem
 		}
 	}
 

@@ -235,7 +235,6 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 
 			thispInfo.online = true
 			thispInfo.availTime = utils.GetUnixNow()
-
 		}
 	}
 	return nil
