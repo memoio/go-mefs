@@ -89,7 +89,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	pids := splitValue[1]
 	has := false
 	for i := 0; i < len(pids)/utils.IDLength; i++ {
-		pid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+		pid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 		_, err := peer.IDB58Decode(pid)
 		if err != nil {
 			continue

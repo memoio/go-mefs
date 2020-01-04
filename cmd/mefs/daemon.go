@@ -328,29 +328,10 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children
 		// that it will wait for before closing, such as the API server.
-		switch value {
-		case metainfo.RoleKeeper:
-			fmt.Println("Keeper-persisting before shut down")
-			err := node.Inst.(*keeper.Info).Stop()
-			if err != nil {
-				fmt.Println("Sorry, something wrong in persisting:", err)
-			} else {
-				fmt.Println("Persist completed")
-			}
-		case metainfo.RoleUser:
-			fmt.Println("User-persisting before shut down")
-			err = node.Inst.(*user.Info).Stop()
-			if err != nil {
-				fmt.Println("Persist falied: ", err)
-			}
-			// 增加provider的persist，将channel的value值保存到本地
-		case metainfo.RoleProvider:
-			fmt.Println("Provider-persisting before shut down")
-			err = node.Inst.(*provider.Info).Stop()
-			if err != nil {
-				fmt.Println("Persist falied: ", err)
-			}
-		default:
+
+		err = node.Inst.Stop()
+		if err != nil {
+			fmt.Println("Persist before exist falied: ", err)
 		}
 
 		err = node.Close()

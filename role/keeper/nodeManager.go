@@ -147,6 +147,7 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 		if k.ds.Connect(ctx, kid) {
 			thisInfo.online = true
 			thisInfo.availTime = ntime
+			continue
 		}
 
 		if ntime-thisInfo.availTime > EXPIRETIME {
@@ -154,8 +155,8 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 		}
 	}
 
-	tmpKeepers, _ = k.GetProviders()
-	for _, pid := range tmpKeepers {
+	tmpPros, _ := k.GetProviders()
+	for _, pid := range tmpPros {
 		thisInfoI, ok := k.providers.Load(pid)
 		if !ok {
 			continue
@@ -166,6 +167,7 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 		if k.ds.Connect(ctx, pid) {
 			thisInfo.online = true
 			thisInfo.availTime = ntime
+			continue
 		}
 
 		if ntime-thisInfo.availTime > EXPIRETIME {
