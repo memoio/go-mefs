@@ -265,14 +265,14 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 	tick := time.Tick(30 * time.Second)
 	for {
 		select {
-		case <-tick: //每过30s 检查是否收到了足够的KP信息，如果不足，继续发送初始化请求，足够的时候进行KP的选择和确认
+		case <-tick:
 			if timeOutCount >= 40 {
 				return ErrTimeOut
 			}
 			switch g.state {
 			case collecting:
 				timeOutCount++
-				log.Printf("No enough keepers and providers, have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
+				log.Printf("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
 				go g.ds.BroadcastMessage(ctx, kmes)
 			case collectDone:
 				g.notify(ctx)
@@ -299,13 +299,12 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 	g.Lock()
 	defer g.Unlock()
 
-	//收集信息阶段，才继续
 	log.Println("Receive InitResponse，from：", from, ", value is：", string(metaValue))
 	splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedMeta) != 2 {
 		return
 	}
-	//把keeper信息和provider信息加入到备选中
+
 	ctx := context.Background()
 	keepers := splitedMeta[0]
 	for i := 0; i < len(keepers)/utils.IDLength; i++ {
@@ -321,6 +320,7 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 			g.tempKeepers = append(g.tempKeepers, kid)
 		}
 	}
+
 	providers := splitedMeta[1]
 	for i := 0; i < len(providers)/utils.IDLength; i++ {
 		pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
@@ -333,12 +333,10 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 	}
 
 	if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
-		//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
 		g.state = collectDone
 	}
 }
 
-//userInitNotify 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
 // key: queryID/"UserNotify"/userID/kc/pc
 func (g *groupInfo) notify(ctx context.Context) {
 	if g.state != collectDone {
@@ -364,6 +362,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 		i++
 		keepers = append(keepers, kidStr)
 	}
+
 	if len(keepers) < g.keeperSLA {
 		g.state = collecting
 		g.Unlock()
@@ -408,8 +407,6 @@ func (g *groupInfo) notify(ctx context.Context) {
 	for _, pid := range g.tempProviders {
 		res.WriteString(pid)
 	}
-
-	g.count = 0
 
 	g.Unlock()
 
@@ -461,6 +458,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 		}
 	}
 
+	// re-collecting
 	g.Lock()
 	g.state = collecting
 	g.Unlock()

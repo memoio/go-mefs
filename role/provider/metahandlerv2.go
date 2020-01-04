@@ -106,7 +106,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	uid := ops[0]
 
 	_, ok := p.users.Load(gid)
-	if ok {
+	if !ok {
 		gp := newGroup(p.localID, uid, gid, keepers)
 		p.users.Store(gid, gp)
 	}
