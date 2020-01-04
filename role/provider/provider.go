@@ -66,13 +66,12 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 				break
 			}
 		}
-	}()
 
-	err = m.getContracts()
-	if err != nil {
-		log.Println("Save ", m.localID, "'s provider info err", err)
-		return nil, err
-	}
+		err = m.getContracts()
+		if err != nil {
+			log.Println("Save ", m.localID, "'s provider info err", err)
+		}
+	}()
 
 	log.Println("Get ", m.localID, "'s contract info success")
 
