@@ -26,17 +26,16 @@ const (
 	groupStarted      // done
 )
 
-//keeperInfo 此结构体记录Keeper的信息，存储Tendermint地址，让user也能访问链上数据
 type keeperInfo struct {
 	keeperID  string
-	sessionID uuid.UUID // for user
+	sessionID uuid.UUID // for one write
 	connected bool
 }
 
 type providerInfo struct {
 	providerID string
 	connected  bool
-	sessionID  uuid.UUID // for user
+	sessionID  uuid.UUID // for one write
 	chanItem   *role.ChannelItem
 	offerItem  *role.OfferItem
 }
@@ -44,22 +43,21 @@ type providerInfo struct {
 // group stores use's groupinfo
 type groupInfo struct {
 	sync.Mutex
-	groupID string // query address
-	userID  string // user address
-	privKey string // utils.EthSkByteToEthString(getSk(userID))
+	groupID string // id format of query address
+	userID  string // id format of user address
+	privKey string // EthString
 	state   int8   // atomic?
 	ds      data.Service
 
 	keepers   map[string]*keeperInfo
 	providers map[string]*providerInfo
 
-	storeDays     int64 //表示部署合约时的存储数据时间，单位是“天”
-	storeSize     int64 //表示部署合约时的存储数据大小，单位是“MB”
-	storePrice    int64 //表示部署合约时的存储价格大小，单位是“wei”
-	keeperSLA     int   //表示部署合约时的keeper参数，目前是keeper数量
-	providerSLA   int   //表示部署合约时的provider参数，目前是provider数量
-	count         int
-	reDeploy      bool     //是否重新部署offer
+	storeDays     int64    //表示部署合约时的存储数据时间，单位是“天”
+	storeSize     int64    //表示部署合约时的存储数据大小，单位是“MB”
+	storePrice    int64    //表示部署合约时的存储价格大小，单位是“wei”
+	keeperSLA     int      //表示部署合约时的keeper参数，目前是keeper数量
+	providerSLA   int      //表示部署合约时的provider参数，目前是provider数量
+	reDeploy      bool     // 是否重新部署offer
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
 
@@ -78,7 +76,6 @@ func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redep
 		storePrice:  price,
 		keeperSLA:   ks,
 		providerSLA: ps,
-		count:       0,
 		reDeploy:    redeploy,
 		keepers:     make(map[string]*keeperInfo, ks),
 		providers:   make(map[string]*providerInfo, ps),
@@ -421,7 +418,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
 		g.Lock()
-		g.count = 0
+		count := 0
 		g.Unlock()
 		for _, kid := range keepers { //循环发消息
 			wg.Add(1)
@@ -437,7 +434,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 						time.Sleep(30 * time.Second)
 					} else {
 						g.Lock()
-						g.count++
+						count++
 						g.Unlock()
 						return
 					}
@@ -449,7 +446,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 		wg.Wait()
 
 		//all keepers are online
-		if g.count == g.keeperSLA {
+		if count == g.keeperSLA {
 			log.Println("Receive all keepers' response")
 			g.Lock()
 			g.state = deploying

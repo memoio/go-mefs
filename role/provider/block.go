@@ -13,7 +13,6 @@ import (
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	b58 "github.com/mr-tron/base58/base58"
 )
 
 func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
@@ -71,35 +70,27 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 	return nil
 }
 
-func (p *Info) handleGetBlock(km *metainfo.KeyMeta, from string) ([]byte, error) {
-	// key is cid|ops|sig
+func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
-	if len(splitedNcid) < 3 {
-		return nil, errors.New("Key is too short")
+	if len(splitedNcid) != 2 {
+		return nil, errors.New("Wrong value for get block")
 	}
 
 	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
 	qid := bids[0]
+
 	gp := p.getGroupInfo(qid, qid, false)
 	if gp == nil {
 		return nil, errors.New("NotMyUser")
 	}
 
-	sigByte, err := b58.Decode(splitedNcid[2])
-	if err != nil {
-		return nil, errors.New("Signature format is wrong")
-	}
-
-	res, value, sig, err := p.verify(gp.channel.ChannelID, gp.channel.Value, sigByte)
+	res, value, sig, err := p.verify(gp.channel.ChannelID, gp.channel.Value, sig)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 		return nil, err
 	}
 
 	if res {
-		// 验证通过
-		// 内存channel的value变化
-		// 然后持久化
 		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
 			return nil, errors.New("Block is not found")

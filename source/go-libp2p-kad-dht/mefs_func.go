@@ -249,6 +249,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 	rec := pmes.GetRecord() //获得record信息
 	metaKey := string(pmes.GetKey())
 	metaValue := rec.GetValue()
+	sig := rec.GetSignature()
 
 	// append/iter can be done here
 
@@ -259,7 +260,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 	log.Println("handle metakey:", metaKey)
 
-	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, p.Pretty())
+	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, sig, p.Pretty())
 	if err != nil {
 		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\n", err, metaKey, p.Pretty())
 	}
@@ -284,7 +285,7 @@ func (dht *KadDHT) handleMetaBroadcast(ctx context.Context, key string, p peer.I
 		return nil, instance.ErrMetaHandlerNotAssign
 	}
 
-	res, err := dht.metahandler.HandleMetaMessage(1, key, nil, p.Pretty())
+	res, err := dht.metahandler.HandleMetaMessage(1, key, nil, nil, p.Pretty())
 	if err != nil {
 		log.Println("handleMetaBroadcast()err:%s\nmetakey:%s\nfrom:%s\n", err, key, p.Pretty())
 	}

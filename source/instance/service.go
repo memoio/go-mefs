@@ -15,7 +15,7 @@ const (
 
 type Service interface {
 	// type, key, value, from
-	HandleMetaMessage(int, string, []byte, string) ([]byte, error)
+	HandleMetaMessage(int, string, []byte, []byte, string) ([]byte, error)
 	GetRole() string
 	Stop() error
 }

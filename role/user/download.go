@@ -417,17 +417,16 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 		return nil, nil, err
 	}
 
-	var channelID string
-
+	channelID := ds.fsID
 	pinfo, ok := ds.group.providers[provider]
 	if !ok {
 		return nil, nil, errors.New("No provider")
 	}
 	if pinfo.chanItem != nil {
+		channelID = pinfo.chanItem.ChannelID
 		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
-	moneyByte := money.Bytes()
 
 	//签名
 	sig, err := role.SignForChannel(channelID, hexSK, money)
@@ -447,7 +446,7 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 		UserPK:          pubKey,
 		UserAddress:     localAddress.String(),
 		ProviderAddress: providerAddress.String(),
-		Money:           moneyByte,
+		Money:           money.Bytes(),
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {

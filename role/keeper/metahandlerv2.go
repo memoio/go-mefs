@@ -13,7 +13,7 @@ import (
 )
 
 // HandleMetaMessage callback
-func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue []byte, from string) ([]byte, error) {
+func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
 	km, err := metainfo.GetKeyMeta(metaKey)
 	if err != nil {
 		return nil, err
