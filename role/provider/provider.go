@@ -56,15 +56,17 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		return nil, err
 	}
 
-	for {
-		_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
-		if err != nil {
-			log.Println("provider deploying resolver and offer failed!")
-			time.Sleep(2 * time.Minute)
-		} else {
-			break
+	go func() {
+		for {
+			_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
+			if err != nil {
+				log.Println("provider deploying resolver and offer failed!")
+				time.Sleep(2 * time.Minute)
+			} else {
+				break
+			}
 		}
-	}
+	}()
 
 	err = m.getContracts()
 	if err != nil {
