@@ -257,8 +257,8 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 
 	kmes := kmInit.ToString()
 
-	go g.ds.BroadcastMessage(ctx, kmes)
 	g.state = collecting
+	go g.ds.BroadcastMessage(ctx, kmes)
 
 	// wait 20 minutes for collecting
 	timeOutCount := 0
@@ -272,23 +272,10 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 			switch g.state {
 			case collecting:
 				timeOutCount++
-				if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
-					//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
-					g.state = collectDone
-					g.notify(ctx)
-				} else {
-					log.Printf("No enough keepers and providers, have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
-					go g.ds.BroadcastMessage(ctx, kmes)
-				}
+				log.Printf("No enough keepers and providers, have k:%d p:%d,want k:%d p:%d, retrying...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
+				go g.ds.BroadcastMessage(ctx, kmes)
 			case collectDone:
-				timeOutCount++
-				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
-				log.Printf("Timeout, waiting keeper response\n")
-				for _, keeperInfo := range g.keepers {
-					if !keeperInfo.connected {
-						log.Printf("Keeper %s not response, waiting...", keeperInfo.keeperID)
-					}
-				}
+				g.notify(ctx)
 			case deploying:
 				g.deployContract(ctx)
 			case depoyDone:
@@ -343,6 +330,11 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 		if g.ds.Connect(ctx, pid) {
 			g.tempProviders = append(g.tempProviders, pid)
 		}
+	}
+
+	if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
+		//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
+		g.state = collectDone
 	}
 }
 
@@ -431,6 +423,9 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
+		g.Lock()
+		g.count = 0
+		g.Unlock()
 		for _, kid := range keepers { //循环发消息
 			wg.Add(1)
 			log.Println("Notify keeper:", kid)
@@ -463,10 +458,6 @@ func (g *groupInfo) notify(ctx context.Context) {
 			g.state = deploying
 			g.Unlock()
 			return
-		} else {
-			g.Lock()
-			g.count = 0
-			g.Unlock()
 		}
 	}
 
