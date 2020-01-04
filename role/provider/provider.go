@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ type Info struct {
 	storageUsed  uint64
 	storageTotal uint64
 	users        sync.Map // key: queryID, value: *groupInfo
+	keepers      sync.Map // key: keeperID, value: *kInfo
 	offers       []*role.OfferItem
 	proContract  *role.ProviderItem
 }
@@ -41,6 +43,10 @@ type groupInfo struct {
 	upkeeping    *role.UpKeepingItem
 	channel      *role.ChannelItem
 	query        *role.QueryItem
+}
+
+type kInfo struct {
+	keeperID string
 }
 
 //New start provider service
@@ -161,20 +167,48 @@ func (p *Info) save(ctx context.Context) error {
 		return errProviderServiceNotReady
 	}
 
+	localID := p.localID
+
+	var pids strings.Builder
+
+	// persist keepers
+	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
+	if err != nil {
+		return err
+	}
+
+	p.keepers.Range(func(key, value interface{}) bool {
+		pids.WriteString(key.(string))
+		return true
+	})
+
+	if pids.Len() > 0 {
+		err = p.ds.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), "local")
+		if err != nil {
+			return err
+		}
+	}
+
+	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
+	if err != nil {
+		return err
+	}
+
 	res := p.getGroups()
+	pids.Reset()
 	for _, qu := range res {
-		p.saveChannelValue(qu.qid, qu.uid, p.localID)
+		if qu.qid != qu.uid {
+			pids.WriteString(qu.uid)
+			pids.WriteString(qu.qid)
+			p.saveChannelValue(qu.qid, qu.uid, p.localID)
+		}
 	}
-	posKM, err := metainfo.NewKeyMeta(groupID, metainfo.PosMeta)
-	if err != nil {
-		return err
-	}
-	posValue := posCidPrefix
-	log.Println("posKM :", posKM.ToString(), "\nposValue :", posValue)
-	err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
-	if err != nil {
-		log.Println("CmdPutTo posKM error :", err)
-		return err
+
+	if pids.Len() > 0 {
+		err = p.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), "local")
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
