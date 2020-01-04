@@ -213,12 +213,12 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	for _, kinfo := range g.keepers {
-		res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, kinfo.keeperID)
+		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, kinfo.keeperID)
 		if err != nil {
 			log.Println("Send keeper", kinfo.keeperID, " err:", err)
 			continue
 		}
-		uuidtmp, err := uuid.FromBytes(res)
+		uuidtmp, err := uuid.FromBytes(resp)
 		if err != nil {
 			continue
 		}
@@ -226,12 +226,12 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	for _, pinfo := range g.providers {
-		res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, pinfo.providerID)
+		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, pinfo.providerID)
 		if err != nil {
 			log.Println("Send provider", pinfo.providerID, " err:", err)
 		}
 
-		uuidtmp, err := uuid.FromBytes(res)
+		uuidtmp, err := uuid.FromBytes(resp)
 		if err != nil {
 			continue
 		}

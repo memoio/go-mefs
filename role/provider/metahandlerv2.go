@@ -22,7 +22,7 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue []byte, f
 	switch dtype {
 	case metainfo.UserStart:
 		log.Println("handle user start: ", metaKey)
-		return p.handleUserStart(km, metaKey, from)
+		return p.handleUserStart(km, metaValue, from)
 	case metainfo.Challenge:
 		log.Println("handle challenge: ", metaKey)
 		go p.handleChallengeBls12(km, metaValue, from)
@@ -63,7 +63,7 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue []byte, f
 	return []byte(instance.MetaHandlerComplete), nil
 }
 
-func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, from string) ([]byte, error) {
+func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
 	gid := km.GetMid()
 	ops := km.GetOptions()
 	if len(ops) != 3 {
