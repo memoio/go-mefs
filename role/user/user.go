@@ -89,6 +89,12 @@ func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64
 			ginfo.queryItem = &qItem
 		}
 		ginfo.groupID = queryID
+		uItem, err := role.GetUpKeeping(ginfo.userID, ginfo.groupID)
+		if err != nil {
+			log.Println("get upkeeping fails")
+		} else {
+			ginfo.upKeepingItem = &uItem
+		}
 	} else {
 		ginfo.groupID = userID
 	}
@@ -102,13 +108,6 @@ func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64
 		}
 		uq.setQuery(queryID)
 		u.qMap.Store(userID, uq)
-	}
-
-	uItem, err := role.GetUpKeeping(ginfo.userID, ginfo.groupID)
-	if err != nil {
-		log.Println("get upkeeping fails")
-	} else {
-		ginfo.upKeepingItem = &uItem
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

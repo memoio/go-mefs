@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"math/big"
 
@@ -16,13 +15,13 @@ import (
 func GetKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
 	keeperContractAddr, _, err := GetResolverFromIndexer(localAddress, "keeper")
 	if err != nil {
-		fmt.Println("get keeper Contract Err:", err)
+		log.Println("get keeper Contract Err:", err)
 		return keeperContract, err
 	}
 
 	keeperContract, err = role.NewKeeper(keeperContractAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newKeeperErr:", err)
+		log.Println("newKeeperErr:", err)
 		return keeperContract, err
 	}
 	return keeperContract, nil
@@ -32,14 +31,14 @@ func GetKeeperContractFromIndexer(localAddress common.Address) (keeperContract *
 func IsKeeper(localAddress common.Address) (bool, error) {
 	keeperContract, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("keeperContracterr:", err)
+		log.Println("keeperContracterr:", err)
 		return false, err
 	}
 	isKeeper, err := keeperContract.IsKeeper(&bind.CallOpts{
 		From: localAddress,
 	}, localAddress)
 	if err != nil {
-		fmt.Println("isKeepererr:", err)
+		log.Println("isKeepererr:", err)
 		return false, err
 	}
 	return isKeeper, nil
@@ -48,13 +47,13 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 func GetProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
 	providerContractAddr, _, err := GetResolverFromIndexer(localAddress, "provider")
 	if err != nil {
-		fmt.Println("get provider Contract Err:", err)
+		log.Println("get provider Contract Err:", err)
 		return providerContract, err
 	}
 
 	providerContract, err = role.NewProvider(providerContractAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return providerContract, err
 	}
 	return providerContract, nil
@@ -64,14 +63,14 @@ func GetProviderContractFromIndexer(localAddress common.Address) (providerContra
 func IsProvider(localaddress common.Address) (bool, error) {
 	providerContract, err := GetProviderContractFromIndexer(localaddress)
 	if err != nil {
-		fmt.Println("providerContracterr:", err)
+		log.Println("providerContracterr:", err)
 		return false, err
 	}
 	isProvider, err := providerContract.IsProvider(&bind.CallOpts{
 		From: localaddress,
 	}, localaddress)
 	if err != nil {
-		fmt.Println("isKeepererr:", err)
+		log.Println("isKeepererr:", err)
 		return false, err
 	}
 	return isProvider, nil
@@ -88,7 +87,7 @@ func KeeperContract(hexKey string) (err error) {
 	deposit := big.NewInt(0)
 	keeperContractAddr, _, _, err := role.DeployKeeper(auth, client, deposit)
 	if err != nil {
-		fmt.Println("deployKeeperErr:", err)
+		log.Println("deployKeeperErr:", err)
 		return err
 	}
 	log.Println("keeperContractAddr:", keeperContractAddr.String())
@@ -96,7 +95,7 @@ func KeeperContract(hexKey string) (err error) {
 	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
+		log.Println("newIndexerErr:", err)
 		return err
 	}
 
@@ -108,7 +107,7 @@ func KeeperContract(hexKey string) (err error) {
 func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err error) {
 	keeper, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("keeperContracterr:", err)
+		log.Println("keeperContracterr:", err)
 		return err
 	}
 
@@ -135,7 +134,7 @@ func ProviderContract(hexKey string) (err error) {
 	deposit := big.NewInt(0)
 	providerContractAddr, _, _, err := role.DeployProvider(auth, client, size, deposit)
 	if err != nil {
-		fmt.Println("deployProviderErr:", err)
+		log.Println("deployProviderErr:", err)
 		return err
 	}
 	log.Println("providerContractAddr:", providerContractAddr.String())
@@ -143,7 +142,7 @@ func ProviderContract(hexKey string) (err error) {
 	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
+		log.Println("newIndexerErr:", err)
 		return err
 	}
 
@@ -170,7 +169,7 @@ func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (e
 
 //DeployKeeperProviderMap deploy KeeperProviderMap-contract
 func DeployKeeperProviderMap(hexKey string) error {
-	fmt.Println("begin deploy keeperProviderMap...")
+	log.Println("begin deploy keeperProviderMap...")
 
 	//之前没有部署过，部署keeperProviderMap合约
 	key, _ := crypto.HexToECDSA(hexKey)
@@ -180,20 +179,20 @@ func DeployKeeperProviderMap(hexKey string) error {
 
 	keeperProviderMapAddr, _, _, err := role.DeployKeeperProviderMap(auth, client)
 	if err != nil {
-		fmt.Println("deployKeeperProviderMapErr:", err)
+		log.Println("deployKeeperProviderMapErr:", err)
 		return err
 	}
 
 	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
+		log.Println("newIndexerErr:", err)
 		return err
 	}
 
 	indexer.Add(auth, "keeperProviderMap", keeperProviderMapAddr)
 
-	fmt.Println("keeperProviderMap-contract have been successfully deployed!")
+	log.Println("keeperProviderMap-contract have been successfully deployed!")
 	return nil
 }
 
@@ -203,7 +202,7 @@ func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role
 	indexerAddr := common.HexToAddress(indexerHex)
 	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newIndexerErr:", err)
+		log.Println("newIndexerErr:", err)
 		return keeperProviderInstance, err
 	}
 
@@ -211,13 +210,13 @@ func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role
 		From: localAddress,
 	}, "keeperProviderMap")
 	if err != nil {
-		fmt.Println("getkeeperproviderMapContractErr:", err)
+		log.Println("getkeeperproviderMapContractErr:", err)
 		return keeperProviderInstance, err
 	}
 
 	keeperProviderInstance, err = role.NewKeeperProviderMap(keeperproviderMapContractAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newKeeperProviderMapContractErr:", err)
+		log.Println("newKeeperProviderMapContractErr:", err)
 		return keeperProviderInstance, err
 	}
 	return keeperProviderInstance, nil
@@ -227,27 +226,27 @@ func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role
 func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
 	res, err := IsKeeper(keeperAddress)
 	if err != nil || res == false {
-		fmt.Println(keeperAddress.String(), "is not a keeper")
+		log.Println(keeperAddress.String(), "is not a keeper")
 		return errors.New("addr is not a keeper")
 	}
 
 	for _, proAddresses := range providerAddresses {
 		res, err = IsProvider(proAddresses)
 		if err != nil || res == false {
-			fmt.Println(proAddresses.String(), "is not a provider")
+			log.Println(proAddresses.String(), "is not a provider")
 			return errors.New("addr is not a provider")
 		}
 	}
 
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
 	}
 
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return err
 	}
 	auth := bind.NewKeyedTransactor(key)
@@ -255,7 +254,7 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 
 	_, err = keeperProviderMapInstance.Add(auth, keeperAddress, providerAddresses)
 	if err != nil {
-		fmt.Println("addKeeperProviderTokpMapErr:", err)
+		log.Println("addKeeperProviderTokpMapErr:", err)
 		return err
 	}
 	return nil
@@ -265,13 +264,13 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address) error {
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
 	}
 
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return err
 	}
 	auth := bind.NewKeyedTransactor(key)
@@ -279,7 +278,7 @@ func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAdd
 
 	_, err = keeperProviderMapInstance.DelKeeper(auth, keeperAddress)
 	if err != nil {
-		fmt.Println("deleteKeeperInkpMapErr:", err)
+		log.Println("deleteKeeperInkpMapErr:", err)
 		return err
 	}
 	return nil
@@ -289,13 +288,13 @@ func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAdd
 func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
 	}
 
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return err
 	}
 	auth := bind.NewKeyedTransactor(key)
@@ -303,7 +302,7 @@ func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperA
 
 	_, err = keeperProviderMapInstance.DelProvider(auth, keeperAddress, providerAddress)
 	if err != nil {
-		fmt.Println("deleteProviderInkpMapErr:", err)
+		log.Println("deleteProviderInkpMapErr:", err)
 		return err
 	}
 	return nil
@@ -315,7 +314,7 @@ func GetAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) 
 
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return nil, err
 	}
 
@@ -323,7 +322,7 @@ func GetAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) 
 		From: localAddress,
 	})
 	if err != nil {
-		fmt.Println("getKeeperInkpMapErr:", err)
+		log.Println("getKeeperInkpMapErr:", err)
 		return nil, err
 	}
 	return keeperAddresses, nil
@@ -335,7 +334,7 @@ func GetProviderInKPMap(localAddress common.Address, keeperAddress common.Addres
 
 	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
 	if err != nil {
-		fmt.Println("getKeeperProviderMapInstanceErr:", err)
+		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return nil, err
 	}
 
@@ -343,7 +342,7 @@ func GetProviderInKPMap(localAddress common.Address, keeperAddress common.Addres
 		From: localAddress,
 	}, keeperAddress)
 	if err != nil {
-		fmt.Println("getProviderInkpMapErr:", err)
+		log.Println("getProviderInkpMapErr:", err)
 		return nil, err
 	}
 	return providerAddresses, nil

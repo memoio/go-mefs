@@ -398,6 +398,7 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 
 		err = l.ds.PutBlock(ctx, updateKey, dataEncoded[j], providers[j])
 		if err != nil {
+			log.Println("Put block to: ", providers[j], " err: ", err)
 			return err
 		}
 		err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))

@@ -11,11 +11,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/role"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -418,22 +417,20 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 		return nil, nil, err
 	}
 
-	var channelAddr common.Address
+	var channelID string
 
 	pinfo, ok := ds.group.providers[provider]
 	if !ok {
 		return nil, nil, errors.New("No provider")
 	}
 	if pinfo.chanItem != nil {
-		channelAddr, _ = address.GetAddressFromID(pinfo.chanItem.ChannelID)
-		// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
 		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 	moneyByte := money.Bytes()
 
 	//签名
-	sig, err := contracts.SignForChannel(channelAddr, money, hexSK)
+	sig, err := role.SignForChannel(channelID, hexSK, money)
 	if err != nil {
 		log.Printf("signature about Block %s from %s failed.\n", ncid, provider)
 		return nil, nil, err

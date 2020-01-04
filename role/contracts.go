@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"
@@ -748,6 +749,49 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 	}
 
 	return item, nil
+}
+
+//SignForChannel user sends a private key signature to the provider
+func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err error) {
+	channelAddr, err := address.GetAddressFromID(channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	//(channelAddress, value)的哈希值
+	valueNew := common.LeftPadBytes(value.Bytes(), 32)
+	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew) //32Byte
+
+	//私钥格式转换
+	skECDSA, err := utils.HexskToECDSAsk(hexKey)
+	if err != nil {
+		log.Println("HexskToECDSAskErr:", err)
+		return sig, err
+	}
+
+	//私钥对上述哈希值签名
+	sig, err = crypto.Sign(hash, skECDSA)
+	if err != nil {
+		log.Println("signForChannelErr:", err)
+		return sig, err
+	}
+	return sig, nil
+}
+
+//VerifySig provider used to verify user's signature for channel-contract
+func VerifySig(channelID string, value *big.Int, sig, userPubKey []byte) (verify bool, err error) {
+	channelAddr, err := address.GetAddressFromID(channelID)
+	if err != nil {
+		return false, err
+	}
+
+	//(channelAddress, value)的哈希值
+	valueNew := common.LeftPadBytes(value.Bytes(), 32)
+	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew)
+
+	//验证签名
+	verify = crypto.VerifySignature(userPubKey, hash, sig[:64])
+	return verify, nil
 }
 
 // GetKeepersOfPro get keepers of some provider

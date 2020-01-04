@@ -8,11 +8,10 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	pb "github.com/memoio/go-mefs/role/user/pb"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
@@ -136,11 +135,6 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 		return false, nil, nil, err
 	}
 
-	channelAddr, err := address.GetAddressFromID(chanID)
-	if err != nil {
-		return false, nil, nil, err
-	}
-
 	//解析传过来的参数
 	var money = new(big.Int)
 	money = money.SetBytes(signForChannel.GetMoney())
@@ -161,7 +155,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 	}
 
 	//判断签名是否正确
-	res, err := contracts.VerifySig(signForChannel.GetUserPK(), sig, channelAddr, money)
+	res, err := role.VerifySig(chanID, money, sig, signForChannel.GetUserPK())
 	if err != nil {
 		return false, nil, nil, err
 	}

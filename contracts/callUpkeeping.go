@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -15,19 +14,19 @@ import (
 
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
 func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
-	fmt.Println("begin deploy upKeeping...")
+	log.Println("begin deploy upKeeping...")
 
 	var ukAddr common.Address
 
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return ukAddr, err
 	}
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return ukAddr, err
 	}
 
@@ -57,7 +56,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, userAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price))
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("deploy Uk Err:", err)
+				log.Println("deploy Uk Err:", err)
 				return ukAddr, err
 			}
 			time.Sleep(time.Minute)
@@ -79,10 +78,10 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	//uk放进mapper
 	err = addToMapper(userAddress, mapperInstance, ukAddr, hexKey)
 	if err != nil {
-		fmt.Println("add uk Err:", err)
+		log.Println("add uk Err:", err)
 		return ukAddr, err
 	}
-	fmt.Println("upKeeping-contract have been successfully deployed!")
+	log.Println("upKeeping-contract have been successfully deployed!")
 	return ukAddr, nil
 }
 
@@ -91,7 +90,7 @@ func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return nil, err
 	}
 
@@ -109,7 +108,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return ukaddr, uk, err
 	}
 
@@ -130,7 +129,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 		ukaddr = uks[len(uks)-1]
 		uk, err := upKeeping.NewUpKeeping(ukaddr, client)
 		if err != nil {
-			fmt.Println("newUkErr:", err)
+			log.Println("newUkErr:", err)
 			return ukaddr, uk, err
 		}
 		return ukaddr, uk, nil
@@ -142,7 +141,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 		for {
 			retryCount++
 			if retryCount > 10 {
-				fmt.Println("GetUpkeepingInfo:", err)
+				log.Println("GetUpkeepingInfo:", err)
 				break
 			}
 
@@ -172,7 +171,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, money *big.Int) error {
 	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newUkErr:", err)
+		log.Println("newUkErr:", err)
 		return err
 	}
 
@@ -187,7 +186,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, money *big
 		_, err := uk.SpaceTimePay(auth, providerAddr, money)
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("spaceTimePayErr:", err)
+				log.Println("spaceTimePayErr:", err)
 				return err
 			}
 			time.Sleep(time.Minute)

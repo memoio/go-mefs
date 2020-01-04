@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -14,14 +13,14 @@ import (
 
 //DeployQuery user use it to deploy query-contract
 func DeployQuery(userAddress common.Address, hexKey string, capacity int64, duration int64, price int64, ks int, ps int, redo bool) (common.Address, error) {
-	fmt.Println("begin to deploy query-contract...")
+	log.Println("begin to deploy query-contract...")
 
 	var queryAddr common.Address
 
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return queryAddr, err
 	}
 
@@ -53,7 +52,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("deployQueryErr:", err)
+				log.Println("deployQueryErr:", err)
 				return queryAddr, err
 			}
 			time.Sleep(time.Minute)
@@ -78,7 +77,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 		return queryAddr, err
 	}
 
-	fmt.Println("query-contract have been successfully deployed!")
+	log.Println("query-contract have been successfully deployed!")
 	return queryAddr, nil
 }
 
@@ -87,7 +86,7 @@ func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return nil, err
 	}
 
@@ -105,7 +104,7 @@ func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return queryAddr, queryInstance, err
 	}
 
@@ -124,7 +123,7 @@ func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.
 
 	queryInstance, err = market.NewQuery(queryAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newQueryErr:", err)
+		log.Println("newQueryErr:", err)
 		return queryAddr, queryInstance, err
 	}
 
@@ -135,12 +134,12 @@ func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.
 func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 	query, err := market.NewQuery(queryAddress, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newQueryErr:", err)
+		log.Println("newQueryErr:", err)
 		return err
 	}
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return err
 	}
 	retryCount := 0
@@ -151,7 +150,7 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 		_, err = query.SetCompleted(auth)
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("set query Completed Err:", err)
+				log.Println("set query Completed Err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
@@ -165,13 +164,13 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 
 //DeployOffer provider use it to deploy offer-contract
 func DeployOffer(localAddress common.Address, hexKey string, capacity int64, duration int64, price int64, redo bool) (common.Address, error) {
-	fmt.Println("begin to deploy offer-contract...")
+	log.Println("begin to deploy offer-contract...")
 	var offerAddr common.Address
 
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, localAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return offerAddr, err
 	}
 
@@ -191,7 +190,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 	//部署mapper，如果部署过就直接返回
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
+		log.Println("HexToECDSAErr:", err)
 		return offerAddr, err
 	}
 
@@ -204,7 +203,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(duration), big.NewInt(price)) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("deploy Offer Err:", err)
+				log.Println("deploy Offer Err:", err)
 				return offerAddr, err
 			}
 			time.Sleep(time.Minute)
@@ -230,7 +229,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 		return offerAddr, err
 	}
 
-	fmt.Println("offer-contract have been successfully deployed!")
+	log.Println("offer-contract have been successfully deployed!")
 	return offerAddr, nil
 }
 
@@ -239,7 +238,7 @@ func GetOfferAddrs(localAddress, ownerAddress common.Address) ([]common.Address,
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, ownerAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return nil, err
 	}
 
@@ -257,7 +256,7 @@ func GetLatestOffer(localAddress, userAddress common.Address) (offerAddr common.
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return offerAddr, offerInstance, err
 	}
 
@@ -276,7 +275,7 @@ func GetLatestOffer(localAddress, userAddress common.Address) (offerAddr common.
 
 	offerInstance, err = market.NewOffer(offerAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newQueryErr:", err)
+		log.Println("newQueryErr:", err)
 		return offerAddr, offerInstance, err
 	}
 

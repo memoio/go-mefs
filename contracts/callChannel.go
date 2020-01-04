@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/channel"
-	"github.com/memoio/go-mefs/utils"
 )
 
 //DeployChannelContract deploy channel-contract, timeOut's unit is second
@@ -22,7 +20,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return channelAddr, err
 	}
 
@@ -55,7 +53,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		cAddr, tx, _, err := channel.DeployChannel(auth, client, providerAddress, timeOut)
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("deploy Channel Err:", err)
+				log.Println("deploy Channel Err:", err)
 				return channelAddr, err
 			}
 			time.Sleep(time.Minute)
@@ -81,7 +79,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		return channelAddr, nil
 	}
 
-	fmt.Println("channel-contract with", providerAddress.String(), "have been successfully deployed!")
+	log.Println("channel-contract with", providerAddress.String(), "have been successfully deployed!")
 	return channelAddr, nil
 }
 
@@ -90,7 +88,7 @@ func GetChannelAddrs(localAddress, userAddress, providerAddress, queryAddress co
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return nil, err
 	}
 
@@ -110,7 +108,7 @@ func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress c
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
+		log.Println("GetResolverErr:", err)
 		return channelAddr, nil, err
 	}
 
@@ -127,7 +125,7 @@ func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress c
 
 	channelInstance, err := channel.NewChannel(channelAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("getChannelsErr:", err)
+		log.Println("getChannelsErr:", err)
 		return channelAddr, nil, err
 	}
 	return channelAddr, channelInstance, nil
@@ -145,11 +143,11 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	_, err = channelInstance.ChannelTimeout(auth)
 	if err != nil {
-		fmt.Println("channelTimeOutErr:", err)
+		log.Println("channelTimeOutErr:", err)
 		return err
 	}
 
-	fmt.Println("you have called ChannelTimeout successfully!")
+	log.Println("you have called ChannelTimeout successfully!")
 	return nil
 }
 
@@ -172,43 +170,10 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 	auth.GasLimit = 8000000
 	_, err = channelInstance.CloseChannel(auth, hashNew, value, sig)
 	if err != nil {
-		fmt.Println("closeChannelErr:", err)
+		log.Println("closeChannelErr:", err)
 		return err
 	}
 
-	fmt.Println("you have called CloseChannel successfully!")
+	log.Println("you have called CloseChannel successfully!")
 	return nil
-}
-
-//SignForChannel user sends a private key signature to the provider
-func SignForChannel(channelAddr common.Address, value *big.Int, hexKey string) (sig []byte, err error) {
-	//(channelAddress, value)的哈希值
-	valueNew := common.LeftPadBytes(value.Bytes(), 32)
-	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew) //32Byte
-
-	//私钥格式转换
-	skECDSA, err := utils.HexskToECDSAsk(hexKey)
-	if err != nil {
-		fmt.Println("HexskToECDSAskErr:", err)
-		return sig, err
-	}
-
-	//私钥对上述哈希值签名
-	sig, err = crypto.Sign(hash, skECDSA)
-	if err != nil {
-		fmt.Println("signForChannelErr:", err)
-		return sig, err
-	}
-	return sig, nil
-}
-
-//VerifySig provider used to verify user's signature for channel-contract
-func VerifySig(userPubKey, sig []byte, channelAddr common.Address, value *big.Int) (verify bool, err error) {
-	//(channelAddress, value)的哈希值
-	valueNew := common.LeftPadBytes(value.Bytes(), 32)
-	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew)
-
-	//验证签名
-	verify = crypto.VerifySignature(userPubKey, hash, sig[:64])
-	return verify, nil
 }

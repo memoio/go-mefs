@@ -3,7 +3,6 @@ package contracts
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -63,7 +62,7 @@ func init() {
 func GetClient(endPoint string) *ethclient.Client {
 	client, err := rpc.Dial(endPoint)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	return ethclient.NewClient(client)
 }
@@ -73,12 +72,12 @@ func QueryBalance(account string) (balance *big.Int, err error) {
 	var result string
 	client, err := rpc.Dial(EndPoint)
 	if err != nil {
-		fmt.Println("rpc.dial err:", err)
+		log.Println("rpc.dial err:", err)
 		return balance, err
 	}
 	err = client.Call(&result, "eth_getBalance", account, "latest")
 	if err != nil {
-		fmt.Println("client.call err:", err)
+		log.Println("client.call err:", err)
 		return balance, err
 	}
 	balance = utils.HexToBigInt(result)
@@ -106,7 +105,7 @@ func DeployAdminIndexer(hexKey string) (common.Address, *indexer.Indexer, error)
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("deploy Indexer Err:", err)
+				log.Println("deploy Indexer Err:", err)
 				return indexerAddr, indexerInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -156,7 +155,7 @@ func DeployRoleIndexer(localAddress, userAddress common.Address, hexKey string) 
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("deploy Indexer Err:", err)
+				log.Println("deploy Indexer Err:", err)
 				return indexerAddr, indexerInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -186,7 +185,7 @@ func DeployRoleIndexer(localAddress, userAddress common.Address, hexKey string) 
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
+				log.Println("\naddResolverErr:", err)
 				return indexerAddr, indexerInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -212,7 +211,7 @@ func DeployRoleIndexer(localAddress, userAddress common.Address, hexKey string) 
 			}, key)
 			if err != nil {
 				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
+					log.Println("add then get Resolver Err:", err)
 					return indexerAddr, indexerInstance, err
 				}
 				continue
@@ -331,7 +330,7 @@ func DeployResolver(localAddress common.Address, hexKey, key string) (common.Add
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("deploy Resolver Err:", err)
+				log.Println("deploy Resolver Err:", err)
 				return resolverAddr, resolverInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -350,7 +349,7 @@ func DeployResolver(localAddress common.Address, hexKey, key string) (common.Add
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
+				log.Println("\naddResolverErr:", err)
 				return resolverAddr, resolverInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -376,7 +375,7 @@ func DeployResolver(localAddress common.Address, hexKey, key string) (common.Add
 			}, key)
 			if err != nil {
 				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
+					log.Println("add then get Resolver Err:", err)
 					return resolverAddr, resolverInstance, err
 				}
 				continue
@@ -399,7 +398,7 @@ func getResolverFromResolver(localAddress, ownerAddress common.Address, resolver
 		}, ownerAddress)
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("get resolve Addr err: ", err)
+				log.Println("get resolve Addr err: ", err)
 				return resolverAddr, nil, err
 			}
 			time.Sleep(30 * time.Second)
@@ -438,7 +437,7 @@ func deployResolverToResolver(localAddress common.Address, resolverInstance *res
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("deploy Resolver Err:", err)
+				log.Println("deploy Resolver Err:", err)
 				return resolverAddr, secondInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -457,7 +456,7 @@ func deployResolverToResolver(localAddress common.Address, resolverInstance *res
 		if err != nil {
 			retryCount++
 			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
+				log.Println("\naddResolverErr:", err)
 				return resolverAddr, secondInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -483,7 +482,7 @@ func deployResolverToResolver(localAddress common.Address, resolverInstance *res
 			}, localAddress)
 			if err != nil {
 				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
+					log.Println("add then get Resolver Err:", err)
 					return resolverAddr, secondInstance, err
 				}
 				continue
@@ -506,7 +505,7 @@ func GetMapperAddrFromResolver(localAddress common.Address, ownerAddress common.
 		}, ownerAddress)
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("getMapperAddrErr:", err)
+				log.Println("getMapperAddrErr:", err)
 				return mapperAddr, err
 			}
 			time.Sleep(30 * time.Second)
@@ -530,7 +529,7 @@ func getMapperFromResolver(localAddress common.Address, ownerAddress common.Addr
 
 	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newMapperErr:", err)
+		log.Println("newMapperErr:", err)
 		return mapperAddr, nil, err
 	}
 	return mapperAddr, mapperInstance, nil
@@ -558,7 +557,7 @@ func DeployMapperToResolver(localAddress common.Address, ownerAddress common.Add
 		mAddr, tx, mInstance, err := mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("deployMapperErr:", err)
+				log.Println("deployMapperErr:", err)
 				return mapperAddr, mapperInstance, err
 			}
 			retryCount++
@@ -637,7 +636,7 @@ func GetMapperAddrFromIndexer(localAddress common.Address, key string, indexerIn
 		}, key)
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("getMapperAddrErr:", err)
+				log.Println("getMapperAddrErr:", err)
 				return mapperAddr, err
 			}
 			time.Sleep(30 * time.Second)
@@ -661,7 +660,7 @@ func getMapperFromIndexer(localAddress common.Address, key string, indexerInstan
 
 	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newMapperErr:", err)
+		log.Println("newMapperErr:", err)
 		return mapperAddr, nil, err
 	}
 	return mapperAddr, mapperInstance, nil
@@ -689,7 +688,7 @@ func DeployMapperToIndexer(localAddress common.Address, key, hexKey string, inde
 		mapperAddr, _, mapperInstance, err = mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("deployMapperErr:", err)
+				log.Println("deployMapperErr:", err)
 				return mapperAddr, mapperInstance, err
 			}
 			retryCount++
@@ -758,7 +757,7 @@ func addToMapper(localAddress common.Address, mapperInstance *mapper.Mapper, add
 		tx, err := mapperInstance.Add(auth, addr)
 		if err != nil {
 			if retryCount > 10 {
-				fmt.Println("add addr to Mapper Err:", err)
+				log.Println("add addr to Mapper Err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
@@ -783,7 +782,7 @@ func addToMapper(localAddress common.Address, mapperInstance *mapper.Mapper, add
 			})
 			if err != nil {
 				if retryCount > 20 {
-					fmt.Println("get addr from Mapper Err:", err)
+					log.Println("get addr from Mapper Err:", err)
 					return err
 				}
 				continue
@@ -811,7 +810,7 @@ func getAllFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper
 		})
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("get addr from mapper:", err)
+				log.Println("get addr from mapper:", err)
 				return addr, err
 			}
 			time.Sleep(30 * time.Second)
@@ -842,7 +841,7 @@ func CheckTx(tx *types.Transaction) error {
 		receipt = GetTransactionReceipt(tx.Hash())
 		if receipt != nil {
 			TxReceipt, _ := receipt.MarshalJSON()
-			fmt.Println("TxReceipt:", string(TxReceipt))
+			log.Println("TxReceipt:", string(TxReceipt))
 			break
 		}
 		time.Sleep(30 * time.Second)
@@ -857,11 +856,11 @@ func CheckTx(tx *types.Transaction) error {
 		return nil
 	}
 	topics := receipt.Logs[0].Topics[0].Hex()
-	fmt.Println("topics:", topics)
+	log.Println("topics:", topics)
 
 	if topics == "0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa" {
 		str := string(receipt.Logs[0].Data)
-		fmt.Println(str)
+		log.Println(str)
 		return errors.New(str)
 	}
 	return nil
