@@ -61,7 +61,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 
 	ctx := context.Background()
 	go func() {
-		err := p.ds.AppendBlock(ctx, splitedNcid[0], value, "local")
+		err := p.ds.AppendBlock(ctx, km.ToString(),, value, "local")
 		if err != nil {
 			log.Printf("Error append field to block %s: %s", km.ToString(), err)
 			return

@@ -419,9 +419,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
-		g.Lock()
 		count := 0
-		g.Unlock()
 		for _, kid := range keepers { //循环发消息
 			wg.Add(1)
 			log.Println("Notify keeper:", kid)
@@ -464,6 +462,9 @@ func (g *groupInfo) notify(ctx context.Context) {
 }
 
 func (g *groupInfo) deployContract(ctx context.Context) error {
+	g.Lock()
+	defer g.Unlock()
+
 	if g.state != deploying {
 		return errors.New("State is wrong")
 	}
