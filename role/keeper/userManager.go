@@ -170,15 +170,12 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 		return err
 	}
 
-	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
-
-	thisIBucket, ok := g.buckets.Load(bucketID)
-	if !ok {
+	thisBucket := g.getBucketInfo(bucketID, true)
+	if thisBucket == nil {
 		return errors.New("cannot create bucket info")
 	}
 
-	thisBucket := thisIBucket.(*bucketInfo)
-
+	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
 	// key: stripeID_chunkID
 	thisBucket.stripes.Store(bids[1], newcidinfo)
 
