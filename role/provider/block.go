@@ -84,27 +84,22 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 		return nil, errors.New("NotMyUser")
 	}
 
-	chanID := gp.userID
-	value := big.NewInt(0)
-
 	if gp.userID != gp.groupID && gp.channel != nil {
-		chanID = gp.channel.ChannelID
-		value = gp.channel.Value
-	}
+		chanID := gp.channel.ChannelID
+		value := gp.channel.Value
 
-	res, value, sig, err := p.verify(chanID, value, sig)
-	if err != nil {
-		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
-		return nil, err
-	}
-
-	if res {
-		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
+		res, value, sig, err := p.verify(chanID, value, sig)
 		if err != nil {
-			return nil, errors.New("Block is not found")
+			log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
+			return nil, err
 		}
 
-		if gp.userID != gp.groupID && gp.channel != nil {
+		if res {
+			b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
+			if err != nil {
+				return nil, errors.New("Block is not found")
+			}
+
 			key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
 			if err != nil {
 				return nil, err
@@ -117,13 +112,19 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 			gp.channel.Value = value
 			gp.channel.Sig = sig
+
+			return b.RawData(), nil
+		}
+
+		log.Printf("verify is false %s", splitedNcid[0])
+	} else {
+		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
+		if err != nil {
+			return nil, errors.New("Block is not found")
 		}
 
 		return b.RawData(), nil
 	}
-
-	log.Printf("verify is false %s", splitedNcid[0])
-
 	return nil, errors.New("Signature is wrong")
 }
 
