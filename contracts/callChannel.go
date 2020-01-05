@@ -20,8 +20,15 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return channelAddr, err
+		log.Println("Get Role Indecer Err:", err)
+	}
+
+	if err == ErrNotDeployedIndexer {
+		_, indexerInstance, err = DeployRoleIndexer(userAddress, userAddress, hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return channelAddr, err
+		}
 	}
 
 	key := queryAddress.String() + "channel" + providerAddress.String()

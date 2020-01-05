@@ -21,13 +21,15 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return ukAddr, err
+		log.Println("Get Role Indecer Err:", err)
 	}
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return ukAddr, err
+
+	if err == ErrNotDeployedIndexer {
+		_, indexerInstance, err = DeployRoleIndexer(userAddress, userAddress, hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return ukAddr, err
+		}
 	}
 
 	//获得mapper, key is upkeeping
@@ -41,6 +43,12 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 		if err == nil {
 			return ukAddr, nil
 		}
+	}
+
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSAErr:", err)
+		return ukAddr, err
 	}
 
 	// 部署UpKeeping

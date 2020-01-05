@@ -20,8 +20,15 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
 	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return queryAddr, err
+		log.Println("Get Role Indecer Err:", err)
+	}
+
+	if err == ErrNotDeployedIndexer {
+		_, indexerInstance, err = DeployRoleIndexer(userAddress, userAddress, hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return queryAddr, err
+		}
 	}
 
 	//获得mapper, key is query
@@ -170,8 +177,15 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 	//获得userIndexer, key is userAddr
 	_, indexerInstance, err := GetRoleIndexer(localAddress, localAddress)
 	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return offerAddr, err
+		log.Println("Get Role Indecer Err:", err)
+	}
+
+	if err == ErrNotDeployedIndexer {
+		_, indexerInstance, err = DeployRoleIndexer(localAddress, localAddress, hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return offerAddr, err
+		}
 	}
 
 	//获得mapper, key is query

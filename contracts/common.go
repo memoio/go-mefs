@@ -256,6 +256,7 @@ func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *
 		if len(indexerAddr) == 0 || indexerAddr.String() == InvalidAddr {
 			return indexerAddr, indexerInstance, ErrNotDeployedIndexer
 		}
+
 		indexerInstance, err = indexer.NewIndexer(indexerAddr, client)
 		if err != nil {
 			return indexerAddr, indexerInstance, err
