@@ -134,32 +134,9 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 	// hash security
 	bs := bstore.NewBlockstore(rds)
 
-	opts := bstore.DefaultCacheOpts()
-
-	rcfg, err := n.Repo.Config()
-	if err != nil {
-		return err
-	}
-
-	opts.HasBloomFilterSize = rcfg.Datastore.BloomFilterSize
-	if !cfg.Permanent {
-		opts.HasBloomFilterSize = 0
-	}
-
-	if !cfg.NilRepo {
-		bs, err = bstore.CachedBlockstore(ctx, bs, opts)
-		if err != nil {
-			return err
-		}
-	}
-
-	bs = bstore.NewIdStore(bs)
+	bs.HashOnRead(false)
 
 	n.Blockstore = bs
-
-	if rcfg.Datastore.HashOnRead {
-		bs.HashOnRead(true)
-	}
 
 	hostOption := cfg.Host
 	if cfg.DisableEncryptedConnections {
@@ -169,6 +146,11 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 		}
 		log.Warningf(`Your MEFS node has been configured to run WITHOUT ENCRYPTED CONNECTIONS.
 		You will not be able to connect to any nodes configured to use encrypted connections`)
+	}
+
+	rcfg, err := n.Repo.Config()
+	if err != nil {
+		return err
 	}
 
 	if cfg.Online {

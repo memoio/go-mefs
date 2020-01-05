@@ -66,10 +66,20 @@ func (d *Datastore) Put(k ds.Key, val []byte) error {
 
 // Append appends block
 func (d *Datastore) Append(k ds.Key, val []byte, beginoffset, endoffset int) error {
-	d.buffer[k] = val
-	if len(d.buffer) > d.maxBufferEntries {
-		return d.AFlush()
+	d.Flush()
+
+	b, err := d.child.Batch()
+	if err != nil {
+		return err
 	}
+
+	err = b.Append(k, val, beginoffset, endoffset)
+	if err != nil {
+		return err
+	}
+
+	b.Commit()
+
 	return nil
 }
 
@@ -89,23 +99,6 @@ func (d *Datastore) Flush() error {
 	// clear out buffer
 	d.buffer = make(map[ds.Key][]byte)
 
-	return b.Commit()
-}
-
-// AFlush flushes the current batch to the underlying datastore
-func (d *Datastore) AFlush() error {
-	b, err := d.child.Batch()
-	if err != nil {
-		return err
-	}
-
-	for k, v := range d.buffer {
-		err := b.Append(k, v, 0, 0)
-		if err != nil {
-			return err
-		}
-	}
-	d.buffer = make(map[ds.Key][]byte)
 	return b.Commit()
 }
 

@@ -144,19 +144,11 @@ func (b *arccache) Put(bl blocks.Block) error {
 	/*if has, _, ok := b.hasCached(bl.Cid()); ok && has {
 		return nil
 	}*/
-	err := b.blockstore.Put(bl)
-	if err == nil {
-		b.cacheSize(bl.Cid(), len(bl.RawData()))
-	}
-	return err
+	return b.blockstore.Put(bl)
 }
 
 func (b *arccache) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
-	err := b.blockstore.Append(c, field, beginoffset, endoffset)
-	if err == nil {
-		b.cacheSize(c, len(field))
-	}
-	return err
+	return b.blockstore.Append(c, field, beginoffset, endoffset)
 }
 
 func (b *arccache) PutMany(bs []blocks.Block) error {
