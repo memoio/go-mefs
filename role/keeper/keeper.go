@@ -173,7 +173,7 @@ func (k *Info) save(ctx context.Context) error {
 	k.users.Range(func(key, value interface{}) bool {
 		uid := key.(string)
 		pids.WriteString(uid)
-		kmfs, err := metainfo.NewKeyMeta(uid, metainfo.LogFS)
+		kmfs, err := metainfo.NewKeyMeta(uid, metainfo.Query)
 		if err != nil {
 			return true
 		}
@@ -298,7 +298,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 			wg.Add(1)
 			go func(userID string) {
 				defer wg.Done()
-				kmfs, err := metainfo.NewKeyMeta(userID, metainfo.LogFS)
+				kmfs, err := metainfo.NewKeyMeta(userID, metainfo.Query)
 				if err != nil {
 					return
 				}
@@ -315,7 +315,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 					if err != nil {
 						continue
 					}
-					err = k.createGroup(qid, userID, []string{qid}, []string{qid})
+					err = k.createGroup(userID, qid, []string{qid}, []string{qid})
 					if err != nil {
 						continue
 					}
