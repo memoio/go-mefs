@@ -290,11 +290,12 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 // key: queryID/"UserInit"/userID/keepercount/providercount,
 // value: kid1kid2..../pid1pid2
 func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from string) {
+	g.Lock()
+	defer g.Unlock()
+
 	if g.state != collecting {
 		return
 	}
-	g.Lock()
-	defer g.Unlock()
 
 	log.Println("Receive InitResponse，from：", from, ", value is：", string(metaValue))
 	splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
@@ -336,12 +337,13 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 
 // key: queryID/"UserNotify"/userID/kc/pc
 func (g *groupInfo) notify(ctx context.Context) {
-	if g.state != collectDone {
-		return
-	}
-
 	// in case other change temp
 	g.Lock()
+
+	if g.state != collectDone {
+		g.Unlock()
+		return
+	}
 
 	log.Println("Has enough Keeper and Providers, choosing...")
 	keepers := make([]string, 0, g.keeperSLA)

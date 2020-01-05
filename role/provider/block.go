@@ -84,7 +84,15 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 		return nil, errors.New("NotMyUser")
 	}
 
-	res, value, sig, err := p.verify(gp.channel.ChannelID, gp.channel.Value, sig)
+	chanID := gp.userID
+	value := big.NewInt(0)
+
+	if gp.userID != gp.groupID && gp.channel != nil {
+		chanID = gp.channel.ChannelID
+		value = gp.channel.Value
+	}
+
+	res, value, sig, err := p.verify(chanID, value, sig)
 	if err != nil {
 		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
 		return nil, err
@@ -96,18 +104,20 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 			return nil, errors.New("Block is not found")
 		}
 
-		key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
-		if err != nil {
-			return nil, err
-		}
+		if gp.userID != gp.groupID && gp.channel != nil {
+			key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
+			if err != nil {
+				return nil, err
+			}
 
-		err = p.ds.PutKey(context.Background(), key.ToString(), value.Bytes(), "local")
-		if err != nil {
-			log.Println("cmdPutErr:", err)
-		}
+			err = p.ds.PutKey(context.Background(), key.ToString(), value.Bytes(), "local")
+			if err != nil {
+				log.Println("cmdPutErr:", err)
+			}
 
-		gp.channel.Value = value
-		gp.channel.Sig = sig
+			gp.channel.Value = value
+			gp.channel.Sig = sig
+		}
 
 		return b.RawData(), nil
 	}

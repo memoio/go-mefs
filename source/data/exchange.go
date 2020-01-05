@@ -155,14 +155,19 @@ func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 // Getting it from the datastore using the key (hash).
 func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error) {
 	log.Println("get block from:", to)
-
+	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
-		block, err := n.bstore.Get(cid.NewCidV2([]byte(key)))
+		block, err := n.bstore.Get(cid.NewCidV2([]byte(bids[0])))
 		if err == nil {
 			return block, nil
 		}
 
 		return nil, err
+	}
+
+	if len(bids) == 1 {
+		km, _ := metainfo.NewKeyMeta(bids[0], metainfo.Block)
+		key = km.ToString()
 	}
 
 	bdata, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, sig, to)
