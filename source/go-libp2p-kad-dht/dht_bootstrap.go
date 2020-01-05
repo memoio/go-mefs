@@ -18,11 +18,11 @@ var DefaultBootstrapPeers []multiaddr.Multiaddr
 
 func init() {
 	for _, s := range []string{
-		"/ip4/39.100.145.251/tcp/4001/ipfs/8MGRZbvn8caS431icB2P1uT74B3EHh",
-		"/ip4/47.90.212.117/tcp/4001/ipfs/8MKX58Ko5vBeJUkfgpkig53jZzwqoW",
-		"/ip4/39.98.240.7/tcp/4001/ipfs/8MHYzNkm6dF9SWU5u7Py8MJ31vJrzS",
-		"/ip4/39.100.0.162/tcp/4001/ipfs/8MJ5cAWfAP86cHmAcC3dxqzK41dh4a",
-		"/ip4/47.90.252.189/tcp/4001/ipfs/8MH4Woxb2FkM5nFr86dHj21fLgEybi",
+		"/ip4/39.100.145.251/tcp/4001/p2p/8MGRZbvn8caS431icB2P1uT74B3EHh",
+		"/ip4/47.90.212.117/tcp/4001/p2p/8MKX58Ko5vBeJUkfgpkig53jZzwqoW",
+		"/ip4/39.98.240.7/tcp/4001/p2p/8MHYzNkm6dF9SWU5u7Py8MJ31vJrzS",
+		"/ip4/39.100.0.162/tcp/4001/p2p/8MJ5cAWfAP86cHmAcC3dxqzK41dh4a",
+		"/ip4/47.90.252.189/tcp/4001/p2p/8MH4Woxb2FkM5nFr86dHj21fLgEybi",
 	} {
 		ma, err := multiaddr.NewMultiaddr(s)
 		if err != nil {

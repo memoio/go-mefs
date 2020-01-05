@@ -464,11 +464,12 @@ func (l *LfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
 func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	bucket.RLock()
 	defer bucket.RUnlock()
-	MetaBackupCount := l.meta.sb.MetaBackupCount
-	providers, _, err := l.gInfo.GetProviders(int(MetaBackupCount))
-	if err != nil && len(providers) == 0 {
+	MetaBackupCount := int(l.meta.sb.MetaBackupCount)
+	providers, _, err := l.gInfo.GetProviders(MetaBackupCount)
+	if err != nil {
 		return err
 	}
+
 	BucketBuffer := bytes.NewBuffer(nil)
 	BucketDelimitedWriter := ggio.NewDelimitedWriter(BucketBuffer)
 	err = BucketDelimitedWriter.WriteMsg(&bucket.BucketInfo)
@@ -482,11 +483,11 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	}
 	ncidPrefix := bm.ToString(3)
 	BucketBytes := BucketBuffer.Bytes()
-	dataEncoded, offset, err := dataformat.DataEncodeToMul(BucketBytes, ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+	dataEncoded, offset, err := dataformat.DataEncodeToMul(BucketBytes, ncidPrefix, 1, int32(MetaBackupCount-1), dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
 
 	ctx := context.Background()
 
-	for j := 0; j < int(MetaBackupCount); j++ { //
+	for j := 0; j < MetaBackupCount && j < len(providers); j++ { //
 		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
 		if err != nil {
