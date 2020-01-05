@@ -175,7 +175,7 @@ func printSelf(node *core.MefsNode) (interface{}, error) {
 
 	if node.PeerHost != nil {
 		for _, a := range node.PeerHost.Addrs() {
-			s := a.String() + "/ipfs/" + info.NetworkAddr
+			s := a.String() + "/p2p/" + info.NetworkAddr
 			info.Addresses = append(info.Addresses, s)
 		}
 	}
