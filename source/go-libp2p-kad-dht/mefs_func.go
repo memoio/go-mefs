@@ -269,7 +269,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 		rec = MakePutRecord(metaKey, res)
 		rpmes.Record = rec
 	} else {
-		rpmes.Record.Value = []byte(res)
+		rpmes.Record.Value = res
 	}
 
 	return rpmes, err

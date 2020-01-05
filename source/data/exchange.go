@@ -3,13 +3,11 @@ package data
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
 	"time"
 
-	iaddr "github.com/ipfs/go-ipfs-addr"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -336,7 +334,7 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 	}
 
 	for i := 0; i < connectTryCount; i++ {
-		res := n.getAddrAndConnect(ctx, to)
+		res := n.getAddrAndConnect(ctx, id)
 		if res {
 			return true
 		}
@@ -344,8 +342,8 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 	return false
 }
 
-func (n *impl) getAddrAndConnect(ctx context.Context, to string) bool {
-	km, err := metainfo.NewKeyMeta(to, metainfo.ExternalAddress)
+func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
+	km, err := metainfo.NewKeyMeta(to.Pretty(), metainfo.ExternalAddress)
 	if err != nil {
 		return false
 	}
@@ -376,57 +374,27 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to string) bool {
 			continue
 		}
 
-		log.Println("has extern ip: ", string(res))
-
 		pai := ma.Cast(res)
 
-		pi, err = peer.AddrInfoFromP2pAddr(pai)
-		if err != nil {
-			continue
-		}
-
 		npi = peer.AddrInfo{
-			ID:    pi.ID,
-			Addrs: pi.Addrs,
+			ID:    to,
+			Addrs: []ma.Multiaddr{pai},
 		}
 
-		err = n.ph.Connect(ctx, npi)
-		if err != nil {
-			continue
-		}
-
-		fmt.Println("try to connect: ", npi.String())
+		log.Println(to, "has extern ip: ", npi.String())
 
 		if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
 			swrm.Backoff().Clear(npi.ID)
 		}
 
-		err = n.ph.Connect(ctx, npi)
-		if err == nil {
-			return true
+		for i := 0; i < 3; i++ {
+			err = n.ph.Connect(ctx, npi)
+			if err == nil {
+				return true
+			}
 		}
 	}
 	return false
-}
-
-// peersWithAddresses is a function that takes in a slice of string peer addresses
-// (multiaddr + peerid) and returns a slice of properly constructed peers
-func peersWithAddresses(addrs string) (peer.AddrInfo, error) {
-	pai := peer.AddrInfo{}
-
-	iaddrs, err := iaddr.ParseString(addrs)
-	if err != nil {
-		return pai, err
-	}
-
-	pai.ID = iaddrs.ID()
-	tpt := iaddrs.Transport()
-
-	if tpt != nil {
-		pai.Addrs = []ma.Multiaddr{tpt}
-	}
-
-	return pai, nil
 }
 
 func (n *impl) Itererate(prefix string) ([]dsq.Entry, error) {
