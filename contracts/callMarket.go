@@ -115,7 +115,7 @@ func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.
 		return queryAddr, queryInstance, err
 	}
 
-	//获得mapper, key is upkeeping
+	//获得mapper, key is query
 	_, mapperInstance, err := getMapperFromIndexer(localAddress, "query", indexerInstance)
 	if err != nil {
 		return queryAddr, queryInstance, err

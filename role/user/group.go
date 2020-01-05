@@ -115,6 +115,8 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 			return false, err
 		}
 
+		log.Println("test user:", g.userID, "has keepers and providers:", string(res))
+
 		splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
 		if len(splitedMeta) == 2 {
 			count := 0

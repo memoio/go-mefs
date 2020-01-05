@@ -13,10 +13,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	commands "github.com/memoio/go-mefs/commands"
+	config "github.com/memoio/go-mefs/config"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	repo "github.com/memoio/go-mefs/repo"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
-	config "github.com/memoio/go-mefs/config"
 	ma "github.com/multiformats/go-multiaddr"
 	mafilter "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -293,7 +293,7 @@ var swarmAddrsLocalCmd = &cmds.Command{
 		for _, addr := range maddrs {
 			saddr := addr.String()
 			if showid {
-				saddr = path.Join(saddr, "ipfs", node.Identity.Pretty())
+				saddr = path.Join(saddr, "p2p", node.Identity.Pretty())
 			}
 			addrs = append(addrs, saddr)
 		}

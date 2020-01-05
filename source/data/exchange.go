@@ -322,8 +322,7 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 	for i := 0; i < connectTryCount; i++ {
 		pi, err := n.rt.FindPeer(ctx, id)
 		if err != nil {
-			fmt.Printf("findpeer err: %s\n", err)
-			return false
+			break
 		}
 
 		if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
@@ -376,6 +375,8 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to string) bool {
 		if err != nil {
 			continue
 		}
+
+		log.Println("has extern ip: ", string(res))
 
 		pai := ma.Cast(res)
 
@@ -449,6 +450,7 @@ func (n *impl) GetExternalAddr(p string) ([]byte, error) {
 		rid := c.RemotePeer()
 		if rid.Pretty() == p {
 			addr := c.RemoteMultiaddr()
+			log.Println(p, "has extern ip: ", addr.String())
 			return addr.Bytes(), nil
 		}
 	}
