@@ -233,9 +233,7 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 			return err
 		}
 
-		bstr := strings.Join(skey[:2], metainfo.DELIMITER)
-
-		bcid := cid.NewCidV2([]byte(bstr))
+		bcid := cid.NewCidV2([]byte(skey[0]))
 
 		err = n.bstore.Append(bcid, data, s, len)
 		if err != nil {
@@ -250,8 +248,6 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 	}
 
 	return nil
-
-	return errors.New("Routing is nil")
 }
 
 // DeleteBlock deletes a block in the blockservice from the datastore
