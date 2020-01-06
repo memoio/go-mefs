@@ -324,7 +324,10 @@ func (l *LfsInfo) flushSuperBlockLocal() error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, _, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, 0, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
+
+	dataEncoded, _, err := enc.Encode(data, ncidPrefix, 0)
 	if err != nil {
 		return err
 	}
@@ -375,7 +378,9 @@ func (l *LfsInfo) flushSuperBlockToProvider() error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, offset, err := dataformat.DataEncodeToMul(data, ncidPrefix, 1, sb.MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
+
+	dataEncoded, offset, err := enc.Encode(data, ncidPrefix, 0)
 	if err != nil {
 		return err
 	}
@@ -434,10 +439,14 @@ func (l *LfsInfo) flushBucketInfoLocal(bucket *superBucket) error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	dataEncoded, _, err := dataformat.DataEncodeToMul(BucketBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
+
+	dataEncoded, _, err := enc.Encode(BucketBuffer.Bytes(), ncidPrefix, 0)
 	if err != nil {
 		return err
 	}
+
 	err = BucketDelimitedWriter.Close()
 	if err != nil {
 		return err
@@ -482,8 +491,13 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 		return err
 	}
 	ncidPrefix := bm.ToString(3)
-	BucketBytes := BucketBuffer.Bytes()
-	dataEncoded, offset, err := dataformat.DataEncodeToMul(BucketBytes, ncidPrefix, 1, int32(MetaBackupCount-1), dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int32(MetaBackupCount-1), l.keySet)
+
+	dataEncoded, offset, err := enc.Encode(BucketBuffer.Bytes(), ncidPrefix, 0)
+	if err != nil {
+		return err
+	}
 
 	ctx := context.Background()
 
@@ -538,6 +552,7 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 	objectsStripeID := 1 //ObjectInfo的stripe从1开始
 	objectsBlockLength := 0
 	ctx := context.Background()
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		object, ok := objectElement.Value.(*objectInfo)
 		if !ok {
@@ -551,10 +566,12 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 				return err
 			}
 			ncidPrefix := bm.ToString(3)
-			dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+
+			dataEncoded, _, err := enc.Encode(objectsBuffer.Bytes(), ncidPrefix, 0)
 			if err != nil {
 				return err
 			}
+
 			ncid := bm.ToString()
 
 			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
@@ -588,7 +605,10 @@ func (l *LfsInfo) flushObjectsInfoLocal(bucket *superBucket) error {
 			return err
 		}
 		ncidPrefix := bm.ToString(3)
-		dataEncoded, _, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, flushLocalBackup, 0, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+		dataEncoded, _, err := enc.Encode(objectsBuffer.Bytes(), ncidPrefix, 0)
+		if err != nil {
+			return err
+		}
 		if err != nil {
 			return err
 		}
@@ -631,7 +651,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 	objectsBlockLength := 0
 
 	ctx := context.Background()
-
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, MetaBackupCount-1, l.keySet)
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		object, ok := objectElement.Value.(*objectInfo)
 		if !ok {
@@ -644,10 +664,11 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 				return err
 			}
 			ncidPrefix := bm.ToString(3)
-			dataEncoded, offset, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+			dataEncoded, offset, err := enc.Encode(objectsBuffer.Bytes(), ncidPrefix, 0)
 			if err != nil {
 				return err
 			}
+
 			for j := 0; j < len(providers); j++ {
 				bm.SetCid(strconv.Itoa(j))
 				ncid := bm.ToString()
@@ -684,10 +705,11 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 			return err
 		}
 		ncidPrefix := bm.ToString(3)
-		dataEncoded, offset, err := dataformat.DataEncodeToMul(objectsBuffer.Bytes(), ncidPrefix, 1, MetaBackupCount-1, dataformat.DefaultSegmentSize, metaTagFlag, l.keySet)
+		dataEncoded, offset, err := enc.Encode(objectsBuffer.Bytes(), ncidPrefix, 0)
 		if err != nil {
 			return err
 		}
+
 		for j := 0; j < len(providers); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
@@ -736,14 +758,16 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 
 	ctx := context.Background()
 
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
+
 	b, err = l.ds.GetBlock(ctx, km.ToString(), nil, "local")
-	if err == nil && b != nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+	if err == nil && b != nil && enc.VerifyBlock(b.RawData(), ncidlocal) { //如果本地有这个块的话，无需麻烦Provider
 	} else { //若本地无超级块，向自己的provider进行查询
 		err = l.ds.DeleteBlock(ctx, km.ToString(), "local")
 		if err != nil && err != bs.ErrNotFound {
 			return nil, err
 		}
-		log.Println("Try to get it from remote servers:", ncidlocal)
+		log.Println("Try to get", ncidlocal, " from remote servers")
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
@@ -763,7 +787,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				continue
 			}
 			if b != nil { //获取到有效数据块，跳出
-				if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
+				if ok := enc.VerifyBlock(b.RawData(), ncid); !ok {
 					log.Println("Verify Block failed.", ncid, "from:", provider)
 				} else {
 					log.Println("load superblock in block", ncid, "from Provider", provider)
@@ -774,8 +798,10 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 	}
 
 	if b != nil {
-		data, err := dataformat.GetDataFromRawData(b.RawData()) //Tag暂时没用
-		if err != nil {                                         //*错误处理
+		res := make([][]byte, 0, 1)
+		res[0] = b.RawData()
+		data, err := enc.Decode(res, 0, -1)
+		if err != nil {
 			log.Println("GetDataFromRawData err!", err)
 			return nil, err
 		}
@@ -814,6 +840,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 		return err
 	}
 
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
 	for bucketID, ok := l.meta.sb.bitsetInfo.NextSet(0); ok; bucketID, ok = l.meta.sb.bitsetInfo.NextSet(bucketID + 1) {
 		if !ok {
 			break
@@ -826,7 +853,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 		}
 		ncidlocal := bm.ToString()
 		ctx := context.Background()
-		if b, err = l.ds.GetBlock(ctx, ncidlocal, nil, "local"); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+		if b, err = l.ds.GetBlock(ctx, ncidlocal, nil, "local"); b != nil && err == nil && enc.VerifyBlock(b.RawData(), ncidlocal) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
 			err = l.ds.DeleteBlock(ctx, ncidlocal, "local")
 			if err != nil && err != bs.ErrNotFound {
@@ -843,7 +870,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 				}
 				b, err = l.ds.GetBlock(ctx, ncid, sig, provider)
 				if b != nil && err == nil {
-					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
+					if ok := enc.VerifyBlock(b.RawData(), ncid); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)
 					} else {
 						break
@@ -855,7 +882,9 @@ func (l *LfsInfo) loadBucketInfo() error {
 		}
 
 		if b != nil {
-			data, err := dataformat.GetDataFromRawData(b.RawData()) //Tag暂时没用
+			res := make([][]byte, 0, 1)
+			res[0] = b.RawData()
+			data, err := enc.Decode(res, 0, -1) //Tag暂时没用
 			if err != nil {
 				log.Println("GetDataFromRawData err!", err)
 				return err
@@ -893,6 +922,9 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 	if ObjectsBlockSize == 0 { //证明此Bucket一个文件都没有
 		return nil
 	}
+
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, 0, l.keySet)
+
 	var readCount int
 	stripeID := 1 //ObjectsBlock的Stripe从1开始计算
 	for {
@@ -904,7 +936,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		}
 		ncidlocal := bm.ToString()
 		ctx := context.Background()
-		if b, err = l.ds.GetBlock(ctx, ncidlocal, nil, "local"); b != nil && err == nil && dataformat.VerifyBlock(b.RawData(), ncidlocal, l.keySet.Pk) { //如果本地有这个块的话，无需麻烦Provider
+		if b, err = l.ds.GetBlock(ctx, ncidlocal, nil, "local"); b != nil && err == nil && enc.VerifyBlock(b.RawData(), ncidlocal) { //如果本地有这个块的话，无需麻烦Provider
 		} else {
 			err = l.ds.DeleteBlock(ctx, ncidlocal, "local")
 			if err != nil && err != bs.ErrNotFound {
@@ -921,7 +953,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
 				b, err = l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 				if b != nil && err == nil {
-					if ok := dataformat.VerifyBlock(b.RawData(), ncid, l.keySet.Pk); !ok {
+					if ok := enc.VerifyBlock(b.RawData(), ncid); !ok {
 						log.Println("Verify Block failed.", ncid, "from:", provider)
 					} else {
 						break
@@ -932,7 +964,9 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			}
 		}
 		if b != nil {
-			data, err := dataformat.GetDataFromRawData(b.RawData())
+			res := make([][]byte, 0, 1)
+			res[0] = b.RawData()
+			data, err := enc.Decode(res, 0, -1)
 			if err != nil {
 				return err
 			}

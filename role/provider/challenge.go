@@ -9,7 +9,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	pb "github.com/memoio/go-mefs/role/pb"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -24,7 +23,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 
 	userID := km.GetMid()
 	log.Println("receive", userID, " 's challenge from", from)
-	pubKey, err := p.getNewUserConfig(userID, from)
+	blskey, err := p.getNewUserConfig(userID, from)
 	if err != nil {
 		log.Println("get new user`s config from:", from, "failed, error :", err)
 		return err
@@ -65,7 +64,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		buf.WriteString(userID)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(bid)
-		blockID := cid.NewCidV2([]byte(buf.String()))
+		blockID := buf.String()
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
@@ -73,7 +72,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		if err != nil {
 			faultBlocks = append(faultBlocks, index)
 		} else {
-			isTrue := mcl.VerifyTag(tmpdata, tmptag, electedIndex, pubKey)
+			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
 			if !isTrue {
 				log.Println("verify tag failed")
 				//验证失败，则在本地删除此块
@@ -90,14 +89,14 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		}
 	}
 
-	proof, err := mcl.GenProof(pubKey, chal, data, tag)
+	proof, err := blskey.GenProof(chal, data, tag, 32)
 	if err != nil {
 		log.Println("GenProof err: ", err)
 		return err
 	}
 
 	// 在发送之前检查生成的proof
-	boo, err := mcl.VerifyProof(pubKey, chal, proof)
+	boo, err := blskey.VerifyProof(chal, proof)
 	if err != nil {
 		log.Println("verify proof failed, err is: ", err)
 		return err

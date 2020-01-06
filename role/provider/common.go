@@ -20,10 +20,10 @@ var (
 	errGetContractItem         = errors.New("Can't get contract Item")
 )
 
-func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.PublicKey, error) {
+func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil || gp.blsPubKey != nil {
-		return gp.blsPubKey, nil
+	if gp != nil || gp.blsKey != nil {
+		return gp.blsKey, nil
 	}
 
 	kmBls12, err := metainfo.NewKeyMeta(groupID, metainfo.Config, userID)
@@ -40,8 +40,8 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.PublicKey, error) 
 
 	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
 	if err == nil && mkey != nil {
-		gp.blsPubKey = mkey.Pk
-		return mkey.Pk, nil
+		gp.blsKey = mkey
+		return mkey, nil
 	}
 
 	for _, kid := range gp.keepers {
@@ -53,8 +53,8 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.PublicKey, error) 
 		if err != nil {
 			return nil, err
 		}
-		gp.blsPubKey = mkey.Pk
-		return mkey.Pk, nil
+		gp.blsKey = mkey
+		return mkey, nil
 	}
 
 	return nil, errors.New("No bls config")
@@ -64,6 +64,10 @@ func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error)
 	gp := p.getGroupInfo(userID, groupID, true)
 	if gp != nil {
 		return nil, errors.New("No user")
+	}
+
+	if gp.blsKey.Sk != nil {
+		return gp.blsKey.Sk, nil
 	}
 
 	kmBls12, err := metainfo.NewKeyMeta(groupID, metainfo.Config, userID)
@@ -80,7 +84,7 @@ func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error)
 
 	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
 	if err == nil && mkey != nil {
-		gp.blsPubKey = mkey.Pk
+		gp.blsKey = mkey
 		return mkey.Sk, nil
 	}
 

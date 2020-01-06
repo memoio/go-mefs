@@ -88,7 +88,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	bucket.objects[objectName] = objectElement
 
 	encoder := dataformat.NewDataCoder(bucket.Policy, bucket.DataCount, bucket.ParityCount,
-		int32(bucket.TagFlag), bucket.SegmentSize, l.keySet)
+		int32(bucket.TagFlag), int32(bucket.SegmentSize), 0, l.keySet)
 
 	ul := &uploadTask{
 		fsID:      l.fsID,
@@ -166,11 +166,11 @@ type blockMeta struct {
 //Start 上传文件
 func (u *uploadTask) Start(ctx context.Context) error {
 	enc := u.encoder
-	dc := enc.DataCount
-	pc := enc.ParityCount
+	dc := enc.Prefix.DataCount
+	pc := enc.Prefix.ParityCount
 	bc := int(dc + pc)
 	least := int(dc + pc/2)
-	segSize := enc.SegmentSize
+	segSize := enc.Prefix.SegmentSize
 	readUnit := int(segSize) * int(dc) //每一次读取的数据，尽量读一个整的
 	readByte := utils.SegementCount * readUnit
 
@@ -196,6 +196,7 @@ Loop:
 				return err
 			}
 
+			// need handle n > readLen
 			tmp := data[:n]
 
 			// 对整个文件的数据进行MD5校验
@@ -219,7 +220,7 @@ Loop:
 				return err
 			}
 
-			encodedData, offset, err := enc.Encode(tmp, bm.ToString(3), int32(u.curOffset))
+			encodedData, offset, err := enc.Encode(tmp, bm.ToString(3), int(u.curOffset))
 			if err != nil {
 				log.Println("encodedData", err)
 				return err

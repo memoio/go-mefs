@@ -39,7 +39,7 @@ type groupInfo struct {
 	storageUsed  uint64
 	storageTotal uint64
 	keepers      []string
-	blsPubKey    *mcl.PublicKey
+	blsKey       *mcl.KeySet
 	upkeeping    *role.UpKeepingItem
 	channel      *role.ChannelItem
 	query        *role.QueryItem

@@ -2,17 +2,14 @@ package dataformat
 
 import (
 	"encoding/binary"
-	"errors"
 	"hash/crc32"
-
-	mcl "github.com/memoio/go-mefs/bls12"
 )
 
 // Tag constants
 const (
-	CRC32 = 0x00
-	BLS   = 0x01
-	BLS12 = 0X02
+	CRC32 = 1
+	BLS   = 2
+	BLS12 = 3
 )
 
 // Names maps the name of a tagFlag to the code
@@ -30,37 +27,29 @@ var Codes = map[uint64]string{
 }
 
 // DefaultLengths maps a hash code to it's default length
-var DefaultLengths = map[uint64]uint64{
-	CRC32: 4,
-	BLS:   128,
-	BLS12: 48,
+var TagMap = map[int]int{
+	4:  CRC32,
+	32: BLS,
+	48: BLS12,
 }
 
 //根据指定段大小生成标签，index是生成BLS-tag的需要
-func GenTagForSegment(segment, index []byte, tagFlag, segmentSize uint64, keyset *mcl.KeySet) ([]byte, error) {
-	if segmentSize < DefaultSegmentSize { //
-		segmentSize = DefaultSegmentSize
+func (d *DataCoder) GenTagForSegment(index, data []byte) ([]byte, error) {
+	tagFlag, ok := TagMap[int(d.Prefix.TagSize)]
+	if !ok {
+		tagFlag = BLS12
 	}
-	if uint64(len(segment)) < segmentSize { //TODO:目前都用零补全，以后为了安全，应用随机数
-		segment = append(segment, make([]byte, segmentSize-uint64(len(segment)))...)
-	}
+
 	switch tagFlag {
 	case CRC32:
-		return uint32ToBytes(crc32.ChecksumIEEE(segment)), nil
+		return uint32ToBytes(crc32.ChecksumIEEE(data)), nil
 	case BLS:
 		return nil, ErrWrongTagFlag
 	case BLS12:
-		return genBLS12Tag(keyset, segment, index)
+		return d.BlsKey.GenTag(index, data, 0, 32, true)
 	default:
 		return nil, ErrWrongTagFlag
 	}
-}
-
-func genBLS12Tag(keySet *mcl.KeySet, segment, index []byte) ([]byte, error) {
-	if keySet == nil || keySet.Sk == nil {
-		return nil, errors.New("bls12 private keyset not construct")
-	}
-	return mcl.GenTag(keySet, segment, index)
 }
 
 //将uint32切片转成[]byte

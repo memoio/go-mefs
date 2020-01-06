@@ -23,14 +23,14 @@ var (
 )
 
 //---config----
-func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.PublicKey, error) {
+func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 	thisGroup := k.getGroupInfo(userID, groupID, false)
 	if thisGroup == nil {
 		return nil, errors.New("No Bls Key")
 	}
 
-	if thisGroup.blsPubKey != nil {
-		return thisGroup.blsPubKey, nil
+	if thisGroup.blsKey != nil {
+		return thisGroup.blsKey, nil
 	}
 
 	userconfigbyte, err := k.getUserBLS12ConfigByte(userID, groupID)
@@ -43,9 +43,9 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.PublicKey, error
 		return nil, err
 	}
 
-	thisGroup.blsPubKey = mkey.Pk
+	thisGroup.blsKey = mkey
 
-	return mkey.Pk, nil
+	return mkey, nil
 }
 
 func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {

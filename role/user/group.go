@@ -117,6 +117,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 
 		log.Println("test user:", g.userID, "has keepers and providers:", string(res))
 
+		var wg sync.WaitGroup
 		splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
 		if len(splitedMeta) == 2 {
 			count := 0
@@ -133,9 +134,16 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 				if !utils.CheckDup(g.tempKeepers, kid) {
 					continue
 				}
-				if g.ds.Connect(ctx, kid) {
-					g.tempKeepers = append(g.tempKeepers, kid)
-				}
+
+				wg.Add(1)
+				go func(kid string) {
+					defer wg.Done()
+					if g.ds.Connect(ctx, kid) {
+						g.Lock()
+						g.tempKeepers = append(g.tempKeepers, kid)
+						g.Unlock()
+					}
+				}(kid)
 			}
 
 			g.keeperSLA = count
@@ -155,12 +163,21 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 				if !utils.CheckDup(g.tempProviders, pid) {
 					continue
 				}
-				if g.ds.Connect(ctx, pid) {
-					g.tempProviders = append(g.tempProviders, pid)
-				}
+
+				wg.Add(1)
+				go func(pid string) {
+					defer wg.Done()
+					if g.ds.Connect(ctx, pid) {
+						g.Lock()
+						g.tempProviders = append(g.tempProviders, pid)
+						g.Unlock()
+					}
+				}(pid)
 			}
 
 			g.providerSLA = count
+
+			wg.Wait()
 
 			log.Println("start test user:", g.userID, "'s lfs:", g.groupID)
 

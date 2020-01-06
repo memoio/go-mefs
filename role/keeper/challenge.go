@@ -260,9 +260,25 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		return false
 	}
 
-	blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
+	muByte, err := b58.Decode(spliteProof[0])
+	if err != nil {
+		return false
+	}
+	nuByte, err := b58.Decode(spliteProof[1])
+	if err != nil {
+		return false
+	}
+	deltaByte, err := b58.Decode(spliteProof[2])
+	if err != nil {
+		return false
+	}
+	pf := &mcl.Proof{
+		Mu:    muByte,
+		Nu:    nuByte,
+		Delta: deltaByte,
+	}
 
-	res, err := mcl.VerifyProof(thisGroup.blsPubKey, chal, blsProof)
+	res, err := thisGroup.blsKey.VerifyProof(chal, pf)
 	if err != nil {
 		log.Println("handle proof of ", qid, "from provider: ", proID, "verify err:", err)
 		return false
@@ -284,6 +300,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		})
 
 		//update thischalinfo.chalMap
+		blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
 		chalResult.proof = blsProof
 		chalResult.res = true
 		chalResult.length = int64((float64(slength) / float64(chalResult.sum)) * float64(chalResult.totalSpace))

@@ -13,7 +13,6 @@ import (
 	"github.com/memoio/go-mefs/crypto/aes"
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -135,7 +134,7 @@ func (p *Info) traversePath(gc bool) {
 		for sid = 0; sid < 1024; sid++ {
 			for i := 0; i < 5; i++ {
 				posCid := posID + "_" + p.localID + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
-				ncid := cid.NewCidV2([]byte(posCid))
+				ncid := posCid
 				exist, err := p.ds.BlockStore().Has(ncid)
 				if err != nil {
 					continue

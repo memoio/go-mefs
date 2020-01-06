@@ -21,6 +21,8 @@ import (
 
 	logging "github.com/ipfs/go-log"
 	dataformat "github.com/memoio/go-mefs/data-format"
+	bf "github.com/memoio/go-mefs/source/go-block-format"
+	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -696,6 +698,59 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 
 func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) (segment []byte, tag []byte, err error) {
 	_, path := fs.encode(key)
+
+	f, err := os.OpenFile(path, os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	fInfo, err := f.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
+	fileSize := fInfo.Size()
+
+	fReader := bufio.NewReader(f)
+	prefix := make([]byte, 6*binary.MaxVarintLen64)
+	_, err = fReader.Read(prefix)
+	if err != nil {
+		return nil, nil, err
+	}
+	pre, err := bf.PrefixDecode(prefix)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tagNum := 2 + (pre.ParityCount-1)/pre.DataCount
+	fieldSize := pre.SegmentSize + pre.TagSize*tagNum
+
+	start := len(pre) + start*fieldSize
+	if uint64(fileSize) < start+fieldSize {
+		return nil, nil, ErrDataTooShort
+	}
+
+	segment := make([]byte, pre.SegmentSize)
+	tag := make([]byte, pre.TagSize)
+	//-------
+	n, err := f.ReadAt(segment, int64(start))
+	if err != nil {
+		return nil, nil, err
+	}
+	if n != int(pre.SegmentSize) {
+		return nil, nil, ErrCannotGetSegment
+	}
+	start += uint64(n)
+	//-------
+	n, err = f.ReadAt(tag, int64(start))
+	if err != nil {
+		return nil, nil, err
+	}
+	if n != int(pre.TagSize) {
+		return nil, nil, ErrCannotGetSegment
+	}
+	return segment, tag, nil
+
 	segment, tag, err = dataformat.GetSegAndTagFromFile(path, offset)
 	if err != nil {
 		if os.IsNotExist(err) {

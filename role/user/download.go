@@ -137,7 +137,7 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 	// segment的偏移
 	offsetPos := opts.Start % segStripeSize
 
-	decoder := dataformat.NewDataCoder(bucket.Policy, bucket.DataCount, bucket.ParityCount, int32(bucket.TagFlag), bucket.SegmentSize, l.keySet)
+	decoder := dataformat.NewDataCoder(bucket.Policy, int32(bucket.DataCount), int32(bucket.ParityCount), int32(bucket.TagFlag), int32(bucket.SegmentSize), 0, l.keySet)
 
 	dl := &downloadTask{
 		fsID:         l.fsID,
@@ -169,8 +169,8 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	curStripe := do.curStripe + 1
 	segStart := do.segOffset
 	dStart := do.dStart
-	dc := do.decoder.DataCount
-	segSize := do.decoder.SegmentSize
+	dc := do.decoder.Prefix.DataCount
+	segSize := do.decoder.Prefix.DataCount
 	stripeSize := int64(utils.BlockSize * dc)
 
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
@@ -259,8 +259,8 @@ type (
 //从一个stripe内指定范围读取数据写入到writer内
 func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset, remain int64) (int64, error) {
 	//首先设置一些本次stripe下载的基本参数
-	dataCount := ds.decoder.DataCount
-	parityCount := ds.decoder.ParityCount
+	dataCount := ds.decoder.Prefix.DataCount
+	parityCount := ds.decoder.Prefix.ParityCount
 	blockCount := dataCount + parityCount
 	bm, err := metainfo.NewBlockMeta(ds.fsID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
@@ -302,13 +302,13 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 		blkData := b.RawData()
 		//需要检查数据块的长度也没问题
-		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(ds.decoder.TagFlag), int(ds.decoder.SegmentSize), int(dataCount), int(parityCount), int(remain), ds.decoder.Policy)
+		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(remain))
 		if !ok {
 			log.Printf("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
 			continue
 		}
 
-		if ok := dataformat.VerifyBlock(blkData, ncid, ds.decoder.KeySet.Pk); !ok || err != nil {
+		if ok := ds.decoder.VerifyBlock(blkData, ncid); !ok || err != nil {
 			log.Println("Verify Block failed.", ncid, "from:", provider)
 			continue
 		}
@@ -323,7 +323,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			log.Println("download success，change channel.value", pinfo.chanItem.ChannelID, money.String())
 		}
 
-		if ds.decoder.Policy == dataformat.RsPolicy {
+		if ds.decoder.Prefix.Policy == dataformat.RsPolicy {
 			datas[i] = blkData
 		} else {
 			datas[0] = blkData
@@ -341,7 +341,9 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		log.Println("Download failed-", ErrCannotGetEnoughBlock)
 		return 0, ErrCannotGetEnoughBlock
 	}
-	data, err = ds.decoder.Decode(datas, int(segStart), needRepair)
+
+	ds.decoder.Repair = needRepair
+	data, err = ds.decoder.Decode(datas, int(segStart), -1)
 	if err != nil {
 		log.Println("Download failed-", err)
 		return 0, err

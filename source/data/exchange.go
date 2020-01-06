@@ -214,8 +214,9 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	return nil
 }
 
-// key: blockID/"Block"/start/offset
+// key: blockID/"Block"/start/end
 func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to string) error {
+	log.Println("append block: ", key)
 	skey := strings.Split(key, metainfo.DELIMITER)
 	if len(skey) < 4 {
 		return metainfo.ErrIllegalKey
@@ -327,9 +328,11 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 			swrm.Backoff().Clear(pi.ID)
 		}
 
-		err = n.ph.Connect(ctx, pi)
-		if err == nil {
-			return true
+		for i := 0; i < 3; i++ {
+			err = n.ph.Connect(ctx, pi)
+			if err == nil {
+				return true
+			}
 		}
 	}
 

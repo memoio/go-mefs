@@ -28,7 +28,7 @@ type groupInfo struct {
 	providers    []string
 	upkeeping    *role.UpKeepingItem
 	query        *role.QueryItem
-	blsPubKey    *mcl.PublicKey
+	blsKey       *mcl.KeySet
 	buckets      sync.Map // key:bucketID; value: *bucketInfo
 	ledgerMap    sync.Map // key:proID，value:*chalInfo
 }

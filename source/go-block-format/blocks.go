@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	cid "github.com/memoio/go-mefs/source/go-cid"
-
+	proto "github.com/gogo/protobuf/proto"
 	u "github.com/ipfs/go-ipfs-util"
-
+	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -85,4 +85,21 @@ func (b *BasicBlock) Loggable() map[string]interface{} {
 	return map[string]interface{}{
 		"block": b.Cid().String(),
 	}
+}
+
+func (b *BasicBlock) Prefix() (*pb.Prefix, error) {
+	return PrefixDecode(b.RawData())
+}
+
+func PrefixDecode(data []byte) (*pb.Prefix, error) {
+	pre := new(pb.Prefix)
+	err := proto.Unmarshal(data, pre)
+	if err != nil {
+		return nil, err
+	}
+	return pre, nil
+}
+
+func PrefixEncode(pre *pb.Prefix) ([]byte, error) {
+	return proto.Marshal(pre)
 }

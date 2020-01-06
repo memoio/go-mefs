@@ -1,0 +1,21 @@
+// In order to re-generate the golang packages for `Message` you will need...
+// 1. Protobuf binary (tested with protoc 3.0.0). - https://github.com/gogo/protobuf/releases
+// 2. Gogo Protobuf (tested with gogo 0.3). - https://github.com/gogo/protobuf
+// 3. To have cloned `libp2p/go-libp2p-{record,kad-dht}` under the same directory.
+// Now from `libp2p/go-libp2p-kad-dht/pb` you can run...
+// `protoc --gogo_out=. --proto_path=../../go-libp2p-record/pb/ --proto_path=./ dht.proto`
+// or 
+// `protoc -I=. -I=$GOPATH/src -I=$GOPATH/src/github.com/gogo/protobuf/protobuf --gogo_out=. *.proto`
+
+syntax = "proto3";
+package block.pb;
+
+message Prefix {
+	int32 Policy  = 1;
+	int32 TagSize = 2;
+	int32 SegmentSize = 3;
+	int32 DataCount = 4;
+	int32 ParityCount = 5;
+	// number of segments
+	int32 Length = 6;
+}
