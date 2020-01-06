@@ -12,10 +12,10 @@ package block.pb;
 
 message Prefix {
 	int32 Policy  = 1;
-	int32 TagSize = 2;
-	int32 SegmentSize = 3;
-	int32 DataCount = 4;
-	int32 ParityCount = 5;
+	int32 DataCount = 2;
+	int32 ParityCount = 3;
+	int32 TagFlag = 4;
+	int32 SegmentSize = 5;
 	// number of segments
-	int32 Length = 6;
+	int32 SegmentCount = 6;
 }

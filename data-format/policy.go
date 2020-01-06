@@ -14,15 +14,16 @@ import (
 )
 
 type DataCoder struct {
-	Prefix *pb.Prefix
-	BlsKey *mcl.KeySet
-	Repair bool
-	Size   int
+	Prefix     *pb.Prefix
+	BlsKey     *mcl.KeySet
+	Repair     bool
+	Size       int
+	PrefixSize int
 }
 
 // NewDefaultDataCoder creates a new datacode with default
 func NewDefaultDataCoder(policy, dataCount, pairtyCount int32, keyset *mcl.KeySet) *DataCoder {
-	return NewDataCoder(policy, dataCount, pairtyCount, DefaultTagSize, DefaultSegmentSize, DefaultLength, keyset)
+	return NewDataCoder(policy, dataCount, pairtyCount, DefaultTagFlag, DefaultSegmentSize, DefaultLength, keyset)
 }
 
 // 构建一个dataformat配置

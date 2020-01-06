@@ -10,23 +10,21 @@ import (
 const (
 	RsPolicy           = 1
 	MulPolicy          = 2
-	DefaultTagSize     = 48
 	DefaultSegmentSize = 4096
 	DefaultLength      = 256
+	DefaultTagFlag     = BLS12
 )
 
 var (
-	ErrVarintBufferShort = errors.New("uvarint: buffer too small")
-	ErrVarintTooLong     = errors.New("uvarint: varint too big (max 64bit)")
-	ErrWrongTagFlag      = errors.New("no such tag flag")
-	ErrWrongPolicy       = errors.New("no such policy")
-	ErrDataTooShort      = errors.New("data is too short")
-	ErrDataBroken        = errors.New("data format is wrong")
-	ErrWrongField        = errors.New("error Wrong Field to append")
-	ErrCannotGetSegment  = errors.New("error cannot get segment")
-	ErrDataToolong       = errors.New("input Data is too long for a block")
-	ErrRepairCrash       = errors.New("repair crash")
-	ErrRecoverData       = errors.New("The recovered data is incorrect")
+	ErrWrongTagFlag     = errors.New("no such tag flag")
+	ErrWrongPolicy      = errors.New("no such policy")
+	ErrDataTooShort     = errors.New("data is too short")
+	ErrDataBroken       = errors.New("data format is wrong")
+	ErrWrongField       = errors.New("error Wrong Field to append")
+	ErrCannotGetSegment = errors.New("error cannot get segment")
+	ErrDataToolong      = errors.New("input Data is too long for a block")
+	ErrRepairCrash      = errors.New("repair crash")
+	ErrRecoverData      = errors.New("The recovered data is incorrect")
 )
 
 //VerifyBlockLength：检查一个块的长度，从beginoffset开始，一个block至少要存的数据量，要么为dif对应的offset，要么填满

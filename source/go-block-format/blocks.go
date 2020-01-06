@@ -87,19 +87,42 @@ func (b *BasicBlock) Loggable() map[string]interface{} {
 	}
 }
 
-func (b *BasicBlock) Prefix() (*pb.Prefix, error) {
+func (b *BasicBlock) Prefix() (*pb.Prefix, int, error) {
 	return PrefixDecode(b.RawData())
 }
 
-func PrefixDecode(data []byte) (*pb.Prefix, error) {
-	pre := new(pb.Prefix)
-	err := proto.Unmarshal(data, pre)
-	if err != nil {
-		return nil, err
+func PrefixLen(data []byte) (int, int, error) {
+	len, n := proto.DecodeVarint(data[:10])
+	if n <= 0 {
+		return 0, 0, errors.New("wrong proto prefix message")
 	}
-	return pre, nil
+
+	return int(len), n + int(len), nil
+}
+
+func PrefixDecode(data []byte) (*pb.Prefix, int, error) {
+	len, n := proto.DecodeVarint(data[:10])
+	if n <= 0 {
+		return nil, 0, errors.New("wrong proto prefix message")
+	}
+	pre := new(pb.Prefix)
+	err := proto.Unmarshal(data[n:n+int(len)], pre)
+	if err != nil {
+		return nil, 0, err
+	}
+	return pre, n + int(len), nil
 }
 
 func PrefixEncode(pre *pb.Prefix) ([]byte, error) {
-	return proto.Marshal(pre)
+	preData, err := proto.Marshal(pre)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	buf := proto.EncodeVarint(uint64(len(preData)))
+
+	buf = append(buf, preData...)
+
+	return buf, nil
 }
