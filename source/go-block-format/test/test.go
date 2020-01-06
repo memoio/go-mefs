@@ -10,14 +10,11 @@ import (
 
 func main() {
 	pre := &pb.Prefix{
-		Policy:      5,
-		ParityCount: 20,
+		Policy:      567677,
+		ParityCount: 200000000,
 	}
 
-	fmt.Println(pre.XXX_Size())
-
-	buf := proto.EncodeVarint(uint64(pre.XXX_Size()))
-
+	fmt.Println(proto.Size(pre))
 	preData, err := bf.PrefixEncode(pre)
 	if err != nil {
 		fmt.Println(err)
@@ -26,25 +23,20 @@ func main() {
 
 	fmt.Println(preData)
 
-	buf = append(buf, preData...)
-
 	pad := make([]byte, 0, 10)
 	for i := 0; i < 10; i++ {
 		pad = append(pad, []byte{1}...)
 	}
-	preData = append(buf, pad...)
+	preData = append(preData, pad...)
 
-	fmt.Println(buf)
+	fmt.Println(preData)
 
-	len, n := proto.DecodeVarint(buf)
-
-	sec := new(pb.Prefix)
-	err = proto.Unmarshal(preData[n:n+int(len)], sec)
+	sec, len, err := bf.PrefixDecode(preData)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println(sec)
-	fmt.Println(preData)
+	fmt.Println(len)
 	return
 }

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	proto "github.com/gogo/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
@@ -17,8 +18,13 @@ type DataCoder struct {
 	Prefix     *pb.Prefix
 	BlsKey     *mcl.KeySet
 	Repair     bool
-	Size       int
-	PrefixSize int
+	DataSize   int
+	blockCount int
+	tagCount   int
+	tagSize    int
+	segSize    int
+	fieldSize  int
+	prefixSize int
 }
 
 // NewDefaultDataCoder creates a new datacode with default
@@ -50,10 +56,24 @@ func NewDataCoder(policy, dataCount, parityCount, tagSize, segmentSize, length i
 		Length:      int32(length),
 	}
 
-	return &DataCoder{
+	d := &DataCoder{
 		Prefix: pre,
 		BlsKey: keyset,
 	}
+	d.PreCompute()
+	return d
+}
+
+func (d *DataCoder) PreCompute() {
+	preLen := proto.Size(d.Prefix)
+	d.prefixSize = preLen + proto.SizeVarint(uint64(preLen))
+	dc := int(d.Prefix.DataCount)
+	pc := int(d.Prefix.ParityCount)
+	d.blockCount = dc + pc
+	d.tagCount = 2 + (pc-1)/dc
+	d.tagSize = int(d.Prefix.TagSize)
+	d.segSize = int(d.Prefix.SegmentSize)
+	d.fieldSize = d.segSize + d.tagSize*d.tagCount
 }
 
 func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte, int, error) {
