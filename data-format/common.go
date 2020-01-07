@@ -4,15 +4,17 @@ import (
 	"errors"
 	"strconv"
 
+	mcl "github.com/memoio/go-mefs/bls12"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 )
 
 const (
-	RsPolicy           = 1
-	MulPolicy          = 2
-	DefaultSegmentSize = 4096
-	DefaultLength      = 256
-	DefaultTagFlag     = BLS12
+	RsPolicy            = 1
+	MulPolicy           = 2
+	DefaultSegmentSize  = 4096
+	DefaultSegmentCount = 256
+	DefaultTagFlag      = BLS12
+	CurrentVersion      = 1
 )
 
 var (
@@ -27,31 +29,28 @@ var (
 	ErrRecoverData      = errors.New("The recovered data is incorrect")
 )
 
-//VerifyBlockLength：检查一个块的长度，从beginoffset开始，一个block至少要存的数据量，要么为dif对应的offset，要么填满
-//整个块
+//VerifyBlockLength  verify blocks length
 func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 	if data == nil {
 		return false, ErrDataTooShort
 	}
-	pre, err := bf.PrefixDecode(data)
+	pre, preLen, err := bf.PrefixDecode(data)
 	if err != nil {
 		return false, err
 	}
 
-	preData, err := bf.PrefixEncode(pre)
-	if err != nil {
-		return false, err
+	tagSize, ok := TagMap[int(pre.TagFlag)]
+	if !ok {
+		return false, ErrWrongTagFlag
 	}
 
-	preLen := len(preData)
+	tagCount := int(2 + (pre.ParityCount-1)/pre.DataCount)
 
-	tagCount := 2 + (pre.ParityCount-1)/pre.DataCount
-
-	fieldSize := pre.SegmentSize + tagCount*pre.TagSize
+	fieldSize := int(pre.SegmentSize) + tagCount*tagSize
 
 	dataLen := len(data)
 
-	if int32(dataLen-preLen)/fieldSize < int32(start+length) {
+	if (dataLen-preLen)/fieldSize < start+length {
 		return false, nil
 	}
 
@@ -65,33 +64,26 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 		return false
 	}
 
-	pre, err := bf.PrefixDecode(data)
+	pre, preLen, err := bf.PrefixDecode(data)
 	if err != nil {
 		return false
 	}
 
-	preData, err := bf.PrefixEncode(pre)
-	if err != nil {
-		return false
-	}
+	d.Prefix = pre
 
-	preLen := len(preData)
-
-	tagCount := 2 + (pre.ParityCount-1)/pre.DataCount
-
-	fieldSize := int(pre.SegmentSize + tagCount*pre.TagSize)
+	d.PreCompute()
 
 	noPreRawdata := data[preLen:]
 
-	count := (len(noPreRawdata) - 1) / fieldSize
+	count := 1 + (len(noPreRawdata)-1)/d.fieldSize
 
 	segments := make([][]byte, count)
 	tags := make([][]byte, count)
 	indices := make([]string, count)
 	for i := 0; i < count; i++ {
 		indices[i] = ncid + "_" + strconv.Itoa(i)
-		segments[i] = noPreRawdata[i*fieldSize : i*fieldSize+int(pre.SegmentSize)]
-		tags[i] = noPreRawdata[i*fieldSize+int(pre.SegmentSize) : i*fieldSize+int(pre.SegmentSize+pre.TagSize)]
+		segments[i] = noPreRawdata[i*d.fieldSize : i*d.fieldSize+d.segSize]
+		tags[i] = noPreRawdata[i*d.fieldSize+d.segSize : i*d.fieldSize+d.segSize+d.tagSize]
 	}
 
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
@@ -99,4 +91,15 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 		return false
 	}
 	return true
+}
+
+func VerifyBlock(data []byte, ncid string, k *mcl.KeySet) bool {
+	if data == nil || len(data) == 0 {
+		return false
+	}
+
+	d := &DataCoder{
+		BlsKey: k,
+	}
+	return d.VerifyBlock(data, ncid)
 }

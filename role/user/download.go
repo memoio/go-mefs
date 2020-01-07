@@ -137,7 +137,7 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 	// segment的偏移
 	offsetPos := opts.Start % segStripeSize
 
-	decoder := dataformat.NewDataCoder(bucket.Policy, int32(bucket.DataCount), int32(bucket.ParityCount), int32(bucket.TagFlag), int32(bucket.SegmentSize), 0, l.keySet)
+	decoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), dataformat.CurrentVersion, int(bucket.ParityCount), int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
 
 	dl := &downloadTask{
 		fsID:         l.fsID,

@@ -9,6 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	pb "github.com/memoio/go-mefs/role/pb"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -64,7 +65,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		buf.WriteString(userID)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(bid)
-		blockID := buf.String()
+		blockID := cid.NewCidV2([]byte(buf.String()))
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
@@ -114,7 +115,11 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		return err
 	}
 
-	retValue := proof
+	mustr := b58.Encode(proof.Mu)
+	nustr := b58.Encode(proof.Nu)
+	deltastr := b58.Encode(proof.Delta)
+
+	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr
 
 	if len(faultBlocks) > 0 {
 		retValue = retValue + metainfo.DELIMITER + b58.Encode([]byte(strings.Join(faultBlocks, metainfo.DELIMITER)))

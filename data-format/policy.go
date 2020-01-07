@@ -3,6 +3,7 @@ package dataformat
 import (
 	"errors"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -18,7 +19,7 @@ type DataCoder struct {
 	Prefix     *pb.Prefix
 	BlsKey     *mcl.KeySet
 	Repair     bool
-	DataSize   int
+	DataCount  int // recover how many fields
 	blockCount int
 	tagCount   int
 	tagSize    int
@@ -27,13 +28,23 @@ type DataCoder struct {
 	prefixSize int
 }
 
-// NewDefaultDataCoder creates a new datacode with default
-func NewDefaultDataCoder(policy, dataCount, pairtyCount int32, keyset *mcl.KeySet) *DataCoder {
-	return NewDataCoder(policy, dataCount, pairtyCount, DefaultTagFlag, DefaultSegmentSize, DefaultLength, keyset)
+// NewDefaultDataCoder creates a new datacoder with default
+func NewDefaultDataCoder(policy, dataCount, pairtyCount int, keyset *mcl.KeySet) *DataCoder {
+	return NewDataCoder(policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, keyset)
+}
+
+// NewDataCoderWithPrefix creates a new datacoder with prefix
+func NewDataCoderWithPrefix(p *pb.Prefix, k *mcl.KeySet) *DataCoder {
+	d := &DataCoder{
+		Prefix: p,
+		BlsKey: k,
+	}
+	d.PreCompute()
+	return d
 }
 
 // 构建一个dataformat配置
-func NewDataCoder(policy, dataCount, parityCount, tagSize, segmentSize, length int32, keyset *mcl.KeySet) *DataCoder {
+func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount int, keyset *mcl.KeySet) *DataCoder {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
 	}
@@ -48,12 +59,12 @@ func NewDataCoder(policy, dataCount, parityCount, tagSize, segmentSize, length i
 	}
 
 	pre := &pb.Prefix{
-		Policy:      int32(policy),
-		DataCount:   int32(dataCount),
-		ParityCount: int32(parityCount),
-		TagSize:     int32(tagSize),
-		SegmentSize: int32(segmentSize),
-		Length:      int32(length),
+		Policy:       int32(policy),
+		DataCount:    int32(dataCount),
+		ParityCount:  int32(parityCount),
+		TagFlag:      int32(tagFlag),
+		SegmentSize:  int32(segmentSize),
+		SegmentCount: int32(segCount),
 	}
 
 	d := &DataCoder{
@@ -71,7 +82,13 @@ func (d *DataCoder) PreCompute() {
 	pc := int(d.Prefix.ParityCount)
 	d.blockCount = dc + pc
 	d.tagCount = 2 + (pc-1)/dc
-	d.tagSize = int(d.Prefix.TagSize)
+
+	s, ok := TagMap[int(d.Prefix.TagFlag)]
+	if !ok {
+		s = 48
+	}
+
+	d.tagSize = int(s)
 	d.segSize = int(d.Prefix.SegmentSize)
 	d.fieldSize = d.segSize + d.tagSize*d.tagCount
 }
@@ -83,70 +100,63 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 	dc := int(d.Prefix.DataCount)
 	pc := int(d.Prefix.ParityCount)
-	bc := dc + pc
-	tagNum := 1 + (bc-1)/dc
 
-	segSize := int(d.Prefix.SegmentSize)
-	endSegment := (len(data) - 1) / (segSize * dc)
+	endSegment := (len(data) - 1) / (d.segSize * dc)
 
-	tagSize := int(d.Prefix.TagSize)
-	fieldSize := segSize + tagSize*tagNum
-	blockSize := fieldSize * (endSegment + 1)
+	blockSize := d.fieldSize * (endSegment + 1)
 
-	blockGroup := make([][]byte, bc)
+	blockGroup := make([][]byte, d.blockCount)
 	for i := 0; i < len(blockGroup); i++ {
 		blockGroup[i] = make([]byte, 0, blockSize)
 	}
 
 	var stripe [][]byte
 	if start == 0 {
-		preData, err := bf.PrefixEncode(d.Prefix)
+		preData, preLen, err := bf.PrefixEncode(d.Prefix)
 		if err != nil {
 			return nil, 0, err
 		}
 
-		preLen := len(preData)
-
-		stripe = creatGroup(bc, blockSize+preLen)
+		stripe = creatGroup(d.blockCount, blockSize+preLen)
 		for i := 0; i < len(stripe); i++ {
 			stripe[i] = append(stripe[i], preData...)
 		}
 	} else {
-		stripe = creatGroup(bc, blockSize)
+		stripe = creatGroup(d.blockCount, blockSize)
 	}
 
 	// 生成临时块组保存data切分后的segment
-	dataGroup := creatGroup(bc, segSize)
+	dataGroup := creatGroup(d.blockCount, d.segSize)
 	// 生成taggroup装一组的tag+tagP
-	tagGroup := creatGroup(bc*tagNum, tagSize)
+	tagGroup := creatGroup(d.blockCount*d.tagCount, d.tagSize)
 
 	enc, err := reedsolomon.New(int(dc), int(pc))
 	if err != nil {
 		return nil, 0, err
 	}
 
-	encP, err := reedsolomon.New(int(bc), int(bc*(tagNum-1)))
+	encP, err := reedsolomon.New(d.blockCount, d.blockCount*(d.tagCount-1))
 	if err != nil {
 		return nil, 0, err
 	}
 
-	for i := 0; i <= int(endSegment) && data != nil; i++ {
+	for i := 0; i <= endSegment && data != nil; i++ {
 		clearGroup(dataGroup)
 		clearGroup(tagGroup)
 		for j := 0; j < int(dc); j++ {
 			// 填充数据
-			if len(data) < int(segSize) {
+			if len(data) < int(d.segSize) {
 				copy(dataGroup[j], data)
 				data = nil
 				break
 			}
-			copy(dataGroup[j], data[:segSize])
-			data = data[segSize:]
+			copy(dataGroup[j], data[:d.segSize])
+			data = data[d.segSize:]
 		}
 
 		switch d.Prefix.Policy {
 		case MulPolicy:
-			for j := dc; j < bc; j++ {
+			for j := dc; j < d.blockCount; j++ {
 				copy(dataGroup[j], dataGroup[0])
 			}
 		case RsPolicy:
@@ -159,7 +169,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 		}
 
 		var res strings.Builder
-		for j := 0; j < int(bc); j++ {
+		for j := 0; j < d.blockCount; j++ {
 			// 生成tag并装进taggroup，index为peerid_bucketid_stripeid_blockid_offsetid
 			res.Reset()
 			res.WriteString(ncidPrefix)
@@ -201,38 +211,28 @@ func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) 
 		return nil, ErrWrongPolicy
 	}
 
-	tagNum := 2 + (d.Prefix.ParityCount-1)/d.Prefix.DataCount
-	fieldSize := int(d.Prefix.SegmentSize + d.Prefix.TagSize*tagNum)
-
-	priData, err := bf.PrefixEncode(d.Prefix)
-	if err != nil {
-		return nil, err
-	}
-
-	priLen := len(priData)
-
 	// 根据offset构建空的文件数据
-	realOffset := len(data[0])/int(fieldSize) - 1
+	count := 1 + (len(data[0])-d.prefixSize-1)/d.fieldSize
 	if length == -1 {
-		length = realOffset - start
+		length = count - start
 	}
 
-	if length <= 0 || start+length > realOffset {
+	if length <= 0 || start+length > count {
 		return nil, ErrDataTooShort
 	}
 
-	res := make([]byte, 0, length*int(d.Prefix.DataCount*d.Prefix.SegmentSize))
+	res := make([]byte, 0, length*d.blockCount)
 	// 根据offset从每个块中提取Field的data
-	for i := start; i <= start+length; i++ {
+	for i := start; i < start+length; i++ {
 		for j := 0; j < int(d.Prefix.DataCount); j++ {
-			res = append(res, data[j][priLen+i*fieldSize:priLen+i*fieldSize+int(d.Prefix.SegmentSize)]...)
+			res = append(res, data[j][d.prefixSize+i*d.fieldSize:d.prefixSize+i*d.fieldSize+d.segSize]...)
 		}
 	}
 	return res, nil
 }
 
 func Repair(stripe [][]byte) ([][]byte, error) {
-	prefix, err := decodeStripe(stripe)
+	prefix, _, err := decodeStripe(stripe)
 	if err != nil {
 		return nil, err
 	}
@@ -254,23 +254,16 @@ func Repair(stripe [][]byte) ([][]byte, error) {
 }
 
 func (d *DataCoder) RecoverStripe(stripe [][]byte) ([][]byte, error) {
-	dc := int(d.Prefix.DataCount)
-	pc := int(d.Prefix.ParityCount)
-	bc := int(dc + pc)
-	tagNum := int(1 + (bc-1)/dc)
-	fieldSize := int(d.Prefix.SegmentSize) + int(d.Prefix.TagSize)*tagNum
-
-	preData, err := bf.PrefixEncode(d.Prefix)
+	preData, preLen, err := bf.PrefixEncode(d.Prefix)
 	if err != nil {
 		return nil, err
 	}
 
-	preLen := len(preData)
 	avai := 0
 	// 构建丢失的块并加上prefix
-	for i := 0; i < bc; i++ {
+	for i := 0; i < d.blockCount; i++ {
 		if len(stripe[i]) == 0 {
-			stripe[i] = make([]byte, 0, preLen+int(d.Prefix.Length)*fieldSize)
+			stripe[i] = make([]byte, 0, d.prefixSize+d.DataCount*d.fieldSize)
 			stripe[i] = append(stripe[i], preData...)
 		} else {
 			avai = i
@@ -278,18 +271,18 @@ func (d *DataCoder) RecoverStripe(stripe [][]byte) ([][]byte, error) {
 	}
 
 	// 创建临时Data组用以恢复segment，临时tag组用以恢复tag和tagp
-	tmpData := creatGroup(bc, int(d.Prefix.SegmentSize))
-	tmpTag := creatGroup(bc*tagNum, int(d.Prefix.TagSize))
+	tmpData := creatGroup(d.blockCount, int(d.segSize))
+	tmpTag := creatGroup(d.blockCount*d.tagCount, d.tagSize)
 	// 解析出data、tag、tagP
-	for i := 0; i < d.Size; i++ {
+	for i := 0; i < d.DataCount; i++ {
 		clearGroup(tmpData)
 		clearGroup(tmpTag)
-		for j := 0; j < bc; j++ {
-			if len(stripe[j]) != preLen+fieldSize*i {
-				rawdata, tags := d.decodeField(stripe[j][preLen+i*fieldSize:preLen+(i+1)*fieldSize], tagNum)
+		for j := 0; j < d.blockCount; j++ {
+			if len(stripe[j]) != preLen+d.fieldSize*i {
+				rawdata, tags := d.decodeField(stripe[j][preLen+i*d.fieldSize:preLen+(i+1)*d.fieldSize], d.tagCount)
 				copy(tmpData[j], rawdata)
-				for k := 0; k < tagNum; k++ {
-					copy(tmpTag[j+bc*k], tags[k])
+				for k := 0; k < d.tagCount; k++ {
+					copy(tmpTag[j+d.blockCount*k], tags[k])
 				}
 			}
 		}
@@ -297,8 +290,8 @@ func (d *DataCoder) RecoverStripe(stripe [][]byte) ([][]byte, error) {
 		// recover data
 		switch d.Prefix.Policy {
 		case MulPolicy:
-			for j := 0; j < bc; j++ {
-				if len(stripe[j]) == preLen+fieldSize*i {
+			for j := 0; j < d.blockCount; j++ {
+				if len(stripe[j]) == preLen+i*d.fieldSize {
 					copy(tmpData[j], tmpData[avai])
 				}
 			}
@@ -319,11 +312,11 @@ func (d *DataCoder) RecoverStripe(stripe [][]byte) ([][]byte, error) {
 		}
 
 		// 将恢复的数据放回stripe内
-		for j := 0; j < bc; j++ {
-			if len(stripe[j]) == preLen+fieldSize*i {
+		for j := 0; j < d.blockCount; j++ {
+			if len(stripe[j]) == preLen+i*d.fieldSize {
 				stripe[j] = append(stripe[j], tmpData[j]...)
-				for k := 0; k < int(tagNum); k++ {
-					stripe[j] = append(stripe[j], tmpTag[j+bc*k]...)
+				for k := 0; k < d.tagCount; k++ {
+					stripe[j] = append(stripe[j], tmpTag[j+k*d.blockCount]...)
 				}
 			}
 		}
@@ -360,10 +353,10 @@ func (d *DataCoder) recover(data [][]byte) ([][]byte, error) {
 }
 
 func (d *DataCoder) decodeField(data []byte, tagNum int) ([]byte, [][]byte) {
-	rawdata := data[:d.Prefix.SegmentSize]
+	rawdata := data[:d.segSize]
 	tag := make([][]byte, 0, tagNum)
 	for i := 0; i < tagNum; i++ {
-		tag[i] = data[d.Prefix.SegmentSize+int32(i)*d.Prefix.TagSize : d.Prefix.SegmentSize+int32(i+1)*d.Prefix.TagSize]
+		tag[i] = data[d.segSize+i*d.tagSize : d.segSize+(i+1)*d.tagSize]
 	}
 	return rawdata, tag
 }
@@ -401,13 +394,15 @@ func createFields(stripe, dataGroup, tagGroup [][]byte) [][]byte {
 }
 
 // 解析一个Stripe中单独一个BLock的Prefix、大小、最多拥有的Field数量和该Stripe实际含有的未D丢失数据块的数量
-func decodeStripe(data [][]byte) (*pb.Prefix, error) {
+func decodeStripe(data [][]byte) (*pb.Prefix, int, error) {
 	var prefix *pb.Prefix
-	var avaNum int32
+	var avaNum int
+	lengths := make([]int, len(data))
 	for i := 0; i < len(data); i++ {
+		lengths[i] = len(data[i])
 		if len(data[i]) != 0 {
 			if prefix == nil {
-				pre, err := bf.PrefixDecode(data[i])
+				pre, _, err := bf.PrefixDecode(data[i])
 				if err != nil {
 					continue
 				}
@@ -418,13 +413,20 @@ func decodeStripe(data [][]byte) (*pb.Prefix, error) {
 	}
 
 	if avaNum == 0 {
-		return nil, errors.New("no available block")
+		return nil, 0, errors.New("no available block")
 	}
 
-	if prefix != nil && prefix.DataCount > avaNum {
+	if prefix != nil && (int(prefix.DataCount) > avaNum || int(prefix.DataCount) > len(lengths)) {
 		log.Println("repair crash: need data:", prefix.DataCount, ", but got avaNum: ", avaNum)
-		return nil, ErrRepairCrash
+		return nil, 0, ErrRepairCrash
 	}
 
-	return prefix, nil
+	sort.Sort(sort.Reverse(sort.IntSlice(lengths)))
+
+	if lengths[prefix.DataCount] <= 0 {
+		log.Println("repair crash: need data:", prefix.DataCount, ", but got avaNum again: ", avaNum)
+		return nil, 0, ErrRepairCrash
+	}
+
+	return prefix, lengths[prefix.DataCount], nil
 }

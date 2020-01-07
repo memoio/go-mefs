@@ -87,8 +87,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	objectElement := bucket.orderedObjects.PushBack(object)
 	bucket.objects[objectName] = objectElement
 
-	encoder := dataformat.NewDataCoder(bucket.Policy, bucket.DataCount, bucket.ParityCount,
-		int32(bucket.TagFlag), int32(bucket.SegmentSize), 0, l.keySet)
+	encoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), int(bucket.ParityCount), dataformat.CurrentVersion, int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
 
 	ul := &uploadTask{
 		fsID:      l.fsID,

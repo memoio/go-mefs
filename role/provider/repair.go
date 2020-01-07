@@ -9,6 +9,7 @@ import (
 	rs "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/role/user"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -112,7 +113,8 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 		//删除修复时get到的block；
 		for _, tmpCid := range cids {
 			if len(tmpCid) > 0 {
-				err = p.ds.BlockStore().DeleteBlock(temCid)
+				tmpcid := cid.NewCidV2([]byte(tmpCid))
+				err = p.ds.BlockStore().DeleteBlock(tmpcid)
 				if err != nil && err != bs.ErrNotFound {
 					log.Println("delete error :", err)
 					return err

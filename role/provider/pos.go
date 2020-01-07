@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/crypto/aes"
 	df "github.com/memoio/go-mefs/data-format"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
+	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -37,11 +38,17 @@ var inGenerate int
 var keeperIDs []string
 var posSkByte []byte
 
-var opt = &df.DataCoder{
+var pre = &pb.Prefix{
+	Version:     1,
+	Policy:      df.MulPolicy,
 	DataCount:   1,
 	ParityCount: 4,
 	TagFlag:     df.BLS12,
 	SegmentSize: df.DefaultSegmentSize,
+}
+
+var opt = &df.DataCoder{
+	Prefix: pre,
 }
 
 // PosService starts pos
@@ -67,6 +74,8 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 	if err != nil {
 		return
 	}
+
+	opt.PreCompute()
 
 	//从磁盘读取存储的Cidprefix
 	posKM, err := metainfo.NewKeyMeta(groupID, metainfo.PosMeta)
@@ -134,7 +143,7 @@ func (p *Info) traversePath(gc bool) {
 		for sid = 0; sid < 1024; sid++ {
 			for i := 0; i < 5; i++ {
 				posCid := posID + "_" + p.localID + strconv.Itoa(gid) + "_" + strconv.Itoa(sid) + "_" + strconv.Itoa(i)
-				ncid := posCid
+				ncid := cid.NewCidV2([]byte(posCid))
 				exist, err := p.ds.BlockStore().Has(ncid)
 				if err != nil {
 					continue
@@ -198,7 +207,6 @@ func (p *Info) doGenerateOrDelete() {
 }
 
 func (p *Info) uploadMulpolicy(data []byte) ([][]byte, int, error) {
-	opt.Policy = df.MulPolicy
 	// 构建加密秘钥
 	buckid := p.localID + strconv.Itoa(curGid)
 	tmpkey := []byte(string(posSkByte) + buckid)
@@ -364,17 +372,17 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 func (p *Info) getUserConifg(userID, groupID string) error {
 	// 需要用私钥decode出bls的私钥，用user中的方法
 	//获取公钥
-	opt.KeySet = new(mcl.KeySet)
+
 	pubKey, err := p.getNewUserConfig(userID, groupID)
 	if err != nil {
 		log.Println("getNewUserConfig in get userconfig error :", err)
 		return err
 	}
 
-	opt.KeySet.Pk = pubKey
+	opt.BlsKey = pubKey
 
 	//获取私钥
-	opt.KeySet.Sk, err = p.getUserPrivateKey(userID, groupID)
+	opt.BlsKey.Sk, err = p.getUserPrivateKey(userID, groupID)
 	if err != nil {
 		log.Println("getUserPrivateKey in get userconfig error ", err)
 		return err

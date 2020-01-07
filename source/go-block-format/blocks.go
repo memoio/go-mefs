@@ -113,16 +113,16 @@ func PrefixDecode(data []byte) (*pb.Prefix, int, error) {
 	return pre, n + int(len), nil
 }
 
-func PrefixEncode(pre *pb.Prefix) ([]byte, error) {
+func PrefixEncode(pre *pb.Prefix) ([]byte, int, error) {
 	preData, err := proto.Marshal(pre)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return nil, 0, err
 	}
 
 	buf := proto.EncodeVarint(uint64(len(preData)))
 
 	buf = append(buf, preData...)
 
-	return buf, nil
+	return buf, len(buf), nil
 }

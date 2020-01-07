@@ -22,7 +22,6 @@ import (
 	logging "github.com/ipfs/go-log"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
-	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -537,27 +536,24 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 	defer f.Close()
 
 	fReader := bufio.NewReader(f)
-	prefix := make([]byte, 6*binary.MaxVarintLen64)
+	prefix := make([]byte, 8*binary.MaxVarintLen64)
 	_, err = fReader.Read(prefix)
 	if err != nil {
 		return err
 	}
-	pre, _, err := dataformat.PrefixDecode(prefix)
+	pre, preLen, err := bf.PrefixDecode(prefix)
 	if err != nil {
 		return err
 	}
-	var TagCount uint64
-	switch pre.Policy {
-	case dataformat.RsPolicy:
-		TagCount = 1 + (pre.ParityCount-1)/pre.DataCount + 1
-	case dataformat.MulPolicy:
-		TagCount = pre.DataCount + pre.ParityCount
-	default:
-		return dataformat.ErrWrongPolicy
+	tagCount := 2 + (pre.ParityCount-1)/pre.DataCount
+
+	tagSize, ok := dataformat.TagMap[int(pre.TagFlag)]
+	if !ok {
+		return dataformat.ErrWrongTagFlag
 	}
 
-	fieldSize := pre.SegmentSize + TagCount*pre.TagSize
-	if uint64(len(fields))%fieldSize != 0 {
+	fieldSize := pre.SegmentSize + tagCount*int32(tagSize)
+	if len(fields)%int(fieldSize) != 0 {
 		return dataformat.ErrWrongField
 	}
 	if (endoffset-beginoffset+1)*int(fieldSize) != len(fields) {
@@ -566,13 +562,13 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 
 	var writeStart = fsize
 
-	if (((int(fsize)-pre.Len)-1)/int(fieldSize) + 1) > beginoffset {
-		writeStart := int64(pre.Len + beginoffset*int(fieldSize))
+	if (((int(fsize)-preLen)-1)/int(fieldSize) + 1) > beginoffset {
+		writeStart := int64(preLen + beginoffset*int(fieldSize))
 		err = f.Truncate(writeStart)
 		if err != nil {
 			return err
 		}
-	} else if (((int(fsize)-pre.Len)-1)/int(fieldSize) + 1) < beginoffset {
+	} else if (((int(fsize)-preLen)-1)/int(fieldSize) + 1) < beginoffset {
 		return errUnmatchOffset
 	}
 	_, err = f.WriteAt(fields, writeStart)
@@ -696,7 +692,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 	return data, nil
 }
 
-func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) (segment []byte, tag []byte, err error) {
+func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) ([]byte, []byte, error) {
 	_, path := fs.encode(key)
 
 	f, err := os.OpenFile(path, os.O_RDONLY, 0666)
@@ -712,33 +708,39 @@ func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) (segment []b
 	fileSize := fInfo.Size()
 
 	fReader := bufio.NewReader(f)
-	prefix := make([]byte, 6*binary.MaxVarintLen64)
+	prefix := make([]byte, 8*binary.MaxVarintLen64)
 	_, err = fReader.Read(prefix)
 	if err != nil {
 		return nil, nil, err
 	}
-	pre, err := bf.PrefixDecode(prefix)
+
+	pre, preLen, err := bf.PrefixDecode(prefix)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	tagNum := 2 + (pre.ParityCount-1)/pre.DataCount
-	fieldSize := pre.SegmentSize + pre.TagSize*tagNum
+	tagSize, ok := dataformat.TagMap[int(pre.TagFlag)]
+	if !ok {
+		return nil, nil, dataformat.ErrWrongTagFlag
+	}
 
-	start := len(pre) + start*fieldSize
-	if uint64(fileSize) < start+fieldSize {
-		return nil, nil, ErrDataTooShort
+	tagNum := 2 + (pre.ParityCount-1)/pre.DataCount
+	fieldSize := uint64(pre.SegmentSize + tagNum*int32(tagSize))
+
+	start := uint64(preLen) + offset*fieldSize
+	if uint64(fileSize) < offset+fieldSize {
+		return nil, nil, dataformat.ErrDataTooShort
 	}
 
 	segment := make([]byte, pre.SegmentSize)
-	tag := make([]byte, pre.TagSize)
+	tag := make([]byte, tagSize)
 	//-------
 	n, err := f.ReadAt(segment, int64(start))
 	if err != nil {
 		return nil, nil, err
 	}
 	if n != int(pre.SegmentSize) {
-		return nil, nil, ErrCannotGetSegment
+		return nil, nil, dataformat.ErrCannotGetSegment
 	}
 	start += uint64(n)
 	//-------
@@ -746,18 +748,8 @@ func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) (segment []b
 	if err != nil {
 		return nil, nil, err
 	}
-	if n != int(pre.TagSize) {
-		return nil, nil, ErrCannotGetSegment
-	}
-	return segment, tag, nil
-
-	segment, tag, err = dataformat.GetSegAndTagFromFile(path, offset)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil, datastore.ErrNotFound
-		}
-		// no specific error to return, so just pass it through
-		return nil, nil, err
+	if n != int(tagSize) {
+		return nil, nil, dataformat.ErrCannotGetSegment
 	}
 
 	return segment, tag, nil

@@ -492,7 +492,7 @@ func (l *LfsInfo) flushBucketInfoToProvider(bucket *superBucket) error {
 	}
 	ncidPrefix := bm.ToString(3)
 
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int32(MetaBackupCount-1), l.keySet)
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int(MetaBackupCount-1), l.keySet)
 
 	dataEncoded, offset, err := enc.Encode(BucketBuffer.Bytes(), ncidPrefix, 0)
 	if err != nil {
@@ -651,7 +651,7 @@ func (l *LfsInfo) flushObjectsInfoToProvider(bucket *superBucket) error {
 	objectsBlockLength := 0
 
 	ctx := context.Background()
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, MetaBackupCount-1, l.keySet)
+	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int(MetaBackupCount-1), l.keySet)
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		object, ok := objectElement.Value.(*objectInfo)
 		if !ok {
