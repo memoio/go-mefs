@@ -3,6 +3,7 @@ package dataformat
 import (
 	"encoding/binary"
 	"hash/crc32"
+	"log"
 )
 
 // Tag constants
@@ -27,7 +28,21 @@ func (d *DataCoder) GenTagForSegment(index, data []byte) ([]byte, error) {
 	case BLS:
 		return nil, ErrWrongTagFlag
 	case BLS12:
-		return d.BlsKey.GenTag(index, data, 0, 32, true)
+		res, err := d.BlsKey.GenTag(index, data, 0, 32, true)
+		if err != nil {
+			return nil, err
+		}
+		indice := make([]string, 1)
+		indice[0] = string(index)
+		segs := make([][]byte, 1)
+		segs[0] = data
+		tags := make([][]byte, 1)
+		tags[0] = res
+		ok, err := d.BlsKey.VerifyDataForUser(indice, segs, tags, 32)
+		if err != nil || !ok {
+			log.Println("gentag and verify fails")
+		}
+		return res, nil
 	default:
 		return nil, ErrWrongTagFlag
 	}

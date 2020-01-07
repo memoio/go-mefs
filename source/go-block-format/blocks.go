@@ -6,6 +6,7 @@ package blocks
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	proto "github.com/gogo/protobuf/proto"
 	u "github.com/ipfs/go-ipfs-util"
@@ -101,16 +102,25 @@ func PrefixLen(data []byte) (int, int, error) {
 }
 
 func PrefixDecode(data []byte) (*pb.Prefix, int, error) {
-	len, n := proto.DecodeVarint(data[:10])
-	if n <= 0 {
+	log.Println(data[:60])
+
+	x, n := proto.DecodeVarint(data[:10])
+	if n <= 0 || x == 0 {
+		log.Println("wrong proto prefix message:", x, n)
 		return nil, 0, errors.New("wrong proto prefix message")
 	}
+
+	if n+int(x) > len(data) {
+		log.Println("short proto prefix message:", x, n)
+		return nil, 0, errors.New("short proto prefix message")
+	}
+
 	pre := new(pb.Prefix)
-	err := proto.Unmarshal(data[n:n+int(len)], pre)
+	err := proto.Unmarshal(data[n:n+int(x)], pre)
 	if err != nil {
 		return nil, 0, err
 	}
-	return pre, n + int(len), nil
+	return pre, n + int(x), nil
 }
 
 func PrefixEncode(pre *pb.Prefix) ([]byte, int, error) {

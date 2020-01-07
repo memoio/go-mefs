@@ -33,16 +33,6 @@ func NewDefaultDataCoder(policy, dataCount, pairtyCount int, keyset *mcl.KeySet)
 	return NewDataCoder(policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, keyset)
 }
 
-// NewDataCoderWithPrefix creates a new datacoder with prefix
-func NewDataCoderWithPrefix(p *pb.Prefix, k *mcl.KeySet) *DataCoder {
-	d := &DataCoder{
-		Prefix: p,
-		BlsKey: k,
-	}
-	d.PreCompute()
-	return d
-}
-
 // 构建一个dataformat配置
 func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount int, keyset *mcl.KeySet) *DataCoder {
 	if segmentSize < DefaultSegmentSize {
@@ -59,6 +49,7 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 	}
 
 	pre := &pb.Prefix{
+		Version:      int32(version),
 		Policy:       int32(policy),
 		DataCount:    int32(dataCount),
 		ParityCount:  int32(parityCount),
@@ -67,9 +58,14 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 		SegmentCount: int32(segCount),
 	}
 
+	return NewDataCoderWithPrefix(pre, keyset)
+}
+
+// NewDataCoderWithPrefix creates a new datacoder with prefix
+func NewDataCoderWithPrefix(p *pb.Prefix, k *mcl.KeySet) *DataCoder {
 	d := &DataCoder{
-		Prefix: pre,
-		BlsKey: keyset,
+		Prefix: p,
+		BlsKey: k,
 	}
 	d.PreCompute()
 	return d
@@ -101,14 +97,9 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 	dc := int(d.Prefix.DataCount)
 	pc := int(d.Prefix.ParityCount)
 
-	endSegment := (len(data) - 1) / (d.segSize * dc)
+	endSegment := 1 + (len(data)-1)/(d.segSize*dc)
 
-	blockSize := d.fieldSize * (endSegment + 1)
-
-	blockGroup := make([][]byte, d.blockCount)
-	for i := 0; i < len(blockGroup); i++ {
-		blockGroup[i] = make([]byte, 0, blockSize)
-	}
+	blockSize := d.fieldSize * endSegment
 
 	var stripe [][]byte
 	if start == 0 {
@@ -117,18 +108,24 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			return nil, 0, err
 		}
 
-		stripe = creatGroup(d.blockCount, blockSize+preLen)
-		for i := 0; i < len(stripe); i++ {
+		log.Println(preData)
+
+		stripe = make([][]byte, d.blockCount)
+		for i := 0; i < d.blockCount; i++ {
+			stripe[i] = make([]byte, 0, blockSize+preLen)
 			stripe[i] = append(stripe[i], preData...)
 		}
 	} else {
-		stripe = creatGroup(d.blockCount, blockSize)
+		stripe = make([][]byte, d.blockCount)
+		for i := 0; i < len(stripe); i++ {
+			stripe[i] = make([]byte, 0, blockSize)
+		}
 	}
 
 	// 生成临时块组保存data切分后的segment
-	dataGroup := creatGroup(d.blockCount, d.segSize)
+	dataGroup := createGroup(d.blockCount, d.segSize)
 	// 生成taggroup装一组的tag+tagP
-	tagGroup := creatGroup(d.blockCount*d.tagCount, d.tagSize)
+	tagGroup := createGroup(d.blockCount*d.tagCount, d.tagSize)
 
 	enc, err := reedsolomon.New(int(dc), int(pc))
 	if err != nil {
@@ -140,24 +137,27 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 		return nil, 0, err
 	}
 
-	for i := 0; i <= endSegment && data != nil; i++ {
+	for i := 0; i < endSegment && len(data) != 0; i++ {
 		clearGroup(dataGroup)
 		clearGroup(tagGroup)
-		for j := 0; j < int(dc); j++ {
+		for j := 0; j < dc; j++ {
 			// 填充数据
-			if len(data) < int(d.segSize) {
+			if len(data) < d.segSize {
 				copy(dataGroup[j], data)
-				data = nil
-				break
+				data = data[:0]
+			} else {
+				copy(dataGroup[j], data[:d.segSize])
+				data = data[d.segSize:]
 			}
-			copy(dataGroup[j], data[:d.segSize])
-			data = data[d.segSize:]
 		}
 
 		switch d.Prefix.Policy {
 		case MulPolicy:
 			for j := dc; j < d.blockCount; j++ {
-				copy(dataGroup[j], dataGroup[0])
+				res := copy(dataGroup[j], dataGroup[0])
+				if res != d.segSize {
+					log.Println("copied: ", res)
+				}
 			}
 		case RsPolicy:
 			err = enc.Encode(dataGroup)
@@ -173,13 +173,14 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			// 生成tag并装进taggroup，index为peerid_bucketid_stripeid_blockid_offsetid
 			res.Reset()
 			res.WriteString(ncidPrefix)
-			res.WriteString(metainfo.DELIMITER)
+			res.WriteString(metainfo.BLOCK_DELIMITER)
 			res.WriteString(strconv.Itoa(j))
-			res.WriteString(metainfo.DELIMITER)
+			res.WriteString(metainfo.BLOCK_DELIMITER)
 			res.WriteString(strconv.Itoa(i))
 
 			tag, err := d.GenTagForSegment([]byte(res.String()), dataGroup[j])
 			if err != nil {
+				log.Println("gentag err for: ", res.String())
 				return nil, 0, err
 			}
 			copy(tagGroup[j], tag)
@@ -190,9 +191,20 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			return nil, 0, err
 		}
 		// 生成Field结构，此时beginOffset为下一个Field的起始偏移
-		stripe = createFields(stripe, dataGroup, tagGroup)
+
+		for j := 0; j < d.blockCount; j++ {
+			stripe[j] = append(stripe[j], dataGroup[j]...)
+		}
+
+		for j := 0; j < d.blockCount*d.tagCount; {
+			for k := 0; k < d.blockCount; k++ {
+				stripe[k] = append(stripe[k], tagGroup[j]...)
+				j++
+			}
+		}
 	}
-	return stripe, start + endSegment, nil
+	// endoffset
+	return stripe, start + endSegment - 1, nil
 }
 
 func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) {
@@ -205,29 +217,30 @@ func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) 
 			if err != nil {
 				return nil, err
 			}
+		} else {
+			data = rawData
 		}
 	case MulPolicy:
+		data = rawData
 	default:
 		return nil, ErrWrongPolicy
 	}
 
-	// 根据offset构建空的文件数据
-	count := 1 + (len(data[0])-d.prefixSize-1)/d.fieldSize
+	segStart := start
+	segLength := 1 + (length-1)/(int(d.Prefix.DataCount)*d.segSize)
+
 	if length == -1 {
-		length = count - start
+		segLength = 1 + (len(data[0])-d.prefixSize-1)/d.fieldSize - segStart
 	}
 
-	if length <= 0 || start+length > count {
-		return nil, ErrDataTooShort
-	}
-
-	res := make([]byte, 0, length*d.blockCount)
+	res := make([]byte, 0, segLength*int(d.Prefix.DataCount)*d.segSize)
 	// 根据offset从每个块中提取Field的data
-	for i := start; i < start+length; i++ {
+	for i := segStart; i < segStart+segLength; i++ {
 		for j := 0; j < int(d.Prefix.DataCount); j++ {
 			res = append(res, data[j][d.prefixSize+i*d.fieldSize:d.prefixSize+i*d.fieldSize+d.segSize]...)
 		}
 	}
+
 	return res, nil
 }
 
@@ -271,8 +284,8 @@ func (d *DataCoder) RecoverStripe(stripe [][]byte) ([][]byte, error) {
 	}
 
 	// 创建临时Data组用以恢复segment，临时tag组用以恢复tag和tagp
-	tmpData := creatGroup(d.blockCount, int(d.segSize))
-	tmpTag := creatGroup(d.blockCount*d.tagCount, d.tagSize)
+	tmpData := createGroup(d.blockCount, int(d.segSize))
+	tmpTag := createGroup(d.blockCount*d.tagCount, d.tagSize)
 	// 解析出data、tag、tagP
 	for i := 0; i < d.DataCount; i++ {
 		clearGroup(tmpData)
@@ -362,10 +375,10 @@ func (d *DataCoder) decodeField(data []byte, tagNum int) ([]byte, [][]byte) {
 }
 
 // 创建空的数据冗余块组
-func creatGroup(count, blockSize int) [][]byte {
+func createGroup(count, blockSize int) [][]byte {
 	blockgroup := make([][]byte, count)
 	for i := 0; i < len(blockgroup); i++ {
-		blockgroup[i] = make([]byte, 0, blockSize)
+		blockgroup[i] = make([]byte, blockSize)
 	}
 	return blockgroup
 }
@@ -373,7 +386,7 @@ func creatGroup(count, blockSize int) [][]byte {
 // 使冗余块组内数据置0
 func clearGroup(group [][]byte) {
 	for i := 0; i < len(group); i++ {
-		for j := 0; j < len(group[0]); j++ {
+		for j := 0; j < len(group[i]); j++ {
 			group[i][j] = 0
 		}
 	}

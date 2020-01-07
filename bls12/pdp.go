@@ -166,7 +166,7 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 
 	atoms, err := splitSegmentToAtoms(segments, typ)
 	if err != nil {
-		return nil, ErrGenTag
+		return nil, err
 	}
 
 	if len(atoms)+start > PDPCount {

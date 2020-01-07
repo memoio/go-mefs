@@ -2,10 +2,12 @@ package dataformat
 
 import (
 	"errors"
+	"log"
 	"strconv"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 const (
@@ -35,22 +37,21 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 		return false, ErrDataTooShort
 	}
 	pre, preLen, err := bf.PrefixDecode(data)
-	if err != nil {
+	if err != nil || pre.GetVersion() == 0 || pre.GetDataCount() == 0 {
 		return false, err
 	}
 
-	tagSize, ok := TagMap[int(pre.TagFlag)]
+	dataLen := len(data) - preLen
+
+	s, ok := TagMap[int(pre.TagFlag)]
 	if !ok {
-		return false, ErrWrongTagFlag
+		s = 48
 	}
 
-	tagCount := int(2 + (pre.ParityCount-1)/pre.DataCount)
+	fieldSize := int(pre.SegmentSize) + s*int(2+(pre.ParityCount-1)/pre.DataCount)
 
-	fieldSize := int(pre.SegmentSize) + tagCount*tagSize
-
-	dataLen := len(data)
-
-	if (dataLen-preLen)/fieldSize < start+length {
+	if dataLen < start*fieldSize+(1+(length-1)/int(pre.DataCount*pre.SegmentSize))*fieldSize {
+		log.Println("has:", dataLen, "need:", start*fieldSize+1+(length-1)/int(pre.DataCount))
 		return false, nil
 	}
 
@@ -65,7 +66,8 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 	}
 
 	pre, preLen, err := bf.PrefixDecode(data)
-	if err != nil {
+	if err != nil || pre.GetVersion() == 0 || pre.GetDataCount() == 0 {
+		log.Println("prefix is not good:", pre)
 		return false
 	}
 
@@ -81,13 +83,14 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 	tags := make([][]byte, count)
 	indices := make([]string, count)
 	for i := 0; i < count; i++ {
-		indices[i] = ncid + "_" + strconv.Itoa(i)
-		segments[i] = noPreRawdata[i*d.fieldSize : i*d.fieldSize+d.segSize]
-		tags[i] = noPreRawdata[i*d.fieldSize+d.segSize : i*d.fieldSize+d.segSize+d.tagSize]
+		indices[i] = ncid + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
+		segments[i] = append(segments[i], noPreRawdata[i*d.fieldSize:i*d.fieldSize+d.segSize]...)
+		tags[i] = append(tags[i], noPreRawdata[i*d.fieldSize+d.segSize:i*d.fieldSize+d.segSize+d.tagSize]...)
 	}
 
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
 	if !ok || err != nil {
+		log.Println("tag is wrong:", err)
 		return false
 	}
 	return true

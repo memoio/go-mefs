@@ -168,7 +168,7 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 func (do *downloadTask) Start(ctx context.Context) error {
 	curStripe := do.curStripe + 1
 	segStart := do.segOffset
-	dStart := do.dStart
+	dStart := do.dStart // 0
 	dc := do.decoder.Prefix.DataCount
 	segSize := do.decoder.Prefix.DataCount
 	stripeSize := int64(utils.BlockSize * dc)
@@ -269,7 +269,6 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	}
 
 	var count int32
-	var data []byte
 	needRepair := true //是否需要修复
 	datas := make([][]byte, blockCount)
 
@@ -303,12 +302,13 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		blkData := b.RawData()
 		//需要检查数据块的长度也没问题
 		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(remain))
-		if !ok {
+		if !ok || err != nil {
 			log.Printf("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
 			continue
 		}
 
-		if ok := ds.decoder.VerifyBlock(blkData, ncid); !ok || err != nil {
+		ok = ds.decoder.VerifyBlock(blkData, ncid)
+		if !ok {
 			log.Println("Verify Block failed.", ncid, "from:", provider)
 			continue
 		}
@@ -343,52 +343,31 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	}
 
 	ds.decoder.Repair = needRepair
-	data, err = ds.decoder.Decode(datas, int(segStart), -1)
+	// decode returns bytes of 16B
+	data, err := ds.decoder.Decode(datas, int(segStart), int(offset+remain))
 	if err != nil {
 		log.Println("Download failed-", err)
 		return 0, err
+	}
+
+	if ds.encrypt {
+		padding := aes.BlockSize - ((offset+remain-1)%aes.BlockSize + 1)
+		data = data[:offset+remain+padding]
+		data, err = aes.AesDecrypt(data, ds.sKey[:])
+		if err != nil {
+			log.Println("Download failed-", err)
+			return 0, err
+		}
+		data = data[:len(data)-int(padding)]
+		if remain+offset > int64(len(data)) {
+			return 0, ErrCannotGetEnoughBlock
+		}
 	}
 
 	if remain+offset > int64(len(data)) {
 		return 0, ErrCannotGetEnoughBlock
 	}
 
-	if int64(len(data)) > remain+offset {
-		if ds.encrypt {
-			padding := aes.BlockSize - ((remain-1)%aes.BlockSize + 1)
-			data = data[:remain+padding] //此处时因为获取的为整块，而文件所需只占里面一部分
-			// 先解密，再去padding
-			data, err = aes.AesDecrypt(data, ds.sKey[:])
-			if err != nil {
-				log.Println("Download failed-", err)
-				return 0, err
-			}
-			data = data[:len(data)-int(padding)]
-			if remain+offset > int64(len(data)) {
-				return 0, ErrCannotGetEnoughBlock
-			}
-		}
-
-		if remain+offset > int64(len(data)) {
-			return 0, ErrCannotGetEnoughBlock
-		}
-
-		_, err = ds.writer.Write(data[offset : offset+remain])
-		if err != nil {
-			return 0, err
-		}
-		return remain, nil
-	}
-
-	if ds.encrypt {
-		data, err = aes.AesDecrypt(data, ds.sKey[:])
-		if err != nil {
-			log.Println("Download failed-", err)
-			return 0, err
-		}
-	}
-
-	//使用匿名函数调度
 	wl, err := ds.writer.Write(data[offset : offset+remain])
 	if err != nil {
 		return 0, err

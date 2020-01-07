@@ -73,6 +73,9 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 		return nil, ErrPolicy
 	}
 
+	bucket.Lock()
+	defer bucket.Unlock()
+
 	object := &objectInfo{
 		ObjectInfo: pb.ObjectInfo{
 			Name:        objectName,
@@ -176,7 +179,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	breakFlag := false
 
 	blockMetas := make([]blockMeta, bc)
-	data := make([]byte, readByte)
+	rdata := make([]byte, readByte)
+	data := make([]byte, 0, readByte)
+	extra := make([]byte, 0, readByte)
 
 	h := md5.New()
 Loop:
@@ -186,9 +191,15 @@ Loop:
 			log.Println("上传取消")
 			return nil
 		default:
-			readLen := readByte - int(u.curOffset)*readUnit
+			// clear itself
+			data = data[:0]
+			if len(extra) > 0 {
+				data = append(data, extra...)
+				extra = extra[:0]
+			}
+			readLen := readByte - int(u.curOffset)*readUnit - len(extra)
 			//尽量一次性读一整个stripe所需数据
-			n, err := io.ReadAtLeast(u.reader, data, readLen)
+			n, err := io.ReadAtLeast(u.reader, rdata, readLen)
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				breakFlag = true
 			} else if err != nil {
@@ -196,17 +207,22 @@ Loop:
 			}
 
 			// need handle n > readLen
-			tmp := data[:n]
+			if n > readLen {
+				data = append(data, rdata[:readLen]...)
+				extra = append(extra, rdata[readLen:n]...)
+			} else {
+				data = append(data, rdata[:n]...)
+			}
 
 			// 对整个文件的数据进行MD5校验
-			h.Write(tmp)
+			h.Write(data)
 
 			// encrypt
 			if u.encrypt {
-				if len(tmp)%aes.BlockSize != 0 {
-					tmp = aes.PKCS5Padding(tmp)
+				if len(data)%aes.BlockSize != 0 {
+					data = aes.PKCS5Padding(data)
 				}
-				tmp, err = aes.AesEncrypt(tmp, u.sKey[:])
+				data, err = aes.AesEncrypt(data, u.sKey[:])
 				if err != nil {
 					return err
 				}
@@ -219,7 +235,7 @@ Loop:
 				return err
 			}
 
-			encodedData, offset, err := enc.Encode(tmp, bm.ToString(3), int(u.curOffset))
+			encodedData, offset, err := enc.Encode(data, bm.ToString(3), int(u.curOffset))
 			if err != nil {
 				log.Println("encodedData", err)
 				return err
@@ -303,7 +319,7 @@ Loop:
 				}
 			}
 			u.length += int64(n)
-			if offset >= int(utils.SegementCount-1) { //如果写满了一个stripe
+			if offset >= int(u.encoder.Prefix.GetSegmentCount()-1) { //如果写满了一个stripe
 				u.curStripe++
 				u.curOffset = 0
 			} else {
