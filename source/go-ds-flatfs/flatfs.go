@@ -556,24 +556,31 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 	if len(fields)%int(fieldSize) != 0 {
 		return dataformat.ErrWrongField
 	}
+
 	if (endoffset-beginoffset+1)*int(fieldSize) != len(fields) {
 		return errUnmatchOffset
 	}
 
-	var writeStart = fsize
+	writeStart := fsize
 
-	if (((int(fsize)-preLen)-1)/int(fieldSize) + 1) > beginoffset {
-		writeStart := int64(preLen + beginoffset*int(fieldSize))
+	segStart := ((int(fsize)-preLen)-1)/int(fieldSize) + 1
+	if segStart > beginoffset {
+		writeStart = int64(preLen + beginoffset*int(fieldSize))
 		err = f.Truncate(writeStart)
 		if err != nil {
 			return err
 		}
-	} else if (((int(fsize)-preLen)-1)/int(fieldSize) + 1) < beginoffset {
+	} else if segStart < beginoffset {
 		return errUnmatchOffset
 	}
-	_, err = f.WriteAt(fields, writeStart)
+
+	n, err := f.WriteAt(fields, writeStart)
 	if err != nil {
 		return err
+	}
+
+	if n != len(fields) {
+		log.Error("append file fails")
 	}
 
 	if fs.sync {

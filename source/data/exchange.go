@@ -216,7 +216,7 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 
 // key: blockID/"Block"/start/end
 func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to string) error {
-	log.Println("append block: ", key)
+	log.Println("append block: ", key, "to: ", to)
 	skey := strings.Split(key, metainfo.DELIMITER)
 	if len(skey) < 4 {
 		return metainfo.ErrIllegalKey
