@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 
+	ggio "github.com/gogo/protobuf/io"
 	proto "github.com/gogo/protobuf/proto"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
@@ -14,8 +17,38 @@ func main() {
 		ParityCount: 200000000,
 	}
 
+	sbBuffer := bytes.NewBuffer(nil)
+	sbWriter := ggio.NewDelimitedWriter(sbBuffer)
+
+	err := sbWriter.WriteMsg(pre)
+	if err != nil {
+		return
+	}
+
+	pad := make([]byte, 0, 60)
+	for i := 0; i < 60; i++ {
+		pad = append(pad, []byte{1}...)
+	}
+
+	data := sbBuffer.Bytes()
+	data = append(data, pad...)
+
+	fmt.Println(sbBuffer.Len())
+	sbBuffer.Reset()
+	sbBuffer = bytes.NewBuffer(data)
+	fmt.Println(sbBuffer.Len())
+
+	newpre := new(pb.Prefix)
+	sbReader := ggio.NewDelimitedReader(sbBuffer, 60)
+	err = sbReader.ReadMsg(newpre)
+	if err != nil && err != io.EOF {
+		return
+	}
+
+	fmt.Println(newpre)
+
 	fmt.Println(proto.Size(pre))
-	preData, err := bf.PrefixEncode(pre)
+	preData, _, err := bf.PrefixEncode(pre)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -23,10 +56,6 @@ func main() {
 
 	fmt.Println(preData)
 
-	pad := make([]byte, 0, 10)
-	for i := 0; i < 10; i++ {
-		pad = append(pad, []byte{1}...)
-	}
 	preData = append(preData, pad...)
 
 	fmt.Println(preData)
