@@ -10,6 +10,7 @@ import (
 	"log"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/memoio/go-mefs/crypto/aes"
@@ -178,13 +179,13 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 	breakFlag := false
 
-	data := make([]byte, 0, readByte)
 	rdata := make([]byte, readByte)
 	extra := make([]byte, 0, readByte)
 
 	h := md5.New()
 
 	var wg sync.WaitGroup
+	parllel := int32(0)
 	for !breakFlag {
 		select {
 		case <-ctx.Done():
@@ -192,7 +193,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			return nil
 		default:
 			// clear itself
-			data = data[:0]
+			data := make([]byte, 0, readByte)
 			readLen := readByte - int(u.curOffset)*readUnit - len(extra)
 			if len(extra) > 0 {
 				data = append(data, extra...)
@@ -218,31 +219,39 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			// encrypt
-			if u.encrypt {
-				if len(data)%aes.BlockSize != 0 {
-					data = aes.PKCS5Padding(data)
+			offset := int(u.curOffset) + 1 + (len(data)-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+
+			for {
+				if atomic.LoadInt32(&parllel) < 32 {
+					break
 				}
-				data, err = aes.AesEncrypt(data, u.sKey[:])
-				if err != nil {
-					return err
-				}
+				time.Sleep(5 * time.Second)
 			}
-
-			bm, err := metainfo.NewBlockMeta(u.fsID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(int(u.curStripe)), "0")
-			if err != nil {
-				return err
-			}
-
-			encodedData, offset, err := enc.Encode(data, bm.ToString(3), int(u.curOffset))
-			if err != nil {
-				log.Println("encodedData", err)
-				return err
-			}
-
+			atomic.AddInt32(&parllel, 1)
 			wg.Add(1)
-			go func(data [][]byte, bcid string, start, end int) {
+
+			go func(data []byte, stripeID, start int) {
 				defer wg.Done()
+				defer atomic.AddInt32(&parllel, -1)
+				// encrypt
+				if u.encrypt {
+					if len(data)%aes.BlockSize != 0 {
+						data = aes.PKCS5Padding(data)
+					}
+					data, err = aes.AesEncrypt(data, u.sKey[:])
+					if err != nil {
+						return
+					}
+				}
+
+				bm, _ := metainfo.NewBlockMeta(u.fsID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
+
+				encodedData, offset, err := enc.Encode(data, bm.ToString(3), start)
+				if err != nil {
+					log.Println("encodedData", err)
+					return
+				}
+
 				var count int
 				blockMetas := make([]blockMeta, bc)
 				for k := 0; k < 3; k++ {
@@ -255,7 +264,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						}
 
 						for i := 0; i < bc; i++ {
-							ncid := bcid + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
+							bm.SetCid(strconv.Itoa(i))
+							ncid := bm.ToString()
 							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
 							blockMetas[i].cid = ncid
 							blockMetas[i].offset = offset
@@ -275,9 +285,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						for i := 0; i < bc; i++ {
 							bm.SetCid(strconv.Itoa(i))
 							ncid := bm.ToString()
-							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(end))
+							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(offset))
 							blockMetas[i].cid = ncid
-							blockMetas[i].offset = end
+							blockMetas[i].offset = offset
 							blockMetas[i].provider = u.fsID
 
 							provider, _, err := u.gInfo.getBlockProviders(ncid)
@@ -309,7 +319,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						return
 					}
 				}
-			}(encodedData, bm.ToString(3), int(u.curOffset), offset)
+			}(data, int(u.curStripe), int(u.curOffset))
 
 			u.length += int64(n)
 			if offset >= int(u.encoder.Prefix.GetSegmentCount()-1) { //如果写满了一个stripe

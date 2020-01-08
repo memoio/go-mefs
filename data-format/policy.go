@@ -108,8 +108,6 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			return nil, 0, err
 		}
 
-		log.Println(preData)
-
 		stripe = make([][]byte, d.blockCount)
 		for i := 0; i < d.blockCount; i++ {
 			stripe[i] = make([]byte, 0, blockSize+preLen)
