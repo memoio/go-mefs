@@ -58,7 +58,7 @@ const (
 	psKwd                     = "providerSla"
 	passwordKwd               = "password"
 	secretKeyKwd              = "secretKey"
-	reDeployOfferKwd          = "reDeployOffer"
+	reDeploy                  = "reDeployContract"
 	netKeyKwd                 = "netKey"
 	posKwd                    = "pos"
 	gcKwd                     = "cleanPos"
@@ -144,7 +144,7 @@ environment variable:
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
-		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(false),
+		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
@@ -387,7 +387,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
-	rdo, ok := req.Options[reDeployOfferKwd].(bool)
+	rdo, ok := req.Options[reDeploy].(bool)
 	if !ok {
 		fmt.Println("input wrong value for redeploy.")
 		return errRepoExists
