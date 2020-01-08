@@ -45,12 +45,9 @@ func main() {
 	fmt.Println("用于转账的账号余额:", num)
 
 	var (
-		capacity int64 = 10000
+		capacity int64 = 1000
 		duration int64 = 10000
 		price    int64 = 100000
-		ks             = 3
-		ps             = 5
-		reDeploy       = false
 	)
 
 	//ethEndPoint = *qeth //用正常的链（http://39.100.146.21:8101）给新建账户转账
@@ -66,45 +63,38 @@ func main() {
 	defer log.Println("==============finish test deployQuery successfully===============")
 
 	//ethEndPoint = *eth //用不正常的链（http://47.92.5.51:8101）部署query合约
-	log.Println("start deploy query")
-	queryAddr, err := contracts.DeployQuery(localAddr, userSk, capacity, duration, price, ks, ps, reDeploy)
+	log.Println("start deploy offer")
+	offerAddr, err := contracts.DeployOffer(localAddr, userSk, capacity, duration, price, false)
 	if err != nil {
-		log.Fatal("deploy Query fails", err)
+		log.Fatal("deploy offer fails", err)
 	}
 
-	log.Println("start set completed")
-	err = contracts.SetQueryCompleted(userSk, queryAddr)
-	if err != nil {
-		log.Fatal("set query completed fails")
-	}
-
-	log.Println("start get 'completed' params")
-	retryCount := 0
-	for {
-		retryCount++
-		queryItem, err := contracts.GetQueryInfo(localAddr, queryAddr)
-		if err != nil {
-			log.Fatal("get queryItem fails")
-		}
-		if queryItem.Completed {
-			break
-		}
-		if retryCount > 10 {
-			log.Fatal("'setCompleted' fails, the 'completed' is false")
-		}
-		time.Sleep(time.Minute)
-	}
-
-	log.Println("start get queryInfo from remote")
+	log.Println("start get offerInfo from remote")
 	contracts.EndPoint = qethEndPoint
-	queryItem, err := contracts.GetQueryInfo(localAddr, queryAddr)
+	offerGot, _, err := contracts.GetLatestOffer(localAddr, localAddr)
 	if err != nil {
-		log.Fatal("get queryItem from remote fails")
+		log.Fatal("get query from remote fails")
 	}
 
-	if queryItem.Capacity != capacity || queryItem.Duration != duration || queryItem.Price != price || queryItem.KeeperNums != int32(ks) || queryItem.ProviderNums != int32(ps) || !queryItem.Completed {
-		log.Println(queryItem)
-		log.Fatal("queryItem different from remote")
+	if offerGot.String() != offerAddr.String() {
+		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
+	}
+
+	log.Println("start deploy offer again")
+	offerAddr, err = contracts.DeployOffer(localAddr, userSk, capacity, duration, price, true)
+	if err != nil {
+		log.Fatal("redo deploy offer fails", err)
+	}
+
+	log.Println("start get offerInfo from remote")
+	contracts.EndPoint = qethEndPoint
+	offerGot, _, err = contracts.GetLatestOffer(localAddr, localAddr)
+	if err != nil {
+		log.Fatal("get query from remote fails")
+	}
+
+	if offerGot.String() != offerAddr.String() {
+		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
 	}
 
 }

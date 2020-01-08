@@ -247,7 +247,7 @@ func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *
 			From: localAddress,
 		}, key)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > 10 {
 				return indexerAddr, indexerInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -636,7 +636,7 @@ func GetMapperAddrFromIndexer(localAddress common.Address, key string, indexerIn
 			From: localAddress,
 		}, key)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > 10 {
 				log.Println("getMapperAddrErr:", err)
 				return mapperAddr, err
 			}
@@ -688,7 +688,7 @@ func DeployMapperToIndexer(localAddress common.Address, key, hexKey string, inde
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		mapperAddr, _, mapperInstance, err = mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > 10 {
 				log.Println("deployMapperErr:", err)
 				return mapperAddr, mapperInstance, err
 			}
@@ -835,7 +835,7 @@ func getLatestFromMapper(localAddress common.Address, mapperInstance *mapper.Map
 
 //CheckTx 通过交易详情检查交易是否触发了errorEvent
 func CheckTx(tx *types.Transaction) error {
-	log.Println("Tx hash:", tx.Hash().Hex())
+	log.Println("Check Tx hash:", tx.Hash().Hex())
 
 	var receipt *types.Receipt
 	for i := 0; i < 60; i++ {
