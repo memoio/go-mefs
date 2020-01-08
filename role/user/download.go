@@ -170,7 +170,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	segStart := do.segOffset
 	dStart := do.dStart // 0
 	dc := do.decoder.Prefix.DataCount
-	segSize := do.decoder.Prefix.DataCount
+	segSize := do.decoder.Prefix.SegmentSize
 	stripeSize := int64(utils.BlockSize * dc)
 
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面

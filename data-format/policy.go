@@ -137,7 +137,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 		return nil, 0, err
 	}
 
-	for i := 0; i < endSegment && len(data) != 0; i++ {
+	for i := start; i < start+endSegment && len(data) != 0; i++ {
 		clearGroup(dataGroup)
 		clearGroup(tagGroup)
 		for j := 0; j < dc; j++ {

@@ -9,9 +9,9 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
@@ -178,14 +178,14 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 	breakFlag := false
 
-	blockMetas := make([]blockMeta, bc)
-	rdata := make([]byte, readByte)
 	data := make([]byte, 0, readByte)
+	rdata := make([]byte, readByte)
 	extra := make([]byte, 0, readByte)
 
 	h := md5.New()
-Loop:
-	for { //循环上传每一个块
+
+	var wg sync.WaitGroup
+	for !breakFlag {
 		select {
 		case <-ctx.Done():
 			log.Println("上传取消")
@@ -193,12 +193,12 @@ Loop:
 		default:
 			// clear itself
 			data = data[:0]
+			readLen := readByte - int(u.curOffset)*readUnit - len(extra)
 			if len(extra) > 0 {
 				data = append(data, extra...)
 				extra = extra[:0]
 			}
-			readLen := readByte - int(u.curOffset)*readUnit - len(extra)
-			//尽量一次性读一整个stripe所需数据
+
 			n, err := io.ReadAtLeast(u.reader, rdata, readLen)
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				breakFlag = true
@@ -210,6 +210,7 @@ Loop:
 			if n > readLen {
 				data = append(data, rdata[:readLen]...)
 				extra = append(extra, rdata[readLen:n]...)
+				n = readLen
 			} else {
 				data = append(data, rdata[:n]...)
 			}
@@ -228,8 +229,6 @@ Loop:
 				}
 			}
 
-			//在这里先将数据编码
-			//这里只输入BucketID和StripeID，blockID后面动态改变
 			bm, err := metainfo.NewBlockMeta(u.fsID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(int(u.curStripe)), "0")
 			if err != nil {
 				return err
@@ -241,83 +240,77 @@ Loop:
 				return err
 			}
 
-			//如果是新的一个stripe，则需要重新找provider
-			var pros []string
-			if u.curOffset == 0 {
-				pros, _, err = u.gInfo.GetProviders(bc)
-				if pros == nil || len(pros) < least {
-					log.Println("putobject err：", ErrNoEnoughProvider)
-					return ErrNoEnoughProvider
-				}
-			}
+			wg.Add(1)
+			go func(data [][]byte, bcid string, start, end int) {
+				defer wg.Done()
+				var count int
+				blockMetas := make([]blockMeta, bc)
+				for k := 0; k < 3; k++ {
+					count = 0
+					if start == 0 {
+						pros, _, _ := u.gInfo.GetProviders(bc)
+						if len(pros) < least {
+							log.Println("putobject err：", ErrNoEnoughProvider)
+							return
+						}
 
-			//总共上传成功几个块
-			var count int
-			var provider string
-			for i := 0; i < bc; i++ {
-				bm.SetCid(strconv.Itoa(i))
-				ncid := bm.ToString()
-				var km *metainfo.KeyMeta
-
-				//如果是追加，则要找到上一个provider
-				if u.curOffset == 0 {
-					if i < len(pros) {
-						provider = pros[i]
-						km, _ = metainfo.NewKeyMeta(ncid, metainfo.Block)
-					} else {
-						blockMetas[i].cid = ncid
-						blockMetas[i].offset = offset
-						blockMetas[i].provider = u.fsID
-						continue
-					}
-					err = u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], provider)
-					if err != nil {
-						log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
-						continue
-					}
-					count++
-				} else {
-					provider, _, err = u.gInfo.getBlockProviders(ncid)
-					if err != nil || provider == u.fsID {
-						log.Println("Append Block to", provider, "failed:", err)
-						_, err := peer.IDB58Decode(provider)
-
-						if err == nil && provider != "" {
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = provider
-						} else {
+						for i := 0; i < bc; i++ {
+							ncid := bcid + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
+							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
 							blockMetas[i].cid = ncid
 							blockMetas[i].offset = offset
 							blockMetas[i].provider = u.fsID
+							if i > len(pros) {
+								continue
+							}
+							err := u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], pros[i])
+							if err != nil {
+								log.Println("Put Block", ncid, u.curOffset, offset, "to", pros[i], "failed:", err)
+								continue
+							}
+							count++
+							blockMetas[i].provider = pros[i]
 						}
-						continue
+					} else {
+						for i := 0; i < bc; i++ {
+							bm.SetCid(strconv.Itoa(i))
+							ncid := bm.ToString()
+							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(end))
+							blockMetas[i].cid = ncid
+							blockMetas[i].offset = end
+							blockMetas[i].provider = u.fsID
+
+							provider, _, err := u.gInfo.getBlockProviders(ncid)
+							if err != nil || provider == u.fsID {
+								continue
+							}
+
+							err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
+							if err != nil {
+								log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
+								continue
+							}
+							count++
+							blockMetas[i].provider = provider
+						}
 					}
-					km, _ = metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(u.curOffset)), strconv.Itoa(offset))
-					err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
+
+					//没有达到最低安全标准，返回错误
+					if count >= least {
+						time.Sleep(60 * time.Second)
+						break
+					}
+				}
+
+				for _, v := range blockMetas {
+					err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
 					if err != nil {
-						log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
-						continue
+						log.Println("putobject", err)
+						return
 					}
-					count++
 				}
+			}(encodedData, bm.ToString(3), int(u.curOffset), offset)
 
-				blockMetas[i].cid = ncid
-				blockMetas[i].offset = offset
-				blockMetas[i].provider = provider
-			}
-			//没有达到最低安全标准，返回错误
-			if count < least {
-				return ErrNoEnoughProvider
-			}
-
-			for _, v := range blockMetas {
-				err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
-				if err != nil {
-					log.Println("putobject", err)
-					return err
-				}
-			}
 			u.length += int64(n)
 			if offset >= int(u.encoder.Prefix.GetSegmentCount()-1) { //如果写满了一个stripe
 				u.curStripe++
@@ -327,9 +320,11 @@ Loop:
 			}
 			if breakFlag {
 				u.etag = hex.EncodeToString(h.Sum(nil))
-				break Loop
 			}
 		}
 	}
+
+	wg.Wait()
+
 	return nil
 }
