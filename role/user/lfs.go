@@ -324,6 +324,7 @@ func (l *LfsInfo) flushBucketAndObjects(bucket *superBucket, flag bool) error {
 	defer bucket.RUnlock()
 
 	if bucket.dirty || flag {
+		utils.MLogger.Info("flush buckets: ", zap.String("bucketname:", bucket.Name))
 		err := l.flushObjectsInfo(bucket)
 		if err != nil {
 			return err
@@ -341,9 +342,6 @@ func (l *LfsInfo) flushBucketAndObjects(bucket *superBucket, flag bool) error {
 
 //-----------------------Flush BucketMeta----------------------------
 func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
-
-	logger.Info("flush bucket length: ", zap.String("bucketname:", bucket.Name), zap.Int64("size:", bucket.ObjectsBlockSize))
-
 	bucketBuffer := bytes.NewBuffer(nil)
 	bucketDelimitedWriter := ggio.NewDelimitedWriter(bucketBuffer)
 	defer bucketDelimitedWriter.Close()

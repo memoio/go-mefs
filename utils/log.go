@@ -9,37 +9,61 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+// MLogger is global
+var MLogger *zap.SugaredLogger
+
+// MLoglevel is zap log level
+var MLoglevel zap.AtomicLevel
+
 // StartLogger starts
-func StartLogger(name string) *zap.SugaredLogger {
-	writerSyncer := getLogWriter(name)
+func StartLogger() {
+
+	MLoglevel = zap.NewAtomicLevel()
+
+	writerSyncer := getLogWriter()
 
 	encoder := getEncoder()
 
-	core := zapcore.NewCore(encoder, writerSyncer, zapcore.DebugLevel)
+	core := zapcore.NewCore(encoder, writerSyncer, MLoglevel)
 
 	logger := zap.New(core, zap.AddCaller())
 
-	return logger.Sugar()
+	MLogger = logger.Sugar()
+
+	MLoglevel.SetLevel(zapcore.DebugLevel)
+
+	MLogger.Info("Mefs Logger init success")
 }
 
 func getEncoder() zapcore.Encoder {
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	return zapcore.NewConsoleEncoder(encoderConfig)
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	return zapcore.NewJSONEncoder(encoderConfig)
 }
 
-func getLogWriter(name string) zapcore.WriteSyncer {
+func getLogWriter() zapcore.WriteSyncer {
 	root, err := mefsPath()
 	if err != nil {
 		root = "~/.mefs"
 	}
 
 	lumberJackLogger := &lumberjack.Logger{
-		Filename:   root + "/logs/" + name + ".log",
-		MaxSize:    10,
-		MaxBackups: 5,
-		MaxAge:     30,
+		Filename:   root + "/mefs.log",
+		MaxSize:    1024, //MB
+		MaxBackups: 3,
+		MaxAge:     30, //days
 		Compress:   false,
 	}
 	return zapcore.AddSync(lumberJackLogger)

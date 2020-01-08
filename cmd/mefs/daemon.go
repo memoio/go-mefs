@@ -321,9 +321,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if err != nil {
 		fmt.Println("node.Routing.CmdPut falied: ", err)
 	}
-	fmt.Println("role is:", value)
-	kvalue, _ := node.Data.GetKey(node.Context(), keystring, "local")
-	fmt.Println(string(kvalue))
 
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children
@@ -364,12 +361,14 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	fmt.Printf("Daemon is ready\n")
 
+	utils.StartLogger()
+
 	err = mcl.Init(mcl.BLS12_381)
 	if err != nil {
-		fmt.Println("Init BLS12_381 curve failed: ", err)
+		utils.MLogger.Errorf("Init BLS12_381 curve failed: ", err)
 		<-req.Context.Done()
 	} else {
-		fmt.Println("Init BLS12_381 curve success")
+		utils.MLogger.Info("Init BLS12_381 curve success")
 	}
 
 	capacity, ok := req.Options[capacityKwd].(int64)
@@ -418,7 +417,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 		node.Inst = ins
 
-		fmt.Println("Keeper daemon is ready")
+		utils.MLogger.Info("Keeper daemon is ready")
 
 	case metainfo.RoleUser:
 		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
@@ -428,7 +427,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		node.Inst = ins
 
-		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
+		utils.MLogger.Info("User daemon is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("started as a provider")
 		ins, err := provider.New(req.Context, node.Identity.Pretty(), sk, node.Data, node.Routing, capacity, duration, price, rdo)
@@ -439,7 +438,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		node.Inst = ins
 
-		fmt.Println("Provider daemon is ready")
+		utils.MLogger.Info("Provider daemon is ready")
 
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
@@ -510,6 +509,7 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 		corehttp.MutexFractionOption("/debug/pprof-mutex/"),
 		corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
 		corehttp.LogOption(),
+		corehttp.MLog(),
 	}
 
 	if len(cfg.Gateway.RootRedirect) > 0 {
