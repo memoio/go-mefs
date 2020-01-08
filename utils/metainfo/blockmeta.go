@@ -71,7 +71,7 @@ func NewBlockMeta(qid, bid, sid, cid string) (*BlockMeta, error) {
 		queryID:  qid,
 		bucketID: bid,
 		stripeID: sid,
-		chunkID:  bid,
+		chunkID:  cid,
 	}, nil
 }
 

@@ -12,7 +12,10 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"go.uber.org/zap"
 )
+
+var logger *zap.Logger
 
 //Info implements user service
 type Info struct {
@@ -55,6 +58,11 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 	if err != nil {
 		return nil, err
 	}
+
+	logger, _ = zap.NewProduction()
+	defer logger.Sync()
+
+	logger.Info("start user service")
 
 	return us, nil
 }
