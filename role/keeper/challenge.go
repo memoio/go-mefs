@@ -24,7 +24,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			utils.MLogger.Info("Challenge start at: ", utils.GetTimeNow())
+			utils.MLogger.Info("Regular challenge start")
 			pus := k.getUQKeys()
 			for _, pu := range pus {
 				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
@@ -113,7 +113,6 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	// key: qid/"Challenge"/uid/pid/kid/chaltime
 	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, userID, proID, localID, utils.UnixToString(challengetime))
 	if err != nil {
-		utils.MLogger.Info("construct challenge KV error :", err)
 		return "", nil, err
 	}
 	return km.ToString(), hByte, nil
@@ -128,7 +127,6 @@ func (l *lInfo) cleanLastChallenge() {
 	failChallTime := l.lastChalTime
 	thischalresult, ok := l.chalMap.Load(failChallTime)
 	if !ok {
-		utils.MLogger.Info("thischalinfo.chalMap.Load error!challengetime: ", failChallTime)
 		return
 	}
 
@@ -142,6 +140,7 @@ func (l *lInfo) cleanLastChallenge() {
 //handleProof handles the challenge result from provider
 //key: qid/"Challenge"/uid/pid/kid/chaltime,value: proof[/FaultBlocks]
 func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
+	utils.MLogger.Info("handleProof: ", km.ToString())
 	ops := km.GetOptions()
 	if len(ops) != 4 {
 		return false
@@ -189,7 +188,6 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 
 	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
 	if !ok {
-		utils.MLogger.Info("thischalinfo.chalMap.Load error!challengetime:", challengetime)
 		return false
 	}
 
@@ -215,7 +213,6 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 			set[s] = struct{}{}
 			chcid, _, err := utils.SplitIndex(s)
 			if err != nil {
-				utils.MLogger.Info("SplitIndex err:", err)
 				continue
 			}
 			cset[chcid] = struct{}{}
@@ -230,7 +227,6 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		buf.Reset()
 		chcid, off, err := utils.SplitIndex(index)
 		if err != nil {
-			utils.MLogger.Info("SplitIndex err:", err)
 			continue
 		}
 

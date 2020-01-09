@@ -43,7 +43,7 @@ type uploadTask struct { //一个上传任务实例
 
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
-	utils.MLogger.Info("PutObject: ", bucketName, objectName)
+	utils.MLogger.Infof("PutObject begin: ", bucketName, objectName)
 	if !l.online {
 		return nil, errors.New("user is not running")
 	}
@@ -133,6 +133,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	bucket.NextOffset = ul.curOffset
 	bucket.dirty = true
 
+	utils.MLogger.Info("PutObject end: ", bucketName, objectName)
 	return &object.ObjectInfo, nil
 }
 

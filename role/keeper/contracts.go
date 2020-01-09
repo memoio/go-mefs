@@ -41,7 +41,7 @@ func (g *groupInfo) getContracts(mode bool) error {
 
 		// not my user
 		if !flag {
-			utils.MLogger.Info(g.userID, "is not my user")
+			utils.MLogger.Info(g.userID, " is not my user")
 			return errors.New("Not my user")
 		}
 
@@ -63,7 +63,6 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 
 	providerAddr, err := address.GetAddressFromID(pid)
 	if err != nil {
-		utils.MLogger.Info("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
@@ -76,13 +75,11 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 
 	userAddr, err := address.GetAddressFromID(uid)
 	if err != nil {
-		utils.MLogger.Info("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
 	queryAddr, err := address.GetAddressFromID(gid)
 	if err != nil {
-		utils.MLogger.Info("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
@@ -90,7 +87,7 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 		utils.MLogger.Info("add provider to: ", userAddr)
 		err = contracts.AddProvider(sk, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 		if err != nil {
-			utils.MLogger.Info("ukAddProvider AddProvider() error", err)
+			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err
 		}
 	}

@@ -81,7 +81,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		var temp mcl.G1
 		err = temp.Deserialize(u)
 		if err != nil {
-			utils.MLogger.Info("temp.Deserialize(u) failed :", err)
+			utils.MLogger.Info("Deserialize failed: ", err)
 		}
 		pk.ElemG1s[i] = temp
 	}
@@ -90,7 +90,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		var temp mcl.G2
 		err = temp.Deserialize(w)
 		if err != nil {
-			utils.MLogger.Info("temp.Deserialize(u) failed :", err)
+			utils.MLogger.Info("Deserialize failed: ", err)
 		}
 		pk.ElemG2s[i] = temp
 	}

@@ -96,13 +96,11 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	var item KeeperItem
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
 	keeperAddress, err := address.GetAddressFromID(keeperID)
 	if err != nil {
-		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
@@ -153,13 +151,11 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	var item ProviderItem
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
-		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
@@ -206,14 +202,13 @@ func IsProvider(userID string) (bool, error) {
 func DeployOffer(localID, sk string, capacity, duration, price int64, redo bool) (offerID string, err error) {
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		utils.MLogger.Info("getLocalAddr err: ", err)
 		return offerID, err
 	}
 
 	//获得用户的账户余额
 	balance, err := contracts.QueryBalance(localAddress.Hex())
 	if err == nil {
-		utils.MLogger.Info("balance is: ", balance)
+		utils.MLogger.Infof("%s (%s) has balance: %s", localID, localAddress.Hex(), balance)
 	}
 
 	offerAddr, err := contracts.DeployOffer(localAddress, sk, capacity, duration, price, redo)
@@ -289,7 +284,7 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 
 	oAddrs, err := contracts.GetOfferAddrs(userAddr, proAddr)
 	if err != nil {
-		utils.MLogger.Info("get", proAddr.String(), "'s offer address err ")
+		utils.MLogger.Info("get ", proID, " 's offer address err: ", err)
 		return item, err
 	}
 
@@ -316,7 +311,7 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	// getbalance
 	balance, err := contracts.QueryBalance(uaddr.String())
 	if err == nil {
-		utils.MLogger.Info(uaddr.String(), " has balance (wei): ", balance)
+		utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
 	}
 
 	//balance >? query + upKeeping + channel cost
@@ -337,7 +332,7 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	// deploy query
 	queryAddr, err := contracts.DeployQuery(uaddr, sk, storeSize, storeDays, storePrice, ks, ps, rdo)
 	if err != nil {
-		utils.MLogger.Info("fail to deploy query contract")
+		utils.MLogger.Warn("fail to deploy query contract: ", err)
 		return queryID, err
 	}
 
@@ -780,14 +775,12 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	//私钥格式转换
 	skECDSA, err := utils.HexskToECDSAsk(hexKey)
 	if err != nil {
-		utils.MLogger.Info("HexskToECDSAskErr:", err)
 		return sig, err
 	}
 
 	//私钥对上述哈希值签名
 	sig, err = crypto.Sign(hash, skECDSA)
 	if err != nil {
-		utils.MLogger.Info("signForChannelErr:", err)
 		return sig, err
 	}
 	return sig, nil
@@ -822,19 +815,17 @@ func GetKeepersOfPro(peerID string) ([]string, bool) {
 func SaveKpMap(peerID string) error {
 	localAddr, err := address.GetAddressFromID(peerID)
 	if err != nil {
-		utils.MLogger.Info("saveKpMap GetAddressFromID() error", err)
 		return err
 	}
 	kps, err := contracts.GetAllKeeperInKPMap(localAddr)
 	if err != nil {
-		utils.MLogger.Info("saveKpMap GetAllKeepers() error", err)
 		return err
 	}
 
 	for _, kpaddr := range kps {
 		pids, err := contracts.GetProviderInKPMap(localAddr, kpaddr)
 		if err != nil {
-			utils.MLogger.Info("get provider from kpmap err:", err)
+			continue
 		}
 		if len(pids) > 0 {
 			keeperID, _ := address.GetIDFromAddress(kpaddr.String())

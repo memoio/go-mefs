@@ -32,7 +32,7 @@ type Service interface {
 
 	TestConnect() error
 	Connect(ctx context.Context, to string) bool
-	GetPeers() []peer.ID
+	GetPeers() ([]peer.ID, error)
 	GetExternalAddr(p string) ([]byte, error)
 	BlockStore() bs.Blockstore
 	DataStore() ds.Datastore

@@ -176,7 +176,11 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 }
 
 func (k *Info) checkConnectedPeer(ctx context.Context) error {
-	connPeers := k.ds.GetPeers() //the list of peers we are connected to
+	connPeers, err := k.ds.GetPeers() //the list of peers we are connected to
+	if err != nil {
+		return err
+	}
+
 	for _, pid := range connPeers {
 		id := pid.Pretty() //连接结点id的base58编码
 

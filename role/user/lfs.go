@@ -18,7 +18,6 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	"go.uber.org/zap"
 )
 
 // LfsInfo has lfs info
@@ -133,10 +132,10 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 		for _, bucket := range l.meta.bucketByID {
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
 			if err != nil {
-				utils.MLogger.Info("load object info fail: ", err)
+				utils.MLogger.Error("load object info fail: ", err)
 				// return err
 			}
-			utils.MLogger.Info("objects in bucket:", bucket.Name, "is loaded")
+			utils.MLogger.Info("objects in bucket: ", bucket.Name, " is loaded")
 		}
 	}
 	utils.MLogger.Info("Lfs Service is ready for: ", l.userID)
@@ -323,7 +322,7 @@ func (l *LfsInfo) flushBucketAndObjects(bucket *superBucket, flag bool) error {
 	defer bucket.RUnlock()
 
 	if bucket.dirty || flag {
-		utils.MLogger.Info("flush buckets: ", zap.String("bucketname:", bucket.Name))
+		utils.MLogger.Info("flush buckets: ", bucket.Name)
 		err := l.flushObjectsInfo(bucket)
 		if err != nil {
 			return err
@@ -333,7 +332,7 @@ func (l *LfsInfo) flushBucketAndObjects(bucket *superBucket, flag bool) error {
 		if err != nil {
 			return err
 		}
-		utils.MLogger.Info("Flush user %s %s BucketInfo and its objects finish.\n", l.userID, bucket.Name)
+		utils.MLogger.Infof("Flush user %s %s BucketInfo and its objects finish.", l.userID, bucket.Name)
 	}
 	bucket.dirty = false
 	return nil
@@ -516,7 +515,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				ok := enc.VerifyBlock(b.RawData(), ncid)
 				if ok {
 					data = append(data, b.RawData()...)
-					utils.MLogger.Info("load superblock in block", ncid, "from Provider", provider)
+					utils.MLogger.Info("load superblock in block: ", ncid, " from Provider: ", provider)
 					break
 				}
 			}

@@ -251,6 +251,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	contracts.EndPoint = cfg.Eth
 
+	// start logger
+	utils.StartLogger()
+
 	routingOption := cfg.Routing.Type
 	if routingOption == "" {
 		routingOption = routingOptionDHTKwd
@@ -281,16 +284,13 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	printSwarmAddrs(node)
 
-	// start logger
-	utils.StartLogger()
-
 	nid := node.Identity.Pretty()
 
 	if !cfg.Test {
 		//从合约中获取账户角色
 		isKeeper, err := role.IsKeeper(nid)
 		if err != nil {
-			utils.MLogger.Errorf("Got Keeper err: ", err)
+			utils.MLogger.Error("Got Keeper err: ", err)
 			return err
 		}
 		if isKeeper {
@@ -298,7 +298,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		} else {
 			isProvider, err := role.IsProvider(nid)
 			if err != nil {
-				utils.MLogger.Errorf("Got Provider role: ", err)
+				utils.MLogger.Error("Got Provider role: ", err)
 				return err
 			}
 			if isProvider {
@@ -316,7 +316,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), "local")
 	if err != nil {
-		utils.MLogger.Warnf("Put role key falied: ", err)
+		utils.MLogger.Error("Put role key falied: ", err)
 	}
 
 	defer func() { //关闭daemon时进行的操作
@@ -325,12 +325,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		err = node.Inst.Stop()
 		if err != nil {
-			utils.MLogger.Errorf("Persist before exist falied: ", err)
+			utils.MLogger.Error("Persist before exist falied: ", err)
 		}
 
 		err = node.Close()
 		if err != nil {
-			utils.MLogger.Errorf("Mefs node close falied: ", err)
+			utils.MLogger.Error("Mefs node close falied: ", err)
 		}
 
 		select {
@@ -360,7 +360,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	err = mcl.Init(mcl.BLS12_381)
 	if err != nil {
-		utils.MLogger.Errorf("Init BLS12_381 curve failed: ", err)
+		utils.MLogger.Error("Init BLS12_381 curve failed: ", err)
 		<-req.Context.Done()
 	} else {
 		utils.MLogger.Info("Init BLS12_381 curve success")

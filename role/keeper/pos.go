@@ -27,31 +27,26 @@ func (k *Info) handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string)
 		//保存在本地
 		blockID, off, err := utils.SplitIndex(boff)
 		if err != nil {
-			utils.MLogger.Info("SplitIndex err:", err)
 			continue
 		}
 
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Pos)
 		if err != nil {
-			utils.MLogger.Info(err)
 			return
 		}
 		pidAndOffset := from + metainfo.DELIMITER + strconv.Itoa(off)
 		err = k.ds.PutKey(context.Background(), kmBlock.ToString(), []byte(pidAndOffset), "local")
 		if err != nil {
-			utils.MLogger.Info(err)
 			return
 		}
 
 		//保存到内存
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
-			utils.MLogger.Info(err)
 			return
 		}
 		err = k.addBlockMeta(bm.GetQid(), blockID, from, off)
 		if err != nil {
-			utils.MLogger.Info(err)
 			return
 		}
 	}
@@ -67,18 +62,15 @@ func (k *Info) handlePosDelete(km *metainfo.KeyMeta, metaValue []byte, from stri
 		//先删除本地信息
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 		if err != nil {
-			utils.MLogger.Info(err)
 			return
 		}
 		err = k.ds.DeleteKey(context.Background(), kmBlock.ToString(), "local")
 		if err != nil && err != ds.ErrNotFound {
-			utils.MLogger.Info(err)
 			return
 		}
 		//再删除内存中信息
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
-			utils.MLogger.Info(err)
 			return
 		}
 		k.deleteBlockMeta(bm.GetQid(), blockID, false)

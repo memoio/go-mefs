@@ -15,6 +15,7 @@ import (
 )
 
 func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	utils.MLogger.Info("handlePutBlock: ", km.ToString(), "from: ", from)
 	// key is blockID/"block"
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
@@ -44,6 +45,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 }
 
 func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	utils.MLogger.Info("handleAppendBlock: ", km.ToString(), "from: ", from)
 	// key is blockID/"Block"/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 4 {
@@ -62,7 +64,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 	go func() {
 		err := p.ds.AppendBlock(ctx, km.ToString(), value, "local")
 		if err != nil {
-			utils.MLogger.Info("Error append field to block %s: %s", km.ToString(), err)
+			utils.MLogger.Errorf("append to block %s: %s", km.ToString(), err)
 			return
 		}
 	}()
@@ -70,6 +72,8 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 }
 
 func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleGetBlock: ", km.ToString(), "from: ", from)
+
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
 		return nil, errors.New("Wrong value for get block")
@@ -132,7 +136,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 	signForChannel := &pb.SignForChannel{}
 	err := proto.Unmarshal(mes, signForChannel)
 	if err != nil {
-		utils.MLogger.Info("proto.Unmarshal when provider verify err:", err)
+		utils.MLogger.Error("proto.Unmarshal when provider verify err:", err)
 		return false, nil, nil, err
 	}
 
@@ -164,6 +168,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 }
 
 func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
+	utils.MLogger.Info("handleDeleteBlock: ", km.ToString(), "from: ", from)
 	err := p.ds.DeleteBlock(context.Background(), km.ToString(), "local")
 	if err != nil && err != bs.ErrNotFound {
 		return err

@@ -15,8 +15,9 @@ import (
 )
 
 func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
-	ops := km.GetOptions()
+	utils.MLogger.Info("handle challenge: ", km.ToString(), "from: ", from)
 
+	ops := km.GetOptions()
 	if len(ops) < 1 {
 		return nil
 	}

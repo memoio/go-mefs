@@ -18,7 +18,7 @@ import (
 // return kv, key: queryID/"UserInit"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
-	utils.MLogger.Info("NewUserInit: ", km.ToString(), " From: ", from)
+	utils.MLogger.Info("handleUserInit: ", km.ToString(), " From: ", from)
 	options := km.GetOptions()
 	if len(options) != 3 {
 		return
@@ -133,7 +133,7 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 // key: queryID/"UserNotify"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	utils.MLogger.Info("NewUserNotify: ", km.ToString(), "From:", from)
+	utils.MLogger.Info("handleUserNotify: ", km.ToString(), "From:", from)
 
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
@@ -155,7 +155,7 @@ func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from str
 // key: queryID/"UserStart"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	utils.MLogger.Info("NewUser Start: ", km.ToString(), "From:", from)
+	utils.MLogger.Info("handleUserStart: ", km.ToString(), "From:", from)
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
 		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)

@@ -154,7 +154,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			for j := dc; j < d.blockCount; j++ {
 				res := copy(dataGroup[j], dataGroup[0])
 				if res != d.segSize {
-					utils.MLogger.Errorf("copied: ", res)
+					utils.MLogger.Error("copied: ", res, " is less than: ", d.segSize)
 				}
 			}
 		case RsPolicy:
@@ -178,7 +178,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 			tag, err := d.GenTagForSegment([]byte(res.String()), dataGroup[j])
 			if err != nil {
-				utils.MLogger.Errorf("gentag err for: ", res.String())
+				utils.MLogger.Error("Gen tag for: ", res.String(), " fails: ", err)
 				return nil, 0, err
 			}
 			copy(tagGroup[j], tag)
@@ -428,14 +428,14 @@ func decodeStripe(data [][]byte) (*pb.Prefix, int, error) {
 	}
 
 	if prefix != nil && (int(prefix.DataCount) > avaNum || int(prefix.DataCount) > len(lengths)) {
-		utils.MLogger.Errorf("repair crash: need data:", prefix.DataCount, ", but got avaNum: ", avaNum)
+		utils.MLogger.Error("repair crash, need data count: ", prefix.DataCount, ", but got avaNum: ", avaNum)
 		return nil, 0, ErrRepairCrash
 	}
 
 	sort.Sort(sort.Reverse(sort.IntSlice(lengths)))
 
 	if lengths[prefix.DataCount] <= 0 {
-		utils.MLogger.Errorf("repair crash: need data:", prefix.DataCount, ", but got avaNum again: ", avaNum)
+		utils.MLogger.Error("repair crash after sort: need count: ", prefix.DataCount, ", but got avaNum again: ", avaNum)
 		return nil, 0, ErrRepairCrash
 	}
 

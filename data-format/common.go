@@ -51,14 +51,14 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 	fieldSize := int(pre.SegmentSize) + s*int(2+(pre.ParityCount-1)/pre.DataCount)
 
 	if dataLen < start*fieldSize+(1+(length-1)/int(pre.DataCount*pre.SegmentSize))*fieldSize {
-		utils.MLogger.Errorf("has:", dataLen, "need:", start*fieldSize+1+(length-1)/int(pre.DataCount))
+		utils.MLogger.Error("VerifyBlockLength has: ", dataLen, ", need: ", start*fieldSize+1+(length-1)/int(pre.DataCount))
 		return false, nil
 	}
 
 	return true, nil
 }
 
-//对数据进行验证，VerifyBlock传进来一个带前缀的完整块
+//VerifyBlock is 传进来一个带前缀的完整块
 //模拟挑战证明聚合验证，0.04s一个块
 func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 	if data == nil || len(data) == 0 {
@@ -67,7 +67,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 
 	pre, preLen, err := bf.PrefixDecode(data)
 	if err != nil || pre.GetVersion() == 0 || pre.GetDataCount() == 0 {
-		utils.MLogger.Errorf("prefix is not good:", pre)
+		utils.MLogger.Error("prefix is not good: ", pre)
 		return false
 	}
 
@@ -90,7 +90,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
 	if !ok || err != nil {
-		utils.MLogger.Errorf("tag is wrong:", err)
+		utils.MLogger.Error("Tag is wrong: ", err)
 		return false
 	}
 	return true

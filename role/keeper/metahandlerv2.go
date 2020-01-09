@@ -60,6 +60,8 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 // key: blockID/"BlockPos"
 // value: pid/offset
 func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from string) {
+	utils.MLogger.Info("handleAddBlockPos: ", km.ToString())
+
 	blockID := km.GetMid()
 
 	err := k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
@@ -88,6 +90,7 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 }
 
 func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
+	utils.MLogger.Info("handleDeleteBlockPos: ", km.ToString())
 	blockID := km.GetMid()
 
 	// delete from local
@@ -105,6 +108,7 @@ func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
 
 // key: "Storage"/pid; value: total/used
 func (k *Info) handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
+	utils.MLogger.Info("handleStorage: ", km.ToString())
 	vals := strings.Split(string(value), metainfo.DELIMITER)
 	if len(vals) < 2 {
 		return
@@ -131,13 +135,15 @@ func (k *Info) handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
 }
 
 func (k *Info) handleExternalAddr(km *metainfo.KeyMeta) ([]byte, error) {
+	utils.MLogger.Info("handleExternnalAddr: ", km.ToString())
 	peerID := km.GetMid()
 	return k.ds.GetExternalAddr(peerID)
 }
 
 func (k *Info) handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {
+	utils.MLogger.Info("handleChalTime: ", km.ToString())
+
 	blockID := km.GetMid()
-	utils.MLogger.Info("handle get last challenge time of block: ", blockID)
 	if len(blockID) < utils.IDLength {
 		return nil, errUnmatchedPeerID
 	}

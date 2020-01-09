@@ -201,15 +201,13 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 	}
 
 	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
-	_, err = k.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
-	if err != nil {
-		utils.MLogger.Info("err: ", err)
-	}
+	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
 }
 
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
 // value: "ok" or "fail"/pid/offset
 func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provider string) {
+	utils.MLogger.Info("handleRepairResult: ", km.ToString(), "From:", provider)
 	blockID := km.GetMid()
 	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) != 3 {

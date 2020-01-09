@@ -92,7 +92,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 			err = contracts.AddProvider(pos.PosSkStr, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 			if err != nil {
-				utils.MLogger.Info("st AddProvider() error", err)
+				utils.MLogger.Info("st AddProvider() error: ", err)
 				return err
 			}
 
@@ -119,7 +119,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	if amount.Sign() > 0 {
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
 		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
-		utils.MLogger.Info("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
+		utils.MLogger.Infof("amount:%d,beginTime:%s, lastTime:%s", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
 		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount) //进行支付
 		if err != nil {
@@ -143,7 +143,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 	amount := big.NewInt(0)
 	if spacetime.Sign() <= 0 || price <= 0 {
-		utils.MLogger.Info("error! spaceTime:", spacetime.String(), "price:", price)
+		utils.MLogger.Error("error! spaceTime:", spacetime.String(), ", price:", price)
 		return amount
 	}
 	amount.Mul(spacetime, big.NewInt(price))

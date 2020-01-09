@@ -20,40 +20,33 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []by
 	dtype := km.GetDType()
 	switch dtype {
 	case metainfo.UserStart:
-		utils.MLogger.Info("handle user start: ", metaKey)
 		return p.handleUserStart(km, metaValue, from)
 	case metainfo.Challenge:
-		utils.MLogger.Info("handle challenge: ", metaKey)
 		go p.handleChallengeBls12(km, metaValue, from)
 	case metainfo.Repair:
-		utils.MLogger.Info("handle repair: ", metaKey)
 		go p.handleRepair(km, metaValue, from)
 	case metainfo.Block:
 		switch optype {
 		case metainfo.Put:
-			utils.MLogger.Info("handle put block: ", metaKey)
 			err := p.handlePutBlock(km, metaValue, from)
 			if err != nil {
-				utils.MLogger.Info("put Blcok Error: ", err)
+				utils.MLogger.Error("put blcok error: ", err)
 				return nil, err
 			}
 		case metainfo.Get:
-			utils.MLogger.Info("handle get block: ", metaKey)
 			res, err := p.handleGetBlock(km, metaValue, sig, from)
 			if err != nil {
-				utils.MLogger.Info("getBlcokError: ", err)
+				utils.MLogger.Error("get blcok error: ", err)
 			} else {
 				return res, nil
 			}
 		case metainfo.Append:
-			utils.MLogger.Info("handle append block: ", metaKey)
 			err := p.handleAppendBlock(km, metaValue, from)
 			if err != nil {
-				utils.MLogger.Info("put Blcok Error: ", err)
+				utils.MLogger.Info("append blcok error: ", err)
 				return nil, err
 			}
 		case metainfo.Delete:
-			utils.MLogger.Info("handle delete block: ", metaKey)
 			go p.handleDeleteBlock(km, from)
 		}
 	default: //没有匹配的信息，报错
@@ -63,6 +56,8 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []by
 }
 
 func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleUserStart: ", km.ToString(), "from: ", from)
+
 	gid := km.GetMid()
 	ops := km.GetOptions()
 	if len(ops) != 3 {

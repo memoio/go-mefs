@@ -102,8 +102,6 @@ func PrefixLen(data []byte) (int, int, error) {
 }
 
 func PrefixDecode(data []byte) (*pb.Prefix, int, error) {
-	log.Println(data[:60])
-
 	x, n := proto.DecodeVarint(data[:10])
 	if n <= 0 || x == 0 {
 		log.Println("wrong proto prefix message:", x, n)

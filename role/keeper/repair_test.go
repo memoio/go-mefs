@@ -13,7 +13,7 @@ import (
 func TestRepair(t *testing.T) {
 	err := mcl.Init(mcl.BLS12_381)
 	if err != nil {
-		utils.MLogger.Info(err)
+		log.Fatal(err)
 	}
 	keySet, _ := mcl.GenKeySet()
 	//providerID := "17nCkDaiLjr2guQG1aYxkdXZsUg"
@@ -53,7 +53,7 @@ func TestRepair(t *testing.T) {
 	blocks[5] = nil
 	newstripe, _ := dataformat.RecoverStripe(blocks)
 	if bytes.Equal(newstripe[1], blocks[1]) {
-		utils.MLogger.Info("no1 equal")
+		log.Println("no1 equal")
 	}
 }
 
