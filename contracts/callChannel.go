@@ -15,30 +15,15 @@ import (
 func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int, redo bool) (common.Address, error) {
 	var channelAddr common.Address
 
-	client := GetClient(EndPoint)
-
-	//获得userIndexer, key is userAddr
-	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
-	if err != nil {
-		log.Println("Get Role Indecer Err:", err)
-	}
-
-	if err == ErrNotDeployedIndexer {
-		_, indexerInstance, err = DeployRoleIndexer(userAddress, userAddress, hexKey)
-		if err != nil {
-			log.Println("Deploy Role Indexer Err:", err)
-			return channelAddr, err
-		}
-	}
-
 	key := queryAddress.String() + "channel" + providerAddress.String()
-	_, mapperInstance, err := DeployMapperToIndexer(userAddress, key, hexKey, indexerInstance)
+
+	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, key, hexKey, true)
 	if err != nil {
 		return channelAddr, err
 	}
 
 	if !redo {
-		channelAddr, err = getLatestFromMapper(userAddress, mapperInstance)
+		channelAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
 		if err == nil {
 			return channelAddr, nil
 		}
@@ -49,6 +34,8 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		log.Println("HexToECDSA err: ", err)
 		return channelAddr, err
 	}
+
+	client := GetClient(EndPoint)
 
 	//本user与指定的provider部署channel合约
 	retryCount := 0
@@ -81,7 +68,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	}
 
 	//将channel合约地址channelAddr放进上述的mapper中
-	err = addToMapper(userAddress, mapperInstance, channelAddr, hexKey)
+	err = AddToMapper(userAddress, channelAddr, hexKey, mapperInstance)
 	if err != nil {
 		return channelAddr, nil
 	}
@@ -92,40 +79,25 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 
 //GetChannelAddrs get the channel contract's address
 func GetChannelAddrs(localAddress, userAddress, providerAddress, queryAddress common.Address) ([]common.Address, error) {
-	//获得userIndexer, key is userAddr
-	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
-	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return nil, err
-	}
-
 	key := queryAddress.String() + "channel" + providerAddress.String()
-	_, mapperInstance, err := getMapperFromIndexer(localAddress, key, indexerInstance)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, key, "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	return getAllFromMapper(localAddress, mapperInstance)
+	return GetAddrsFromMapper(localAddress, mapperInstance)
 }
 
 //GetLatestChannel get the channel contract's address
 func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress common.Address) (common.Address, *channel.Channel, error) {
 	var channelAddr common.Address
-
-	//获得userIndexer, key is userAddr
-	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
-	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return channelAddr, nil, err
-	}
-
 	key := queryAddress.String() + "channel" + providerAddress.String()
-	_, mapperInstance, err := getMapperFromIndexer(localAddress, key, indexerInstance)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, key, "", false)
 	if err != nil {
 		return channelAddr, nil, err
 	}
 
-	channelAddr, err = getLatestFromMapper(localAddress, mapperInstance)
+	channelAddr, err = GetLatestFromMapper(localAddress, mapperInstance)
 	if err != nil {
 		return channelAddr, nil, err
 	}

@@ -18,28 +18,13 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 
 	var ukAddr common.Address
 
-	//获得userIndexer, key is userAddr
-	_, indexerInstance, err := GetRoleIndexer(userAddress, userAddress)
-	if err != nil {
-		log.Println("Get Role Indecer Err:", err)
-	}
-
-	if err == ErrNotDeployedIndexer {
-		_, indexerInstance, err = DeployRoleIndexer(userAddress, userAddress, hexKey)
-		if err != nil {
-			log.Println("Deploy Role Indexer Err:", err)
-			return ukAddr, err
-		}
-	}
-
-	//获得mapper, key is upkeeping
-	_, mapperInstance, err := DeployMapperToIndexer(userAddress, "upkeeping", hexKey, indexerInstance)
+	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "upkeeping", hexKey, true)
 	if err != nil {
 		return ukAddr, err
 	}
 
 	if !redo {
-		ukAddr, err = getLatestFromMapper(userAddress, mapperInstance)
+		ukAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
 		if err == nil {
 			return ukAddr, nil
 		}
@@ -84,7 +69,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	}
 
 	//uk放进mapper
-	err = addToMapper(userAddress, mapperInstance, ukAddr, hexKey)
+	err = AddToMapper(userAddress, ukAddr, hexKey, mapperInstance)
 	if err != nil {
 		log.Println("add uk Err:", err)
 		return ukAddr, err
@@ -96,37 +81,23 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 //GetUpkeepingAddrs get all upKeeping address
 func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
-	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
-	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return nil, err
-	}
-
-	//获得mapper, key is upkeeping
-	_, mapperInstance, err := getMapperFromIndexer(localAddress, "upkeeping", indexerInstance)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", true)
 	if err != nil {
 		return nil, err
 	}
 
-	return getAllFromMapper(localAddress, mapperInstance)
+	return GetAddrsFromMapper(localAddress, mapperInstance)
 }
 
 //GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
 func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
 	//获得userIndexer, key is userAddr
-	_, indexerInstance, err := GetRoleIndexer(localAddress, userAddress)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", true)
 	if err != nil {
-		log.Println("GetResolverErr:", err)
-		return ukaddr, uk, err
+		return ukaddr, nil, err
 	}
 
-	//获得mapper, key is upkeeping
-	_, mapperInstance, err := getMapperFromIndexer(localAddress, "upkeeping", indexerInstance)
-	if err != nil {
-		return ukaddr, uk, err
-	}
-
-	uks, err := getAllFromMapper(localAddress, mapperInstance)
+	uks, err := GetAddrsFromMapper(localAddress, mapperInstance)
 	if err != nil {
 		return ukaddr, uk, err
 	}
