@@ -43,7 +43,6 @@ type uploadTask struct { //一个上传任务实例
 
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
-	utils.MLogger.Infof("PutObject begin: ", bucketName, objectName)
 	if !l.online {
 		return nil, errors.New("user is not running")
 	}
@@ -75,6 +74,8 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 
 	bucket.Lock()
 	defer bucket.Unlock()
+
+	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " begin")
 
 	object := &objectInfo{
 		ObjectInfo: pb.ObjectInfo{
@@ -133,7 +134,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	bucket.NextOffset = ul.curOffset
 	bucket.dirty = true
 
-	utils.MLogger.Info("PutObject end: ", bucketName, objectName)
+	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end")
 	return &object.ObjectInfo, nil
 }
 
@@ -177,19 +178,18 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	readUnit := int(segSize) * int(dc) //每一次读取的数据，尽量读一个整的
 	readByte := utils.SegementCount * readUnit
 
-	breakFlag := false
-
 	rdata := make([]byte, readByte)
 	extra := make([]byte, 0, readByte)
 
 	h := md5.New()
-
-	var wg sync.WaitGroup
 	parllel := int32(0)
+	var wg sync.WaitGroup
+
+	breakFlag := false
 	for !breakFlag {
 		select {
 		case <-ctx.Done():
-			utils.MLogger.Info("上传取消")
+			utils.MLogger.Warn("upload cancle")
 			return nil
 		default:
 			// clear itself
@@ -219,7 +219,19 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			offset := int(u.curOffset) + 1 + (len(data)-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+			endOffset := int(u.curOffset) + 1 + (len(data)-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+			u.length += int64(n)
+			if endOffset > int(u.encoder.Prefix.GetSegmentCount()) {
+				utils.MLogger.Error("wrong offset, need to handle: ", endOffset)
+				return errors.New("read length unexpected err")
+			}
+
+			if endOffset == int(u.encoder.Prefix.GetSegmentCount()) { //如果写满了一个stripe
+				u.curStripe++
+				u.curOffset = 0
+			} else {
+				u.curOffset = int64(endOffset)
+			}
 
 			for {
 				if atomic.LoadInt32(&parllel) < 32 {
@@ -320,19 +332,10 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					}
 				}
 			}(data, int(u.curStripe), int(u.curOffset))
-
-			u.length += int64(n)
-			if offset >= int(u.encoder.Prefix.GetSegmentCount()-1) { //如果写满了一个stripe
-				u.curStripe++
-				u.curOffset = 0
-			} else {
-				u.curOffset = int64(offset + 1)
-			}
-			if breakFlag {
-				u.etag = hex.EncodeToString(h.Sum(nil))
-			}
 		}
 	}
+
+	u.etag = hex.EncodeToString(h.Sum(nil))
 
 	wg.Wait()
 

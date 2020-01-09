@@ -22,7 +22,7 @@ var (
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil || gp.blsKey != nil {
+	if gp != nil && gp.blsKey != nil {
 		return gp.blsKey, nil
 	}
 

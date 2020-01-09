@@ -23,10 +23,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	}
 
 	userID := km.GetMid()
-	utils.MLogger.Info("receive", userID, " 's challenge from", from)
+	utils.MLogger.Info("receive: ", userID, " 's challenge from: ", from)
 	blskey, err := p.getNewUserConfig(userID, from)
 	if err != nil {
-		utils.MLogger.Info("get new user`s config from:", from, "failed, error :", err)
+		utils.MLogger.Info("get new user`s config from: ", from, " failed: ", err)
 		return err
 	}
 
@@ -34,7 +34,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	hByte, _ := b58.Decode(string(metaValue))
 	err = proto.Unmarshal(hByte, hProto)
 	if err != nil {
-		utils.MLogger.Info("unmarshal h failed, err: ", err)
+		utils.MLogger.Error("unmarshal h failed: ", err)
 	}
 
 	var chal mcl.Challenge
