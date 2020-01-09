@@ -684,18 +684,29 @@ func DeployMapperToIndexer(localAddress common.Address, key, hexKey string, inde
 	// 部署Mapper
 	retryCount := 0
 	for {
+		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		mapperAddr, _, mapperInstance, err = mapper.DeployMapperToResolver(auth, client)
+		mapperAddr, tx, mapperInstance, err := mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
 			if retryCount > 10 {
 				log.Println("deployMapperErr:", err)
 				return mapperAddr, mapperInstance, err
 			}
-			retryCount++
 			time.Sleep(30 * time.Second)
 			continue
 		}
+
+		//检查交易
+		err = CheckTx(tx)
+		if err != nil {
+			log.Println("DeployMapper transaction fails:", err)
+			if retryCount > 10 {
+				return mapperAddr, mapperInstance, err
+			}
+			continue
+		}
+
 		break
 	}
 
@@ -717,7 +728,7 @@ func DeployMapperToIndexer(localAddress common.Address, key, hexKey string, inde
 		//检查交易
 		err = CheckTx(tx)
 		if err != nil {
-			log.Println("addMapper transaction fails", err)
+			log.Println("addMapper transaction fails:", err)
 			if retryCount > 20 {
 				return mapperAddr, mapperInstance, err
 			}
