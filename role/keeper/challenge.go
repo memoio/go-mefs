@@ -25,7 +25,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			utils.MLogger.Info("Regular challenge start")
-			pus := k.getUQKeys()
+			pus := k.getQUKeys()
 			for _, pu := range pus {
 				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
 				if thisGroup == nil {

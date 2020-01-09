@@ -22,7 +22,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 			return
 		case <-ticker.C:
 			utils.MLogger.Info("Repair starts!")
-			pus := k.getUQKeys()
+			pus := k.getQUKeys()
 			for _, pu := range pus {
 				// not repair pos blocks
 				if pu.uid == pos.GetPosId() {

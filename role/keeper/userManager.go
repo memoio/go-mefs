@@ -295,18 +295,18 @@ type quKey struct {
 	qid string
 }
 
-func (k *Info) getUQKeys() []quKey {
+func (k *Info) getQUKeys() []quKey {
 	var res []quKey
 	k.ukpGroup.Range(func(k, v interface{}) bool {
 		key := k.(string)
 		value := v.(*groupInfo)
 		// filter test user
 		if value.upkeeping == nil {
-			return true
+			//return true
 		}
 
 		if key == value.userID {
-			return true
+			//return true
 		}
 
 		tmpUQ := quKey{

@@ -25,7 +25,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			uqs := k.getUQKeys()
+			uqs := k.getQUKeys()
 			for _, uq := range uqs {
 				qid := uq.qid
 

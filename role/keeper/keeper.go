@@ -220,7 +220,7 @@ func (k *Info) save(ctx context.Context) error {
 	}
 
 	// save last pay
-	pus := k.getUQKeys()
+	pus := k.getQUKeys()
 	for _, pu := range pus {
 		gp := k.getGroupInfo(pu.uid, pu.qid, false)
 		if gp == nil {
