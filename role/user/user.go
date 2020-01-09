@@ -90,9 +90,7 @@ func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64
 		}
 		ginfo.groupID = queryID
 		uItem, err := role.GetUpKeeping(ginfo.userID, ginfo.groupID)
-		if err != nil {
-			utils.MLogger.Info("get upkeeping fails")
-		} else {
+		if err == nil {
 			ginfo.upKeepingItem = &uItem
 		}
 	} else {
@@ -141,9 +139,9 @@ func (u *Info) Stop() error {
 		}
 		err := uInfo.Fsync(true)
 		if err != nil {
-			utils.MLogger.Info("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
+			utils.MLogger.Warnf("Sorry, something wrong in persisting for %s: %s", uInfo.userID, err)
 		} else {
-			utils.MLogger.Info("User %s Persist completed\n", uInfo.userID)
+			utils.MLogger.Infof("User %s Persist completed\n", uInfo.userID)
 		}
 		uInfo.cancelFunc() //释放资源
 		return true
@@ -195,9 +193,9 @@ func (u *Info) Fsync() error {
 		}
 		err := uInfo.Fsync(true)
 		if err != nil {
-			utils.MLogger.Info("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
+			utils.MLogger.Infof("Sorry, something wrong in persisting for %s: %v", uInfo.userID, err)
 		} else {
-			utils.MLogger.Info("User %s Persist completed\n", uInfo.userID)
+			utils.MLogger.Infof("User %s Persist completed", uInfo.userID)
 		}
 		return true
 	})

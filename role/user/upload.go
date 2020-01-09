@@ -223,8 +223,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 			// handle it before
 			if endOffset >= int(u.encoder.Prefix.GetSegmentCount()) {
-				utils.MLogger.Error("wrong offset, need to handle: ", endOffset)
-				return errors.New("read length unexpected err")
+				utils.MLogger.Error("Wrong offset, need to handle: ", endOffset)
+				return errors.New("Read length unexpected err")
 			}
 
 			u.length += int64(n)
@@ -256,7 +256,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 				encodedData, offset, err := enc.Encode(data, bm.ToString(3), start)
 				if err != nil {
-					utils.MLogger.Info("encodedData", err)
 					return
 				}
 
@@ -267,7 +266,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					if start == 0 {
 						pros, _, _ := u.gInfo.GetProviders(bc)
 						if len(pros) < least {
-							utils.MLogger.Info("putobject err：", ErrNoEnoughProvider)
 							return
 						}
 
@@ -283,7 +281,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 							}
 							err := u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], pros[i])
 							if err != nil {
-								utils.MLogger.Info("Put Block", ncid, u.curOffset, offset, "to", pros[i], "failed:", err)
+								utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", pros[i], " failed: ", err)
 								continue
 							}
 							count++
@@ -305,7 +303,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 							err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
 							if err != nil {
-								utils.MLogger.Info("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
+								utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", provider, " failed: ", err)
 								continue
 							}
 							count++
@@ -323,7 +321,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				for _, v := range blockMetas {
 					err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
 					if err != nil {
-						utils.MLogger.Info("putobject", err)
 						return
 					}
 				}

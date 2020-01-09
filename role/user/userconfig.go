@@ -14,7 +14,7 @@ func initBLS12Config() (*mcl.KeySet, error) {
 	utils.MLogger.Info("Generating BLS12 Sk and Pk")
 	kset, err := mcl.GenKeySet()
 	if err != nil {
-		utils.MLogger.Info("Init BlS12 keyset error: ", err)
+		utils.MLogger.Error("Init BlS12 keyset error: ", err)
 		return nil, err
 	}
 	return kset, nil
@@ -37,18 +37,13 @@ func (l *LfsInfo) putUserConfig() {
 
 	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet, l.privateKey)
 	if err != nil {
-		utils.MLogger.Info("Marshal BlS12 config failed: ", err)
 		return
 	}
 
 	blskey := kmBls.ToString()
 	ctx := context.Background()
 	// put to local first
-	err = l.ds.PutKey(ctx, blskey, userBLS12Config, "local")
-	if err != nil {
-		utils.MLogger.Info("CmdPutTo()err")
-		return
-	}
+	l.ds.PutKey(ctx, blskey, userBLS12Config, "local")
 
 	//最后发送本节点的BLS12公钥到自己的keeper上保存
 	for _, kid := range l.gInfo.tempKeepers {
@@ -58,7 +53,7 @@ func (l *LfsInfo) putUserConfig() {
 			if err != nil {
 				retry++
 				if retry >= 10 {
-					utils.MLogger.Info("put config failed :", err)
+					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
 				}
 				time.Sleep(60 * time.Second)
 			}
@@ -102,7 +97,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 			if len(userBLS12config) > 0 {
 				err = l.ds.PutKey(ctx, blskey, userBLS12config, kid)
 				if err != nil {
-					utils.MLogger.Info("put blsconfig to keeper", kid, " failed: ", err)
+					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
 				}
 			}
 		}
@@ -114,10 +109,10 @@ func (l *LfsInfo) loadBLS12Config() error {
 		// store local
 		err = l.ds.PutKey(ctx, blskey, userBLS12config, "local")
 		if err != nil {
-			utils.MLogger.Info("put blsconfig to lcoal failed: ", err)
+			utils.MLogger.Warn("Put bls config to local failed: ", err)
 		}
 	}
 
-	utils.MLogger.Info("BlS12 SK and Pk is loaded for ", l.userID)
+	utils.MLogger.Info("BlS12 SK and Pk is loaded for ", l.fsID)
 	return nil
 }

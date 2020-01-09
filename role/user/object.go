@@ -242,7 +242,7 @@ func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
 		blockID := bm.ToString()
 		blockAvailTime, err := l.getLastChalTime(blockID)
 		if err != nil {
-			utils.MLogger.Info("Get block-%s's availTime failed!err: %v\n", blockID, err)
+			utils.MLogger.Warn("Get block: %s's availTime failed: %s", blockID, err)
 			continue
 		}
 		if blockAvailTime.After(latestTime) {

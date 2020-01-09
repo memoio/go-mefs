@@ -157,7 +157,7 @@ func BuildSignMessage() ([]byte, error) {
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		utils.MLogger.Info("protoMarshal failed err: ", err)
+		utils.MLogger.Error("protoMarshal failed err: ", err)
 		return nil, err
 	}
 	return mes, nil
