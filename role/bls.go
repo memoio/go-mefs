@@ -58,6 +58,10 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 }
 
 func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, error) {
+	if len(userBLS12config) == 0 {
+		return nil, errors.New("empty blskey byte")
+	}
+
 	mkey := new(mcl.KeySet)
 
 	userBLS12ConfigProto := new(pb.UserBLS12Config)

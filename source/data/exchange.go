@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	ErrNoRouting = errors.New("routing is not running")
+	errNoRouting = errors.New("routing is not running")
 )
 
 type impl struct {
@@ -58,10 +58,10 @@ func (n *impl) GetNetAddr() string {
 
 func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data, sig []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("SendMetaMessage: ", key, " to: ", to)
+	utils.MLogger.Debug("SendMetaMessage: ", key, " to: ", to)
 
 	p, err := peer.IDB58Decode(to)
 	if err != nil {
@@ -75,10 +75,10 @@ func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data,
 
 func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data, sig []byte, to string) ([]byte, error) {
 	if n.ph == nil || n.rt == nil {
-		return nil, ErrNoRouting
+		return nil, errNoRouting
 	}
 
-	utils.MLogger.Info("SendMetaRequest: ", key, " to: ", to)
+	utils.MLogger.Debug("SendMetaRequest: ", key, " to: ", to)
 
 	p, err := peer.IDB58Decode(to)
 	if err != nil {
@@ -92,10 +92,10 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 
 func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error) {
 	if n.ph == nil || n.rt == nil {
-		return nil, ErrNoRouting
+		return nil, errNoRouting
 	}
 
-	utils.MLogger.Info("GetKey: ", key, " from: ", to)
+	utils.MLogger.Debug("GetKey: ", key, " from: ", to)
 
 	if to != "local" && to != "" {
 		n.Connect(ctx, to)
@@ -111,10 +111,10 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 
 func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("PutKey: ", key, " to: ", to)
+	utils.MLogger.Debug("PutKey: ", key, " to: ", to)
 
 	if to != "local" && to != "" {
 		n.Connect(ctx, to)
@@ -126,10 +126,10 @@ func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) e
 // to modify
 func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("AppendKey: ", key, " to: ", to)
+	utils.MLogger.Debug("AppendKey: ", key, " to: ", to)
 
 	if to == "local" {
 		skey := strings.Split(key, metainfo.DELIMITER)
@@ -158,10 +158,10 @@ func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string
 
 func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("DeleteKey: ", key, " from: ", to)
+	utils.MLogger.Debug("DeleteKey: ", key, " from: ", to)
 
 	if to == "local" {
 		return n.dstore.Delete(ds.NewKey(key))
@@ -174,10 +174,10 @@ func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 // Getting it from the datastore using the key (hash).
 func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error) {
 	if n.ph == nil || n.rt == nil {
-		return nil, ErrNoRouting
+		return nil, errNoRouting
 	}
 
-	utils.MLogger.Info("GetBlock: ", key, " from: ", to)
+	utils.MLogger.Debug("GetBlock: ", key, " from: ", to)
 	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
 		block, err := n.bstore.Get(cid.NewCidV2([]byte(bids[0])))
@@ -213,10 +213,10 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 // key: blockID/"Block"
 func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("PutBlock: ", key, " to: ", to)
+	utils.MLogger.Debug("PutBlock: ", key, " to: ", to)
 
 	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
@@ -248,10 +248,10 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 // key: blockID/"Block"/start/end
 func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("AppendBlock: ", key, " to: ", to)
+	utils.MLogger.Debug("AppendBlock: ", key, " to: ", to)
 
 	skey := strings.Split(key, metainfo.DELIMITER)
 	if len(skey) < 4 {
@@ -288,10 +288,10 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 // DeleteBlock deletes a block in the blockservice from the datastore
 func (n *impl) DeleteBlock(ctx context.Context, key, to string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("DeleteBlock: ", key, " from: ", to)
+	utils.MLogger.Debug("DeleteBlock: ", key, " from: ", to)
 
 	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
@@ -315,10 +315,10 @@ func (n *impl) DeleteBlock(ctx context.Context, key, to string) error {
 // BroadcastMessage
 func (n *impl) BroadcastMessage(ctx context.Context, key string) error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("BroadcastMessage: ", key)
+	utils.MLogger.Debug("BroadcastMessage: ", key)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -328,21 +328,21 @@ func (n *impl) BroadcastMessage(ctx context.Context, key string) error {
 
 func (n *impl) TestConnect() error {
 	if n.ph == nil || n.rt == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
-	utils.MLogger.Info("Test Connect")
+	utils.MLogger.Debug("Test Connect")
 
 	waitTime := 0 //进行网络连接\
 
 	if n.ph == nil {
-		return ErrNoRouting
+		return errNoRouting
 	}
 
 	for {
 		if waitTime > 60 { //连不上网？
 			utils.MLogger.Error("No network, please add bootstrap peers restart.")
-			return ErrNoRouting
+			return errNoRouting
 		}
 		if connPeers := n.ph.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
 			break //连上网了，退出
@@ -442,7 +442,7 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 			Addrs: []ma.Multiaddr{pai},
 		}
 
-		utils.MLogger.Info(to, "has extern ip: ", npi.String())
+		utils.MLogger.Debug(to, "has extern ip: ", npi.String())
 
 		if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
 			swrm.Backoff().Clear(npi.ID)
@@ -460,10 +460,10 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 
 func (n *impl) Itererate(prefix string) ([]dsq.Entry, error) {
 	if n.ph == nil || n.rt == nil {
-		return nil, ErrNoRouting
+		return nil, errNoRouting
 	}
 
-	utils.MLogger.Info("Itererate: ", prefix)
+	utils.MLogger.Debug("Itererate: ", prefix)
 
 	q := dsq.Query{Prefix: prefix}
 	qr, _ := n.dstore.Query(q) //进行查询操作
@@ -474,17 +474,17 @@ func (n *impl) Itererate(prefix string) ([]dsq.Entry, error) {
 
 func (n *impl) GetPeers() ([]peer.ID, error) {
 	if n.ph == nil || n.rt == nil {
-		return nil, ErrNoRouting
+		return nil, errNoRouting
 	}
 	return n.ph.Network().Peers(), nil
 }
 
 func (n *impl) GetExternalAddr(p string) ([]byte, error) {
 	if n.ph == nil || n.rt == nil {
-		return nil, ErrNoRouting
+		return nil, errNoRouting
 	}
 
-	utils.MLogger.Info("GetExternalAddr: ", p)
+	utils.MLogger.Debug("GetExternalAddr: ", p)
 
 	pid, err := peer.IDB58Decode(p)
 	if err != nil {
@@ -494,7 +494,7 @@ func (n *impl) GetExternalAddr(p string) ([]byte, error) {
 		rid := c.RemotePeer()
 		if rid.Pretty() == p {
 			addr := c.RemoteMultiaddr()
-			utils.MLogger.Info(p, " has extern ip: ", addr.String())
+			utils.MLogger.Debug(p, " has extern ip: ", addr.String())
 			return addr.Bytes(), nil
 		}
 	}
