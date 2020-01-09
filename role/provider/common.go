@@ -22,7 +22,11 @@ var (
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil && gp.blsKey != nil {
+	if gp == nil {
+		return nil, errors.New("No user")
+	}
+
+	if gp.blsKey != nil {
 		return gp.blsKey, nil
 	}
 
@@ -62,11 +66,11 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 
 func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error) {
 	gp := p.getGroupInfo(userID, groupID, true)
-	if gp != nil {
+	if gp == nil {
 		return nil, errors.New("No user")
 	}
 
-	if gp.blsKey.Sk != nil {
+	if gp.blsKey != nil && gp.blsKey.Sk != nil {
 		return gp.blsKey.Sk, nil
 	}
 
