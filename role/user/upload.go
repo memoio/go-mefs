@@ -219,19 +219,15 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			endOffset := int(u.curOffset) + 1 + (len(data)-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
-			u.length += int64(n)
-			if endOffset > int(u.encoder.Prefix.GetSegmentCount()) {
+			endOffset := int(u.curOffset) + (len(data)-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+
+			// handle it before
+			if endOffset >= int(u.encoder.Prefix.GetSegmentCount()) {
 				utils.MLogger.Error("wrong offset, need to handle: ", endOffset)
 				return errors.New("read length unexpected err")
 			}
 
-			if endOffset == int(u.encoder.Prefix.GetSegmentCount()) { //如果写满了一个stripe
-				u.curStripe++
-				u.curOffset = 0
-			} else {
-				u.curOffset = int64(endOffset)
-			}
+			u.length += int64(n)
 
 			for {
 				if atomic.LoadInt32(&parllel) < 32 {
@@ -332,6 +328,13 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					}
 				}
 			}(data, int(u.curStripe), int(u.curOffset))
+
+			if endOffset == int(u.encoder.Prefix.GetSegmentCount())-1 { //如果写满了一个stripe
+				u.curStripe++
+				u.curOffset = 0
+			} else {
+				u.curOffset = int64(endOffset + 1)
+			}
 		}
 	}
 

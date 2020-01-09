@@ -282,7 +282,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		ncid := bm.ToString()
 		provider, _, err := ds.group.getBlockProviders(ncid)
 		if err != nil || provider == ds.fsID {
-			utils.MLogger.Info("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
+			utils.MLogger.Infof("Get Block %s 's provider from keeper failed, Err: %s", ncid, err)
 			continue
 		}
 
@@ -295,14 +295,14 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		//获取数据块
 		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
 		if err != nil {
-			utils.MLogger.Info("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
+			utils.MLogger.Errorf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
 			continue
 		}
 		blkData := b.RawData()
-		//需要检查数据块的长度也没问题
+		//需要检查数据块的长度也没问题f
 		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(remain))
 		if !ok || err != nil {
-			utils.MLogger.Info("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
+			utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", ncid, provider, err)
 			continue
 		}
 
