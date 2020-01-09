@@ -66,7 +66,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		for {
 			_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
 			if err != nil {
-				utils.MLogger.Info("provider deploying resolver and offer failed!")
+				utils.MLogger.Error("provider deploying resolver and offer failed: ", err)
 				time.Sleep(2 * time.Minute)
 			} else {
 				break
@@ -75,7 +75,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 		err = m.getContracts()
 		if err != nil {
-			utils.MLogger.Info("Save ", m.localID, "'s provider info err", err)
+			utils.MLogger.Info("Save ", m.localID, " 's provider info err: ", err)
 		}
 	}()
 
