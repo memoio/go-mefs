@@ -483,7 +483,6 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 			return mapperAddr, nil, err
 		}
 
-		log.Println("Get Role Indecer Err:", err)
 		indexerAddr, iInstance, err := DeployIndexer(hexKey)
 		if err != nil {
 			log.Println("Deploy Role Indexer Err:", err)
