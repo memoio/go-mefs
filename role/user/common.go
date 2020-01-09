@@ -2,7 +2,6 @@ package user
 
 import (
 	"errors"
-	"log"
 	"math/big"
 	"regexp"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/role/user/pb"
+	"github.com/memoio/go-mefs/utils"
 )
 
 //-------Group Type------
@@ -157,7 +157,7 @@ func BuildSignMessage() ([]byte, error) {
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		log.Println("protoMarshal failed err: ", err)
+		utils.MLogger.Info("protoMarshal failed err: ", err)
 		return nil, err
 	}
 	return mes, nil

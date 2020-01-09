@@ -3,12 +3,12 @@ package keeper
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -41,7 +41,7 @@ func (g *groupInfo) getContracts(mode bool) error {
 
 		// not my user
 		if !flag {
-			log.Println(g.userID, "is not my user")
+			utils.MLogger.Info(g.userID, "is not my user")
 			return errors.New("Not my user")
 		}
 
@@ -63,7 +63,7 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 
 	providerAddr, err := address.GetAddressFromID(pid)
 	if err != nil {
-		log.Println("ukAddProvider GetAddressFromID() error", err)
+		utils.MLogger.Info("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
@@ -76,21 +76,21 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 
 	userAddr, err := address.GetAddressFromID(uid)
 	if err != nil {
-		log.Println("ukAddProvider GetAddressFromID() error", err)
+		utils.MLogger.Info("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
 	queryAddr, err := address.GetAddressFromID(gid)
 	if err != nil {
-		log.Println("ukAddProvider GetAddressFromID() error", err)
+		utils.MLogger.Info("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
 
 	if gp.isMaster(pid) {
-		log.Println("add provider to: ", userAddr)
+		utils.MLogger.Info("add provider to: ", userAddr)
 		err = contracts.AddProvider(sk, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 		if err != nil {
-			log.Println("ukAddProvider AddProvider() error", err)
+			utils.MLogger.Info("ukAddProvider AddProvider() error", err)
 			return err
 		}
 	}
@@ -102,7 +102,7 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 }
 
 func (k *Info) getKpMapRegular(ctx context.Context) {
-	log.Println("Get kpMap from chain start!")
+	utils.MLogger.Info("Get kpMap from chain start!")
 
 	peerID := k.localID
 	role.SaveKpMap(peerID)

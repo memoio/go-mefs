@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -11,6 +10,7 @@ import (
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -91,7 +91,7 @@ func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64
 		ginfo.groupID = queryID
 		uItem, err := role.GetUpKeeping(ginfo.userID, ginfo.groupID)
 		if err != nil {
-			log.Println("get upkeeping fails")
+			utils.MLogger.Info("get upkeeping fails")
 		} else {
 			ginfo.upKeepingItem = &uItem
 		}
@@ -141,9 +141,9 @@ func (u *Info) Stop() error {
 		}
 		err := uInfo.Fsync(true)
 		if err != nil {
-			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
+			utils.MLogger.Info("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
 		} else {
-			log.Printf("User %s Persist completed\n", uInfo.userID)
+			utils.MLogger.Info("User %s Persist completed\n", uInfo.userID)
 		}
 		uInfo.cancelFunc() //释放资源
 		return true
@@ -195,9 +195,9 @@ func (u *Info) Fsync() error {
 		}
 		err := uInfo.Fsync(true)
 		if err != nil {
-			log.Printf("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
+			utils.MLogger.Info("Sorry, something wrong in persisting for %s: %v\n", uInfo.userID, err)
 		} else {
-			log.Printf("User %s Persist completed\n", uInfo.userID)
+			utils.MLogger.Info("User %s Persist completed\n", uInfo.userID)
 		}
 		return true
 	})

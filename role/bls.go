@@ -2,12 +2,12 @@ package role
 
 import (
 	"errors"
-	"log"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	pb "github.com/memoio/go-mefs/role/pb"
+	"github.com/memoio/go-mefs/utils"
 )
 
 func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
@@ -81,7 +81,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		var temp mcl.G1
 		err = temp.Deserialize(u)
 		if err != nil {
-			log.Println("temp.Deserialize(u) failed :", err)
+			utils.MLogger.Info("temp.Deserialize(u) failed :", err)
 		}
 		pk.ElemG1s[i] = temp
 	}
@@ -90,7 +90,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		var temp mcl.G2
 		err = temp.Deserialize(w)
 		if err != nil {
-			log.Println("temp.Deserialize(u) failed :", err)
+			utils.MLogger.Info("temp.Deserialize(u) failed :", err)
 		}
 		pk.ElemG2s[i] = temp
 	}

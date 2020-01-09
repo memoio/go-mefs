@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"errors"
-	"log"
 	"math/big"
 	"sort"
 	"strconv"
@@ -57,7 +56,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 
 		// not my user
 		if tempInfo.localKeeper != localID {
-			log.Println(uid, "is not my user")
+			utils.MLogger.Info(uid, "is not my user")
 			return nil, errors.New("Not my user")
 		}
 	}

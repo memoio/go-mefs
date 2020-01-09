@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +16,7 @@ import (
 )
 
 func (k *Info) challengeRegular(ctx context.Context) {
-	log.Println("Challenge service start!")
+	utils.MLogger.Info("Challenge service start!")
 	ticker := time.NewTicker(CHALTIME)
 	defer ticker.Stop()
 	for {
@@ -25,7 +24,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			log.Println("Challenge start at: ", utils.GetTimeNow())
+			utils.MLogger.Info("Challenge start at: ", utils.GetTimeNow())
 			pus := k.getUQKeys()
 			for _, pu := range pus {
 				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
@@ -114,7 +113,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	// key: qid/"Challenge"/uid/pid/kid/chaltime
 	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, userID, proID, localID, utils.UnixToString(challengetime))
 	if err != nil {
-		log.Println("construct challenge KV error :", err)
+		utils.MLogger.Info("construct challenge KV error :", err)
 		return "", nil, err
 	}
 	return km.ToString(), hByte, nil
@@ -129,7 +128,7 @@ func (l *lInfo) cleanLastChallenge() {
 	failChallTime := l.lastChalTime
 	thischalresult, ok := l.chalMap.Load(failChallTime)
 	if !ok {
-		log.Println("thischalinfo.chalMap.Load error!challengetime: ", failChallTime)
+		utils.MLogger.Info("thischalinfo.chalMap.Load error!challengetime: ", failChallTime)
 		return
 	}
 
@@ -190,7 +189,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 
 	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
 	if !ok {
-		log.Println("thischalinfo.chalMap.Load error!challengetime:", challengetime)
+		utils.MLogger.Info("thischalinfo.chalMap.Load error!challengetime:", challengetime)
 		return false
 	}
 
@@ -208,7 +207,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	// key: bucketid_stripeid_blockid
 	cset := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
-		log.Println("Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
+		utils.MLogger.Info("Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
 		for _, s := range splitedindex {
 			if len(s) == 0 {
 				continue
@@ -216,7 +215,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 			set[s] = struct{}{}
 			chcid, _, err := utils.SplitIndex(s)
 			if err != nil {
-				log.Println("SplitIndex err:", err)
+				utils.MLogger.Info("SplitIndex err:", err)
 				continue
 			}
 			cset[chcid] = struct{}{}
@@ -231,7 +230,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		buf.Reset()
 		chcid, off, err := utils.SplitIndex(index)
 		if err != nil {
-			log.Println("SplitIndex err:", err)
+			utils.MLogger.Info("SplitIndex err:", err)
 			continue
 		}
 
@@ -280,11 +279,11 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 
 	res, err := thisGroup.blsKey.VerifyProof(chal, pf)
 	if err != nil {
-		log.Println("handle proof of ", qid, "from provider: ", proID, "verify err:", err)
+		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, "verify err:", err)
 		return false
 	}
 	if res {
-		log.Println("handle proof of ", qid, "from provider: ", proID, " verify success.")
+		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify success.")
 
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
@@ -306,7 +305,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		chalResult.length = int64((float64(slength) / float64(chalResult.sum)) * float64(chalResult.totalSpace))
 		return true
 	} else {
-		log.Println("handle proof of ", qid, "from provider: ", proID, " verify fail.")
+		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
 	}
 
 	return false

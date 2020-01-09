@@ -25,11 +25,11 @@ import (
 	"github.com/memoio/go-mefs/core/commands"
 	"github.com/memoio/go-mefs/core/corehttp"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/role/keeper"
 	"github.com/memoio/go-mefs/role/provider"
 	"github.com/memoio/go-mefs/role/user"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
@@ -281,32 +281,24 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	printSwarmAddrs(node)
 
-	//把每个角色的k v保存到本地leveldb中
+	// start logger
+	utils.StartLogger()
+
 	nid := node.Identity.Pretty()
-	kmRole, err := metainfo.NewKeyMeta(nid, metainfo.Role)
-	if err != nil {
-		return err
-	}
-	keystring := kmRole.ToString() //角色信息的key
 
 	if !cfg.Test {
 		//从合约中获取账户角色
-		localAddress, err := address.GetAddressFromID(nid)
+		isKeeper, err := role.IsKeeper(nid)
 		if err != nil {
-			log.Error("error from get address from id: ", err)
-			return err
-		}
-		isKeeper, err := contracts.IsKeeper(localAddress)
-		if err != nil {
-			log.Error("error from IsKeeper: ", err)
+			utils.MLogger.Errorf("Got Keeper err: ", err)
 			return err
 		}
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 		} else {
-			isProvider, err := contracts.IsProvider(localAddress)
+			isProvider, err := role.IsProvider(nid)
 			if err != nil {
-				log.Error("error from IsProvider: ", err)
+				utils.MLogger.Errorf("Got Provider role: ", err)
 				return err
 			}
 			if isProvider {
@@ -316,10 +308,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}
 		}
 	}
-	value := cfg.Role //角色信息的value
-	err = node.Data.PutKey(node.Context(), keystring, []byte(value), "local")
+
+	kmRole, err := metainfo.NewKeyMeta(nid, metainfo.Role)
 	if err != nil {
-		fmt.Println("node.Routing.CmdPut falied: ", err)
+		return err
+	}
+
+	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), "local")
+	if err != nil {
+		utils.MLogger.Warnf("Put role key falied: ", err)
 	}
 
 	defer func() { //关闭daemon时进行的操作
@@ -328,17 +325,17 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		err = node.Inst.Stop()
 		if err != nil {
-			fmt.Println("Persist before exist falied: ", err)
+			utils.MLogger.Errorf("Persist before exist falied: ", err)
 		}
 
 		err = node.Close()
 		if err != nil {
-			fmt.Println("node.Close falied: ", err)
+			utils.MLogger.Errorf("Mefs node close falied: ", err)
 		}
 
 		select {
 		case <-req.Context.Done():
-			log.Info("Gracefully shut down daemon")
+			utils.MLogger.Info("Gracefully shut down daemon")
 		default:
 		}
 	}()
@@ -348,20 +345,18 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	}
 
 	// construct api endpoint - every time
-	// metb的req的端口为0
 	apiErrc, err := serveHTTPApi(req, cctx)
 	if err != nil {
 		return err
 	}
 
+	// just for minio
 	core.LocalNode = node
 
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.MefsNodeCollector{Node: node})
 
 	fmt.Printf("Daemon is ready\n")
-
-	utils.StartLogger()
 
 	err = mcl.Init(mcl.BLS12_381)
 	if err != nil {
@@ -409,7 +404,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	sk := utils.EthSkByteToEthString(userkey.PrivateKey)
 
-	switch value {
+	switch cfg.Role {
 	case metainfo.RoleKeeper:
 		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), sk, node.Data, node.Routing)
 		if err != nil {
@@ -417,7 +412,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 		node.Inst = ins
 
-		utils.MLogger.Info("Keeper daemon is ready")
+		fmt.Println("Keeper daemon is ready")
 
 	case metainfo.RoleUser:
 		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
@@ -427,7 +422,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		node.Inst = ins
 
-		utils.MLogger.Info("User daemon is ready; run `mefs lfs start` to start lfs service")
+		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("started as a provider")
 		ins, err := provider.New(req.Context, node.Identity.Pretty(), sk, node.Data, node.Routing, capacity, duration, price, rdo)
@@ -438,13 +433,13 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		node.Inst = ins
 
-		utils.MLogger.Info("Provider daemon is ready")
+		fmt.Println("Provider daemon is ready")
 
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
 		if pos {
-			fmt.Println("Start pos Service")
+			utils.MLogger.Info("Start pos Service")
 			go ins.(*provider.Info).PosService(req.Context, gc)
 		}
 	default:

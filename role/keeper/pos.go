@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 
@@ -18,41 +17,41 @@ func (k *Info) handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string)
 	// add provider to upkeeping if it is not in upkeeping
 	err := k.ukAddProvider(pos.GetPosId(), pos.GetPosId(), from, pos.PosSkStr)
 	if err != nil {
-		log.Println("handlePosAdd err:", err)
+		utils.MLogger.Info("handlePosAdd err:", err)
 	}
 	if from != km.GetMid() {
-		log.Println("handlePosAdd error! from!=km.mid")
+		utils.MLogger.Info("handlePosAdd error! from!=km.mid")
 	}
 	blocks := strings.Split(string(metaValue), metainfo.DELIMITER)
 	for _, boff := range blocks {
 		//保存在本地
 		blockID, off, err := utils.SplitIndex(boff)
 		if err != nil {
-			log.Println("SplitIndex err:", err)
+			utils.MLogger.Info("SplitIndex err:", err)
 			continue
 		}
 
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Pos)
 		if err != nil {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 		pidAndOffset := from + metainfo.DELIMITER + strconv.Itoa(off)
 		err = k.ds.PutKey(context.Background(), kmBlock.ToString(), []byte(pidAndOffset), "local")
 		if err != nil {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 
 		//保存到内存
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 		err = k.addBlockMeta(bm.GetQid(), blockID, from, off)
 		if err != nil {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 	}
@@ -62,24 +61,24 @@ func (k *Info) handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string)
 func (k *Info) handlePosDelete(km *metainfo.KeyMeta, metaValue []byte, from string) {
 	deleteBlocks := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if from != km.GetMid() {
-		log.Println("handlePosDelete error! from and km.mid are: ", from, km.GetMid())
+		utils.MLogger.Info("handlePosDelete error! from and km.mid are: ", from, km.GetMid())
 	}
 	for _, blockID := range deleteBlocks {
 		//先删除本地信息
 		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 		if err != nil {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 		err = k.ds.DeleteKey(context.Background(), kmBlock.ToString(), "local")
 		if err != nil && err != ds.ErrNotFound {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 		//再删除内存中信息
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
-			log.Println(err)
+			utils.MLogger.Info(err)
 			return
 		}
 		k.deleteBlockMeta(bm.GetQid(), blockID, false)

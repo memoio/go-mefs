@@ -2,11 +2,11 @@ package user
 
 import (
 	"context"
-	"log"
 	"math/big"
 	"strings"
 
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
@@ -55,10 +55,10 @@ func (g *groupInfo) getContracts() error {
 			}
 			valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
 			if err != nil {
-				log.Println("try to get channel value from: ", proID)
+				utils.MLogger.Info("try to get channel value from: ", proID)
 				valueByte, err = g.ds.GetKey(ctx, km.ToString(), proID)
 				if err != nil {
-					log.Println("Set channel price to 0.")
+					utils.MLogger.Info("Set channel price to 0.")
 					value = big.NewInt(0)
 				} else {
 					value, _ = new(big.Int).SetString(string(valueByte), 10)
@@ -88,7 +88,7 @@ func (g *groupInfo) loadChannelValue() {
 
 			valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
 			if err != nil {
-				log.Println("try to get channel value from: ", proID)
+				utils.MLogger.Info("try to get channel value from: ", proID)
 				valueByte, _ = g.ds.GetKey(ctx, km.ToString(), proID)
 			}
 
@@ -100,7 +100,7 @@ func (g *groupInfo) loadChannelValue() {
 				sig, _ = b58.Decode(vals[1])
 			}
 
-			log.Println("channel value are:", value.String())
+			utils.MLogger.Info("channel value are:", value.String())
 			if value.Cmp(proInfo.chanItem.Value) > 0 {
 				proInfo.chanItem.Value = value
 				proInfo.chanItem.Sig = sig

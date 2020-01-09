@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -81,7 +80,7 @@ func (l *LfsInfo) Start() error {
 
 	has, err := l.gInfo.start(l.context)
 	if err != nil {
-		log.Println("start group err: ", err)
+		utils.MLogger.Info("start group err: ", err)
 		return err
 	}
 
@@ -89,13 +88,13 @@ func (l *LfsInfo) Start() error {
 		// init or send bls config
 		err = l.loadBLS12Config()
 		if err != nil {
-			log.Println("load bls config err: ", err)
+			utils.MLogger.Info("load bls config err: ", err)
 		}
 	}
 	if !has || err != nil {
 		mkey, err := initBLS12Config()
 		if err != nil {
-			log.Println("init bls config err: ", err)
+			utils.MLogger.Info("init bls config err: ", err)
 			return err
 		}
 
@@ -105,7 +104,7 @@ func (l *LfsInfo) Start() error {
 
 	err = l.startLfs(l.context)
 	if err != nil {
-		log.Println("StartLfsService()err")
+		utils.MLogger.Info("StartLfsService()err")
 		return err
 	}
 	l.online = true
@@ -119,28 +118,28 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 	l.meta, err = l.loadSuperBlock() //先加载超级块
 	if err != nil || l.meta == nil {
 		//启动失败，证明本地无metablock
-		log.Println("load superblock fail, so begin to init Lfs :", l.fsID)
+		utils.MLogger.Info("load superblock fail, so begin to init Lfs :", l.fsID)
 		l.meta, err = initLfs() //初始化
 		if err != nil {
-			log.Println(ErrCannotStartLfsService)
+			utils.MLogger.Info(ErrCannotStartLfsService)
 			return ErrCannotStartLfsService
 		}
 	} else {
 		err = l.loadBucketInfo() //再加载Group元数据
 		if err != nil {          //*错误处理
-			log.Println("load bucket info fail: ", err)
+			utils.MLogger.Info("load bucket info fail: ", err)
 			//return err
 		}
 		for _, bucket := range l.meta.bucketByID {
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
 			if err != nil {
-				log.Println("load object info fail: ", err)
+				utils.MLogger.Info("load object info fail: ", err)
 				// return err
 			}
-			log.Println("objects in bucket:", bucket.Name, "is loaded")
+			utils.MLogger.Info("objects in bucket:", bucket.Name, "is loaded")
 		}
 	}
-	log.Println("Lfs Service is ready for: ", l.userID)
+	utils.MLogger.Info("Lfs Service is ready for: ", l.userID)
 	l.online = true
 	go l.persistMetaBlock(ctx)
 	return nil
@@ -207,14 +206,14 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 			if l.online { //LFS没启动不刷新
 				err := l.Fsync(false)
 				if err != nil {
-					log.Println("Cannot Persist MetaBlock : ", err)
+					utils.MLogger.Info("Cannot Persist MetaBlock : ", err)
 				}
 			}
 		case <-ctx.Done():
 			if l.online { //LFS没启动不刷新
 				err := l.Fsync(false)
 				if err != nil {
-					log.Println("Cannot Persist MetaBlock : ", err)
+					utils.MLogger.Info("Cannot Persist MetaBlock : ", err)
 				}
 			}
 			return nil
@@ -259,7 +258,7 @@ func (l *LfsInfo) flushSuperBlock() error {
 
 	err := sbDelimitedWriter.WriteMsg(&sb.SuperBlockInfo)
 	if err != nil {
-		log.Println("SbDelimitedWriter.WriteMsg(sb) failed ", err)
+		utils.MLogger.Info("SbDelimitedWriter.WriteMsg(sb) failed ", err)
 		return err
 	}
 
@@ -315,7 +314,7 @@ func (l *LfsInfo) flushSuperBlock() error {
 		}
 	}
 
-	log.Println("Flush Superblock to local finish. The uid is ", l.userID)
+	utils.MLogger.Info("Flush Superblock to local finish. The uid is ", l.userID)
 	return nil
 }
 
@@ -334,7 +333,7 @@ func (l *LfsInfo) flushBucketAndObjects(bucket *superBucket, flag bool) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("Flush user %s %s BucketInfo and its objects finish.\n", l.userID, bucket.Name)
+		utils.MLogger.Info("Flush user %s %s BucketInfo and its objects finish.\n", l.userID, bucket.Name)
 	}
 	bucket.dirty = false
 	return nil
@@ -471,7 +470,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 //lfs启动时加载超级块操作，返回结构体Meta,主要填充其中的superblock字段
 //先从本地查找超级快信息，若没找到，就找自己的provider获取
 func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
-	log.Println("Begin to load superblock : ", l.fsID, "for user:", l.userID)
+	utils.MLogger.Info("Begin to load superblock : ", l.fsID, "for user:", l.userID)
 	if l.keySet == nil {
 		return nil, ErrKeySetIsNil
 	}
@@ -501,7 +500,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 
 	if len(data) == 0 { //若本地无超级块，向自己的provider进行查询
 		l.ds.DeleteBlock(ctx, km.ToString(), "local")
-		log.Println("Try to get", ncidlocal, " from remote servers")
+		utils.MLogger.Info("Try to get", ncidlocal, " from remote servers")
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
@@ -517,7 +516,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				ok := enc.VerifyBlock(b.RawData(), ncid)
 				if ok {
 					data = append(data, b.RawData()...)
-					log.Println("load superblock in block", ncid, "from Provider", provider)
+					utils.MLogger.Info("load superblock in block", ncid, "from Provider", provider)
 					break
 				}
 			}
@@ -529,7 +528,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		res[0] = data
 		data, err := enc.Decode(res, 0, -1)
 		if err != nil {
-			log.Println("GetDataFromRawData err!", err)
+			utils.MLogger.Info("GetDataFromRawData err!", err)
 			return nil, err
 		}
 		pbSuperBlock := pb.SuperBlockInfo{}
@@ -538,13 +537,13 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		err = SbDelimitedReader.ReadMsg(&pbSuperBlock)
 		if err == io.EOF {
 		} else if err != nil {
-			log.Println("Cannot load Lfs superblock.", err)
+			utils.MLogger.Info("Cannot load Lfs superblock.", err)
 			return nil, err
 		}
 		bucketByID := make(map[int32]*superBucket)
 		bucketNameToID := make(map[string]int32)
 
-		log.Println("Lfs superBlock is loaded.")
+		utils.MLogger.Info("Lfs superBlock is loaded.")
 		return &lfsMeta{
 			sb: &superBlock{
 				SuperBlockInfo: pbSuperBlock,
@@ -555,7 +554,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 			bucketNameToID: bucketNameToID,
 		}, nil
 	}
-	log.Println("Cannot load Lfs superblock. Get metablock failed")
+	utils.MLogger.Info("Cannot load Lfs superblock. Get metablock failed")
 	return nil, ErrCannotLoadSuperBlock
 }
 
@@ -592,7 +591,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 				ncid := bm.ToString()
 				provider, _, err := l.gInfo.getBlockProviders(ncid)
 				if err != nil || provider == "" {
-					log.Printf("load superBucket: %d's block: %s from provider: %s falied.\n", bucketID, ncid, provider)
+					utils.MLogger.Info("load superBucket: %d's block: %s from provider: %s falied.\n", bucketID, ncid, provider)
 					continue
 				}
 				b, err = l.ds.GetBlock(ctx, ncid, sig, provider)
@@ -611,7 +610,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 			res[0] = data
 			data, err := enc.Decode(res, 0, -1) //Tag暂时没用
 			if err != nil {
-				log.Println("GetDataFromRawData err!", err)
+				utils.MLogger.Info("GetDataFromRawData err!", err)
 				continue
 			}
 			bucket := pb.BucketInfo{}
@@ -629,7 +628,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 				dirty:          false,
 			}
 			l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
-			log.Println("superBucket-ID:", bucket.BucketID, "Name-", bucket.Name, "is loaded")
+			utils.MLogger.Info("superBucket-ID:", bucket.BucketID, "Name-", bucket.Name, "is loaded")
 		}
 	}
 	return nil
@@ -700,7 +699,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		}
 
 		if len(data) < int(objectsBlockSize) {
-			log.Println("data length is not equal")
+			utils.MLogger.Info("data length is not equal")
 		}
 
 		fullData = append(fullData, data...)

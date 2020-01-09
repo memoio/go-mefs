@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -66,7 +66,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		for {
 			_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
 			if err != nil {
-				log.Println("provider deploying resolver and offer failed!")
+				utils.MLogger.Info("provider deploying resolver and offer failed!")
 				time.Sleep(2 * time.Minute)
 			} else {
 				break
@@ -75,11 +75,11 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 		err = m.getContracts()
 		if err != nil {
-			log.Println("Save ", m.localID, "'s provider info err", err)
+			utils.MLogger.Info("Save ", m.localID, "'s provider info err", err)
 		}
 	}()
 
-	log.Println("Get ", m.localID, "'s contract info success")
+	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
 
 	go m.getKpMapRegular(ctx)
 	go m.sendStorageRegular(ctx)
@@ -87,7 +87,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	m.state = true
 
-	log.Println("Provider Service is ready")
+	utils.MLogger.Info("Provider Service is ready")
 	return m, nil
 }
 
@@ -214,7 +214,7 @@ func (p *Info) save(ctx context.Context) error {
 }
 
 func (p *Info) getKpMapRegular(ctx context.Context) {
-	log.Println("Get kpMap from chain start!")
+	utils.MLogger.Info("Get kpMap from chain start!")
 	peerID := p.localID
 	role.SaveKpMap(peerID)
 	ticker := time.NewTicker(30 * time.Minute)
@@ -232,7 +232,7 @@ func (p *Info) getKpMapRegular(ctx context.Context) {
 }
 
 func (p *Info) sendStorageRegular(ctx context.Context) {
-	log.Println("Send storages to keepers start!")
+	utils.MLogger.Info("Send storages to keepers start!")
 	time.Sleep(time.Minute)
 	p.storageSync(ctx)
 	ticker := time.NewTicker(30 * time.Minute)
@@ -264,7 +264,7 @@ func (p *Info) storageSync(ctx context.Context) error {
 
 	km, err := metainfo.NewKeyMeta(p.localID, metainfo.Storage)
 	if err != nil {
-		log.Println("construct StorageSync KV error :", err)
+		utils.MLogger.Info("construct StorageSync KV error :", err)
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (p *Info) storageSync(ctx context.Context) error {
 	for _, kid := range klist {
 		_, err = p.ds.SendMetaRequest(ctx, int32(metainfo.Put), km.ToString(), []byte(value), nil, kid)
 		if err != nil {
-			log.Println("storage info send to", kid, "error: ", err)
+			utils.MLogger.Info("storage info send to", kid, "error: ", err)
 		}
 	}
 

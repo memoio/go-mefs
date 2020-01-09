@@ -2,12 +2,12 @@ package provider
 
 import (
 	"context"
-	"log"
 	"math/big"
 	"strings"
 
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -76,7 +76,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 
 		valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
 		if err != nil {
-			log.Println("try to get channel value from: ", gp.userID)
+			utils.MLogger.Info("try to get channel value from: ", gp.userID)
 			valueByte, _ = p.ds.GetKey(ctx, km.ToString(), gp.userID)
 		}
 
@@ -88,7 +88,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 			sig, _ = b58.Decode(vals[1])
 		}
 
-		log.Println("channel value are:", value.String())
+		utils.MLogger.Info("channel value are:", value.String())
 		if value.Cmp(gp.channel.Value) > 0 {
 			gp.channel.Value = value
 			gp.channel.Sig = sig

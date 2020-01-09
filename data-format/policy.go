@@ -2,7 +2,6 @@ package dataformat
 
 import (
 	"errors"
-	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -154,7 +154,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			for j := dc; j < d.blockCount; j++ {
 				res := copy(dataGroup[j], dataGroup[0])
 				if res != d.segSize {
-					log.Println("copied: ", res)
+					utils.MLogger.Errorf("copied: ", res)
 				}
 			}
 		case RsPolicy:
@@ -178,7 +178,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 			tag, err := d.GenTagForSegment([]byte(res.String()), dataGroup[j])
 			if err != nil {
-				log.Println("gentag err for: ", res.String())
+				utils.MLogger.Errorf("gentag err for: ", res.String())
 				return nil, 0, err
 			}
 			copy(tagGroup[j], tag)
@@ -428,14 +428,14 @@ func decodeStripe(data [][]byte) (*pb.Prefix, int, error) {
 	}
 
 	if prefix != nil && (int(prefix.DataCount) > avaNum || int(prefix.DataCount) > len(lengths)) {
-		log.Println("repair crash: need data:", prefix.DataCount, ", but got avaNum: ", avaNum)
+		utils.MLogger.Errorf("repair crash: need data:", prefix.DataCount, ", but got avaNum: ", avaNum)
 		return nil, 0, ErrRepairCrash
 	}
 
 	sort.Sort(sort.Reverse(sort.IntSlice(lengths)))
 
 	if lengths[prefix.DataCount] <= 0 {
-		log.Println("repair crash: need data:", prefix.DataCount, ", but got avaNum again: ", avaNum)
+		utils.MLogger.Errorf("repair crash: need data:", prefix.DataCount, ", but got avaNum again: ", avaNum)
 		return nil, 0, ErrRepairCrash
 	}
 

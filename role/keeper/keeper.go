@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -58,14 +57,14 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 
 	err := m.load(ctx) //连接节点
 	if err != nil {
-		log.Println("searchAllKeepersAndProviders err:", err)
+		utils.MLogger.Info("searchAllKeepersAndProviders err:", err)
 		return nil, err
 	}
 
 	//tendermint启动相关
 	m.enableBft = false
 	if !m.enableBft {
-		log.Println("Use simple mode")
+		utils.MLogger.Info("Use simple mode")
 	}
 
 	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
@@ -82,7 +81,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.checkPeers(ctx)
 	go m.getKpMapRegular(ctx)
 	m.state = true
-	log.Println("Keeper Service is ready")
+	utils.MLogger.Info("Keeper Service is ready")
 	return m, nil
 }
 
@@ -104,7 +103,7 @@ func (k *Info) Stop() error {
 /*====================Save and Load========================*/
 
 func (k *Info) persistRegular(ctx context.Context) {
-	log.Println("Persist LocalPeerInfo start!")
+	utils.MLogger.Info("Persist LocalPeerInfo start!")
 	ticker := time.NewTicker(PERSISTTIME)
 	defer ticker.Stop()
 	for {
@@ -114,7 +113,7 @@ func (k *Info) persistRegular(ctx context.Context) {
 		case <-ticker.C:
 			err := k.save(ctx)
 			if err != nil {
-				log.Println("PersistlocalPeerInfo err:", err)
+				utils.MLogger.Info("PersistlocalPeerInfo err:", err)
 			}
 		}
 	}
@@ -250,7 +249,7 @@ func (k *Info) savePay(qid, pid string) error {
 		//value: `beginTime/endTime/spacetime/signature/proof`
 		kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
 		if err != nil {
-			log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
+			utils.MLogger.Info("doSpaceTimePay()NewKeyMeta()err: ", err)
 			return err
 		}
 		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
@@ -261,7 +260,7 @@ func (k *Info) savePay(qid, pid string) error {
 		//for storing
 		km, err := metainfo.NewKeyMeta(qid, metainfo.ChalPay, pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 		if err != nil {
-			log.Println("doSpaceTimePay()NewKeyMeta()err: ", err)
+			utils.MLogger.Info("doSpaceTimePay()NewKeyMeta()err: ", err)
 			return err
 		}
 		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
@@ -278,7 +277,7 @@ func (k *Info) load(ctx context.Context) error {
 
 //重启后重新恢复User现场 读取本地存储的U-K-P信息，构建PInfo结构
 func (k *Info) loadUser(ctx context.Context) error {
-	log.Println("Load All userID's Information")
+	utils.MLogger.Info("Load All userID's Information")
 	localID := k.localID //本地id
 	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
 	if err != nil {
@@ -294,7 +293,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 				continue
 			}
 
-			log.Println("Load user", userID, "'s infomations")
+			utils.MLogger.Info("Load user", userID, "'s infomations")
 			wg.Add(1)
 			go func(userID string) {
 				defer wg.Done()
@@ -379,7 +378,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	}
 
 	if kids, err := k.ds.GetKey(ctx, kmKID.ToString(), "local"); kids != nil && err == nil {
-		log.Println(localID, "has keepers:", string(kids))
+		utils.MLogger.Info(localID, "has keepers:", string(kids))
 		for i := 0; i < len(kids)/utils.IDLength; i++ {
 			tmpKid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)
@@ -404,7 +403,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	}
 
 	if pids, err := k.ds.GetKey(ctx, kmPID.ToString(), "local"); pids != nil && err == nil {
-		log.Println(localID, "has providers:", string(pids))
+		utils.MLogger.Info(localID, "has providers:", string(pids))
 		for i := 0; i < len(pids)/utils.IDLength; i++ {
 			tmpKid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
 			_, err := peer.IDB58Decode(tmpKid)
@@ -431,7 +430,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 
 //clean unpaid users
 func (k *Info) cleanTestUsersRegular(ctx context.Context) {
-	log.Println("Clean Test Users start!")
+	utils.MLogger.Info("Clean Test Users start!")
 	ticker := time.NewTicker(2 * time.Hour)
 	defer ticker.Stop()
 	for {
@@ -444,7 +443,7 @@ func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 			t2 := t1.Add(4 * time.Hour)
 			//在一点和五点之间，清理testUsers
 			if tNow.After(t1) && tNow.Before(t2) {
-				log.Println("Begin to clean test users")
+				utils.MLogger.Info("Begin to clean test users")
 				unpaids := k.getUnpaidUsers()
 				for uid, qid := range unpaids {
 					k.deleteGroup(ctx, qid)
@@ -474,7 +473,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 
 			kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
 			if err != nil {
-				log.Println(err)
+				utils.MLogger.Info(err)
 				return err
 			}
 
@@ -482,12 +481,12 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 			// get from leveldb
 			res, err := k.ds.GetKey(ctx, kms, "local")
 			if err != nil {
-				log.Println("no lastTime data, return Unix(0)")
+				utils.MLogger.Info("no lastTime data, return Unix(0)")
 				return err
 			}
 			err = lin.parseLastPayKV(res)
 			if err != nil {
-				log.Println("checkLastPayTime() parseLastPayKV() err: ", err)
+				utils.MLogger.Info("checkLastPayTime() parseLastPayKV() err: ", err)
 				return err
 			}
 		}
@@ -509,7 +508,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 		return
 	}
 
-	log.Println(qid, "is a test userID, clean its data")
+	utils.MLogger.Info(qid, "is a test userID, clean its data")
 	for _, proID := range thisGroup.providers {
 		thisIlinfo, ok := thisGroup.ledgerMap.Load(proID)
 		if !ok {
@@ -520,27 +519,27 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 
 		thisLinfo.blockMap.Range(func(key, value interface{}) bool {
 			blockID := qid + metainfo.BLOCK_DELIMITER + key.(string)
-			log.Println("Delete testUser block-", blockID)
+			utils.MLogger.Info("Delete testUser block-", blockID)
 			//先通知Provider删除块
 			km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 			if err != nil {
-				log.Println("construct delete block KV error :", err)
+				utils.MLogger.Info("construct delete block KV error :", err)
 				return false
 			}
 			err = k.ds.DeleteBlock(ctx, km.ToString(), proID)
 			if err != nil {
-				log.Println("Delete testUser block failed-", blockID, "error:", err)
+				utils.MLogger.Info("Delete testUser block failed-", blockID, "error:", err)
 			}
 
 			kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 			if err != nil {
-				log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
+				utils.MLogger.Info("NewKeyMeta()error!", err, "blockID:", blockID)
 			}
 
 			//delete from local
 			err = k.ds.DeleteKey(ctx, kmBlock.ToString(), "local")
 			if err != nil {
-				log.Println("Delete local key error:", err)
+				utils.MLogger.Info("Delete local key error:", err)
 			}
 
 			return true
@@ -563,13 +562,13 @@ func (k *Info) getBlockPos(qid, bid string) (string, error) {
 }
 
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {
-	log.Println("add block: ", bid, "for query: ", qid, " and provider: ", pid)
+	utils.MLogger.Info("add block: ", bid, "for query: ", qid, " and provider: ", pid)
 
 	blockID := qid + metainfo.BLOCK_DELIMITER + bid
 
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
-		log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
+		utils.MLogger.Info("NewKeyMeta()error!", err, "blockID:", blockID)
 	}
 
 	ctx := context.Background()
@@ -577,7 +576,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {
 	value := pid + metainfo.DELIMITER + strconv.Itoa(offset)
 	err = k.ds.PutKey(ctx, kmBlock.ToString(), []byte(value), "local")
 	if err != nil {
-		log.Println("Delete local key error:", err)
+		utils.MLogger.Info("Delete local key error:", err)
 	}
 
 	gp := k.getGroupInfo(qid, qid, false)
@@ -594,14 +593,14 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
-		log.Println("NewKeyMeta()error!", err, "blockID:", blockID)
+		utils.MLogger.Info("NewKeyMeta()error!", err, "blockID:", blockID)
 	}
 
 	ctx := context.Background()
 	//delete from local
 	err = k.ds.DeleteKey(ctx, kmBlock.ToString(), "local")
 	if err != nil {
-		log.Println("Delete local key error:", err)
+		utils.MLogger.Info("Delete local key error:", err)
 	}
 
 	var pid string
@@ -626,12 +625,12 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 		// notify provider, to delete block
 		km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 		if err != nil {
-			log.Println("construct delete block KV error :", err)
+			utils.MLogger.Info("construct delete block KV error :", err)
 			return
 		}
 		err = k.ds.DeleteBlock(ctx, km.ToString(), pid)
 		if err != nil {
-			log.Println("Delete testUser block failed-", blockID, "error:", err)
+			utils.MLogger.Info("Delete testUser block failed-", blockID, "error:", err)
 		}
 	}
 

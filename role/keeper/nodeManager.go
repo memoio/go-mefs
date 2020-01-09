@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"errors"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -114,7 +113,7 @@ func (k *Info) getPInfo(pid string) (*pInfo, error) {
 }
 
 func (k *Info) checkPeers(ctx context.Context) {
-	log.Println("Check connected peer start!")
+	utils.MLogger.Info("Check connected peer start!")
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
 	k.checkConnectedPeer(ctx)
@@ -200,7 +199,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 			continue
 		}
 
-		log.Println("try to get new: ", id, " roleinfo from net and chain")
+		utils.MLogger.Info("try to get new: ", id, " roleinfo from net and chain")
 		kmRole, err := metainfo.NewKeyMeta(id, metainfo.Role)
 		if err != nil {
 			return err
@@ -216,7 +215,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 				return err
 			}
 			if isKeeper {
-				log.Println("Connect to new keeper: ", id)
+				utils.MLogger.Info("Connect to new keeper: ", id)
 				thiskInfo, err := k.getKInfo(id)
 				if err != nil {
 					continue
@@ -225,7 +224,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 				thiskInfo.availTime = utils.GetUnixNow()
 			}
 		} else if string(val) == metainfo.RoleProvider {
-			log.Println("Connect to new provider: ", id)
+			utils.MLogger.Info("Connect to new provider: ", id)
 			thispInfo, err := k.getPInfo(id)
 			if err != nil {
 				continue

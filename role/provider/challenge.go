@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 
@@ -23,10 +22,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	}
 
 	userID := km.GetMid()
-	log.Println("receive", userID, " 's challenge from", from)
+	utils.MLogger.Info("receive", userID, " 's challenge from", from)
 	blskey, err := p.getNewUserConfig(userID, from)
 	if err != nil {
-		log.Println("get new user`s config from:", from, "failed, error :", err)
+		utils.MLogger.Info("get new user`s config from:", from, "failed, error :", err)
 		return err
 	}
 
@@ -34,7 +33,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	hByte, _ := b58.Decode(string(metaValue))
 	err = proto.Unmarshal(hByte, hProto)
 	if err != nil {
-		log.Println("unmarshal h failed, err: ", err)
+		utils.MLogger.Info("unmarshal h failed, err: ", err)
 	}
 
 	var chal mcl.Challenge
@@ -75,11 +74,11 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		} else {
 			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
 			if !isTrue {
-				log.Println("verify tag failed")
+				utils.MLogger.Info("verify tag failed")
 				//验证失败，则在本地删除此块
 				err := p.ds.DeleteBlock(context.Background(), blockID.String(), "local")
 				if err != nil {
-					log.Println("Delete block", blockID.String(), "error:", err)
+					utils.MLogger.Info("Delete block", blockID.String(), "error:", err)
 				}
 				faultBlocks = append(faultBlocks, index)
 			} else {
@@ -92,23 +91,23 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 
 	proof, err := blskey.GenProof(chal, data, tag, 32)
 	if err != nil {
-		log.Println("GenProof err: ", err)
+		utils.MLogger.Info("GenProof err: ", err)
 		return err
 	}
 
 	// 在发送之前检查生成的proof
 	boo, err := blskey.VerifyProof(chal, proof)
 	if err != nil {
-		log.Println("verify proof failed, err is: ", err)
+		utils.MLogger.Info("verify proof failed, err is: ", err)
 		return err
 	}
 
 	if !boo {
-		log.Println("proof is false")
+		utils.MLogger.Info("proof is false")
 		return mcl.ErrProofVerifyInProvider
 	}
 
-	log.Println("proof is right")
+	utils.MLogger.Info("proof is right")
 
 	retKm, err := metainfo.NewKeyMeta(userID, metainfo.Challenge, ops[0])
 	if err != nil {
@@ -128,7 +127,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
 	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retValue), nil, from)
 	if err != nil {
-		log.Println("send proof err: ", err)
+		utils.MLogger.Info("send proof err: ", err)
 	}
 	return nil
 }

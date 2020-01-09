@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,7 +90,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 	// getUK
 	if g.upKeepingItem != nil {
 		uItem := g.upKeepingItem
-		log.Println("start user:", g.userID, "'s lfs:", g.groupID)
+		utils.MLogger.Info("start user:", g.userID, "'s lfs:", g.groupID)
 		g.keeperSLA = int(uItem.KeeperSLA)
 		g.providerSLA = int(uItem.ProviderSLA)
 		g.tempKeepers = uItem.KeeperIDs
@@ -115,7 +114,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 			return false, err
 		}
 
-		log.Println("test user:", g.userID, "has keepers and providers:", string(res))
+		utils.MLogger.Info("test user:", g.userID, "has keepers and providers:", string(res))
 
 		var wg sync.WaitGroup
 		splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
@@ -179,7 +178,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 
 			wg.Wait()
 
-			log.Println("start test user:", g.userID, "'s lfs:", g.groupID)
+			utils.MLogger.Info("start test user:", g.userID, "'s lfs:", g.groupID)
 
 			g.state = depoyDone
 			err = g.connect(ctx)
@@ -190,7 +189,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		}
 	}
 
-	log.Println("init user:", g.userID, "'s lfs:", g.groupID)
+	utils.MLogger.Info("init user:", g.userID, "'s lfs:", g.groupID)
 	err := g.initGroup(ctx)
 	if err != nil {
 		return false, err
@@ -207,7 +206,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	g.Lock()
 	defer g.Unlock()
 
-	log.Println("Connect for user: ", g.userID)
+	utils.MLogger.Info("Connect for user: ", g.userID)
 	for _, kid := range g.tempKeepers {
 		tempKeeper := &keeperInfo{
 			keeperID: kid,
@@ -224,7 +223,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 				failNum++
 				kinfo.connected = false
 				if i == connectTryCount-1 {
-					log.Println("Connect to keeper", kinfo.keeperID, "failed.")
+					utils.MLogger.Info("Connect to keeper", kinfo.keeperID, "failed.")
 				}
 			} else {
 				kinfo.connected = true
@@ -258,7 +257,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 				failNum++
 				pinfo.connected = false
 				if i == connectTryCount-1 {
-					log.Println("Connect to provider", pinfo.providerID, "failed.")
+					utils.MLogger.Info("Connect to provider", pinfo.providerID, "failed.")
 				}
 			} else {
 				pinfo.connected = true
@@ -280,7 +279,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	// key: queryID/"UserStart"/userID/kc/pc
 	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
-		log.Println("Construct Deployed key error", err)
+		utils.MLogger.Info("Construct Deployed key error", err)
 		return err
 	}
 
@@ -298,7 +297,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	for _, kinfo := range g.keepers {
 		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, kinfo.keeperID)
 		if err != nil {
-			log.Println("Send keeper", kinfo.keeperID, " err:", err)
+			utils.MLogger.Info("Send keeper", kinfo.keeperID, " err:", err)
 			continue
 		}
 		uuidtmp, err := uuid.FromBytes(resp)
@@ -311,7 +310,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	for _, pinfo := range g.providers {
 		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, pinfo.providerID)
 		if err != nil {
-			log.Println("Send provider", pinfo.providerID, " err:", err)
+			utils.MLogger.Info("Send provider", pinfo.providerID, " err:", err)
 		}
 
 		uuidtmp, err := uuid.FromBytes(resp)
@@ -321,7 +320,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		pinfo.sessionID = uuidtmp
 	}
 
-	log.Println("Group Service is ready for: ", g.userID)
+	utils.MLogger.Info("Group Service is ready for: ", g.userID)
 
 	g.state = groupStarted
 	return nil
@@ -334,7 +333,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
 	kmInit, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserInit, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
-		log.Println("gp connect: NewKeyMeta error!")
+		utils.MLogger.Info("gp connect: NewKeyMeta error!")
 		return err
 	}
 
@@ -355,7 +354,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 			switch g.state {
 			case collecting:
 				timeOutCount++
-				log.Printf("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
+				utils.MLogger.Info("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
 				go g.ds.BroadcastMessage(ctx, kmes)
 			case collectDone:
 				g.notify(ctx)
@@ -383,7 +382,7 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 		return
 	}
 
-	log.Println("Receive InitResponse，from：", from, ", value is：", string(metaValue))
+	utils.MLogger.Info("Receive InitResponse，from：", from, ", value is：", string(metaValue))
 	splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedMeta) != 2 {
 		return
@@ -431,7 +430,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 		return
 	}
 
-	log.Println("Has enough Keeper and Providers, choosing...")
+	utils.MLogger.Info("Has enough Keeper and Providers, choosing...")
 	keepers := make([]string, 0, g.keeperSLA)
 	providers := make([]string, 0, g.providerSLA)
 	g.tempKeepers = utils.DisorderArray(g.tempKeepers)
@@ -451,7 +450,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 	if len(keepers) < g.keeperSLA {
 		g.state = collecting
 		g.Unlock()
-		log.Println("Keeper is not enough, collecting...")
+		utils.MLogger.Info("Keeper is not enough, collecting...")
 		return
 	}
 
@@ -473,14 +472,14 @@ func (g *groupInfo) notify(ctx context.Context) {
 	if len(providers) < g.providerSLA {
 		g.state = collecting
 		g.Unlock()
-		log.Println("Provider is not enough, collecting...")
+		utils.MLogger.Info("Provider is not enough, collecting...")
 		return
 	}
 
 	g.tempKeepers = keepers
 	g.tempProviders = providers
 
-	log.Println("Choose completed")
+	utils.MLogger.Info("Choose completed")
 
 	var res strings.Builder
 	for _, kid := range g.tempKeepers {
@@ -497,7 +496,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	kmNotify, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserNotify, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
-		log.Println("gp notify: NewKeyMeta error!")
+		utils.MLogger.Info("gp notify: NewKeyMeta error!")
 		return
 	}
 
@@ -508,7 +507,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 		count := 0
 		for _, kid := range keepers { //循环发消息
 			wg.Add(1)
-			log.Println("Notify keeper:", kid)
+			utils.MLogger.Info("Notify keeper:", kid)
 			go func(kid string) {
 				defer wg.Done()
 				retry := 0
@@ -533,7 +532,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 		//all keepers are online
 		if count == g.keeperSLA {
-			log.Println("Receive all keepers' response")
+			utils.MLogger.Info("Receive all keepers' response")
 			g.Lock()
 			g.state = deploying
 			g.Unlock()
@@ -576,12 +575,12 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 	if g.userID != g.groupID {
 		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
 		if err != nil {
-			log.Println("deploy UpKeeping failed :", err)
+			utils.MLogger.Info("deploy UpKeeping failed :", err)
 		}
 
 		uItem, err := role.GetUpkeepingInfo(g.userID, ukID)
 		if err != nil {
-			log.Println("get UpKeeping failed :", err)
+			utils.MLogger.Info("get UpKeeping failed :", err)
 		}
 
 		g.upKeepingItem = &uItem
@@ -628,12 +627,12 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 		pidstr = splitedValue[0]
 		offset, err = strconv.Atoi(splitedValue[1])
 		if err != nil {
-			log.Println("Offset decode error-", pidstr, err)
+			utils.MLogger.Info("Offset decode error-", pidstr, err)
 			continue
 		}
 
 		if !g.ds.Connect(ctx, pidstr) { //连接不上此provider
-			log.Println("Cannot connect to provider-", pidstr)
+			utils.MLogger.Info("Cannot connect to provider-", pidstr)
 			return pidstr, offset, ErrNoProviders
 		}
 		return pidstr, offset, nil
@@ -715,7 +714,7 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 	for _, keeper := range g.tempKeepers {
 		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper)
 		if err != nil {
-			log.Println("send metaMessage to ", keeper, " error :", err)
+			utils.MLogger.Info("send metaMessage to ", keeper, " error :", err)
 			count++
 		}
 	}
@@ -731,7 +730,7 @@ func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset
 	}
 	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
-		log.Println("construct put blockMeta KV error :", err)
+		utils.MLogger.Info("construct put blockMeta KV error :", err)
 		return err
 	}
 	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
@@ -745,7 +744,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	}
 	provider, _, err := g.getBlockProviders(blockID)
 	if err == ErrNoProviders { //Noprovider说明此块还不存在，不用删除
-		log.Printf("Get block:%s's location error, no exist or keepers lost it.\n", blockID)
+		utils.MLogger.Info("Get block:%s's location error, no exist or keepers lost it.\n", blockID)
 		return nil
 	} else if err != nil {
 		return err
@@ -753,7 +752,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 
 	km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 	if err != nil {
-		log.Println("construct delete block KV error :", err)
+		utils.MLogger.Info("construct delete block KV error :", err)
 		return err
 	}
 
@@ -762,7 +761,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	if updateMeta { //这个需要等待返回
 		err := g.ds.DeleteBlock(ctx, km.ToString(), provider)
 		if err != nil {
-			log.Println("Cannot delete Block-", blockID, err)
+			utils.MLogger.Info("Cannot delete Block-", blockID, err)
 			return ErrCannotDeleteMetaBlock
 		}
 	} else {

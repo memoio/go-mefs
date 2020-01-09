@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -13,7 +12,7 @@ import (
 )
 
 func (k *Info) checkLedger(ctx context.Context) {
-	log.Println("Check Ledger start!")
+	utils.MLogger.Info("Check Ledger start!")
 	time.Sleep(2 * CHALTIME)
 	ticker := time.NewTicker(CHECKTIME)
 	defer ticker.Stop()
@@ -22,7 +21,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			log.Println("Repair starts!")
+			utils.MLogger.Info("Repair starts!")
 			pus := k.getUQKeys()
 			for _, pu := range pus {
 				// not repair pos blocks
@@ -53,21 +52,21 @@ func (k *Info) checkLedger(ctx context.Context) {
 						case 0:
 							if EXPIRETIME < eclasped {
 								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-								log.Println("Need repair cid first time: ", cid)
+								utils.MLogger.Info("Need repair cid first time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 1:
 							if 4*EXPIRETIME < eclasped {
 								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-								log.Println("Need repair cid second time: ", cid)
+								utils.MLogger.Info("Need repair cid second time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 2:
 							if 16*EXPIRETIME < eclasped {
 								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-								log.Println("Need repair cid third time: ", cid)
+								utils.MLogger.Info("Need repair cid third time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
@@ -77,7 +76,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 								// try every 32 hours
 								if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
 									cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
-									log.Println("Need repair cid tried: ", cid)
+									utils.MLogger.Info("Need repair cid tried: ", cid)
 									thisinfo.repair++
 									k.repch <- cid
 								}
@@ -93,12 +92,12 @@ func (k *Info) checkLedger(ctx context.Context) {
 }
 
 func (k *Info) repairRegular(ctx context.Context) {
-	log.Println("Check repairlist start!")
+	utils.MLogger.Info("Check repairlist start!")
 	go func() {
 		for {
 			select {
 			case cid := <-k.repch:
-				log.Println("repairing cid: ", cid)
+				utils.MLogger.Info("repairing cid: ", cid)
 				k.repairBlock(ctx, cid)
 			case <-ctx.Done():
 				return
@@ -173,13 +172,13 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 	}
 
 	if len(ugid) == 0 {
-		log.Println("Repair: no enough informations")
+		utils.MLogger.Info("Repair: no enough informations")
 		return
 	}
 
 	if len(response) > 0 {
 		if !k.ds.Connect(ctx, response) {
-			log.Println("Repair: need choose a new provider to replace old: ", response)
+			utils.MLogger.Info("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
 	}
@@ -187,7 +186,7 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 	if len(response) == 0 || response == "" {
 		response = k.searchNewProvider(ctx, qid, ugid)
 		if response == "" {
-			log.Println("Repair failed, no available provider")
+			utils.MLogger.Info("Repair failed, no available provider")
 			return
 		}
 	}
@@ -197,14 +196,14 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 
 	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair)
 	if err != nil {
-		log.Println("construct repair KV error: ", err)
+		utils.MLogger.Info("construct repair KV error: ", err)
 		return
 	}
 
-	log.Println("cpids: ", cpids, ",repairs on: ", response)
+	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
 	_, err = k.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
 	if err != nil {
-		log.Println("err: ", err)
+		utils.MLogger.Info("err: ", err)
 	}
 }
 
@@ -221,11 +220,11 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 	bid := splitedKey[1]
 
 	if strings.Compare(splitedValue[0], "ok") == 0 {
-		log.Println("repair success, cid is: ", blockID)
+		utils.MLogger.Info("repair success, cid is: ", blockID)
 		newPid := splitedValue[1]
 		newOffset, err := strconv.Atoi(splitedValue[2])
 		if err != nil {
-			log.Println("strconv.Atoi offset error: ", err)
+			utils.MLogger.Info("strconv.Atoi offset error: ", err)
 			return
 		}
 
@@ -240,7 +239,7 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 		return
 	}
 
-	log.Println("repair failed, block is: ", blockID)
+	utils.MLogger.Info("repair failed, block is: ", blockID)
 
 	return
 

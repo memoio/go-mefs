@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 
@@ -19,7 +18,7 @@ import (
 // return kv, key: queryID/"UserInit"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
-	log.Println("NewUserInit: ", km.ToString(), " From: ", from)
+	utils.MLogger.Info("NewUserInit: ", km.ToString(), " From: ", from)
 	options := km.GetOptions()
 	if len(options) != 3 {
 		return
@@ -27,13 +26,13 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 
 	kc, err := strconv.Atoi(options[1])
 	if err != nil {
-		log.Println("handleUserInitReq: ", err)
+		utils.MLogger.Info("handleUserInitReq: ", err)
 		return
 	}
 
 	pc, err := strconv.Atoi(options[2])
 	if err != nil {
-		log.Println("handleUserInitReq: ", err)
+		utils.MLogger.Info("handleUserInitReq: ", err)
 		return
 	}
 
@@ -42,10 +41,10 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	price := int64(utils.STOREPRICEPEDOLLAR)
 	var response string
 	if qid != uid {
-		log.Println("Get k/p numbers from query contract of user: ", uid)
+		utils.MLogger.Info("Get k/p numbers from query contract of user: ", uid)
 		item, err := role.GetQueryInfo(uid, qid)
 		if item.Completed || err != nil {
-			log.Println("complete:", item.Completed, "error:", err)
+			utils.MLogger.Info("complete:", item.Completed, "error:", err)
 			return
 		}
 		kc = int(item.KeeperNums)
@@ -60,11 +59,11 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	response, err = k.initUser(uid, qid, kc, pc, price)
 	if err != nil {
 		if err != nil {
-			log.Println("handleUserInitReq err: ", err)
+			utils.MLogger.Info("handleUserInitReq err: ", err)
 			return
 		}
 	}
-	log.Println("New user: ", qid, " keeperCount: ", kc, "providerCount: ", pc, "price: ", price)
+	utils.MLogger.Info("New user: ", qid, " keeperCount: ", kc, "providerCount: ", pc, "price: ", price)
 
 	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(response), nil, from)
 }
@@ -134,11 +133,11 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 // key: queryID/"UserNotify"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	log.Println("NewUserNotify: ", km.ToString(), "From:", from)
+	utils.MLogger.Info("NewUserNotify: ", km.ToString(), "From:", from)
 
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
-		log.Println("UserNotif value is not correct: ", metaValue)
+		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
 		return []byte("no"), nil
 	}
 
@@ -156,10 +155,10 @@ func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from str
 // key: queryID/"UserStart"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	log.Println("NewUser Start: ", km.ToString(), "From:", from)
+	utils.MLogger.Info("NewUser Start: ", km.ToString(), "From:", from)
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
-		log.Println("UserNotif value is not correct: ", metaValue)
+		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
 		return nil, errors.New("value is not right")
 	}
 
@@ -170,13 +169,13 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	kc, err := strconv.Atoi(ops[1])
 	if err != nil {
-		log.Println("handleUserInitReq: ", err)
+		utils.MLogger.Info("handleUserInitReq: ", err)
 		return nil, err
 	}
 
 	pc, err := strconv.Atoi(ops[2])
 	if err != nil {
-		log.Println("handleUserInitReq: ", err)
+		utils.MLogger.Info("handleUserInitReq: ", err)
 		return nil, err
 	}
 
@@ -199,7 +198,7 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 	//将value切分，生成好对应的keepers和providers列表
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
-		log.Println("UserNotif value is not correct: ", metaValue)
+		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
 		return
 	}
 
@@ -233,13 +232,13 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 
 	kmKid, err := metainfo.NewKeyMeta(groupID, metainfo.Keepers)
 	if err != nil {
-		log.Println("handleNewUserNotif err: ", err)
+		utils.MLogger.Info("handleNewUserNotif err: ", err)
 		return
 	}
 
 	kmPid, err := metainfo.NewKeyMeta(groupID, metainfo.Providers)
 	if err != nil {
-		log.Println("handleNewUserNotif err: ", err)
+		utils.MLogger.Info("handleNewUserNotif err: ", err)
 		return
 	}
 

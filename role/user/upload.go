@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -44,7 +43,7 @@ type uploadTask struct { //一个上传任务实例
 
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
-	log.Println("PutObject: ", bucketName, objectName)
+	utils.MLogger.Info("PutObject: ", bucketName, objectName)
 	if !l.online {
 		return nil, errors.New("user is not running")
 	}
@@ -189,7 +188,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	for !breakFlag {
 		select {
 		case <-ctx.Done():
-			log.Println("上传取消")
+			utils.MLogger.Info("上传取消")
 			return nil
 		default:
 			// clear itself
@@ -248,7 +247,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 				encodedData, offset, err := enc.Encode(data, bm.ToString(3), start)
 				if err != nil {
-					log.Println("encodedData", err)
+					utils.MLogger.Info("encodedData", err)
 					return
 				}
 
@@ -259,7 +258,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					if start == 0 {
 						pros, _, _ := u.gInfo.GetProviders(bc)
 						if len(pros) < least {
-							log.Println("putobject err：", ErrNoEnoughProvider)
+							utils.MLogger.Info("putobject err：", ErrNoEnoughProvider)
 							return
 						}
 
@@ -275,7 +274,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 							}
 							err := u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], pros[i])
 							if err != nil {
-								log.Println("Put Block", ncid, u.curOffset, offset, "to", pros[i], "failed:", err)
+								utils.MLogger.Info("Put Block", ncid, u.curOffset, offset, "to", pros[i], "failed:", err)
 								continue
 							}
 							count++
@@ -297,7 +296,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 							err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
 							if err != nil {
-								log.Println("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
+								utils.MLogger.Info("Put Block", ncid, u.curOffset, offset, "to", provider, "failed:", err)
 								continue
 							}
 							count++
@@ -315,7 +314,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				for _, v := range blockMetas {
 					err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
 					if err != nil {
-						log.Println("putobject", err)
+						utils.MLogger.Info("putobject", err)
 						return
 					}
 				}

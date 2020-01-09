@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"errors"
-	"log"
 	"math/big"
 	"sort"
 	"strings"
@@ -18,7 +17,7 @@ import (
 )
 
 func (k *Info) stPayRegular(ctx context.Context) {
-	log.Println("SpaceTime Pay start!")
+	utils.MLogger.Info("SpaceTime Pay start!")
 	ticker := time.NewTicker(SPACETIMEPAYTIME)
 	defer ticker.Stop()
 	for {
@@ -50,8 +49,8 @@ func (k *Info) stPayRegular(ctx context.Context) {
 
 func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
-	log.Println(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
-	defer log.Println("========spacetimepay========")
+	utils.MLogger.Info(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
+	defer utils.MLogger.Info("========spacetimepay========")
 	if !g.isMaster(proID) {
 		return errors.New("fail to pay")
 	}
@@ -93,7 +92,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 			err = contracts.AddProvider(pos.PosSkStr, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 			if err != nil {
-				log.Println("st AddProvider() error", err)
+				utils.MLogger.Info("st AddProvider() error", err)
 				return err
 			}
 
@@ -120,11 +119,11 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	if amount.Sign() > 0 {
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
 		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
-		log.Printf("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
+		utils.MLogger.Info("amount:%d\nbeginTime:%s\nlastTime:%s\n", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
 		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount) //进行支付
 		if err != nil {
-			log.Println("contracts.SpaceTimePay() failed: ", err)
+			utils.MLogger.Info("contracts.SpaceTimePay() failed: ", err)
 			return err
 		}
 	}
@@ -144,13 +143,13 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 	amount := big.NewInt(0)
 	if spacetime.Sign() <= 0 || price <= 0 {
-		log.Println("error! spaceTime:", spacetime.String(), "price:", price)
+		utils.MLogger.Info("error! spaceTime:", spacetime.String(), "price:", price)
 		return amount
 	}
 	amount.Mul(spacetime, big.NewInt(price))
 	amount.Quo(amount, big.NewInt(1024*1024*60*60*24)) //注意这里先用时空值×单位，计算出来更加准确
 	if amount.Sign() <= 0 {
-		log.Println("error! spaceTime:", spacetime, "amount:", amount, "price:", price)
+		utils.MLogger.Info("error! spaceTime:", spacetime, "amount:", amount, "price:", price)
 		return amount
 	}
 	return amount
@@ -186,7 +185,7 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 	for _, key := range tsl {
 		chalres, ok := l.chalMap.Load(key)
 		if !ok {
-			log.Println("fetch challenge results err, time:", utils.UnixToTime(key))
+			utils.MLogger.Info("fetch challenge results err, time:", utils.UnixToTime(key))
 		}
 		timeList = append(timeList, key)
 		lengthtemp := chalres.(*chalresult).length
@@ -194,7 +193,7 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 	}
 
 	if len(timeList) <= 1 || len(lenghList) <= 1 {
-		log.Println("no enough challenge data")
+		utils.MLogger.Info("no enough challenge data")
 		return spacetime, 0
 	}
 	timepre := timeList[0]
@@ -207,7 +206,7 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 		lengthpre = length
 	}
 	if spacetime.Sign() < 0 {
-		log.Println("error spacetime<0!\ntimeList:", timeList, "\nlenghlist:", lenghList)
+		utils.MLogger.Info("error spacetime<0!\ntimeList:", timeList, "\nlenghlist:", lenghList)
 	}
 	return spacetime, timepre
 }
@@ -227,7 +226,7 @@ func (l *lInfo) parseLastPayKV(value []byte) error {
 
 	st, ok := big.NewInt(0).SetString(splitedValue[2], 10)
 	if !ok {
-		log.Println("SetString()err!value: ", splitedValue[2])
+		utils.MLogger.Info("SetString()err!value: ", splitedValue[2])
 	}
 	begintime := utils.StringToUnix(splitedValue[0])
 	endtime := utils.StringToUnix(splitedValue[1])

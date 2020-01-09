@@ -2,11 +2,11 @@ package dataformat
 
 import (
 	"errors"
-	"log"
 	"strconv"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -51,7 +51,7 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 	fieldSize := int(pre.SegmentSize) + s*int(2+(pre.ParityCount-1)/pre.DataCount)
 
 	if dataLen < start*fieldSize+(1+(length-1)/int(pre.DataCount*pre.SegmentSize))*fieldSize {
-		log.Println("has:", dataLen, "need:", start*fieldSize+1+(length-1)/int(pre.DataCount))
+		utils.MLogger.Errorf("has:", dataLen, "need:", start*fieldSize+1+(length-1)/int(pre.DataCount))
 		return false, nil
 	}
 
@@ -67,7 +67,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 
 	pre, preLen, err := bf.PrefixDecode(data)
 	if err != nil || pre.GetVersion() == 0 || pre.GetDataCount() == 0 {
-		log.Println("prefix is not good:", pre)
+		utils.MLogger.Errorf("prefix is not good:", pre)
 		return false
 	}
 
@@ -90,7 +90,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
 	if !ok || err != nil {
-		log.Println("tag is wrong:", err)
+		utils.MLogger.Errorf("tag is wrong:", err)
 		return false
 	}
 	return true

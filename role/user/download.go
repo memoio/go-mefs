@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"io"
-	"log"
 	"math/big"
 	"strconv"
 	"time"
@@ -90,7 +89,7 @@ type downloadTask struct {
 
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
-	log.Println("GetObject: ", bucketName, objectName)
+	utils.MLogger.Info("GetObject: ", bucketName, objectName)
 	if !l.online {
 		return ErrLfsServiceNotReady
 	}
@@ -197,7 +196,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		}
 
 		if n != remain {
-			log.Println("length is not match")
+			utils.MLogger.Info("length is not match")
 		}
 
 		do.sizeReceived += int(n)
@@ -264,7 +263,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	blockCount := dataCount + parityCount
 	bm, err := metainfo.NewBlockMeta(ds.fsID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
-		log.Println("Download failed-", err)
+		utils.MLogger.Info("Download failed-", err)
 		return 0, err
 	}
 
@@ -275,7 +274,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	for i := 0; i < int(blockCount); i++ {
 		// fails too many, no need to download
 		if blockCount-int32(i)+count < dataCount {
-			log.Printf("Get Obeject failed, Err: %v\n", ErrCannotGetEnoughBlock)
+			utils.MLogger.Info("Get Obeject failed, Err: %v\n", ErrCannotGetEnoughBlock)
 			return 0, ErrCannotGetEnoughBlock
 		}
 
@@ -283,7 +282,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		ncid := bm.ToString()
 		provider, _, err := ds.group.getBlockProviders(ncid)
 		if err != nil || provider == ds.fsID {
-			log.Printf("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
+			utils.MLogger.Info("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
 			continue
 		}
 
@@ -296,20 +295,20 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		//获取数据块
 		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
 		if err != nil {
-			log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
+			utils.MLogger.Info("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
 			continue
 		}
 		blkData := b.RawData()
 		//需要检查数据块的长度也没问题
 		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(remain))
 		if !ok || err != nil {
-			log.Printf("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
+			utils.MLogger.Info("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
 			continue
 		}
 
 		ok = ds.decoder.VerifyBlock(blkData, ncid)
 		if !ok {
-			log.Println("Verify Block failed.", ncid, "from:", provider)
+			utils.MLogger.Info("Verify Block failed.", ncid, "from:", provider)
 			continue
 		}
 
@@ -320,7 +319,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 		if pinfo.chanItem != nil {
 			pinfo.chanItem.Value = money
-			log.Println("download success，change channel.value", pinfo.chanItem.ChannelID, money.String())
+			utils.MLogger.Info("download success，change channel.value", pinfo.chanItem.ChannelID, money.String())
 		}
 
 		if ds.decoder.Prefix.Policy == dataformat.RsPolicy {
@@ -338,7 +337,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 	}
 	if count < dataCount {
-		log.Println("Download failed-", ErrCannotGetEnoughBlock)
+		utils.MLogger.Info("Download failed-", ErrCannotGetEnoughBlock)
 		return 0, ErrCannotGetEnoughBlock
 	}
 
@@ -346,7 +345,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	// decode returns bytes of 16B
 	data, err := ds.decoder.Decode(datas, int(segStart), int(offset+remain))
 	if err != nil {
-		log.Println("Download failed-", err)
+		utils.MLogger.Info("Download failed-", err)
 		return 0, err
 	}
 
@@ -355,7 +354,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		data = data[:offset+remain+padding]
 		data, err = aes.AesDecrypt(data, ds.sKey[:])
 		if err != nil {
-			log.Println("Download failed-", err)
+			utils.MLogger.Info("Download failed-", err)
 			return 0, err
 		}
 		data = data[:len(data)-int(padding)]
@@ -374,7 +373,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	}
 
 	if int64(wl) != remain {
-		log.Println("write length is not equal")
+		utils.MLogger.Info("write length is not equal")
 	}
 
 	return remain, nil
@@ -388,13 +387,13 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 
 	providerAddress, err := address.GetAddressFromID(provider)
 	if err != nil {
-		log.Println("GetProAddr err: ", err)
+		utils.MLogger.Info("GetProAddr err: ", err)
 		return nil, nil, err
 	}
 
 	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
-		log.Println("GetLocalAddr err: ", err)
+		utils.MLogger.Info("GetLocalAddr err: ", err)
 		return nil, nil, err
 	}
 
@@ -412,13 +411,13 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 	//签名
 	sig, err := role.SignForChannel(channelID, hexSK, money)
 	if err != nil {
-		log.Printf("signature about Block %s from %s failed.\n", ncid, provider)
+		utils.MLogger.Info("signature about Block %s from %s failed.\n", ncid, provider)
 		return nil, nil, err
 	}
 	//将签名信息、user公钥、user地址、provider地址、签名金额一并发给provider
 	pubKey, err := utils.GetCompressedPkFromHexSk(hexSK)
 	if err != nil {
-		log.Println("get public key error.")
+		utils.MLogger.Info("get public key error.")
 		return nil, nil, err
 	}
 
@@ -431,7 +430,7 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		log.Println("protoMarshal about Block", ncid, "from", provider, "failed. err:", err)
+		utils.MLogger.Info("protoMarshal about Block", ncid, "from", provider, "failed. err:", err)
 		return nil, nil, err
 	}
 	return mes, money, nil

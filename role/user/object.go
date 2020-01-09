@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -243,7 +242,7 @@ func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
 		blockID := bm.ToString()
 		blockAvailTime, err := l.getLastChalTime(blockID)
 		if err != nil {
-			log.Printf("Get block-%s's availTime failed!err: %v\n", blockID, err)
+			utils.MLogger.Info("Get block-%s's availTime failed!err: %v\n", blockID, err)
 			continue
 		}
 		if blockAvailTime.After(latestTime) {

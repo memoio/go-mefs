@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"crypto/sha256"
-	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -80,33 +79,33 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 	//从磁盘读取存储的Cidprefix
 	posKM, err := metainfo.NewKeyMeta(groupID, metainfo.PosMeta)
 	if err != nil {
-		log.Println("NewKeyMeta posKM error :", err)
+		utils.MLogger.Info("NewKeyMeta posKM error :", err)
 	} else {
-		log.Println("posKm :", posKM.ToString())
+		utils.MLogger.Info("posKm :", posKM.ToString())
 		posValue, err := p.ds.GetKey(ctx, posKM.ToString(), "local")
 		if err != nil {
-			log.Println("Get posKM from local error :", err)
+			utils.MLogger.Info("Get posKM from local error :", err)
 		} else {
-			log.Println("posvalue :", string(posValue))
+			utils.MLogger.Info("posvalue :", string(posValue))
 			posCidPrefix = string(posValue)
 			cidInfo, err := metainfo.GetBlockMeta(string(posValue) + "_0")
 			if err != nil {
-				log.Println("get block meta in posRegular error :", err)
+				utils.MLogger.Info("get block meta in posRegular error :", err)
 			} else {
 				curGid, err = strconv.Atoi(cidInfo.GetBid()[utils.IDLength:])
 				if err != nil {
-					log.Println("strconv.Atoi Gid in posReguar error :", err)
+					utils.MLogger.Info("strconv.Atoi Gid in posReguar error :", err)
 				}
 				curSid, err = strconv.Atoi(cidInfo.GetSid())
 				if err != nil {
-					log.Println("strconv.Atoi Sid in posReguar error :", err)
+					utils.MLogger.Info("strconv.Atoi Sid in posReguar error :", err)
 				}
 			}
 		}
 	}
 
 	p.traversePath(gc)
-	log.Println("pos blocks reaches gid: ", curGid, ", sid: ", curSid)
+	utils.MLogger.Info("pos blocks reaches gid: ", curGid, ", sid: ", curSid)
 
 	//开始pos
 	p.posRegular(ctx)
@@ -114,7 +113,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 
 // posRegular checks posBlocks and decide to add/delete
 func (p *Info) posRegular(ctx context.Context) {
-	log.Println("Pos start!")
+	utils.MLogger.Info("Pos start!")
 
 	p.doGenerateOrDelete()
 	ticker := time.NewTicker(30 * time.Minute)
@@ -134,7 +133,7 @@ func (p *Info) posRegular(ctx context.Context) {
 
 func (p *Info) traversePath(gc bool) {
 	if gc {
-		log.Println("clean pos blocks first")
+		utils.MLogger.Info("clean pos blocks first")
 	}
 	exist := false
 	gid := 0
@@ -197,7 +196,7 @@ func (p *Info) doGenerateOrDelete() {
 	totalSpace := p.getDiskTotal()
 
 	ratio := float64(usedSpace) / float64(totalSpace)
-	log.Println("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
+	utils.MLogger.Info("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
 	if ratio <= lowWater {
 		p.generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
@@ -228,7 +227,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 	// fillRandom()
 	// DataEncodeToMul()
 	// send BlockMeta to keepers
-	log.Println("generate pos blcoks")
+	utils.MLogger.Info("generate pos blcoks")
 
 	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
 	if err != nil {
@@ -254,7 +253,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		data, _, err := p.uploadMulpolicy(tmpData)
 		if err != nil {
-			log.Println("UploadMulpolicy in generate Pos Blocks error :", err)
+			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error :", err)
 			continue
 		}
 
@@ -266,13 +265,13 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 			ncid := cid.NewCidV2([]byte(blockID))
 			newblk, err := blocks.NewBlockWithCid(dataBlock, ncid)
 			if err != nil {
-				log.Println("New block failed, error :", err)
+				utils.MLogger.Info("New block failed, error :", err)
 				continue
 			}
-			log.Println("New block success :", newblk.Cid())
+			utils.MLogger.Info("New block success :", newblk.Cid())
 			err = p.ds.BlockStore().Put(newblk)
 			if err != nil {
-				log.Println("add block failed, error :", err)
+				utils.MLogger.Info("add block failed, error :", err)
 			}
 
 			boff := blockID + "_" + strconv.Itoa(offset)
@@ -289,17 +288,17 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 
 		// 本地更新
 		posValue := posCidPrefix
-		log.Println("posKM :", posKM.ToString(), ", posValue :", posValue)
+		utils.MLogger.Info("posKM :", posKM.ToString(), ", posValue :", posValue)
 		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
-			log.Println("CmdPutTo posKM error :", err)
+			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
 		}
 	}
 }
 
 func (p *Info) deletePosBlocks(decreseSpace uint64) {
-	log.Println("data is about to exceed the space limit, delete pos blcoks")
+	utils.MLogger.Info("data is about to exceed the space limit, delete pos blcoks")
 
 	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
 	if err != nil {
@@ -324,10 +323,10 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 			ncid := cid.NewCidV2([]byte(blockID))
 			err := p.ds.BlockStore().DeleteBlock(ncid)
 			if err != nil {
-				log.Println("delete block: ", blockID, " error :", err)
+				utils.MLogger.Info("delete block: ", blockID, " error :", err)
 				j++
 			} else {
-				log.Println("delete block : ", blockID, " success")
+				utils.MLogger.Info("delete block : ", blockID, " success")
 				totalDecresed += uint64(mullen)
 				deleteBlocks = append(deleteBlocks, blockID)
 			}
@@ -344,12 +343,12 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		}
 
 		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
-		log.Println("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
+		utils.MLogger.Info("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
 		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
 		if err != nil {
-			log.Println("CmdPutTo posKM error :", err)
+			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
 		}
 
@@ -358,7 +357,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		if j < 5 {
 			km, err := metainfo.NewKeyMeta(p.localID, metainfo.Pos)
 			if err != nil {
-				log.Println("construct put blockMeta KV error :", err)
+				utils.MLogger.Info("construct put blockMeta KV error :", err)
 				return
 			}
 			metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
@@ -375,7 +374,7 @@ func (p *Info) getUserConifg(userID, groupID string) error {
 
 	pubKey, err := p.getNewUserConfig(userID, groupID)
 	if err != nil {
-		log.Println("getNewUserConfig in get userconfig error :", err)
+		utils.MLogger.Info("getNewUserConfig in get userconfig error :", err)
 		return err
 	}
 
@@ -384,7 +383,7 @@ func (p *Info) getUserConifg(userID, groupID string) error {
 	//获取私钥
 	opt.BlsKey.Sk, err = p.getUserPrivateKey(userID, groupID)
 	if err != nil {
-		log.Println("getUserPrivateKey in get userconfig error ", err)
+		utils.MLogger.Info("getUserPrivateKey in get userconfig error ", err)
 		return err
 	}
 	return nil

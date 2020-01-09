@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"errors"
-	"log"
 	"math/big"
 	"strings"
 
@@ -35,7 +34,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 	go func() {
 		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {
-			log.Printf("Error writing block to datastore: %s", err)
+			utils.MLogger.Info("Error writing block to datastore: %s", err)
 			return
 		}
 		return
@@ -63,7 +62,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 	go func() {
 		err := p.ds.AppendBlock(ctx, km.ToString(), value, "local")
 		if err != nil {
-			log.Printf("Error append field to block %s: %s", km.ToString(), err)
+			utils.MLogger.Info("Error append field to block %s: %s", km.ToString(), err)
 			return
 		}
 	}()
@@ -90,7 +89,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 		res, value, sig, err := p.verify(chanID, value, sig)
 		if err != nil {
-			log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
+			utils.MLogger.Info("verify block %s failed, err is : %s", splitedNcid[0], err)
 			return nil, err
 		}
 
@@ -107,7 +106,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 			err = p.ds.PutKey(context.Background(), key.ToString(), value.Bytes(), "local")
 			if err != nil {
-				log.Println("cmdPutErr:", err)
+				utils.MLogger.Info("cmdPutErr:", err)
 			}
 
 			gp.channel.Value = value
@@ -116,7 +115,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 			return b.RawData(), nil
 		}
 
-		log.Printf("verify is false %s", splitedNcid[0])
+		utils.MLogger.Info("verify is false %s", splitedNcid[0])
 	} else {
 		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
@@ -133,7 +132,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 	signForChannel := &pb.SignForChannel{}
 	err := proto.Unmarshal(mes, signForChannel)
 	if err != nil {
-		log.Println("proto.Unmarshal when provider verify err:", err)
+		utils.MLogger.Info("proto.Unmarshal when provider verify err:", err)
 		return false, nil, nil, err
 	}
 
@@ -141,7 +140,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 	var money = new(big.Int)
 	money = money.SetBytes(signForChannel.GetMoney())
 	sig := signForChannel.GetSig()
-	log.Println("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
+	utils.MLogger.Info("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
 	if sig == nil {
 		return true, nil, nil, nil
 	}
@@ -151,7 +150,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 	value := big.NewInt(0)
 	value = value.Add(oldValue, big.NewInt(addValue))
 	if money.Cmp(value) < 0 {
-		log.Println("value is less than money,  value is: ", value.String())
+		utils.MLogger.Info("value is less than money,  value is: ", value.String())
 		// to test
 		//return false, nil, nil, nil
 	}

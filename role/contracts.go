@@ -2,7 +2,6 @@ package role
 
 import (
 	"errors"
-	"log"
 	"math/big"
 	"sync"
 	"time"
@@ -97,13 +96,13 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	var item KeeperItem
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		log.Println("getLocalAddr err: ", err)
+		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
 	keeperAddress, err := address.GetAddressFromID(keeperID)
 	if err != nil {
-		log.Println("getLocalAddr err: ", err)
+		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
@@ -141,18 +140,26 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	return item, errors.New("is not a keeper")
 }
 
+func IsKeeper(userID string) (bool, error) {
+	localAddress, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return false, err
+	}
+	return contracts.IsKeeper(localAddress)
+}
+
 // GetProviderInfo returns provider info
 func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	var item ProviderItem
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		log.Println("getLocalAddr err: ", err)
+		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
-		log.Println("getLocalAddr err: ", err)
+		utils.MLogger.Info("getLocalAddr err: ", err)
 		return item, err
 	}
 
@@ -187,18 +194,26 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	return item, errors.New("is not a provider")
 }
 
+func IsProvider(userID string) (bool, error) {
+	localAddress, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return false, err
+	}
+	return contracts.IsProvider(localAddress)
+}
+
 // DeployOffer is
 func DeployOffer(localID, sk string, capacity, duration, price int64, redo bool) (offerID string, err error) {
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		log.Println("getLocalAddr err: ", err)
+		utils.MLogger.Info("getLocalAddr err: ", err)
 		return offerID, err
 	}
 
 	//获得用户的账户余额
 	balance, err := contracts.QueryBalance(localAddress.Hex())
 	if err == nil {
-		log.Println("balance is: ", balance)
+		utils.MLogger.Info("balance is: ", balance)
 	}
 
 	offerAddr, err := contracts.DeployOffer(localAddress, sk, capacity, duration, price, redo)
@@ -274,7 +289,7 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 
 	oAddrs, err := contracts.GetOfferAddrs(userAddr, proAddr)
 	if err != nil {
-		log.Println("get", proAddr.String(), "'s offer address err ")
+		utils.MLogger.Info("get", proAddr.String(), "'s offer address err ")
 		return item, err
 	}
 
@@ -301,7 +316,7 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	// getbalance
 	balance, err := contracts.QueryBalance(uaddr.String())
 	if err == nil {
-		log.Println(uaddr.String(), " has balance (wei): ", balance)
+		utils.MLogger.Info(uaddr.String(), " has balance (wei): ", balance)
 	}
 
 	//balance >? query + upKeeping + channel cost
@@ -315,18 +330,18 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	var leastMoney = new(big.Int)
 	leastMoney = leastMoney.Add(moneyAccount, deployPrice)
 	if balance.Cmp(leastMoney) < 0 { //余额不足
-		log.Println(uaddr.String(), " need more balance to start")
+		utils.MLogger.Info(uaddr.String(), " need more balance to start")
 		return queryID, errBalance
 	}
 
 	// deploy query
 	queryAddr, err := contracts.DeployQuery(uaddr, sk, storeSize, storeDays, storePrice, ks, ps, rdo)
 	if err != nil {
-		log.Println("fail to deploy query contract")
+		utils.MLogger.Info("fail to deploy query contract")
 		return queryID, err
 	}
 
-	log.Println(uaddr.String(), "has new query: ", queryAddr.String())
+	utils.MLogger.Info(uaddr.String(), "has new query: ", queryAddr.String())
 
 	queryID, err = address.GetIDFromAddress(queryAddr.String())
 	if err != nil {
@@ -440,7 +455,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	moneyPerDay = moneyPerDay.Mul(big.NewInt(storePrice), big.NewInt(storeSize))
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(storeDays))
 
-	log.Println("Begin to dploy upkeeping contract...")
+	utils.MLogger.Info("Begin to dploy upkeeping contract...")
 
 	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, storeDays, storeSize, storePrice, moneyAccount, redo)
 	if err != nil {
@@ -607,7 +622,7 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 
 // DeployChannel is
 func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize int64, redo bool) (string, error) {
-	log.Println("Begin to deploy channel contract...")
+	utils.MLogger.Info("Begin to deploy channel contract...")
 	var chanAddr string
 	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
@@ -765,14 +780,14 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	//私钥格式转换
 	skECDSA, err := utils.HexskToECDSAsk(hexKey)
 	if err != nil {
-		log.Println("HexskToECDSAskErr:", err)
+		utils.MLogger.Info("HexskToECDSAskErr:", err)
 		return sig, err
 	}
 
 	//私钥对上述哈希值签名
 	sig, err = crypto.Sign(hash, skECDSA)
 	if err != nil {
-		log.Println("signForChannelErr:", err)
+		utils.MLogger.Info("signForChannelErr:", err)
 		return sig, err
 	}
 	return sig, nil
@@ -807,19 +822,19 @@ func GetKeepersOfPro(peerID string) ([]string, bool) {
 func SaveKpMap(peerID string) error {
 	localAddr, err := address.GetAddressFromID(peerID)
 	if err != nil {
-		log.Println("saveKpMap GetAddressFromID() error", err)
+		utils.MLogger.Info("saveKpMap GetAddressFromID() error", err)
 		return err
 	}
 	kps, err := contracts.GetAllKeeperInKPMap(localAddr)
 	if err != nil {
-		log.Println("saveKpMap GetAllKeepers() error", err)
+		utils.MLogger.Info("saveKpMap GetAllKeepers() error", err)
 		return err
 	}
 
 	for _, kpaddr := range kps {
 		pids, err := contracts.GetProviderInKPMap(localAddr, kpaddr)
 		if err != nil {
-			log.Println("get provider from kpmap err:", err)
+			utils.MLogger.Info("get provider from kpmap err:", err)
 		}
 		if len(pids) > 0 {
 			keeperID, _ := address.GetIDFromAddress(kpaddr.String())

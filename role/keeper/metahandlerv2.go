@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 
@@ -65,25 +64,25 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 
 	err := k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
 	if err != nil {
-		log.Println("handleBlockPos err: ", err)
+		utils.MLogger.Info("handleBlockPos err: ", err)
 		return
 	}
 
 	sValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(sValue) < 2 {
-		log.Println("handleBlockPos err: ", metainfo.ErrIllegalValue)
+		utils.MLogger.Info("handleBlockPos err: ", metainfo.ErrIllegalValue)
 		return
 	}
 	offset, err := strconv.Atoi(sValue[1])
 	if err != nil {
-		log.Println("handleBlockPos err: ", err)
+		utils.MLogger.Info("handleBlockPos err: ", err)
 		return
 	}
 
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
 	err = k.addBlockMeta(bids[0], bids[1], sValue[0], offset)
 	if err != nil {
-		log.Println("handleBlockPos err: ", err)
+		utils.MLogger.Info("handleBlockPos err: ", err)
 	}
 	return
 }
@@ -94,7 +93,7 @@ func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
 	// delete from local
 	err := k.ds.DeleteKey(context.Background(), km.ToString(), "local")
 	if err != nil {
-		log.Println("handleBlockPos err: ", err)
+		utils.MLogger.Info("handleBlockPos err: ", err)
 		return
 	}
 
@@ -113,13 +112,13 @@ func (k *Info) handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
 
 	total, err := strconv.ParseUint(vals[0], 10, 64)
 	if err != nil {
-		log.Println("handleStorageSync err: ", err)
+		utils.MLogger.Info("handleStorageSync err: ", err)
 		return
 	}
 
 	used, err := strconv.ParseUint(vals[1], 10, 64)
 	if err != nil {
-		log.Println("handleStorageSync err: ", err)
+		utils.MLogger.Info("handleStorageSync err: ", err)
 		return
 	}
 
@@ -138,7 +137,7 @@ func (k *Info) handleExternalAddr(km *metainfo.KeyMeta) ([]byte, error) {
 
 func (k *Info) handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {
 	blockID := km.GetMid()
-	log.Println("handle get last challenge time of block: ", blockID)
+	utils.MLogger.Info("handle get last challenge time of block: ", blockID)
 	if len(blockID) < utils.IDLength {
 		return nil, errUnmatchedPeerID
 	}

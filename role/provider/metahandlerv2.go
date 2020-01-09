@@ -2,7 +2,6 @@ package provider
 
 import (
 	"errors"
-	"log"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -21,40 +20,40 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []by
 	dtype := km.GetDType()
 	switch dtype {
 	case metainfo.UserStart:
-		log.Println("handle user start: ", metaKey)
+		utils.MLogger.Info("handle user start: ", metaKey)
 		return p.handleUserStart(km, metaValue, from)
 	case metainfo.Challenge:
-		log.Println("handle challenge: ", metaKey)
+		utils.MLogger.Info("handle challenge: ", metaKey)
 		go p.handleChallengeBls12(km, metaValue, from)
 	case metainfo.Repair:
-		log.Println("handle repair: ", metaKey)
+		utils.MLogger.Info("handle repair: ", metaKey)
 		go p.handleRepair(km, metaValue, from)
 	case metainfo.Block:
 		switch optype {
 		case metainfo.Put:
-			log.Println("handle put block: ", metaKey)
+			utils.MLogger.Info("handle put block: ", metaKey)
 			err := p.handlePutBlock(km, metaValue, from)
 			if err != nil {
-				log.Println("put Blcok Error: ", err)
+				utils.MLogger.Info("put Blcok Error: ", err)
 				return nil, err
 			}
 		case metainfo.Get:
-			log.Println("handle get block: ", metaKey)
+			utils.MLogger.Info("handle get block: ", metaKey)
 			res, err := p.handleGetBlock(km, metaValue, sig, from)
 			if err != nil {
-				log.Println("getBlcokError: ", err)
+				utils.MLogger.Info("getBlcokError: ", err)
 			} else {
 				return res, nil
 			}
 		case metainfo.Append:
-			log.Println("handle append block: ", metaKey)
+			utils.MLogger.Info("handle append block: ", metaKey)
 			err := p.handleAppendBlock(km, metaValue, from)
 			if err != nil {
-				log.Println("put Blcok Error: ", err)
+				utils.MLogger.Info("put Blcok Error: ", err)
 				return nil, err
 			}
 		case metainfo.Delete:
-			log.Println("handle delete block: ", metaKey)
+			utils.MLogger.Info("handle delete block: ", metaKey)
 			go p.handleDeleteBlock(km, from)
 		}
 	default: //没有匹配的信息，报错

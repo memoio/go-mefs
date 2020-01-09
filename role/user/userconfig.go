@@ -2,19 +2,19 @@ package user
 
 import (
 	"context"
-	"log"
 	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 func initBLS12Config() (*mcl.KeySet, error) {
-	log.Println("Generating BLS12 Sk and Pk")
+	utils.MLogger.Info("Generating BLS12 Sk and Pk")
 	kset, err := mcl.GenKeySet()
 	if err != nil {
-		log.Println("Init BlS12 keyset error: ", err)
+		utils.MLogger.Info("Init BlS12 keyset error: ", err)
 		return nil, err
 	}
 	return kset, nil
@@ -37,7 +37,7 @@ func (l *LfsInfo) putUserConfig() {
 
 	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet, l.privateKey)
 	if err != nil {
-		log.Println("Marshal BlS12 config failed: ", err)
+		utils.MLogger.Info("Marshal BlS12 config failed: ", err)
 		return
 	}
 
@@ -46,7 +46,7 @@ func (l *LfsInfo) putUserConfig() {
 	// put to local first
 	err = l.ds.PutKey(ctx, blskey, userBLS12Config, "local")
 	if err != nil {
-		log.Println("CmdPutTo()err")
+		utils.MLogger.Info("CmdPutTo()err")
 		return
 	}
 
@@ -58,7 +58,7 @@ func (l *LfsInfo) putUserConfig() {
 			if err != nil {
 				retry++
 				if retry >= 10 {
-					log.Println("put config failed :", err)
+					utils.MLogger.Info("put config failed :", err)
 				}
 				time.Sleep(60 * time.Second)
 			}
@@ -102,7 +102,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 			if len(userBLS12config) > 0 {
 				err = l.ds.PutKey(ctx, blskey, userBLS12config, kid)
 				if err != nil {
-					log.Println("put blsconfig to keeper", kid, " failed: ", err)
+					utils.MLogger.Info("put blsconfig to keeper", kid, " failed: ", err)
 				}
 			}
 		}
@@ -114,10 +114,10 @@ func (l *LfsInfo) loadBLS12Config() error {
 		// store local
 		err = l.ds.PutKey(ctx, blskey, userBLS12config, "local")
 		if err != nil {
-			log.Println("put blsconfig to lcoal failed: ", err)
+			utils.MLogger.Info("put blsconfig to lcoal failed: ", err)
 		}
 	}
 
-	log.Println("BlS12 SK and Pk is loaded for ", l.userID)
+	utils.MLogger.Info("BlS12 SK and Pk is loaded for ", l.userID)
 	return nil
 }
