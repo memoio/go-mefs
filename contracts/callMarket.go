@@ -188,7 +188,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 		}
 	}
 
-	//获得mapper, key is query
+	//获得mapper, key is offer
 	_, mapperInstance, err := DeployMapperToIndexer(localAddress, "offer", hexKey, indexerInstance)
 	if err != nil {
 		return offerAddr, err
