@@ -262,7 +262,9 @@ func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance
 			time.Sleep(30 * time.Second)
 			continue
 		}
+
 		if len(indexerAddr) == 0 || indexerAddr.String() == InvalidAddr {
+			log.Println("get empty addr from indexer")
 			return indexerAddr, ownAddr, ErrEmpty
 		}
 
@@ -371,7 +373,6 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 }
 
 func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) ([]common.Address, error) {
-	var addr []common.Address
 	retryCount := 0
 	for {
 		retryCount++
@@ -381,7 +382,7 @@ func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapp
 		if err != nil {
 			if retryCount > 20 {
 				log.Println("get addr from mapper:", err)
-				return addr, err
+				return nil, err
 			}
 			time.Sleep(30 * time.Second)
 			continue
@@ -389,7 +390,8 @@ func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapp
 		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
 			return channels, nil
 		}
-		return addr, ErrEmpty
+		log.Println("get empty addr from mapper")
+		return nil, ErrEmpty
 	}
 }
 
@@ -503,7 +505,7 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 		}
 	}
 
-	mapperAddr, mapperInstance, err := GetMapperFromIndexer(localAddr, "query", indexerInstance)
+	mapperAddr, mapperInstance, err := GetMapperFromIndexer(localAddr, key, indexerInstance)
 	if err != nil {
 		if !flag {
 			return mapperAddr, nil, err

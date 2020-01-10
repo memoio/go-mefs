@@ -44,12 +44,6 @@ func main() {
 	num := queryBalance("0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6")
 	fmt.Println("用于转账的账号余额:", num)
 
-	var (
-		capacity int64 = 1000
-		duration int64 = 10000
-		price    int64 = 100000
-	)
-
 	//ethEndPoint = *qeth //用正常的链（http://39.100.146.21:8101）给新建账户转账
 	userAddr, userSk, err := createAddr()
 	if err != nil {
@@ -59,44 +53,71 @@ func main() {
 
 	localAddr := common.HexToAddress(userAddr[2:]) //将id转化成智能合约中的address格式
 
-	log.Println("===============start test deployQuery================")
-	defer log.Println("==============finish test deployQuery successfully===============")
+	log.Println("===============start test================")
+	defer log.Println("==============finish test===============")
 
 	//ethEndPoint = *eth //用不正常的链（http://47.92.5.51:8101）部署query合约
-	log.Println("start deploy offer")
-	offerAddr, err := contracts.DeployOffer(localAddr, userSk, capacity, duration, price, false)
+	log.Println("=====start set mapper addr=====")
+	contracts.EndPoint = ethEndPoint
+	addrSet, _, err := contracts.GetMapperFromAdmin(localAddr, localAddr, "test", userSk, true)
 	if err != nil {
-		log.Fatal("deploy offer fails", err)
+		log.Fatal("set addr fails", err)
 	}
 
-	log.Println("start get offerInfo from remote")
+	log.Println("=====start get addr from remote=====")
+	contracts.EndPoint = ethEndPoint
+	addrGot, mapperInstance, err := contracts.GetMapperFromAdmin(localAddr, localAddr, "test", userSk, false)
+	if err != nil {
+		log.Fatal("got addr from remote fails: ", err)
+	}
+
+	if addrSet.String() != addrGot.String() {
+		log.Fatal(addrSet.String(), "set different from got:", addrGot.String())
+	}
+
+	log.Println("=====start add addr first=====")
+	contracts.EndPoint = ethEndPoint
+
+	err = contracts.AddToMapper(localAddr, localAddr, userSk, mapperInstance)
+	if err != nil {
+		log.Fatal("set addr fails", err)
+	}
+
+	log.Println("=====start get addr from remote=====")
 	contracts.EndPoint = qethEndPoint
-	offerGot, _, err := contracts.GetLatestOffer(localAddr, localAddr)
+	aGot, err := contracts.GetAddrsFromMapper(localAddr, mapperInstance)
 	if err != nil {
-		log.Fatal("get offer from remote fails: ", err)
+		log.Fatal("got addr from remote fails: ", err)
 	}
 
-	if offerGot.String() != offerAddr.String() {
-		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
+	le := len(aGot)
+
+	if aGot[le-1].String() != localAddr.String() {
+		log.Fatal(localAddr.String(), " set different from got:", aGot[le-1].String())
 	}
 
-	log.Println("start deploy offer again")
-	offerAddr, err = contracts.DeployOffer(localAddr, userSk, capacity, duration, price, true)
+	log.Println("=====start add addr second=====")
+	contracts.EndPoint = ethEndPoint
+
+	err = contracts.AddToMapper(localAddr, addrSet, userSk, mapperInstance)
 	if err != nil {
-		log.Fatal("redo deploy offer fails", err)
+		log.Fatal("set addr fails", err)
 	}
 
-	log.Println("start get offerInfo from remote")
+	log.Println("=====start get addr from remote=====")
 	contracts.EndPoint = qethEndPoint
-	offerGot, _, err = contracts.GetLatestOffer(localAddr, localAddr)
+	aGot, err = contracts.GetAddrsFromMapper(localAddr, mapperInstance)
 	if err != nil {
-		log.Fatal("get query from remote fails")
+		log.Fatal("got addr from remote fails: ", err)
 	}
 
-	if offerGot.String() != offerAddr.String() {
-		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
+	le = len(aGot)
+
+	if aGot[le-1].String() != addrSet.String() {
+		log.Fatal(addrSet.String(), " set different from got:", aGot[le-1].String())
 	}
 
+	log.Println("=====test pass=====")
 }
 
 func transferTo(value *big.Int, addr string) {

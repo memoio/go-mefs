@@ -99,17 +99,23 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 		}
 	}
 
-	err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr, listProviderAddr, 10, 1024, 111, big.NewInt(234500))
+	log.Println("begin to deploy upkeeping first")
+	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr[0], listKeeperAddr, listProviderAddr, 10, 1024, 111, big.NewInt(234500), false)
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err
 	}
 
 	log.Println("begin to reget upkeeping's addr")
-	contracts.EndPoint = ethEndPoint
-	ukaddr, uk, err := contracts.GetUKFromResolver(localAddr)
+	contracts.EndPoint = qethEndPoint
+	ukaddr, _, err := contracts.GetUpkeeping(localAddr, localAddr, listKeeperAddr[0].String())
 	if err != nil {
-		log.Fatal("cannnot get upkeeping contract from resolver")
+		log.Fatal("cannnot get upkeeping contract: ", err)
+		return err
+	}
+
+	if uAddr.String() != ukaddr.String() {
+		log.Fatal("set is different from get")
 		return err
 	}
 
@@ -118,7 +124,7 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr)
+		amountUk := queryBalance(ukaddr.String())
 		if amountUk.Cmp(big.NewInt(100)) > 0 {
 			log.Println("contract balance", amountUk)
 			if amountUk.Cmp(big.NewInt(234500)) != 0 {
@@ -137,79 +143,11 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 		}
 	}
 
-	log.Println("begin to reget upkeeping's addr from remote")
-	contracts.EndPoint = qethEndPoint
-	ukAddr, uk, err := contracts.GetUKFromResolver(localAddr)
-	if err != nil {
-		log.Fatal("cannnot get upkeeping contract from resolver")
-		return err
-	}
-
 	log.Println("begin to query upkeeping's information")
-
-	retryCount = 0
-	for {
-		retryCount++
-		time.Sleep(30 * time.Second)
-
-		item, err := contracts.GetUpkeepingInfo(localAddr, uk)
-		if err != nil {
-			if retryCount > 20 {
-				log.Fatal("Upkeeping has no information, err: ", err)
-				break
-			}
-			continue
-		}
-
-		if item.Duration != int64(10) {
-			log.Fatal("Contract duration", item.Duration, " is not equal to preset: 10")
-		}
-
-		if item.Capacity != int64(1024) {
-			log.Fatal("Contract duration ", item.Capacity, " is not equal to preset: 1024")
-		}
-
-		if item.Price != int64(111) {
-			log.Fatal("Contract price ", item.Price, " is not equal to preset: 111")
-		}
-
-		knum := 0
-
-		for _, kp := range listKeeperAddr {
-			kid, _ := address.GetIDFromAddress(kp.String())
-			for _, keeper := range item.KeeperIDs {
-				if kid == keeper {
-					knum++
-				}
-			}
-		}
-
-		if knum != kCount {
-			log.Fatal("Contract keeper count is not equal to preset: ", kCount+1)
-		}
-
-		pnum := 0
-
-		for _, kp := range listProviderAddr {
-			kid, _ := address.GetIDFromAddress(kp.String())
-			for _, keeper := range item.ProviderIDs {
-				if kid == keeper {
-					pnum++
-				}
-			}
-		}
-
-		if pnum != pCount {
-			log.Fatal("Contract provider count is not equal to preset: ", pCount)
-		}
-
-		log.Println("upkeeping's information is right")
-		break
-	}
 
 	log.Println("begin to initiate spacetime pay")
 	contracts.EndPoint = ethEndPoint
-	err = contracts.SpaceTimePay(common.HexToAddress(ukAddr[2:]), localAddr, listProviderAddr[0], userSk, amount)
+	err = contracts.SpaceTimePay(ukaddr, listProviderAddr[0], userSk, amount)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -222,7 +160,7 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr)
+		amountUk := queryBalance(ukaddr.String())
 		if amountUk.Cmp(big.NewInt(234500)) < 0 {
 			log.Println("keeper's balance change")
 			for kAddr, amount := range mapKeeperAddr {
@@ -264,49 +202,10 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 		return err
 	}
 
-	err = contracts.AddProvider(userSk, localAddr, []common.Address{providerAddr})
+	err = contracts.AddProvider(userSk, localAddr, localAddr, []common.Address{providerAddr}, localAddr.String())
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
-	}
-
-	contracts.EndPoint = qethEndPoint
-	retryCount = 0
-	for {
-		retryCount++
-		time.Sleep(30 * time.Second)
-
-		item, err := contracts.GetUpkeepingInfo(localAddr, uk)
-		if err != nil {
-			if retryCount > 20 {
-				log.Fatal("Upkeeping has no information, err: ", err)
-				break
-			}
-			continue
-		}
-
-		if len(item.ProviderIDs) != pCount+1 {
-			if retryCount > 20 {
-				log.Fatal("Upkeeping addProvider fails")
-				break
-			}
-			continue
-		}
-
-		i := 0
-		for _, keeper := range item.ProviderIDs {
-			if serverPids[pCount] == keeper {
-				break
-			}
-			i++
-		}
-
-		if len(item.ProviderIDs) == i {
-			log.Fatal("Upkeeping addProvider adds wrong providers")
-		}
-
-		log.Println("upkeeping's addProvider is right")
-		break
 	}
 
 	log.Println("upkeeping's tests pass")
