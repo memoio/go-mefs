@@ -151,18 +151,10 @@ func (k *Info) handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {
 	sValue := strings.SplitN(string(blockID), metainfo.BLOCK_DELIMITER, 2)
 	qid := sValue[0]
 	bid := sValue[1]
-	pid, err := k.getBlockPos(qid, bid)
+	avail, err := k.getBlockAvail(qid, bid)
 	if err != nil {
 		return nil, err
 	}
 
-	thisl := k.getLInfo(qid, qid, pid, false)
-	if thisl != nil {
-		thiscidinfo, ok := thisl.blockMap.Load(bid)
-		if ok {
-			return []byte(utils.UnixToString(thiscidinfo.(*blockInfo).availtime)), nil
-		}
-	}
-
-	return nil, errBlockNotExist
+	return []byte(utils.UnixToString(avail)), nil
 }

@@ -620,10 +620,19 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 func (k *Info) getBlockPos(qid, bid string) (string, error) {
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp == nil {
-		return "", errors.New("No block")
+		return "", errBlockNotExist
 	}
 
 	return gp.getBlockPos(bid)
+}
+
+func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp == nil {
+		return 0, errBlockNotExist
+	}
+
+	return gp.getBlockAvail(bid)
 }
 
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {

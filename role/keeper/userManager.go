@@ -239,6 +239,20 @@ func (g *groupInfo) getBlockPos(bid string) (string, error) {
 	return "", errors.New("No such block")
 }
 
+func (g *groupInfo) getBlockAvail(bid string) (int64, error) {
+	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
+
+	bui, ok := g.buckets.Load(bids[0])
+	if ok {
+		sti, ok := bui.(*bucketInfo).stripes.Load(bids[1])
+		if ok {
+			return sti.(*blockInfo).availtime, nil
+		}
+	}
+
+	return 0, errors.New("No such block")
+}
+
 type bucketInfo struct {
 	bucketID    int
 	dataCount   int
