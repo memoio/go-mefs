@@ -105,7 +105,7 @@ func KeeperContract(hexKey string) (err error) {
 
 //SetKeeper set "localAddress" keeper in contract if isKeeper is true
 func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err error) {
-	keeper, err := GetKeeperContractFromIndexer(localAddress)
+	keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
 		return err
@@ -115,7 +115,7 @@ func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err e
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 
-	_, err = keeper.Set(auth, localAddress, isKeeper)
+	_, err = keeperInstance.Set(auth, localAddress, isKeeper)
 	if err != nil {
 		return err
 	}

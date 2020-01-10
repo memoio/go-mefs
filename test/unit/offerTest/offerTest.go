@@ -97,6 +97,7 @@ func main() {
 		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
 	}
 
+	log.Println("*****test pass*****")
 }
 
 func transferTo(value *big.Int, addr string) {

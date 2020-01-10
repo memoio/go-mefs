@@ -89,13 +89,12 @@ func QueryBalance(account string) (balance *big.Int, err error) {
 // DeployIndexer deploy role's indexer and add it to admin indexer
 func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 	var indexerAddr common.Address
-	var indexerInstance *indexer.Indexer
 
 	client := GetClient(EndPoint)
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		log.Println("HexToECDSA err: ", err)
-		return indexerAddr, indexerInstance, err
+		return indexerAddr, nil, err
 	}
 
 	retryCount := 0
@@ -158,32 +157,20 @@ func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, admi
 			continue
 		}
 
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			_, addrGetted, err := adminIndexer.Get(&bind.CallOpts{
-				From: localAddress,
-			}, key)
-			if err != nil {
-				if retryCount > 20 {
-					log.Println("add then get iindexer Err:", err)
-					return err
-				}
-				time.Sleep(30 * time.Second)
-				continue
-			}
-			if addrGetted == addAddr { //放进去了
-				return nil
-			}
-
-			if retryCount > 20 {
-				break
-			}
+		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+		if err != nil {
+			time.Sleep(60 * time.Second)
+			continue
 		}
-		break
+
+		if addrGetted == addAddr {
+			return nil
+		}
+
+		if retryCount > 20 {
+			return ErrNotDeployedIndexer
+		}
 	}
-	return ErrNotDeployedIndexer
 }
 
 // AlterAddrInIndexer alters
@@ -218,32 +205,20 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 			continue
 		}
 
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			_, addrGetted, err := adminIndexer.Get(&bind.CallOpts{
-				From: localAddress,
-			}, key)
-			if err != nil {
-				if retryCount > 20 {
-					log.Println("add then get iindexer Err:", err)
-					return err
-				}
-				time.Sleep(30 * time.Second)
-				continue
-			}
-			if addrGetted == addAddr { //放进去了
-				return nil
-			}
-
-			if retryCount > 20 {
-				break
-			}
+		if retryCount > 20 {
+			return ErrNotDeployedIndexer
 		}
-		break
+
+		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+		if err != nil {
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		if addrGetted == addAddr {
+			return nil
+		}
 	}
-	return ErrNotDeployedIndexer
 }
 
 // GetAddrFromIndexer gets addr
@@ -313,18 +288,12 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 	}
 }
 
-func TestMapper(localAddress common.Address, mapperInstance *mapper.Mapper) error {
-	_, err := GetAddrsFromMapper(localAddress, mapperInstance)
-	return err
-}
-
 func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstance *mapper.Mapper) error {
 	key, _ := crypto.HexToECDSA(hexKey)
 
 	retryCount := 0
 	for {
 		retryCount++
-		time.Sleep(time.Minute)
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		tx, err := mapperInstance.Add(auth, addr)
@@ -333,6 +302,7 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 				log.Println("add addr to Mapper Err:", err)
 				return err
 			}
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -345,33 +315,24 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 			continue
 		}
 
-		retryCount = 0
-		for {
-			retryCount++
-			addrGetted, err := mapperInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			})
-			if err != nil {
-				if retryCount > 10 {
-					log.Println("get addr from Mapper Err:", err)
-					return err
-				}
-				time.Sleep(30 * time.Second)
-				continue
-			}
-			length := len(addrGetted)
-			if length != 0 && addrGetted[length-1] == addr {
-				return nil
-			}
-			if retryCount > 20 {
-				break
-			}
+		if retryCount > 20 {
+			return errors.New("add address to mapper fail")
 		}
-		break
+
+		addrGetted, err := GetAddrsFromMapper(localAddress, mapperInstance)
+		if err != nil {
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		length := len(addrGetted)
+		if length != 0 && addrGetted[length-1] == addr {
+			return nil
+		}
 	}
-	return errors.New("add address to mapper fail")
 }
 
+// GetAddrsFromMapper gets
 func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) ([]common.Address, error) {
 	retryCount := 0
 	for {
@@ -390,6 +351,7 @@ func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapp
 		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
 			return channels, nil
 		}
+
 		log.Println("get empty addr from mapper")
 		return nil, ErrEmpty
 	}
@@ -450,11 +412,6 @@ func GetMapperFromIndexer(localAddress common.Address, key string, indexerInstan
 	if err != nil {
 		log.Println("newMapperErr:", err)
 		return mapperAddr, nil, err
-	}
-
-	err = TestMapper(localAddress, mapperInstance)
-	if err != nil {
-		return mapperAddr, mapperInstance, err
 	}
 
 	return mapperAddr, mapperInstance, nil
@@ -518,12 +475,12 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 
 		mapperInstance = mInstance
 
-		//获得mapper, key is query
 		err = AddToIndexer(localAddr, mapperAddr, key, hexKey, indexerInstance)
 		if err != nil {
 			log.Println("add mapper to indexer err:", err)
 			return mapperAddr, nil, err
 		}
+		return mapperAddr, mapperInstance, nil
 	}
 
 	return mapperAddr, mapperInstance, nil

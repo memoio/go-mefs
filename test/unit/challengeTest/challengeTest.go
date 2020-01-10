@@ -153,7 +153,7 @@ func ChallengeTest() error {
 		return err
 	}
 	cid := bm.ToString()
-	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.Local, metainfo.SyncTypeBlock)
+	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.Block)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -177,7 +177,7 @@ func ChallengeTest() error {
 	log.Println("md5 of block`s rawdata :", ret)
 
 	//在provider上删除指定块
-	km, err := metainfo.NewKeyMeta(cid, metainfo.DeleteBlock)
+	km, err := metainfo.NewKeyMeta(cid, metainfo.Block)
 	if err != nil {
 		log.Println("construct del block KV error :", err)
 		return err

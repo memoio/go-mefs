@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,74 +17,52 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/pos"
+)
+
+var (
+	ethEndPoint  string
+	qethEndPoint string
 )
 
 const (
-	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
-	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	moneyTo  = 1000000000000000
+	moneyTo = 1000000000000000
 )
 
-var ethEndPoint, qethEndPoint string
-
 func main() {
-	flag.String("testnet", "--eth=http://39.100.146.21:8101 --qeth=http://47.92.5.51:8101", "testnet commands")
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
-	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+	//--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101      testnet网
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;")               //dev网
+	addr := flag.String("addr", "0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6", "transfer to") //dev网，用于keeper、provider连接
 	flag.Parse()
 	ethEndPoint = *eth
-	qethEndPoint = *qeth
-
+	toAddr := *addr
 	contracts.EndPoint = ethEndPoint
-	userAddr := pos.GetPosAddr()
 
-	localAddr := common.HexToAddress(userAddr[2:])
+	num := queryBalance("0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6")
+	fmt.Println("用于转账的账号余额:", num)
 
-	ukAddr, _, err := contracts.GetUpkeeping(localAddr, localAddr, "latest")
-	if err != nil {
-		log.Fatal(userAddr, "has not deployed upkeeping")
-		return
-	}
-
-	balance := queryBalance(ukAddr.String())
+	var balance *big.Int
+	balance = queryBalance(toAddr)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
-		transferTo(big.NewInt(moneyTo), ukAddr.String())
+		transferTo(big.NewInt(moneyTo), toAddr)
 	}
 
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(ukAddr.String())
+	for i := 1; i <= 35; i++ {
+		time.Sleep(time.Minute)
+		balance = queryBalance(toAddr)
 		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
 			break
 		}
-
-		log.Println(ukAddr, "'s Balance now:", balance.String(), ", waiting for transfer success")
-	}
-
-	localID, _ := address.GetIDFromAddress(localAddr.String())
-	ukID, _ := address.GetIDFromAddress(ukAddr.String())
-	uItem, err := role.GetUpkeepingInfo(localID, ukID)
-	if err != nil {
-		log.Fatal("Upkeeping has no information, err: ", err)
-		return
-	}
-
-	var tempPro []string
-	for _, pid := range uItem.ProviderIDs {
-		if utils.CheckDup(tempPro, pid) {
-			tempPro = append(tempPro, pid)
+		log.Println(toAddr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+		if (i % 6) == 0 {
+			log.Println("tranfer again: ", i/6+1)
+			transferTo(big.NewInt(moneyTo), toAddr)
 		}
 	}
 
-	log.Println(userAddr, "'s upkeeping addr: ", ukAddr, " has balance: ", balance)
-	log.Println(userAddr, "has keeper: ", uItem.KeeperIDs)
-	log.Println(userAddr, "has provider: ", uItem.ProviderIDs)
-	log.Println(userAddr, "has dedeup provider: ", tempPro)
 }
 
 func transferTo(value *big.Int, addr string) {
@@ -142,9 +124,52 @@ func transferTo(value *big.Int, addr string) {
 	log.Printf("tx sent: %s\n", signedTx.Hash().Hex())
 }
 
+func createAddr() (string, string, error) {
+	identity, err := config.CreateID(os.Stdout, 2048)
+	if err != nil {
+		return "", "", err
+	}
+	address, err := address.GetAddressFromID(identity.PeerID)
+	if err != nil {
+		return "", "", err
+	}
+	addressHex := address.Hex()
+	skByteEth, err := utils.IPFSskToEthskByte(identity.PrivKey)
+	if err != nil {
+		return "", "", err
+	}
+	enc := make([]byte, len(skByteEth)*2)
+	//对私钥进行十六进制编码，得到以太坊格式的私钥，此处不加上"0x"前缀
+	hex.Encode(enc, skByteEth)
+
+	var balance *big.Int
+	balance = queryBalance(addressHex)
+	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
+		transferTo(big.NewInt(moneyTo), addressHex)
+	}
+
+	for i := 1; i <= 35; i++ {
+		time.Sleep(time.Minute)
+		balance = queryBalance(addressHex)
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
+			break
+		}
+		log.Println(addressHex, "'s Balance now:", balance.String(), ", waiting for transfer success")
+		if (i % 6) == 0 {
+			log.Println("第", i/6+1, "次触发转账")
+			transferTo(big.NewInt(moneyTo), addressHex)
+		}
+	}
+	if balance.Cmp(big.NewInt(moneyTo)) < 0 {
+		return addressHex, string(enc), errors.New("转账失败")
+	}
+
+	return addressHex, string(enc), nil
+}
+
 func queryBalance(addr string) *big.Int {
 	var result string
-	client, err := rpc.Dial(qethEndPoint)
+	client, err := rpc.Dial(ethEndPoint)
 	if err != nil {
 		log.Fatal("rpc.dial err:", err)
 	}

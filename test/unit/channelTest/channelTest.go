@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -64,26 +65,19 @@ func main() {
 func testChannelTimeout() (err error) {
 	log.Println("==========test channel timeout=========")
 	contracts.EndPoint = ethEndPoint
-	proAddr, proSk, err := createAddr()
+	proAddr, _, err := createAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
 	}
 
 	providerAddr := common.HexToAddress(proAddr[2:])
-
-	log.Println("test deploy channel resolver")
-	_, err = contracts.DeployResolverForChannel(providerAddr, proSk)
-	if err != nil {
-		log.Fatal("deployResolverErr:", err)
-		return err
-	}
-
 	localAddr := common.HexToAddress(userAddr[2:])
 
-	log.Println("test deploy channel contract")
 	timeout := big.NewInt(5 * 60)
 	moneyToChannel := big.NewInt(1000000)
-	channelAddr, err := contracts.DeployChannelContract(userSk, localAddr, providerAddr, timeout, moneyToChannel)
+
+	log.Println("test deploy channel contract")
+	channelAddr, err := contracts.DeployChannelContract(userSk, localAddr, localAddr, providerAddr, timeout, moneyToChannel, true)
 	if err != nil {
 		log.Fatal("deployChannelErr:", err)
 		return err
@@ -110,27 +104,20 @@ func testChannelTimeout() (err error) {
 	}
 
 	log.Println("test query channel addr")
-	newChannel, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
+	addGot, err := contracts.DeployChannelContract(userSk, localAddr, localAddr, providerAddr, timeout, moneyToChannel, false)
 	if err != nil {
-		log.Println("Get Channel StartDate Err: ", err)
+		log.Println("Get Channel Err: ", err)
 		return err
 	}
 
-	if newChannel.String() != channelAddr.String() {
+	if addGot.String() != channelAddr.String() {
 		log.Println("Get Wrong Channel")
-	}
-
-	log.Println("test query channel start date")
-	_, err = contracts.GetChannelInfo(localAddr, providerAddr, localAddr)
-	if err != nil {
-		log.Println("Get Channel Info Err: ", err)
-		return err
 	}
 
 	log.Println("test channel timeout before enddate, should return err")
 	//触发channelTimeout()
 	contracts.EndPoint = ethEndPoint
-	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
+	err = contracts.ChannelTimeout(channelAddr, userSk)
 	if err == nil {
 		log.Println("call channelTimeout success, but time is early")
 		return err
@@ -138,7 +125,7 @@ func testChannelTimeout() (err error) {
 
 	log.Println("test channel timeout after enddate")
 	time.Sleep(300 * time.Second)
-	err = contracts.ChannelTimeout(localAddr, providerAddr, userSk)
+	err = contracts.ChannelTimeout(channelAddr, userSk)
 	if err != nil {
 		log.Println("call channelTimeout err:", err)
 		return err
@@ -178,20 +165,12 @@ func testCloseChannel() (err error) {
 	}
 
 	providerAddr := common.HexToAddress(proAddr[2:])
-
-	log.Println("test deploy channel resolver")
-	_, err = contracts.DeployResolverForChannel(providerAddr, proSk)
-	if err != nil {
-		log.Fatal("deployResolverErr:", err)
-		return err
-	}
-
 	localAddr := common.HexToAddress(userAddr[2:])
 
 	log.Println("test deploy channel contract")
 	timeout := big.NewInt(5 * 60)
 	moneyToChannel := big.NewInt(1000000)
-	channelAddr, err := contracts.DeployChannelContract(userSk, localAddr, providerAddr, timeout, moneyToChannel)
+	channelAddr, err := contracts.DeployChannelContract(userSk, localAddr, localAddr, providerAddr, timeout, moneyToChannel, true)
 	if err != nil {
 		log.Fatal("deployChannelErr:", err)
 		return err
@@ -218,13 +197,13 @@ func testCloseChannel() (err error) {
 
 	log.Println("test query channel contract")
 	contracts.EndPoint = qethEndPoint
-	chanAddr, _, err := contracts.GetChannelAddr(localAddr, providerAddr, localAddr)
+	addGot, err := contracts.DeployChannelContract(userSk, localAddr, localAddr, providerAddr, timeout, moneyToChannel, false)
 	if err != nil {
 		log.Fatal("GetChannelAddr fails:", err)
 		return err
 	}
 
-	if chanAddr.String() != channelAddr.String() {
+	if addGot.String() != channelAddr.String() {
 		log.Fatal("Get Wrong ChannelAddr")
 	}
 
@@ -233,7 +212,8 @@ func testCloseChannel() (err error) {
 	//签名
 	value := big.NewInt(11111)
 	contracts.EndPoint = ethEndPoint
-	sig, err := contracts.SignForChannel(channelAddr, value, userSk)
+	chanID, _ := address.GetIDFromAddress(channelAddr.String())
+	sig, err := role.SignForChannel(chanID, userSk, value)
 	if err != nil {
 		log.Fatal("SignForChannelErr:", err)
 		return err
@@ -245,14 +225,14 @@ func testCloseChannel() (err error) {
 		log.Fatal("GetCompressedPkFromHexSkErr:", err)
 		return err
 	}
-	verify, err := contracts.VerifySig(pubKey, sig, channelAddr, value)
+	verify, err := role.VerifySig(chanID, value, sig, pubKey)
 	if err != nil || !verify {
 		log.Fatal("verifyErr:", err)
 		return err
 	}
 
 	//provider触发CloseChannel()
-	err = contracts.CloseChannel(providerAddr, localAddr, proSk, sig, value)
+	err = contracts.CloseChannel(channelAddr, proSk, sig, value)
 	if err != nil {
 		log.Fatal("CloseChannelErr:", err)
 		return err

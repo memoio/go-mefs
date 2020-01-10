@@ -65,7 +65,7 @@ func main() {
 	}
 
 	log.Println("=====start get addr from remote=====")
-	contracts.EndPoint = ethEndPoint
+	contracts.EndPoint = qethEndPoint
 	addrGot, mapperInstance, err := contracts.GetMapperFromAdmin(localAddr, localAddr, "test", userSk, false)
 	if err != nil {
 		log.Fatal("got addr from remote fails: ", err)

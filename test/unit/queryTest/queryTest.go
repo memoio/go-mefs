@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -63,7 +64,7 @@ func main() {
 	localAddr := common.HexToAddress(userAddr[2:]) //将id转化成智能合约中的address格式
 
 	log.Println("===============start test deployQuery================")
-	defer log.Println("==============finish test deployQuery successfully===============")
+	defer log.Println("==============finish test deployQuery===============")
 
 	//ethEndPoint = *eth //用不正常的链（http://47.92.5.51:8101）部署query合约
 	log.Println("start deploy query")
@@ -75,38 +76,26 @@ func main() {
 	log.Println("start set completed")
 	err = contracts.SetQueryCompleted(userSk, queryAddr)
 	if err != nil {
-		log.Fatal("set query completed fails")
+		log.Fatal("set query completed fails:", err)
 	}
 
-	log.Println("start get 'completed' params")
-	retryCount := 0
-	for {
-		retryCount++
-		queryItem, queryInstance, err := contracts.GetLatestQuery(localAddr, localAddr)
-		if err != nil {
-			log.Fatal("get queryItem fails")
-		}
-		if queryItem.Completed {
-			break
-		}
-		if retryCount > 10 {
-			log.Fatal("'setCompleted' fails, the 'completed' is false")
-		}
-		time.Sleep(time.Minute)
-	}
-
-	log.Println("start get queryInfo from remote")
 	contracts.EndPoint = qethEndPoint
-	queryItem, err := contracts.GetQueryInfo(localAddr, queryAddr)
+	log.Println("start get 'completed' params")
+	localID, _ := address.GetIDFromAddress(localAddr.String())
+	queryID, _ := address.GetIDFromAddress(queryAddr.String())
+	qItem, err := role.GetQueryInfo(localID, queryID)
 	if err != nil {
-		log.Fatal("get queryItem from remote fails")
+		log.Fatal("get query fails:", err)
 	}
 
-	if queryItem.Capacity != capacity || queryItem.Duration != duration || queryItem.Price != price || queryItem.KeeperNums != int32(ks) || queryItem.ProviderNums != int32(ps) || !queryItem.Completed {
-		log.Println(queryItem)
-		log.Fatal("queryItem different from remote")
+	if qItem.Capacity != capacity || qItem.Duration != duration || qItem.Price != price || qItem.KeeperNums != int32(ks) || qItem.ProviderNums != int32(ps) {
+		log.Fatal("query info is different from set")
 	}
 
+	if !qItem.Completed {
+		log.Fatal("set completed fails:")
+	}
+	log.Println("*****test pass*****")
 }
 
 func transferTo(value *big.Int, addr string) {
