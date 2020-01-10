@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"errors"
+	"io"
 	"time"
 
 	query "github.com/memoio/go-mefs/source/go-datastore/query"
@@ -31,6 +32,20 @@ proper error reporting. Thus, all Datastore calls may return errors, which
 should be checked by callers.
 */
 type Datastore interface {
+	Read
+	Write
+	// Sync guarantees that any Put or Delete calls under prefix that returned
+	// before Sync(prefix) was called will be observed after Sync(prefix)
+	// returns, even if the program crashes. If Put/Delete operations already
+	// satisfy these requirements then Sync may be a no-op.
+	//
+	// If the prefix fails to Sync this method returns an error.
+	Sync(prefix Key) error
+	io.Closer
+}
+
+// Write is the write-side of the Datastore interface.
+type Write interface {
 	// Put stores the object `value` named by `key`.
 	//
 	// The generalized Datastore interface does not impose a value type,
@@ -44,7 +59,13 @@ type Datastore interface {
 
 	// Append the designated block
 	Append(key Key, value []byte, beginoffset, endoffset int) error
+	// Delete removes the value for given `key`. If the key is not in the
+	// datastore, this method returns no error.
+	Delete(key Key) error
+}
 
+// Read is the read-side of the Datastore interface.
+type Read interface {
 	// Get retrieves the object `value` named by `key`.
 	// Get will return ErrNotFound if the key is not mapped to a value.
 	Get(key Key) (value []byte, err error)
@@ -62,9 +83,6 @@ type Datastore interface {
 	// In some contexts, it may be much cheaper to only get the size of the
 	// value rather than retrieving the value itself.
 	GetSize(key Key) (size int, err error)
-
-	// Delete removes the value for given `key`.
-	Delete(key Key) error
 
 	// Query searches the datastore and returns a query result. This function
 	// may return before the query actually runs. To wait for the query:
@@ -93,15 +111,9 @@ type Batching interface {
 	Batch() (Batch, error)
 }
 
+// ErrBatchUnsupported is returned if the by Batch if the Datastore doesn't
+// actually support batching.
 var ErrBatchUnsupported = errors.New("this datastore does not support batching")
-
-// ThreadSafeDatastore is an interface that all threadsafe datastore should
-// implement to leverage type safety checks.
-type ThreadSafeDatastore interface {
-	Datastore
-
-	IsThreadSafe()
-}
 
 // CheckedDatastore is an interface that should be implemented by datastores
 // which may need checking on-disk data integrity.
@@ -152,7 +164,11 @@ func DiskUsage(d Datastore) (uint64, error) {
 // support expiring entries.
 type TTLDatastore interface {
 	Datastore
+	TTL
+}
 
+// TTL encapulates the methods that deal with entries with time-to-live.
+type TTL interface {
 	PutWithTTL(key Key, value []byte, ttl time.Duration) error
 	SetTTL(key Key, ttl time.Duration) error
 	GetExpiration(key Key) (time.Time, error)
@@ -164,7 +180,8 @@ type TTLDatastore interface {
 // Commit has been made. Likewise, transactions can be aborted by calling
 // Discard before a successful Commit has been made.
 type Txn interface {
-	Datastore
+	Read
+	Write
 
 	// Commit finalizes a transaction, attempting to commit it to the Datastore.
 	// May return an error if the transaction has gone stale. The presence of an
@@ -187,14 +204,18 @@ type TxnDatastore interface {
 
 // Errors
 
-// ErrNotFound is returned by Get, Has, and Delete when a datastore does not
-// map the given key to a value.
-var ErrNotFound = errors.New("datastore: key not found")
+type dsError struct {
+	error
+	isNotFound bool
+}
 
-// ErrInvalidType is returned by Put when a given value is incopatible with
-// the type the datastore supports. This means a conversion (or serialization)
-// is needed beforehand.
-var ErrInvalidType = errors.New("datastore: invalid type error")
+func (e *dsError) NotFound() bool {
+	return e.isNotFound
+}
+
+// ErrNotFound is returned by Get and GetSize when a datastore does not map the
+// given key to a value.
+var ErrNotFound error = &dsError{error: errors.New("datastore: key not found"), isNotFound: true}
 
 // GetBackedHas provides a default Datastore.Has implementation.
 // It exists so Datastore.Has implementations can use it, like so:
@@ -202,7 +223,7 @@ var ErrInvalidType = errors.New("datastore: invalid type error")
 // func (*d SomeDatastore) Has(key Key) (exists bool, err error) {
 //   return GetBackedHas(d, key)
 // }
-func GetBackedHas(ds Datastore, key Key) (bool, error) {
+func GetBackedHas(ds Read, key Key) (bool, error) {
 	_, err := ds.Get(key)
 	switch err {
 	case nil:
@@ -220,7 +241,7 @@ func GetBackedHas(ds Datastore, key Key) (bool, error) {
 // func (*d SomeDatastore) GetSize(key Key) (size int, err error) {
 //   return GetBackedSize(d, key)
 // }
-func GetBackedSize(ds Datastore, key Key) (int, error) {
+func GetBackedSize(ds Read, key Key) (int, error) {
 	value, err := ds.Get(key)
 	if err == nil {
 		return len(value), nil
@@ -229,11 +250,7 @@ func GetBackedSize(ds Datastore, key Key) (int, error) {
 }
 
 type Batch interface {
-	Put(key Key, val []byte) error
-
-	Delete(key Key) error
+	Write
 
 	Commit() error
-
-	Append(key Key, val []byte, beginoffset, endoffset int) error
 }

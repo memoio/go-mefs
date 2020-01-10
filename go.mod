@@ -21,7 +21,6 @@ require (
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
-	github.com/go-check/check v0.0.0-20180628173108-788fd7840127
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/golang/protobuf v1.3.2
@@ -51,7 +50,7 @@ require (
 	github.com/karalabe/usb v0.0.0-20190703133951-9be757f914c0 // indirect
 	github.com/libp2p/go-libp2p v0.5.0
 	github.com/libp2p/go-libp2p-circuit v0.1.4
-	github.com/libp2p/go-libp2p-connmgr v0.1.1
+	github.com/libp2p/go-libp2p-connmgr v0.2.1
 	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/libp2p/go-libp2p-interface-connmgr v0.1.0
 	github.com/libp2p/go-libp2p-kbucket v0.2.3
@@ -59,7 +58,7 @@ require (
 	github.com/libp2p/go-libp2p-mplex v0.2.1
 	github.com/libp2p/go-libp2p-peerstore v0.1.4
 	github.com/libp2p/go-libp2p-pnet v0.1.0
-	github.com/libp2p/go-libp2p-quic-transport v0.1.1
+	github.com/libp2p/go-libp2p-quic-transport v0.2.2
 	github.com/libp2p/go-libp2p-routing v0.1.0
 	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-testing v0.1.1
@@ -87,7 +86,7 @@ require (
 	github.com/onsi/gomega v1.5.0
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/oschwald/maxminddb-golang v1.3.1 // indirect
-	github.com/prometheus/client_golang v1.1.0
+	github.com/prometheus/client_golang v1.2.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20190706150252-9beb055b7962 // indirect
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
@@ -106,14 +105,10 @@ require (
 	go.uber.org/zap v1.12.0
 	go4.org v0.0.0-20190313082347-94abd6928b1d // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
-	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
-	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
+	golang.org/x/sys v0.0.0-20191010194322-b09406accb47
+	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
-)
-
-replace (
-	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392 => github.com/golang/crypto v0.0.0-20190923035154-9ee001bba392
-	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69 => github.com/golang/sys v0.0.0-20190922100055-0a153f010e69
 )

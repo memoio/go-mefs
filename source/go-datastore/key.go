@@ -125,7 +125,7 @@ func (k Key) List() []string {
 //   NewKey("/Actor:JohnCleese/MontyPython/Comedy")
 func (k Key) Reverse() Key {
 	l := k.List()
-	r := make([]string, len(l), len(l))
+	r := make([]string, len(l))
 	for i, e := range l {
 		r[len(l)-i-1] = e
 	}
@@ -239,7 +239,7 @@ func (k Key) MarshalJSON() ([]byte, error) {
 	return json.Marshal(k.String())
 }
 
-// MarshalJSON implements the json.Unmarshaler interface,
+// UnmarshalJSON implements the json.Unmarshaler interface,
 // keys will parse any value specified as a key to a string
 func (k *Key) UnmarshalJSON(data []byte) error {
 	var key string

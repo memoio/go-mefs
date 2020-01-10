@@ -43,6 +43,8 @@ github.com/census-instrumentation/opencensus-proto/gen-go/agent/trace/v1
 github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1
 github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1
 github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1
+# github.com/cespare/xxhash/v2 v2.1.0
+github.com/cespare/xxhash/v2
 # github.com/cheekybits/genny v1.0.0
 github.com/cheekybits/genny/generic
 # github.com/cheggaaa/pb v1.0.28
@@ -153,8 +155,6 @@ github.com/fatih/color
 github.com/fatih/structs
 # github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff
 github.com/gballet/go-libpcsclite
-# github.com/go-check/check v0.0.0-20180628173108-788fd7840127
-github.com/go-check/check
 # github.com/go-ole/go-ole v1.2.4
 github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
@@ -349,7 +349,7 @@ github.com/libp2p/go-libp2p-autonat/pb
 # github.com/libp2p/go-libp2p-circuit v0.1.4
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
-# github.com/libp2p/go-libp2p-connmgr v0.1.1
+# github.com/libp2p/go-libp2p-connmgr v0.2.1
 github.com/libp2p/go-libp2p-connmgr
 # github.com/libp2p/go-libp2p-core v0.3.0
 github.com/libp2p/go-libp2p-core/connmgr
@@ -398,7 +398,7 @@ github.com/libp2p/go-libp2p-peerstore/pstoremem
 github.com/libp2p/go-libp2p-peerstore/queue
 # github.com/libp2p/go-libp2p-pnet v0.1.0
 github.com/libp2p/go-libp2p-pnet
-# github.com/libp2p/go-libp2p-quic-transport v0.1.1
+# github.com/libp2p/go-libp2p-quic-transport v0.2.2
 github.com/libp2p/go-libp2p-quic-transport
 # github.com/libp2p/go-libp2p-routing v0.1.0
 github.com/libp2p/go-libp2p-routing
@@ -414,6 +414,8 @@ github.com/libp2p/go-libp2p-testing/ci
 github.com/libp2p/go-libp2p-testing/ci/travis
 github.com/libp2p/go-libp2p-testing/etc
 github.com/libp2p/go-libp2p-testing/net
+# github.com/libp2p/go-libp2p-tls v0.1.1
+github.com/libp2p/go-libp2p-tls
 # github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 github.com/libp2p/go-libp2p-transport-upgrader
 # github.com/libp2p/go-libp2p-yamux v0.2.1
@@ -441,7 +443,7 @@ github.com/libp2p/go-tcp-transport
 github.com/libp2p/go-ws-transport
 # github.com/libp2p/go-yamux v1.2.3
 github.com/libp2p/go-yamux
-# github.com/lucas-clemente/quic-go v0.11.2
+# github.com/lucas-clemente/quic-go v0.13.1
 github.com/lucas-clemente/quic-go
 github.com/lucas-clemente/quic-go/internal/ackhandler
 github.com/lucas-clemente/quic-go/internal/congestion
@@ -451,12 +453,17 @@ github.com/lucas-clemente/quic-go/internal/protocol
 github.com/lucas-clemente/quic-go/internal/qerr
 github.com/lucas-clemente/quic-go/internal/utils
 github.com/lucas-clemente/quic-go/internal/wire
+github.com/lucas-clemente/quic-go/quictrace
+github.com/lucas-clemente/quic-go/quictrace/pb
 # github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/marten-seemann/qtls v0.2.3
+# github.com/marten-seemann/chacha20 v0.2.0
+github.com/marten-seemann/chacha20
+github.com/marten-seemann/chacha20/internal/subtle
+# github.com/marten-seemann/qtls v0.4.1
 github.com/marten-seemann/qtls
 # github.com/mattn/go-colorable v0.1.2
 github.com/mattn/go-colorable
@@ -655,19 +662,20 @@ github.com/pkg/errors
 github.com/pkg/profile
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.1.0
+# github.com/prometheus/client_golang v1.2.1
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
-# github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
+# github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.6.0
+# github.com/prometheus/common v0.7.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.0.3
+# github.com/prometheus/procfs v0.0.5
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
+github.com/prometheus/procfs/internal/util
 # github.com/prometheus/tsdb v0.10.0
 github.com/prometheus/tsdb/fileutil
 # github.com/rcrowley/go-metrics v0.0.0-20190706150252-9beb055b7962
@@ -726,6 +734,11 @@ github.com/tyler-smith/go-bip39/wordlists
 github.com/urfave/cli
 # github.com/valyala/tcplisten v0.0.0-20161114210144-ceec8f93295a
 github.com/valyala/tcplisten
+# github.com/vishvananda/netlink v1.0.0
+github.com/vishvananda/netlink
+github.com/vishvananda/netlink/nl
+# github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f
+github.com/vishvananda/netns
 # github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 github.com/whyrusleeping/base32
 # github.com/whyrusleeping/go-ctrlnet v0.0.0-20180313164037-f564fbbdaa95
@@ -826,7 +839,7 @@ golang.org/x/net/trace
 golang.org/x/net/websocket
 # golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20190922100055-0a153f010e69 => github.com/golang/sys v0.0.0-20190922100055-0a153f010e69
+# golang.org/x/sys v0.0.0-20191010194322-b09406accb47
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -869,7 +882,7 @@ golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/semver
 golang.org/x/tools/internal/span
-# golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
+# golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # google.golang.org/api v0.7.0
@@ -921,6 +934,8 @@ google.golang.org/grpc/tap
 gopkg.in/Shopify/sarama.v1
 # gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d
 gopkg.in/asn1-ber.v1
+# gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
+gopkg.in/check.v1
 # gopkg.in/fsnotify.v1 v1.4.7
 gopkg.in/fsnotify.v1
 # gopkg.in/ini.v1 v1.48.0

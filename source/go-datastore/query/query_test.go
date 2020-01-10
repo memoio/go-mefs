@@ -15,11 +15,6 @@ var sampleKeys = []string{
 	"/ab",
 }
 
-type testCase struct {
-	keys   []string
-	expect []string
-}
-
 func testResults(t *testing.T, res Results, expect []string) {
 	actualE, err := res.Rest()
 	if err != nil {
@@ -38,6 +33,70 @@ func testResults(t *testing.T, res Results, expect []string) {
 	if strings.Join(actual, "") != strings.Join(expect, "") {
 		t.Error("expect != actual.", expect, actual)
 	}
+}
+
+func TestNaiveQueryApply(t *testing.T) {
+	testNaiveQueryApply := func(t *testing.T, query Query, keys []string, expect []string) {
+		e := make([]Entry, len(keys))
+		for i, k := range keys {
+			e[i] = Entry{Key: k}
+		}
+
+		res := ResultsWithEntries(query, e)
+		res = NaiveQueryApply(query, res)
+
+		testResults(t, res, expect)
+	}
+
+	q := Query{Limit: 2}
+
+	testNaiveQueryApply(t, q, sampleKeys, []string{
+		"/ab/c",
+		"/ab/cd",
+	})
+
+	q = Query{Offset: 3, Limit: 2}
+	testNaiveQueryApply(t, q, sampleKeys, []string{
+		"/abce",
+		"/abcf",
+	})
+
+	f := &FilterKeyCompare{Op: Equal, Key: "/ab"}
+	q = Query{Filters: []Filter{f}}
+	testNaiveQueryApply(t, q, sampleKeys, []string{
+		"/ab",
+	})
+
+	q = Query{Prefix: "/ab"}
+	testNaiveQueryApply(t, q, sampleKeys, []string{
+		"/ab/c",
+		"/ab/cd",
+		"/abce",
+		"/abcf",
+		"/ab",
+	})
+
+	q = Query{Orders: []Order{OrderByKeyDescending{}}}
+	testNaiveQueryApply(t, q, sampleKeys, []string{
+		"/abcf",
+		"/abce",
+		"/ab/cd",
+		"/ab/c",
+		"/ab",
+		"/a",
+	})
+
+	q = Query{
+		Limit:  3,
+		Offset: 2,
+		Prefix: "/ab",
+		Orders: []Order{OrderByKey{}},
+	}
+	testNaiveQueryApply(t, q, sampleKeys, []string{
+		"/ab/cd",
+		"/abce",
+		"/abcf",
+	})
 }
 
 func TestLimit(t *testing.T) {
@@ -183,4 +242,66 @@ func getKeysViaChan(rs Results) []string {
 		ret = append(ret, r.Key)
 	}
 	return ret
+}
+
+func TestStringer(t *testing.T) {
+	q := Query{}
+
+	expected := `SELECT keys,vals`
+	actual := q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+
+	q.Offset = 10
+	q.Limit = 10
+	expected = `SELECT keys,vals OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+
+	q.Orders = []Order{OrderByValue{}, OrderByKey{}}
+	expected = `SELECT keys,vals ORDER [VALUE, KEY] OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+
+	q.Filters = []Filter{
+		FilterKeyCompare{Op: GreaterThan, Key: "/foo/bar"},
+		FilterKeyCompare{Op: LessThan, Key: "/foo/bar"},
+	}
+	expected = `SELECT keys,vals FILTER [KEY > "/foo/bar", KEY < "/foo/bar"] ORDER [VALUE, KEY] OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+
+	q.Prefix = "/foo"
+	expected = `SELECT keys,vals FROM "/foo" FILTER [KEY > "/foo/bar", KEY < "/foo/bar"] ORDER [VALUE, KEY] OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+
+	q.ReturnExpirations = true
+	expected = `SELECT keys,vals,exps FROM "/foo" FILTER [KEY > "/foo/bar", KEY < "/foo/bar"] ORDER [VALUE, KEY] OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+
+	q.KeysOnly = true
+	expected = `SELECT keys,exps FROM "/foo" FILTER [KEY > "/foo/bar", KEY < "/foo/bar"] ORDER [VALUE, KEY] OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
+	q.ReturnExpirations = false
+	expected = `SELECT keys FROM "/foo" FILTER [KEY > "/foo/bar", KEY < "/foo/bar"] ORDER [VALUE, KEY] OFFSET 10 LIMIT 10`
+	actual = q.String()
+	if actual != expected {
+		t.Fatalf("expected\n\t%s\ngot\n\t%s", expected, actual)
+	}
 }

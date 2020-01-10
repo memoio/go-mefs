@@ -7,9 +7,9 @@ import (
 	"time"
 
 	bloom "github.com/ipfs/bbloom"
+	metrics "github.com/ipfs/go-metrics-interface"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	metrics "github.com/ipfs/go-metrics-interface"
 )
 
 // bloomCached returns a Blockstore that caches Has requests using a Bloom
@@ -113,7 +113,7 @@ func (b *bloomcache) build(ctx context.Context) error {
 
 func (b *bloomcache) DeleteBlock(k cid.Cid) error {
 	if has, ok := b.hasCached(k); ok && !has {
-		return ErrNotFound
+		return nil
 	}
 
 	return b.blockstore.DeleteBlock(k)

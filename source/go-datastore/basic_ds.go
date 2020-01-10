@@ -1,7 +1,6 @@
 package datastore
 
 import (
-	"io"
 	"log"
 
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
@@ -14,7 +13,9 @@ type MapDatastore struct {
 	values map[Key][]byte
 }
 
-// NewMapDatastore constructs a MapDatastore
+// NewMapDatastore constructs a MapDatastore. It is _not_ thread-safe by
+// default, wrap using sync.MutexWrap if you need thread safety (the answer here
+// is usually yes).
 func NewMapDatastore() (d *MapDatastore) {
 	return &MapDatastore{
 		values: make(map[Key][]byte),
@@ -32,6 +33,11 @@ func (d *MapDatastore) Append(key Key, value []byte, beginoffset, endoffset int)
 	v := d.values[key]
 	values := append(v, value...)
 	d.values[key] = values
+	return nil
+}
+
+// Sync implements Datastore.Sync
+func (d *MapDatastore) Sync(prefix Key) error {
 	return nil
 }
 
@@ -65,9 +71,6 @@ func (d *MapDatastore) GetSize(key Key) (size int, err error) {
 
 // Delete implements Datastore.Delete
 func (d *MapDatastore) Delete(key Key) (err error) {
-	if _, found := d.values[key]; !found {
-		return ErrNotFound
-	}
 	delete(d.values, key)
 	return nil
 }
@@ -76,19 +79,21 @@ func (d *MapDatastore) Delete(key Key) (err error) {
 func (d *MapDatastore) Query(q dsq.Query) (dsq.Results, error) {
 	re := make([]dsq.Entry, 0, len(d.values))
 	for k, v := range d.values {
-		re = append(re, dsq.Entry{Key: k.String(), Value: v})
+		e := dsq.Entry{Key: k.String(), Size: len(v)}
+		if !q.KeysOnly {
+			e.Value = v
+		}
+		re = append(re, e)
 	}
 	r := dsq.ResultsWithEntries(q, re)
 	r = dsq.NaiveQueryApply(q, r)
 	return r, nil
 }
 
-// Batch implments Datastore.Batch
 func (d *MapDatastore) Batch() (Batch, error) {
 	return NewBasicBatch(d), nil
 }
 
-// Close implements Datastore.close
 func (d *MapDatastore) Close() error {
 	return nil
 }
@@ -110,6 +115,11 @@ func (d *NullDatastore) Put(key Key, value []byte) (err error) {
 
 // Append implements Datastore.Append
 func (d *NullDatastore) Append(key Key, value []byte, beginoffset, endoffset int) (err error) {
+	return nil
+}
+
+// Sync implements Datastore.Sync
+func (d *NullDatastore) Sync(prefix Key) error {
 	return nil
 }
 
@@ -143,12 +153,10 @@ func (d *NullDatastore) Query(q dsq.Query) (dsq.Results, error) {
 	return dsq.ResultsWithEntries(q, nil), nil
 }
 
-// Batch implements Datastore.Batch
 func (d *NullDatastore) Batch() (Batch, error) {
 	return NewBasicBatch(d), nil
 }
 
-// Close implements Datastore.Close
 func (d *NullDatastore) Close() error {
 	return nil
 }
@@ -190,6 +198,12 @@ func (d *LogDatastore) Put(key Key, value []byte) (err error) {
 func (d *LogDatastore) Append(key Key, value []byte, beginoffset, endoffset int) (err error) {
 	log.Printf("%s: Append %s\n", d.Name, key)
 	return d.child.Append(key, value, beginoffset, endoffset)
+}
+
+// Sync implements Datastore.Sync
+func (d *LogDatastore) Sync(prefix Key) error {
+	log.Printf("%s: Sync %s\n", d.Name, prefix)
+	return d.child.Sync(prefix)
 }
 
 // Get implements Datastore.Get
@@ -246,7 +260,6 @@ type LogBatch struct {
 	child Batch
 }
 
-// Batch implements Batch.Batch.
 func (d *LogDatastore) Batch() (Batch, error) {
 	log.Printf("%s: Batch\n", d.Name)
 	if bds, ok := d.child.(Batching); ok {
@@ -290,10 +303,7 @@ func (d *LogBatch) Commit() (err error) {
 
 func (d *LogDatastore) Close() error {
 	log.Printf("%s: Close\n", d.Name)
-	if cds, ok := d.child.(io.Closer); ok {
-		return cds.Close()
-	}
-	return nil
+	return d.child.Close()
 }
 
 func (d *LogDatastore) Check() error {

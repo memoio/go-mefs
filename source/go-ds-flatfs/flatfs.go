@@ -20,6 +20,7 @@ import (
 	"time"
 
 	logging "github.com/ipfs/go-log"
+	"github.com/jbenet/goprocess"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
@@ -95,9 +96,11 @@ func combineAccuracy(a, b initAccuracy) initAccuracy {
 var _ datastore.Datastore = (*Datastore)(nil)
 
 var (
+	errUnmatchOffset         = errors.New("offset is umatch.")
 	ErrDatastoreExists       = errors.New("datastore already exists")
 	ErrDatastoreDoesNotExist = errors.New("datastore directory does not exist")
 	ErrShardingFileMissing   = fmt.Errorf("%s file not found in datastore", SHARDING_FN)
+	ErrClosed                = errors.New("datastore closed")
 	ErrNotExist              = errors.New("the file does not exist")
 )
 
@@ -128,8 +131,12 @@ type Datastore struct {
 	dirty       bool
 	storedValue diskUsageValue
 
+	// Used to trigger a checkpoint.
 	checkpointCh chan struct{}
 	done         chan struct{}
+
+	shutdownLock sync.RWMutex
+	shutdown     bool
 
 	// opMap handles concurrent write operations (put/delete)
 	// to the same key
@@ -245,12 +252,14 @@ func Open(path string, syncFiles bool) (*Datastore, error) {
 	}
 
 	fs := &Datastore{
-		path:      path,
-		shardStr:  shardId.String(),
-		getDir:    shardId.Func(),
-		sync:      syncFiles,
-		diskUsage: 0,
-		opMap:     new(opMap),
+		path:         path,
+		shardStr:     shardId.String(),
+		getDir:       shardId.Func(),
+		sync:         syncFiles,
+		checkpointCh: make(chan struct{}, 1),
+		done:         make(chan struct{}),
+		diskUsage:    0,
+		opMap:        new(opMap),
 	}
 
 	// This sets diskUsage to the correct value
@@ -264,8 +273,6 @@ func Open(path string, syncFiles bool) (*Datastore, error) {
 		return nil, err
 	}
 
-	fs.checkpointCh = make(chan struct{}, 1)
-	fs.done = make(chan struct{})
 	go fs.checkpointLoop()
 	return fs, nil
 }
@@ -361,7 +368,6 @@ func (fs *Datastore) renameAndUpdateDiskUsage(tmpPath, path string) error {
 }
 
 var putMaxRetries = 6
-var appendMaxRetries = 6
 
 // Put stores a key/value in the datastore.
 //
@@ -374,6 +380,12 @@ var appendMaxRetries = 6
 // concurrent Put and a Delete operation, we cannot guarantee which one
 // will win.
 func (fs *Datastore) Put(key datastore.Key, value []byte) error {
+	fs.shutdownLock.RLock()
+	defer fs.shutdownLock.RUnlock()
+	if fs.shutdown {
+		return ErrClosed
+	}
+
 	var err error
 	for i := 1; i <= putMaxRetries; i++ {
 		err = fs.doWriteOp(&op{
@@ -397,8 +409,10 @@ func (fs *Datastore) Put(key datastore.Key, value []byte) error {
 
 // Append appends
 func (fs *Datastore) Append(key datastore.Key, value []byte, beginoffset, endoffset int) error {
+	fs.shutdownLock.RLock()
+	defer fs.shutdownLock.RUnlock()
 	var err error
-	for i := 1; i <= appendMaxRetries; i++ {
+	for i := 1; i <= putMaxRetries; i++ {
 		err = fs.doWriteOp(&op{
 			typ:         opAppend,
 			key:         key,
@@ -420,6 +434,16 @@ func (fs *Datastore) Append(key datastore.Key, value []byte, beginoffset, endoff
 	return err
 }
 
+func (fs *Datastore) Sync(prefix datastore.Key) error {
+	fs.shutdownLock.RLock()
+	defer fs.shutdownLock.RUnlock()
+	if fs.shutdown {
+		return ErrClosed
+	}
+
+	return nil
+}
+
 func (fs *Datastore) doOp(oper *op) error {
 	switch oper.typ {
 	case opPut:
@@ -435,10 +459,10 @@ func (fs *Datastore) doOp(oper *op) error {
 	}
 }
 
-// doWrite optmizes out write operations (put/delete) to the same
-// key by queueing them and suceeding all queued
+// doWrite optimizes out write operations (put/delete) to the same
+// key by queueing them and succeeding all queued
 // operations if one of them does. In such case,
-// we assume that the first suceeding operation
+// we assume that the first succeeding operation
 // on that key was the last one to happen after
 // all successful others.
 func (fs *Datastore) doWriteOp(oper *op) error {
@@ -451,6 +475,7 @@ func (fs *Datastore) doWriteOp(oper *op) error {
 
 	// Do the operation
 	err := fs.doOp(oper)
+
 	// Finish it. If no error, it will signal other operations
 	// waiting on this result to succeed. Otherwise, they will
 	// retry.
@@ -459,12 +484,13 @@ func (fs *Datastore) doWriteOp(oper *op) error {
 }
 
 func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
+
 	dir, path := fs.encode(key)
 	if err := fs.makeDir(dir); err != nil {
 		return err
 	}
 
-	tmp, err := ioutil.TempFile(dir, "put-") //在dir目录下创建一个文件名为"put-"的临时文件
+	tmp, err := ioutil.TempFile(dir, "put-")
 	if err != nil {
 		return err
 	}
@@ -485,7 +511,7 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 		return err
 	}
 	if fs.sync {
-		if err := syncFile(tmp); err != nil { //把当前内容持久化,一般就是马上写入到磁盘
+		if err := syncFile(tmp); err != nil {
 			return err
 		}
 	}
@@ -507,8 +533,6 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 	}
 	return nil
 }
-
-var errUnmatchOffset = errors.New("offset is umatch.")
 
 func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, endoffset int) error {
 	if endoffset < beginoffset {
@@ -597,16 +621,32 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 	}
 	return nil
 }
+func (fs *Datastore) putMany(data map[datastore.Key][]byte) error {
+	fs.shutdownLock.RLock()
+	defer fs.shutdownLock.RUnlock()
+	if fs.shutdown {
+		return ErrClosed
+	}
 
-func (fs *Datastore) putMany(data map[datastore.Key]interface{}) error {
 	var dirsToSync []string
-	files := make(map[*os.File]*op)
+
+	files := make(map[*os.File]*op, len(data))
+	ops := make(map[*os.File]int, len(data))
+
+	defer func() {
+		for fi := range files {
+			val := ops[fi]
+			switch val {
+			case 0:
+				_ = fi.Close()
+				fallthrough
+			case 1:
+				_ = os.Remove(fi.Name())
+			}
+		}
+	}()
 
 	for key, value := range data {
-		val, ok := value.([]byte)
-		if !ok {
-			return datastore.ErrInvalidType
-		}
 		dir, path := fs.encode(key)
 		if err := fs.makeDirNoSync(dir); err != nil {
 			return err
@@ -618,7 +658,7 @@ func (fs *Datastore) putMany(data map[datastore.Key]interface{}) error {
 			return err
 		}
 
-		if _, err := tmp.Write(val); err != nil {
+		if _, err := tmp.Write(value); err != nil {
 			return err
 		}
 
@@ -630,24 +670,9 @@ func (fs *Datastore) putMany(data map[datastore.Key]interface{}) error {
 		}
 	}
 
-	ops := make(map[*os.File]int)
-
-	defer func() {
-		for fi, _ := range files {
-			val, _ := ops[fi]
-			switch val {
-			case 0:
-				_ = fi.Close()
-				fallthrough
-			case 1:
-				_ = os.Remove(fi.Name())
-			}
-		}
-	}()
-
 	// Now we sync everything
 	// sync and close files
-	for fi, _ := range files {
+	for fi := range files {
 		if fs.sync {
 			if err := syncFile(fi); err != nil {
 				return err
@@ -664,7 +689,10 @@ func (fs *Datastore) putMany(data map[datastore.Key]interface{}) error {
 
 	// move files to their proper places
 	for fi, op := range files {
-		fs.doWriteOp(op)
+		err := fs.doWriteOp(op)
+		if err != nil {
+			return err
+		}
 		// signify removed
 		ops[fi] = 2
 	}
@@ -700,6 +728,12 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 }
 
 func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) ([]byte, []byte, error) {
+	fs.shutdownLock.RLock()
+	defer fs.shutdownLock.RUnlock()
+	if fs.shutdown {
+		return nil, nil, ErrClosed
+	}
+
 	_, path := fs.encode(key)
 
 	f, err := os.OpenFile(path, os.O_RDONLY, 0666)
@@ -790,6 +824,12 @@ func (fs *Datastore) GetSize(key datastore.Key) (size int, err error) {
 // the Put() explanation about the handling of concurrent write
 // operations to the same key.
 func (fs *Datastore) Delete(key datastore.Key) error {
+	fs.shutdownLock.RLock()
+	defer fs.shutdownLock.RUnlock()
+	if fs.shutdown {
+		return ErrClosed
+	}
+
 	return fs.doWriteOp(&op{
 		typ: opDelete,
 		key: key,
@@ -810,7 +850,7 @@ func (fs *Datastore) doDelete(key datastore.Key) error {
 		fs.checkpointDiskUsage()
 		return nil
 	case os.IsNotExist(err):
-		return datastore.ErrNotFound
+		return nil
 	default:
 		return err
 	}
@@ -822,24 +862,33 @@ func (fs *Datastore) Query(q query.Query) (query.Results, error) {
 		len(q.Orders) > 0 ||
 		q.Limit > 0 ||
 		q.Offset > 0 ||
-		!q.KeysOnly {
+		!q.KeysOnly ||
+		q.ReturnExpirations ||
+		q.ReturnsSizes {
 		// TODO this is overly simplistic, but the only caller is
-		// `mefs refs local` for now, and this gets us moving.
+		// `ipfs refs local` for now, and this gets us moving.
 		return nil, errors.New("flatfs only supports listing all keys in random order")
 	}
 
-	reschan := make(chan query.Result, query.KeysOnlyBufSize)
-	go func() {
-		defer close(reschan)
-		err := fs.walkTopLevel(fs.path, reschan)
-		if err != nil {
-			reschan <- query.Result{Error: errors.New("walk failed: " + err.Error())}
+	// Replicates the logic in ResultsWithChan but actually respects calls
+	// to `Close`.
+	b := query.NewResultBuilder(q)
+	b.Process.Go(func(p goprocess.Process) {
+		err := fs.walkTopLevel(fs.path, b)
+		if err == nil {
+			return
 		}
-	}()
-	return query.ResultsWithChan(q, reschan), nil
+		select {
+		case b.Output <- query.Result{Error: errors.New("walk failed: " + err.Error())}:
+		case <-p.Closing():
+		}
+	})
+	go b.Process.CloseAfterChildren() //nolint
+
+	return b.Results(), nil
 }
 
-func (fs *Datastore) walkTopLevel(path string, reschan chan query.Result) error {
+func (fs *Datastore) walkTopLevel(path string, result *query.ResultBuilder) error {
 	dir, err := os.Open(path)
 	if err != nil {
 		return err
@@ -850,23 +899,28 @@ func (fs *Datastore) walkTopLevel(path string, reschan chan query.Result) error 
 		return err
 	}
 	for _, dir := range names {
-
 		if len(dir) == 0 || dir[0] == '.' {
 			continue
 		}
 
-		err = fs.walk(filepath.Join(path, dir), reschan)
+		err = fs.walk(filepath.Join(path, dir), result)
 		if err != nil {
 			return err
 		}
 
+		// Are we closing?
+		select {
+		case <-result.Process.Closing():
+			return nil
+		default:
+		}
 	}
 	return nil
 }
 
 // folderSize estimates the diskUsage of a folder by reading
-// up to DiskUsageFilesAverage entries in it and assumming any
-// other files will have an avereage size.
+// up to DiskUsageFilesAverage entries in it and assuming any
+// other files will have an average size.
 func folderSize(path string, deadline time.Time) (int64, initAccuracy, error) {
 	var du int64
 
@@ -1036,6 +1090,8 @@ func (fs *Datastore) checkpointDiskUsage() {
 }
 
 func (fs *Datastore) checkpointLoop() {
+	defer close(fs.done)
+
 	timerActive := true
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -1049,7 +1105,6 @@ func (fs *Datastore) checkpointLoop() {
 				if fs.dirty {
 					log.Errorf("could not store final value of disk usage to file, future estimates may be inaccurate")
 				}
-				fs.done <- struct{}{}
 				return
 			}
 			// If the difference between the checkpointed disk usage and
@@ -1161,7 +1216,7 @@ func (fs *Datastore) Accuracy() string {
 	return string(fs.storedValue.Accuracy)
 }
 
-func (fs *Datastore) walk(path string, reschan chan query.Result) error {
+func (fs *Datastore) walk(path string, result *query.ResultBuilder) error {
 	dir, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1197,10 +1252,14 @@ func (fs *Datastore) walk(path string, reschan chan query.Result) error {
 			continue
 		}
 
-		reschan <- query.Result{
+		select {
+		case result.Output <- query.Result{
 			Entry: query.Entry{
 				Key: key.String(),
 			},
+		}:
+		case <-result.Process.Closing():
+			return nil
 		}
 	}
 	return nil
@@ -1209,21 +1268,24 @@ func (fs *Datastore) walk(path string, reschan chan query.Result) error {
 // Deactivate closes background maintenance threads, most write
 // operations will fail but readonly operations will continue to
 // function
-func (fs *Datastore) deactivate() error {
-	if fs.checkpointCh != nil {
-		close(fs.checkpointCh)
-		<-fs.done
-		fs.checkpointCh = nil
+func (fs *Datastore) deactivate() {
+	fs.shutdownLock.Lock()
+	defer fs.shutdownLock.Unlock()
+	if fs.shutdown {
+		return
 	}
-	return nil
+	fs.shutdown = true
+	close(fs.checkpointCh)
+	<-fs.done
 }
 
 func (fs *Datastore) Close() error {
-	return fs.deactivate()
+	fs.deactivate()
+	return nil
 }
 
 type flatfsBatch struct {
-	puts    map[datastore.Key]interface{}
+	puts    map[datastore.Key][]byte
 	deletes map[datastore.Key]struct{}
 	appends map[datastore.Key]interface{}
 
@@ -1232,7 +1294,7 @@ type flatfsBatch struct {
 
 func (fs *Datastore) Batch() (datastore.Batch, error) {
 	return &flatfsBatch{
-		puts:    make(map[datastore.Key]interface{}),
+		puts:    make(map[datastore.Key][]byte),
 		deletes: make(map[datastore.Key]struct{}),
 		appends: make(map[datastore.Key]interface{}),
 		ds:      fs,
@@ -1259,7 +1321,7 @@ func (bt *flatfsBatch) Commit() error {
 		return err
 	}
 
-	for k, _ := range bt.deletes {
+	for k := range bt.deletes {
 		if err := bt.ds.Delete(k); err != nil {
 			return err
 		}
@@ -1267,7 +1329,3 @@ func (bt *flatfsBatch) Commit() error {
 
 	return nil
 }
-
-var _ datastore.ThreadSafeDatastore = (*Datastore)(nil)
-
-func (*Datastore) IsThreadSafe() {}

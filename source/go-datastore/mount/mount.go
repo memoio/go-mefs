@@ -3,15 +3,15 @@
 package mount
 
 import (
+	"container/heap"
 	"errors"
-	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"sync"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
+	xerrors "golang.org/x/xerrors"
 )
 
 var (
@@ -26,9 +26,7 @@ type Mount struct {
 func New(mounts []Mount) *Datastore {
 	// make a copy so we're sure it doesn't mutate
 	m := make([]Mount, len(mounts))
-	for i, v := range mounts {
-		m[i] = v
-	}
+	copy(m, mounts)
 	sort.Slice(m, func(i, j int) bool { return m[i].Prefix.String() > m[j].Prefix.String() })
 	return &Datastore{mounts: m}
 }
@@ -48,6 +46,105 @@ func (d *Datastore) lookup(key ds.Key) (ds.Datastore, ds.Key, ds.Key) {
 		}
 	}
 	return nil, ds.NewKey("/"), key
+}
+
+type queryResults struct {
+	mount   ds.Key
+	results query.Results
+	next    query.Result
+}
+
+func (qr *queryResults) advance() bool {
+	if qr.results == nil {
+		return false
+	}
+
+	qr.next = query.Result{}
+	r, more := qr.results.NextSync()
+	if !more {
+		err := qr.results.Close()
+		qr.results = nil
+		if err != nil {
+			// One more result, the error.
+			qr.next = query.Result{Error: err}
+			return true
+		}
+		return false
+	}
+
+	r.Key = qr.mount.Child(ds.RawKey(r.Key)).String()
+	qr.next = r
+	return true
+}
+
+type querySet struct {
+	query query.Query
+	heads []*queryResults
+}
+
+func (h *querySet) Len() int {
+	return len(h.heads)
+}
+
+func (h *querySet) Less(i, j int) bool {
+	return query.Less(h.query.Orders, h.heads[i].next.Entry, h.heads[j].next.Entry)
+}
+
+func (h *querySet) Swap(i, j int) {
+	h.heads[i], h.heads[j] = h.heads[j], h.heads[i]
+}
+
+func (h *querySet) Push(x interface{}) {
+	h.heads = append(h.heads, x.(*queryResults))
+}
+
+func (h *querySet) Pop() interface{} {
+	i := len(h.heads) - 1
+	last := h.heads[i]
+	h.heads[i] = nil
+	h.heads = h.heads[:i]
+	return last
+}
+
+func (h *querySet) close() error {
+	var errs []error
+	for _, qr := range h.heads {
+		err := qr.results.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	h.heads = nil
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+func (h *querySet) addResults(mount ds.Key, results query.Results) {
+	r := &queryResults{
+		results: results,
+		mount:   mount,
+	}
+	if r.advance() {
+		heap.Push(h, r)
+	}
+}
+
+func (h *querySet) next() (query.Result, bool) {
+	if len(h.heads) == 0 {
+		return query.Result{}, false
+	}
+	head := h.heads[0]
+	next := head.next
+
+	if head.advance() {
+		heap.Fix(h, 0)
+	} else {
+		heap.Remove(h, 0)
+	}
+
+	return next, true
 }
 
 // lookupAll returns all mounts that might contain keys that are descendant of <key>
@@ -98,6 +195,24 @@ func (d *Datastore) Append(key ds.Key, value []byte, beginoffset, endoffset int)
 	return cds.Append(k, value, beginoffset, endoffset)
 }
 
+// Sync implements Datastore.Sync
+func (d *Datastore) Sync(prefix ds.Key) error {
+	// Sync all mount points below the prefix
+	// Sync the mount point right at (or above) the prefix
+	dstores, mountPts, rest := d.lookupAll(prefix)
+	for i, suffix := range rest {
+		if err := dstores[i].Sync(suffix); err != nil {
+			return err
+		}
+
+		if mountPts[i].Equal(prefix) || suffix.String() != "/" {
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func (d *Datastore) Get(key ds.Key) (value []byte, err error) {
 	cds, _, k := d.lookup(key)
 	if cds == nil {
@@ -133,89 +248,71 @@ func (d *Datastore) GetSize(key ds.Key) (size int, err error) {
 func (d *Datastore) Delete(key ds.Key) error {
 	cds, _, k := d.lookup(key)
 	if cds == nil {
-		return ds.ErrNotFound
+		return nil
 	}
 	return cds.Delete(k)
 }
 
-func (d *Datastore) Query(q query.Query) (query.Results, error) {
-	if len(q.Filters) > 0 ||
-		len(q.Orders) > 0 ||
-		q.Limit > 0 ||
-		q.Offset > 0 {
-		// TODO this is still overly simplistic, but the only callers are
-		// `mefs refs local` and ipfs-ds-convert.
-		return nil, errors.New("mount only supports listing all prefixed keys in random order")
+func (d *Datastore) Query(master query.Query) (query.Results, error) {
+	childQuery := query.Query{
+		Prefix:            master.Prefix,
+		Orders:            master.Orders,
+		KeysOnly:          master.KeysOnly,
+		ReturnExpirations: master.ReturnExpirations,
+		ReturnsSizes:      master.ReturnsSizes,
 	}
-	prefix := ds.NewKey(q.Prefix)
+
+	prefix := ds.NewKey(childQuery.Prefix)
 	dses, mounts, rests := d.lookupAll(prefix)
 
-	// current itorator state
-	var res query.Results
-	var mount ds.Key
-	i := 0
+	queries := &querySet{
+		query: childQuery,
+		heads: make([]*queryResults, 0, len(dses)),
+	}
 
-	return query.ResultsFromIterator(q, query.Iterator{
-		Next: func() (query.Result, bool) {
-			var r query.Result
-			var more bool
+	for i := range dses {
+		mount := mounts[i]
+		dstore := dses[i]
+		rest := rests[i]
 
-			for try := true; try; try = len(dses) > i {
-				if res == nil {
-					if len(dses) <= i {
-						//This should not happen normally
-						return query.Result{}, false
-					}
+		qi := childQuery
+		qi.Prefix = rest.String()
+		results, err := dstore.Query(qi)
 
-					dst := dses[i]
-					mount = mounts[i]
-					rest := rests[i]
+		if err != nil {
+			_ = queries.close()
+			return nil, err
+		}
+		queries.addResults(mount, results)
+	}
 
-					q2 := q
-					q2.Prefix = rest.String()
-					r, err := dst.Query(q2)
-					if err != nil {
-						return query.Result{Error: err}, false
-					}
-					res = r
-				}
+	qr := query.ResultsFromIterator(master, query.Iterator{
+		Next:  queries.next,
+		Close: queries.close,
+	})
 
-				r, more = res.NextSync()
-				if !more {
-					err := res.Close()
-					if err != nil {
-						return query.Result{Error: err}, false
-					}
-					res = nil
+	if len(master.Filters) > 0 {
+		for _, f := range master.Filters {
+			qr = query.NaiveFilter(qr, f)
+		}
+	}
 
-					i++
-					more = len(dses) > i
-				} else {
-					break
-				}
-			}
+	if master.Offset > 0 {
+		qr = query.NaiveOffset(qr, master.Offset)
+	}
 
-			r.Key = mount.Child(ds.RawKey(r.Key)).String()
-			return r, more
-		},
-		Close: func() error {
-			if len(mounts) > i && res != nil {
-				return res.Close()
-			}
-			return nil
-		},
-	}), nil
+	if master.Limit > 0 {
+		qr = query.NaiveLimit(qr, master.Limit)
+	}
+
+	return qr, nil
 }
-
-func (d *Datastore) IsThreadSafe() {}
 
 func (d *Datastore) Close() error {
 	for _, d := range d.mounts {
-		if c, ok := d.Datastore.(io.Closer); ok {
-			err := c.Close()
-			if err != nil {
-				return err
-			}
+		err := d.Datastore.Close()
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -314,7 +411,7 @@ func (d *Datastore) Check() error {
 	for _, m := range d.mounts {
 		if c, ok := m.Datastore.(ds.CheckedDatastore); ok {
 			if err := c.Check(); err != nil {
-				return fmt.Errorf("checking datastore at %s: %s", m.Prefix.String(), err.Error())
+				return xerrors.Errorf("checking datastore at %s: %w", m.Prefix.String(), err)
 			}
 		}
 	}
@@ -325,7 +422,7 @@ func (d *Datastore) Scrub() error {
 	for _, m := range d.mounts {
 		if c, ok := m.Datastore.(ds.ScrubbedDatastore); ok {
 			if err := c.Scrub(); err != nil {
-				return fmt.Errorf("scrubbing datastore at %s: %s", m.Prefix.String(), err.Error())
+				return xerrors.Errorf("scrubbing datastore at %s: %w", m.Prefix.String(), err)
 			}
 		}
 	}
@@ -336,7 +433,7 @@ func (d *Datastore) CollectGarbage() error {
 	for _, m := range d.mounts {
 		if c, ok := m.Datastore.(ds.GCDatastore); ok {
 			if err := c.CollectGarbage(); err != nil {
-				return fmt.Errorf("gc on datastore at %s: %s", m.Prefix.String(), err.Error())
+				return xerrors.Errorf("gc on datastore at %s: %w", m.Prefix.String(), err)
 			}
 		}
 	}

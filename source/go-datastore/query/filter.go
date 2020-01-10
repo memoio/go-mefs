@@ -1,8 +1,8 @@
 package query
 
 import (
+	"bytes"
 	"fmt"
-	"reflect"
 	"strings"
 )
 
@@ -33,24 +33,32 @@ var (
 //
 // [*] other than == and !=, which use reflect.DeepEqual.
 type FilterValueCompare struct {
-	Op          Op
-	Value       interface{}
-	TypedFilter Filter
+	Op    Op
+	Value []byte
 }
 
 func (f FilterValueCompare) Filter(e Entry) bool {
-	if f.TypedFilter != nil {
-		return f.TypedFilter.Filter(e)
-	}
-
+	cmp := bytes.Compare(e.Value, f.Value)
 	switch f.Op {
 	case Equal:
-		return reflect.DeepEqual(f.Value, e.Value)
+		return cmp == 0
 	case NotEqual:
-		return !reflect.DeepEqual(f.Value, e.Value)
+		return cmp != 0
+	case LessThan:
+		return cmp < 0
+	case LessThanOrEqual:
+		return cmp <= 0
+	case GreaterThan:
+		return cmp > 0
+	case GreaterThanOrEqual:
+		return cmp >= 0
 	default:
-		panic(fmt.Errorf("cannot apply op '%s' to interface{}.", f.Op))
+		panic(fmt.Errorf("unknown operation: %s", f.Op))
 	}
+}
+
+func (f FilterValueCompare) String() string {
+	return fmt.Sprintf("VALUE %s %q", f.Op, string(f.Value))
 }
 
 type FilterKeyCompare struct {
@@ -77,10 +85,18 @@ func (f FilterKeyCompare) Filter(e Entry) bool {
 	}
 }
 
+func (f FilterKeyCompare) String() string {
+	return fmt.Sprintf("KEY %s %q", f.Op, f.Key)
+}
+
 type FilterKeyPrefix struct {
 	Prefix string
 }
 
 func (f FilterKeyPrefix) Filter(e Entry) bool {
 	return strings.HasPrefix(e.Key, f.Prefix)
+}
+
+func (f FilterKeyPrefix) String() string {
+	return fmt.Sprintf("PREFIX(%q)", f.Prefix)
 }

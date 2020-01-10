@@ -29,9 +29,6 @@ var ErrHashMismatch = errors.New("block in storage has different hash than reque
 // ErrNotFound is an error returned when a block is not found.
 var ErrNotFound = errors.New("blockstore: block not found")
 
-// ErrNotExist is an error returned when a block not exists.
-//var ErrNotExist = errors.New("blockstore: block not exists")
-
 // Blockstore wraps a Datastore block-centered methods and provides a layer
 // of abstraction which allows to add different caching strategies.
 type Blockstore interface {
@@ -218,11 +215,7 @@ func (bs *blockstore) GetSize(k cid.Cid) (int, error) {
 }
 
 func (bs *blockstore) DeleteBlock(k cid.Cid) error {
-	err := bs.datastore.Delete(dshelp.CidToDsKey(k))
-	if err == ds.ErrNotFound {
-		return ErrNotFound
-	}
-	return err
+	return bs.datastore.Delete(dshelp.CidToDsKey(k))
 }
 
 // AllKeysChan runs a query for keys from the blockstore.

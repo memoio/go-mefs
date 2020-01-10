@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	. "github.com/go-check/check"
+	. "gopkg.in/check.v1"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	kt "github.com/memoio/go-mefs/source/go-datastore/keytransform"
@@ -20,22 +20,21 @@ type DSSuite struct{}
 
 var _ = Suite(&DSSuite{})
 
+var pair = &kt.Pair{
+	Convert: func(k ds.Key) ds.Key {
+		return ds.NewKey("/abc").Child(k)
+	},
+	Invert: func(k ds.Key) ds.Key {
+		// remove abc prefix
+		l := k.List()
+		if l[0] != "abc" {
+			panic("key does not have prefix. convert failed?")
+		}
+		return ds.KeyWithNamespaces(l[1:])
+	},
+}
+
 func (ks *DSSuite) TestBasic(c *C) {
-
-	pair := &kt.Pair{
-		Convert: func(k ds.Key) ds.Key {
-			return ds.NewKey("/abc").Child(k)
-		},
-		Invert: func(k ds.Key) ds.Key {
-			// remove abc prefix
-			l := k.List()
-			if l[0] != "abc" {
-				panic("key does not have prefix. convert failed?")
-			}
-			return ds.KeyWithNamespaces(l[1:])
-		},
-	}
-
 	mpds := dstest.NewTestDatastore(true)
 	ktds := kt.Wrap(mpds, pair)
 
@@ -109,4 +108,16 @@ func strsToKeys(strs []string) []ds.Key {
 		keys[i] = ds.NewKey(s)
 	}
 	return keys
+}
+
+func TestSuiteDefaultPair(t *testing.T) {
+	mpds := dstest.NewTestDatastore(true)
+	ktds := kt.Wrap(mpds, pair)
+	dstest.SubtestAll(t, ktds)
+}
+
+func TestSuitePrefixTransform(t *testing.T) {
+	mpds := dstest.NewTestDatastore(true)
+	ktds := kt.Wrap(mpds, kt.PrefixTransform{Prefix: ds.NewKey("/foo")})
+	dstest.SubtestAll(t, ktds)
 }

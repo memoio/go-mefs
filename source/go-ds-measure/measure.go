@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
+	metrics "github.com/ipfs/go-metrics-interface"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
-	metrics "github.com/ipfs/go-metrics-interface"
 )
 
 var (
@@ -31,6 +31,11 @@ func New(prefix string, ds datastore.Datastore) *measure {
 			"Latency distribution of Datastore.Put calls").Histogram(datastoreLatencyBuckets),
 		putSize: metrics.New(prefix+".put.size_bytes",
 			"Size distribution of stored byte slices").Histogram(datastoreSizeBuckets),
+
+		syncNum: metrics.New(prefix+".sync_total", "Total number of Datastore.Sync calls").Counter(),
+		syncErr: metrics.New(prefix+".sync.errors_total", "Number of errored Datastore.Sync calls").Counter(),
+		syncLatency: metrics.New(prefix+".sync.latency_seconds",
+			"Latency distribution of Datastore.Sync calls").Histogram(datastoreLatencyBuckets),
 
 		getNum: metrics.New(prefix+".get_total", "Total number of Datastore.Get calls").Counter(),
 		getErr: metrics.New(prefix+".get.errors_total", "Number of errored Datastore.Get calls").Counter(),
@@ -77,6 +82,23 @@ func New(prefix string, ds datastore.Datastore) *measure {
 		duErr: metrics.New(prefix+".du.errors_total", "Number of errored Datastore.DiskUsage calls").Counter(),
 		duLatency: metrics.New(prefix+".du.latency_seconds",
 			"Latency distribution of Datastore.DiskUsage calls").Histogram(datastoreLatencyBuckets),
+
+		batchPutNum: metrics.New(prefix+".batchput_total", "Total number of Batch.Put calls").Counter(),
+		batchPutErr: metrics.New(prefix+".batchput.errors_total", "Number of errored Batch.Put calls").Counter(),
+		batchPutLatency: metrics.New(prefix+".batchput.latency_seconds",
+			"Latency distribution of Batch.Put calls").Histogram(datastoreLatencyBuckets),
+		batchPutSize: metrics.New(prefix+".batchput.size_bytes",
+			"Size distribution of byte slices put into batches").Histogram(datastoreSizeBuckets),
+
+		batchDeleteNum: metrics.New(prefix+".batchdelete_total", "Total number of Batch.Delete calls").Counter(),
+		batchDeleteErr: metrics.New(prefix+".batchdelete.errors_total", "Number of errored Batch.Delete calls").Counter(),
+		batchDeleteLatency: metrics.New(prefix+".batchdelete.latency_seconds",
+			"Latency distribution of Batch.Delete calls").Histogram(datastoreLatencyBuckets),
+
+		batchCommitNum: metrics.New(prefix+".batchcommit_total", "Total number of Batch.Commit calls").Counter(),
+		batchCommitErr: metrics.New(prefix+".batchcommit.errors_total", "Number of errored Batch.Commit calls").Counter(),
+		batchCommitLatency: metrics.New(prefix+".batchcommit.latency_seconds",
+			"Latency distribution of Batch.Commit calls").Histogram(datastoreLatencyBuckets),
 	}
 	return m
 }
@@ -88,6 +110,10 @@ type measure struct {
 	putErr     metrics.Counter
 	putLatency metrics.Histogram
 	putSize    metrics.Histogram
+
+	syncNum     metrics.Counter
+	syncErr     metrics.Counter
+	syncLatency metrics.Histogram
 
 	getNum     metrics.Counter
 	getErr     metrics.Counter
@@ -125,6 +151,19 @@ type measure struct {
 	duNum     metrics.Counter
 	duErr     metrics.Counter
 	duLatency metrics.Histogram
+
+	batchPutNum     metrics.Counter
+	batchPutErr     metrics.Counter
+	batchPutLatency metrics.Histogram
+	batchPutSize    metrics.Histogram
+
+	batchDeleteNum     metrics.Counter
+	batchDeleteErr     metrics.Counter
+	batchDeleteLatency metrics.Histogram
+
+	batchCommitNum     metrics.Counter
+	batchCommitErr     metrics.Counter
+	batchCommitLatency metrics.Histogram
 }
 
 func recordLatency(h metrics.Histogram, start time.Time) {
@@ -150,6 +189,16 @@ func (m *measure) Append(key datastore.Key, value []byte, beginoffset, endoffset
 	err := m.backend.Append(key, value, beginoffset, endoffset)
 	if err != nil {
 		m.putErr.Inc()
+	}
+	return err
+}
+
+func (m *measure) Sync(prefix datastore.Key) error {
+	defer recordLatency(m.syncLatency, time.Now())
+	m.syncNum.Inc()
+	err := m.backend.Sync(prefix)
+	if err != nil {
+		m.syncErr.Inc()
 	}
 	return err
 }
@@ -188,10 +237,11 @@ func (m *measure) Has(key datastore.Key) (exists bool, err error) {
 
 func (m *measure) GetSize(key datastore.Key) (size int, err error) {
 	defer recordLatency(m.getsizeLatency, time.Now())
-	m.hasNum.Inc()
+	m.getsizeNum.Inc()
 	size, err = m.backend.GetSize(key)
 	switch err {
 	case nil, datastore.ErrNotFound:
+		// Not really an error.
 	default:
 		m.getsizeErr.Inc()
 	}
@@ -268,14 +318,7 @@ func (m *measure) DiskUsage() (uint64, error) {
 }
 
 type measuredBatch struct {
-	puts    int
-	deletes int
-	appends int
-
-	putts    datastore.Batch
-	delts    datastore.Batch
-	appendts datastore.Batch
-
+	b datastore.Batch
 	m *measure
 }
 
@@ -284,70 +327,56 @@ func (m *measure) Batch() (datastore.Batch, error) {
 	if !ok {
 		return nil, datastore.ErrBatchUnsupported
 	}
-	pb, err := bds.Batch()
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := bds.Batch()
+	batch, err := bds.Batch()
 	if err != nil {
 		return nil, err
 	}
 
 	return &measuredBatch{
-		putts: pb,
-		delts: db,
-
+		b: batch,
 		m: m,
 	}, nil
 }
 
 func (mt *measuredBatch) Put(key datastore.Key, val []byte) error {
-	mt.puts++
-	mt.m.putSize.Observe(float64(len(val)))
-	return mt.putts.Put(key, val)
+	defer recordLatency(mt.m.batchPutLatency, time.Now())
+	mt.m.batchPutNum.Inc()
+	mt.m.batchPutSize.Observe(float64(len(val)))
+	err := mt.b.Put(key, val)
+	if err != nil {
+		mt.m.batchPutErr.Inc()
+	}
+	return err
 }
-
 func (mt *measuredBatch) Append(key datastore.Key, val []byte, beginoffset, endoffset int) error {
-	mt.appends++
-	mt.m.putSize.Observe(float64(len(val)))
-	return mt.appendts.Append(key, val, beginoffset, endoffset)
+	defer recordLatency(mt.m.batchPutLatency, time.Now())
+	mt.m.batchPutNum.Inc()
+	mt.m.batchPutSize.Observe(float64(len(val)))
+	err := mt.b.Append(key, val, beginoffset, endoffset)
+	if err != nil {
+		mt.m.batchPutErr.Inc()
+	}
+	return err
 }
 
 func (mt *measuredBatch) Delete(key datastore.Key) error {
-	mt.deletes++
-	return mt.delts.Delete(key)
+	defer recordLatency(mt.m.batchDeleteLatency, time.Now())
+	mt.m.batchDeleteNum.Inc()
+	err := mt.b.Delete(key)
+	if err != nil {
+		mt.m.batchDeleteErr.Inc()
+	}
+	return err
 }
 
 func (mt *measuredBatch) Commit() error {
-	err := logBatchCommit(mt.delts, mt.deletes, mt.m.deleteNum, mt.m.deleteErr, mt.m.deleteLatency)
+	defer recordLatency(mt.m.batchCommitLatency, time.Now())
+	mt.m.batchCommitNum.Inc()
+	err := mt.b.Commit()
 	if err != nil {
-		return err
+		mt.m.batchCommitErr.Inc()
 	}
-
-	err = logBatchCommit(mt.putts, mt.puts, mt.m.putNum, mt.m.putErr, mt.m.putLatency)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func logBatchCommit(b datastore.Batch, n int, num, errs metrics.Counter, lat metrics.Histogram) error {
-	if n > 0 {
-		before := time.Now()
-		err := b.Commit()
-		took := time.Since(before) / time.Duration(n)
-		num.Add(float64(n))
-		for i := 0; i < n; i++ {
-			lat.Observe(took.Seconds())
-		}
-		if err != nil {
-			errs.Inc()
-			return err
-		}
-	}
-	return nil
+	return err
 }
 
 func (m *measure) Close() error {

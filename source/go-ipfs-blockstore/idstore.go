@@ -18,6 +18,7 @@ func NewIdStore(bs Blockstore) Blockstore {
 }
 
 func extractContents(k cid.Cid) (bool, []byte) {
+
 	if k.Version() == 2 {
 		return false, nil
 	}
