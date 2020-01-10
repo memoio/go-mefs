@@ -81,7 +81,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 //GetUpkeepingAddrs get all upKeeping address
 func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", true)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]
 //GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
 func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", true)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", false)
 	if err != nil {
 		return ukaddr, nil, err
 	}

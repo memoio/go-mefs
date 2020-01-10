@@ -33,6 +33,7 @@ const (
 
 var (
 	ErrEmpty              = errors.New("has not addr")
+	ErrMisType            = errors.New("mistype contract")
 	ErrNotDeployedIndexer = errors.New("has not deployed indexer")
 	//ErrNotDeployedMapper the user has not deployed mapper in the specified resolver
 	ErrNotDeployedMapper = errors.New("has not deployed mapper")
@@ -246,32 +247,27 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 }
 
 // GetAddrFromIndexer gets addr
-func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, error) {
+func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, common.Address, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		_, indexerAddr, err := indexerInstance.Get(&bind.CallOpts{
+		ownAddr, indexerAddr, err := indexerInstance.Get(&bind.CallOpts{
 			From: localAddress,
 		}, key)
 		if err != nil {
 			if retryCount > 10 {
 				log.Println("get addr from indexer err: ", err)
-				return indexerAddr, err
+				return indexerAddr, ownAddr, err
 			}
 			time.Sleep(30 * time.Second)
 			continue
 		}
 		if len(indexerAddr) == 0 || indexerAddr.String() == InvalidAddr {
-			return indexerAddr, ErrEmpty
+			return indexerAddr, ownAddr, ErrEmpty
 		}
 
-		return indexerAddr, nil
+		return indexerAddr, ownAddr, nil
 	}
-}
-
-func TestIndexer(localAddress common.Address, indexerInstance *indexer.Indexer) error {
-	_, err := GetAddrFromIndexer(localAddress, "test", indexerInstance)
-	return err
 }
 
 // DeployMapper deploy a new mapper
@@ -421,17 +417,17 @@ func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *
 
 	key := userAddress.String()
 
-	indexerAddr, err = GetAddrFromIndexer(localAddress, key, adminIndexer)
+	indexerAddr, ownAddr, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
 	if err != nil {
 		return indexerAddr, indexerInstance, err
+	}
+
+	if ownAddr.String() != key {
+		log.Println("set owner is: ", key, ", but got owner is: ", ownAddr.String())
+		return indexerAddr, indexerInstance, ErrMisType
 	}
 
 	indexerInstance, err = indexer.NewIndexer(indexerAddr, client)
-	if err != nil {
-		return indexerAddr, indexerInstance, err
-	}
-
-	err = TestIndexer(userAddress, indexerInstance)
 	if err != nil {
 		return indexerAddr, indexerInstance, err
 	}
@@ -443,7 +439,7 @@ func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *
 // 特别地，当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
 // 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
 func GetMapperFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, *mapper.Mapper, error) {
-	mapperAddr, err := GetAddrFromIndexer(localAddress, key, indexerInstance)
+	mapperAddr, _, err := GetAddrFromIndexer(localAddress, key, indexerInstance)
 	if err != nil {
 		return mapperAddr, nil, err
 	}
@@ -469,8 +465,16 @@ func GetMapperFromIndexer(localAddress common.Address, key string, indexerInstan
 func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
 	var mapperAddr common.Address
 
+	if hexKey == "" {
+		flag = false
+	}
+
 	//获得userIndexer, key is userAddr.String()
 	_, indexerInstance, err := GetRoleIndexer(localAddr, userAddr)
+	if err == ErrMisType {
+		return mapperAddr, nil, err
+	}
+
 	if err != nil {
 		if !flag {
 			return mapperAddr, nil, err
@@ -491,19 +495,11 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 
 		indexerInstance = iInstance
 
-		if err == ErrEmpty {
-			err = AddToIndexer(localAddr, indexerAddr, userAddr.String(), hexKey, adminIndexer)
-			if err != nil {
-				log.Println("add Role Indexer Err:", err)
-				return mapperAddr, nil, err
-			}
-
-		} else {
-			err = AlterAddrInIndexer(localAddr, indexerAddr, userAddr.String(), hexKey, adminIndexer)
-			if err != nil {
-				log.Println("add Role Indexer Err:", err)
-				return mapperAddr, nil, err
-			}
+		log.Println("add Role Indexer")
+		err = AddToIndexer(localAddr, indexerAddr, userAddr.String(), hexKey, adminIndexer)
+		if err != nil {
+			log.Println("add Role Indexer Err:", err)
+			return mapperAddr, nil, err
 		}
 	}
 
@@ -520,24 +516,10 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 
 		mapperInstance = mInstance
 
-		if err == ErrEmpty {
-			err = AddToIndexer(localAddr, mapperAddr, key, hexKey, indexerInstance)
-			if err != nil {
-				log.Println("add mapper to indexer err:", err)
-				return mapperAddr, nil, err
-			}
-
-		} else {
-			err = AlterAddrInIndexer(localAddr, mapperAddr, key, hexKey, indexerInstance)
-			if err != nil {
-				log.Println("alter mapper to indexer err:", err)
-				return mapperAddr, nil, err
-			}
-		}
-
 		//获得mapper, key is query
 		err = AddToIndexer(localAddr, mapperAddr, key, hexKey, indexerInstance)
 		if err != nil {
+			log.Println("add mapper to indexer err:", err)
 			return mapperAddr, nil, err
 		}
 	}
@@ -553,12 +535,13 @@ func CheckTx(tx *types.Transaction) error {
 	for i := 0; i < 60; i++ {
 		receipt = GetTransactionReceipt(tx.Hash())
 		if receipt != nil {
-			TxReceipt, _ := receipt.MarshalJSON()
-			log.Println("TxReceipt:", string(TxReceipt))
+			//TxReceipt, _ := receipt.MarshalJSON()
+			//log.Println("TxReceipt:", string(TxReceipt))
 			break
 		}
 		time.Sleep(30 * time.Second)
 	}
+
 	if receipt == nil { //30分钟获取不到交易信息，判定交易失败
 		log.Println("transaction fails")
 		return ErrTxFail
@@ -569,11 +552,11 @@ func CheckTx(tx *types.Transaction) error {
 		return nil
 	}
 	topics := receipt.Logs[0].Topics[0].Hex()
-	log.Println("topics:", topics)
+	//log.Println("topics:", topics)
 
 	if topics == "0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa" {
 		str := string(receipt.Logs[0].Data)
-		log.Println(str)
+		log.Println("err in log is: ", str)
 		return errors.New(str)
 	}
 	return nil
