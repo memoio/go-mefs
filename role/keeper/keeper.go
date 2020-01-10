@@ -220,17 +220,37 @@ func (k *Info) save(ctx context.Context) error {
 	}
 
 	// save last pay
-	pus := k.getQUKeys()
-	for _, pu := range pus {
-		gp := k.getGroupInfo(pu.uid, pu.qid, false)
+	qus := k.getQUKeys()
+	for _, qu := range qus {
+		gp := k.getGroupInfo(qu.uid, qu.qid, false)
 		if gp == nil {
 			continue
 		}
 
 		for _, proID := range gp.providers {
-			k.savePay(pu.qid, proID)
+			k.savePay(qu.qid, proID)
 		}
 
+		pids.Reset()
+		kmkps, err := metainfo.NewKeyMeta(qu.qid, metainfo.LogFS)
+		if err != nil {
+			continue
+		}
+
+		for _, kp := range gp.keepers {
+			pids.WriteString(kp)
+		}
+
+		pids.WriteString(metainfo.DELIMITER)
+
+		for _, kp := range gp.providers {
+			pids.WriteString(kp)
+		}
+
+		err = k.ds.PutKey(ctx, kmkps.ToString(), []byte(pids.String()), "local")
+		if err != nil {
+			continue
+		}
 	}
 
 	return nil
@@ -300,8 +320,13 @@ func (k *Info) loadUser(ctx context.Context) error {
 					return
 				}
 
-				qs, err := k.ds.GetKey(ctx, kmfs.ToString(), "local")
+				ui := &uInfo{
+					userID: userID,
+				}
 
+				k.users.Store(userID, ui)
+
+				qs, err := k.ds.GetKey(ctx, kmfs.ToString(), "local")
 				if err != nil {
 					return
 				}
@@ -312,7 +337,53 @@ func (k *Info) loadUser(ctx context.Context) error {
 					if err != nil {
 						continue
 					}
-					err = k.createGroup(userID, qid, []string{qid}, []string{qid})
+
+					ui.setQuery(qid)
+
+					kmkps, err := metainfo.NewKeyMeta(qid, metainfo.LogFS)
+					if err != nil {
+						continue
+					}
+
+					kps, err := k.ds.GetKey(ctx, kmkps.ToString(), "local")
+					if err != nil {
+						continue
+					}
+
+					splitedMeta := strings.Split(string(kps), metainfo.DELIMITER)
+					var tmpKps []string
+					var tmpPros []string
+					if len(splitedMeta) == 2 {
+						ks := splitedMeta[0]
+						for i := 0; i < len(ks)/utils.IDLength; i++ {
+							kid := string(ks[i*utils.IDLength : (i+1)*utils.IDLength])
+							_, err := peer.IDB58Decode(kid)
+							if err != nil {
+								continue
+							}
+							tmpKps = append(tmpKps, kid)
+						}
+
+						pros := splitedMeta[1]
+						for i := 0; i < len(pros)/utils.IDLength; i++ {
+							kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+							_, err := peer.IDB58Decode(kid)
+							if err != nil {
+								continue
+							}
+							tmpPros = append(tmpPros, kid)
+						}
+					}
+
+					if len(tmpKps) == 0 {
+						tmpKps = append(tmpKps, qid)
+					}
+
+					if len(tmpPros) == 0 {
+						tmpPros = append(tmpPros, qid)
+					}
+
+					err = k.createGroup(userID, qid, tmpKps, tmpPros)
 					if err != nil {
 						continue
 					}
@@ -328,7 +399,6 @@ func (k *Info) loadUser(ctx context.Context) error {
 }
 
 func (k *Info) loadUserBlock(qid string) error {
-
 	prefix := qid + metainfo.BLOCK_DELIMITER
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
@@ -500,7 +570,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 		return
 	}
 
-	err := thisGroup.getContracts(true)
+	err := thisGroup.loadContracts(true)
 	if err == nil {
 		return
 	}

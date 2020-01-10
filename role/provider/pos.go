@@ -63,7 +63,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 	if gp == nil {
 		return
 	}
-	err := gp.getContracts(p.localID)
+	err := gp.loadContracts(p.localID)
 	if err == nil {
 		return
 	}

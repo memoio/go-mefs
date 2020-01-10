@@ -225,6 +225,8 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 		return ErrLfsServiceNotReady
 	}
 
+	l.gInfo.saveChannelValue()
+
 	l.meta.sb.RLock()
 	if l.meta.sb.dirty || isForce { //将超级块信息保存在本地
 		err := l.flushSuperBlock()

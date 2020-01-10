@@ -185,9 +185,8 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	k.fillPinfo(uid, qid, pc, kc, metaValue, from)
 
 	gp := k.getGroupInfo(uid, qid, true)
-
-	if gp != nil && qid != uid {
-		gp.getContracts(false)
+	if gp != nil {
+		gp.loadContracts(false)
 	}
 
 	return gp.sessionID.NodeID(), nil
@@ -230,22 +229,16 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		return
 	}
 
-	kmKid, err := metainfo.NewKeyMeta(groupID, metainfo.Keepers)
+	ui, _ := k.getUInfo(userID)
+	if ui != nil {
+		ui.setQuery(groupID)
+	}
+
+	kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS)
 	if err != nil {
-		utils.MLogger.Info("handleNewUserNotif err: ", err)
 		return
 	}
 
-	kmPid, err := metainfo.NewKeyMeta(groupID, metainfo.Providers)
-	if err != nil {
-		utils.MLogger.Info("handleNewUserNotif err: ", err)
-		return
-	}
-
-	ctx := context.Background()
-	k.ds.PutKey(ctx, kmKid.ToString(), []byte(kids), "local")
-
-	k.ds.PutKey(ctx, kmPid.ToString(), []byte(pids), "local")
-
+	k.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
 	return
 }

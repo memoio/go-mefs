@@ -13,7 +13,7 @@ import (
 )
 
 // force update if mode is set true
-func (g *groupInfo) getContracts(mode bool) error {
+func (g *groupInfo) loadContracts(mode bool) error {
 	if g.groupID == g.userID {
 		return errors.New("not deploying contracts")
 	}
@@ -93,7 +93,7 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 	}
 
 	// update uk info
-	gp.getContracts(true)
+	gp.loadContracts(true)
 
 	return nil
 }

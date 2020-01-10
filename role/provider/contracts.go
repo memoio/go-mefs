@@ -13,13 +13,16 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func (p *Info) getContracts() error {
+func (p *Info) loadContracts() error {
 	proID := p.localID
-	proItem, err := role.GetProviderInfo(proID, proID)
-	if err != nil {
-		return err
+
+	if p.proContract == nil {
+		proItem, err := role.GetProviderInfo(proID, proID)
+		if err != nil {
+			return err
+		}
+		p.proContract = &proItem
 	}
-	p.proContract = &proItem
 
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
@@ -31,11 +34,22 @@ func (p *Info) getContracts() error {
 		return err
 	}
 
+	if len(offers) >= len(p.offers) {
+		return nil
+	}
+
 	for _, offAddr := range offers {
 		offerID, err := address.GetIDFromAddress(offAddr.String())
 		if err != nil {
 			continue
 		}
+
+		for _, item := range p.offers {
+			if item.OfferID == offerID {
+				continue
+			}
+		}
+
 		oItem, err := role.GetOfferInfo(proID, offerID)
 		if err != nil {
 			continue
@@ -47,6 +61,10 @@ func (p *Info) getContracts() error {
 }
 
 func (p *Info) saveChannelValue(userID, groupID, proID string) error {
+	if userID == groupID {
+		return nil
+	}
+
 	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.userID != gp.groupID && gp.channel != nil {
 		ctx := context.Background()
@@ -66,6 +84,9 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 }
 
 func (p *Info) loadChannelValue(userID, groupID string) error {
+	if userID == groupID {
+		return nil
+	}
 	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.userID != gp.groupID && gp.channel != nil {
 		ctx := context.Background()
@@ -98,7 +119,11 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 	return nil
 }
 
-func (g *groupInfo) getContracts(proID string) error {
+func (g *groupInfo) loadContracts(proID string) error {
+	if g.userID == g.groupID {
+		return nil
+	}
+
 	if g.query == nil {
 		qItem, err := role.GetQueryInfo(g.userID, g.groupID)
 		if err != nil {

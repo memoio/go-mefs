@@ -43,7 +43,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 	}
 
 	if qid != uid {
-		err := tempInfo.getContracts(true)
+		err := tempInfo.loadContracts(true)
 		if err != nil {
 			return nil, err
 		}

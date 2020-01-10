@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -99,11 +100,28 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	uid := ops[0]
 
-	_, ok := p.users.Load(gid)
+	kmkps, err := metainfo.NewKeyMeta(gid, metainfo.LogFS)
+	if err != nil {
+		return nil, err
+	}
+
+	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
+
+	_, ok := p.fsGroup.Load(gid)
 	if !ok {
 		gp := newGroup(p.localID, uid, gid, keepers)
-		p.users.Store(gid, gp)
+		p.fsGroup.Store(gid, gp)
 	}
+
+	ui, ok := p.users.Load(uid)
+	if !ok {
+		ui := &uInfo{
+			userID: uid,
+		}
+		ui.setQuery(gid)
+		p.users.Store(uid, ui)
+	}
+	ui.(*uInfo).setQuery(groupID)
 
 	p.loadChannelValue(uid, gid)
 

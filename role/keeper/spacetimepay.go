@@ -27,6 +27,9 @@ func (k *Info) stPayRegular(ctx context.Context) {
 		case <-ticker.C:
 			uqs := k.getQUKeys()
 			for _, uq := range uqs {
+				if uq.qid == uq.uid {
+					continue
+				}
 				qid := uq.qid
 
 				thisGroup := k.getGroupInfo(uq.uid, qid, false)

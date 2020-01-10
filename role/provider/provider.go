@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/role"
@@ -26,7 +27,8 @@ type Info struct {
 	ds           data.Service
 	storageUsed  uint64
 	storageTotal uint64
-	users        sync.Map // key: queryID, value: *groupInfo
+	fsGroup      sync.Map // key: queryID, value: *groupInfo
+	users        sync.Map // key: userID, value: *uInfo
 	keepers      sync.Map // key: keeperID, value: *kInfo
 	offers       []*role.OfferItem
 	proContract  *role.ProviderItem
@@ -45,8 +47,38 @@ type groupInfo struct {
 	query        *role.QueryItem
 }
 
+// store user information
+type uInfo struct {
+	sync.RWMutex
+	userID string
+	querys map[string]struct{} // key is queryID
+}
+
+func (u *uInfo) setQuery(qid string) {
+	u.Lock()
+	defer u.Unlock()
+	_, ok := u.querys[qid]
+	if !ok {
+		u.querys[qid] = struct{}{}
+	}
+}
+
+func (u *uInfo) getQuery() []string {
+	u.RLock()
+	defer u.RUnlock()
+	var res []string
+	for id := range u.querys {
+		res = append(res, id)
+	}
+
+	return res
+}
+
 type kInfo struct {
-	keeperID string
+	keeperID  string
+	online    bool
+	availTime int64
+	keepItem  *role.KeeperItem
 }
 
 //New start provider service
@@ -73,7 +105,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 			}
 		}
 
-		err = m.getContracts()
+		err = m.loadContracts()
 		if err != nil {
 			utils.MLogger.Info("Save ", m.localID, " 's provider info err: ", err)
 		}
@@ -110,15 +142,13 @@ func newGroup(localID, uid, gid string, kps []string) *groupInfo {
 		keepers: kps,
 	}
 
-	if gid != uid {
-		g.getContracts(localID)
-	}
+	g.loadContracts(localID)
 
 	return g
 }
 
 func (p *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
-	groupI, ok := p.users.Load(groupID)
+	groupI, ok := p.fsGroup.Load(groupID)
 	if !ok {
 		if mode {
 			return newGroup(p.localID, userID, groupID, []string{userID})
@@ -136,7 +166,7 @@ type quKey struct {
 
 func (p *Info) getGroups() []quKey {
 	var res []quKey
-	p.users.Range(func(key, value interface{}) bool {
+	p.fsGroup.Range(func(key, value interface{}) bool {
 		tmp := quKey{
 			uid: value.(*groupInfo).userID,
 			qid: key.(string),
@@ -160,6 +190,115 @@ func (p *Info) saveRegular(ctx context.Context) {
 			p.save(ctx)
 		}
 	}
+}
+
+func (p *Info) load(ctx context.Context) error {
+	localID := p.localID
+	// load keepers
+	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
+	if err != nil {
+
+		return err
+	}
+
+	kids, err := p.ds.GetKey(ctx, kmKID.ToString(), "local")
+
+	if err == nil && len(kids) > 0 {
+		utils.MLogger.Info(localID, " has keepers: ", string(kids))
+		for i := 0; i < len(kids)/utils.IDLength; i++ {
+			tmpKid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(tmpKid)
+			if err != nil {
+				continue
+			}
+
+			if p.ds.Connect(ctx, tmpKid) {
+				thisKinfo := &kInfo{
+					keeperID: tmpKid,
+				}
+				p.keepers.Store(tmpKid, thisKinfo)
+			}
+		}
+	}
+
+	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
+	if err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+	users, err := p.ds.GetKey(ctx, kmUID.ToString(), "local")
+
+	if err == nil && len(users) > 0 {
+		for i := 0; i < len(users)/utils.IDLength; i++ {
+			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(userID)
+			if err != nil {
+				continue
+			}
+
+			utils.MLogger.Info("Load user: ", userID, " 's infomations")
+			wg.Add(1)
+			go func(userID string) {
+				defer wg.Done()
+				kmfs, err := metainfo.NewKeyMeta(userID, metainfo.Query)
+				if err != nil {
+					return
+				}
+
+				qs, err := p.ds.GetKey(ctx, kmfs.ToString(), "local")
+				if err != nil {
+					return
+				}
+
+				ui := &uInfo{
+					userID: userID,
+				}
+
+				p.users.Store(userID, ui)
+
+				for i := 0; i < len(qs)/utils.IDLength; i++ {
+					qid := string(qs[i*utils.IDLength : (i+1)*utils.IDLength])
+					_, err := peer.IDB58Decode(qid)
+					if err != nil {
+						continue
+					}
+
+					ui.setQuery(qid)
+
+					kmkeepers, err := metainfo.NewKeyMeta(qid, metainfo.Keepers)
+					if err != nil {
+						continue
+					}
+
+					kps, err := p.ds.GetKey(ctx, kmkeepers.ToString(), "local")
+					if err != nil {
+						continue
+					}
+
+					var tmpKps []string
+					for i := 0; i < len(kps)/utils.IDLength; i++ {
+						kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+						_, err := peer.IDB58Decode(kid)
+						if err != nil {
+							continue
+						}
+						tmpKps = append(tmpKps, kid)
+					}
+
+					gp := newGroup(localID, userID, qid, tmpKps)
+					if gp != nil {
+						continue
+					}
+					p.fsGroup.Store(qid, gp)
+				}
+			}(userID)
+		}
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 func (p *Info) save(ctx context.Context) error {
@@ -189,20 +328,16 @@ func (p *Info) save(ctx context.Context) error {
 		}
 	}
 
+	pids.Reset()
 	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
 	if err != nil {
 		return err
 	}
 
-	res := p.getGroups()
-	pids.Reset()
-	for _, qu := range res {
-		if qu.qid != qu.uid {
-			pids.WriteString(qu.uid)
-			pids.WriteString(qu.qid)
-			p.saveChannelValue(qu.qid, qu.uid, p.localID)
-		}
-	}
+	p.users.Range(func(key, value interface{}) bool {
+		pids.WriteString(key.(string))
+		return true
+	})
 
 	if pids.Len() > 0 {
 		err = p.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), "local")
@@ -210,6 +345,60 @@ func (p *Info) save(ctx context.Context) error {
 			return err
 		}
 	}
+
+	p.users.Range(func(key, value interface{}) bool {
+		pids.Reset()
+		uid := key.(string)
+		ui := value.(*uInfo)
+		qus := ui.getQuery()
+		if len(qus) > 0 {
+			kmQID, err := metainfo.NewKeyMeta(uid, metainfo.Query)
+			if err != nil {
+				return true
+			}
+
+			for _, qid := range qus {
+				pids.WriteString(qid)
+			}
+
+			if pids.Len() > 0 {
+				err = p.ds.PutKey(ctx, kmQID.ToString(), []byte(pids.String()), "local")
+				if err != nil {
+					return true
+				}
+			}
+		}
+		return true
+	})
+
+	// store keepers and channel value
+	res := p.getGroups()
+	pids.Reset()
+	for _, qu := range res {
+		p.saveChannelValue(qu.uid, qu.qid, p.localID)
+
+		fs, ok := p.fsGroup.Load(qu.qid)
+		if !ok {
+			continue
+		}
+
+		gp := fs.(*groupInfo)
+		pids.Reset()
+		kmkeepers, err := metainfo.NewKeyMeta(qu.qid, metainfo.Keepers)
+		if err != nil {
+			continue
+		}
+
+		for _, kp := range gp.keepers {
+			pids.WriteString(kp)
+		}
+
+		err = p.ds.PutKey(ctx, kmkeepers.ToString(), []byte(pids.String()), "local")
+		if err != nil {
+			continue
+		}
+	}
+
 	return nil
 }
 
