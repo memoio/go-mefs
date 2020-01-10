@@ -12,13 +12,15 @@ import (
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 )
 
+const ukey = "memoriae"
+
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
 func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
 	log.Println("begin deploy upKeeping...")
 
 	var ukAddr common.Address
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "upkeeping", hexKey, true)
+	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, ukey, hexKey, true)
 	if err != nil {
 		return ukAddr, err
 	}
@@ -81,7 +83,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 //GetUpkeepingAddrs get all upKeeping address
 func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +94,7 @@ func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]
 //GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
 func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "upkeeping", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
 	if err != nil {
 		return ukaddr, nil, err
 	}

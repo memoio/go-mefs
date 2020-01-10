@@ -13,7 +13,7 @@ import (
 )
 
 func GetKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
-	keeperContractAddr, _, err := GetResolverFromIndexer(localAddress, "keeper")
+	keeperContractAddr, _, err := GetResolver(localAddress, "keeper")
 	if err != nil {
 		log.Println("get keeper Contract Err:", err)
 		return keeperContract, err
@@ -45,7 +45,7 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 }
 
 func GetProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
-	providerContractAddr, _, err := GetResolverFromIndexer(localAddress, "provider")
+	providerContractAddr, _, err := GetResolver(localAddress, "provider")
 	if err != nil {
 		log.Println("get provider Contract Err:", err)
 		return providerContract, err

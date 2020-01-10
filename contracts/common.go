@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/mapper"
+	"github.com/memoio/go-mefs/contracts/resolver"
 	"github.com/memoio/go-mefs/utils"
 )
 
@@ -247,6 +248,116 @@ func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance
 	}
 }
 
+// DeployResolver deploys
+func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
+	var resolverAddr common.Address
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return resolverAddr, nil, err
+	}
+
+	client := GetClient(EndPoint)
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		resAddr, tx, resolverInstance, err := resolver.DeployResolver(auth, client)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("deploy Resolver Err:", err)
+				return resolverAddr, resolverInstance, err
+			}
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			log.Println("deploy Resolver transaction fails:", err)
+			if retryCount > 20 {
+				return resolverAddr, resolverInstance, err
+			}
+			continue
+		}
+
+		return resAddr, resolverInstance, nil
+	}
+}
+
+// AddToResolver adds
+// ownerAddress is according to hexKey
+func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolverInstance *resolver.Resolver) error {
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := resolverInstance.Add(auth, addAddr)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("add to resolver err:", err)
+				return err
+			}
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("add to resolver transaction fails: ", err)
+				return err
+			}
+			continue
+		}
+
+		addrGetted, err := GetAddrFromResolver(ownerAddress, ownerAddress, resolverInstance)
+		if err != nil {
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		if addrGetted == addAddr {
+			return nil
+		}
+
+		if retryCount > 20 {
+			return ErrNotDeployedIndexer
+		}
+	}
+}
+
+// GetAddrFromResolver gets addr from resolver
+func GetAddrFromResolver(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, error) {
+	retryCount := 0
+	for {
+		retryCount++
+		mapperAddr, err := resolverInstance.Get(&bind.CallOpts{
+			From: localAddress,
+		}, ownerAddress)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("getMapperAddrErr:", err)
+				return mapperAddr, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if len(mapperAddr) == 0 || mapperAddr.String() == InvalidAddr {
+			return mapperAddr, ErrEmpty
+		}
+		return mapperAddr, nil
+	}
+}
+
 // DeployMapper deploy a new mapper
 func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *mapper.Mapper, error) {
 	var mapperAddr common.Address
@@ -366,6 +477,31 @@ func GetLatestFromMapper(localAddress common.Address, mapperInstance *mapper.Map
 	return addrs[len(addrs)-1], nil
 }
 
+// GetResolver gets role indexer
+func GetResolver(localAddress common.Address, key string) (common.Address, *resolver.Resolver, error) {
+	var resAddr common.Address
+
+	client := GetClient(EndPoint)
+	adminIndexerAddr := common.HexToAddress(indexerHex)
+	adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+	if err != nil {
+		log.Println("new admin Indexer err: ", err)
+		return resAddr, nil, err
+	}
+
+	resAddr, _, err = GetAddrFromIndexer(localAddress, key, adminIndexer)
+	if err != nil {
+		return resAddr, nil, err
+	}
+
+	resInstance, err := resolver.NewResolver(resAddr, client)
+	if err != nil {
+		return resAddr, nil, err
+	}
+
+	return resAddr, resInstance, nil
+}
+
 // GetRoleIndexer gets role indexer
 func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *indexer.Indexer, error) {
 	var indexerAddr common.Address
@@ -417,11 +553,95 @@ func GetMapperFromIndexer(localAddress common.Address, key string, indexerInstan
 	return mapperAddr, mapperInstance, nil
 }
 
+func GetMapperFromResolver(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, *mapper.Mapper, error) {
+	mapperAddr, err := GetAddrFromResolver(localAddress, ownerAddress, resolverInstance)
+	if err != nil {
+		return mapperAddr, nil, err
+	}
+
+	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
+	if err != nil {
+		log.Println("newMapperErr:", err)
+		return mapperAddr, nil, err
+	}
+	return mapperAddr, mapperInstance, nil
+}
+
 // GetMapperFromAdmin get mapper
+// key is adminIndexer->resolver
+// userAddr is resolver->mapper
+// flag indicates set or not;
+// when set: userAddr depends on hexKey
+func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
+	var mapperAddr common.Address
+
+	if hexKey == "" {
+		flag = false
+	}
+
+	//获得userIndexer, key is userAddr.String()
+	_, resInstance, err := GetResolver(localAddr, key)
+	if err == ErrMisType {
+		return mapperAddr, nil, err
+	}
+
+	if err != nil {
+		if !flag {
+			return mapperAddr, nil, err
+		}
+		client := GetClient(EndPoint)
+		adminIndexerAddr := common.HexToAddress(indexerHex)
+		adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+		if err != nil {
+			log.Println("New Admin Indexer Err: ", err)
+			return mapperAddr, nil, err
+		}
+
+		resAddr, rInstance, err := DeployResolver(hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return mapperAddr, nil, err
+		}
+
+		log.Println("add resolver")
+		err = AddToIndexer(localAddr, resAddr, key, hexKey, adminIndexer)
+		if err != nil {
+			log.Println("add Role Indexer Err:", err)
+			return mapperAddr, nil, err
+		}
+
+		resInstance = rInstance
+	}
+
+	mapperAddr, mapperInstance, err := GetMapperFromResolver(localAddr, userAddr, resInstance)
+	if err != nil {
+		if !flag {
+			return mapperAddr, nil, err
+		}
+		mapperAddr, mInstance, err := DeployMapper(localAddr, hexKey)
+		if err != nil {
+			log.Println("deploy mapper err:", err)
+			return mapperAddr, nil, err
+		}
+
+		mapperInstance = mInstance
+
+		err = AddToResolver(userAddr, mapperAddr, hexKey, resInstance)
+		if err != nil {
+			log.Println("add mapper to resolver err:", err)
+			return mapperAddr, nil, err
+		}
+		return mapperAddr, mapperInstance, nil
+	}
+
+	return mapperAddr, mapperInstance, nil
+}
+
+// GetMapperFromAdminV1 get mapper
 // userAddr is adminIndexer->indexer
 // key is indexer->mapper
 // flag indicates set or not
-func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
+func GetMapperFromAdminV1(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
 	var mapperAddr common.Address
 
 	if hexKey == "" {

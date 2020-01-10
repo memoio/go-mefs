@@ -12,9 +12,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts/indexer"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -31,21 +28,19 @@ var (
 	qethEndPoint string
 )
 
-const (
-	moneyTo         = 1000000000000000
-	defaultGasPrice = 100
+const ( //indexerHex indexerAddress, it is well known
+	indexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
+	moneyTo    = 1000000000000000
 )
 
 func main() {
-	//--eth=http://47.92.5.51:8101   --qeth=http://39.100.146.21:8101     testnet网
+	//--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101      testnet网
 	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;")    //dev网，用于user连接
 	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address;") //dev网，用于keeper、provider连接
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
 	contracts.EndPoint = ethEndPoint
-
-	key := "test"
 
 	num := queryBalance("0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6")
 	fmt.Println("用于转账的账号余额:", num)
@@ -58,65 +53,32 @@ func main() {
 
 	localAddr := common.HexToAddress(userAddr[2:]) //将id转化成智能合约中的address格式
 
-	log.Println("===============start test resolver==================")
-	defer log.Println("=============finish test resolver successfully============")
+	log.Println("=============start test mapper=============")
+	defer log.Println("============finish test mapper===========")
 
-	log.Println("start deploy resolver")
-	resolverAddr, _, err := contracts.DeployResolver(localAddr, userSk, key)
+	log.Println("start deploy mapper")
+	resAddr, resInsatnce, err := contracts.DeployMapper(localAddr, userSk)
 	if err != nil {
-		log.Fatal("deploy resolver fails", err)
+		log.Fatal("deploy mapper fails:", err)
 	}
 
-	//从另一条链查询resolver地址
-	log.Println("start get resolverAddress from remote")
+	log.Println("start add to mapper")
+	err = contracts.AddToMapper(localAddr, resAddr, userSk, resInsatnce)
+	if err != nil {
+		log.Fatal("add mapper fails: ", err)
+	}
+
+	log.Println("start get address from mapper remote")
 	contracts.EndPoint = qethEndPoint
-	resolverAddrRemote, _, err := contracts.GetResolverFromIndexer(localAddr, key)
+	mapperAddr, err := contracts.GetAddrsFromMapper(localAddr, resInsatnce)
 	if err != nil {
-		log.Fatal("can't get resolverAddress from remote")
+		log.Fatal("get mapper fails: ", err)
 	}
-	if resolverAddr != resolverAddrRemote {
-		log.Fatal("the resolverAddress different from remote")
-	}
-}
 
-func putResolverToIndexer(resolverAddr, localAddress common.Address, indexerInstance *indexer.Indexer, sk *ecdsa.PrivateKey, keyTest string) error {
-	retryCount := 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err := indexerInstance.Add(auth, keyTest, resolverAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				log.Println("addResolverErr:", err)
-				return err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			_, resolverAddrGetted, err := indexerInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			}, keyTest)
-			if err != nil {
-				if retryCount > 20 {
-					log.Println("add then get Resolver Err:", err)
-					return err
-				}
-				continue
-			}
-			if resolverAddrGetted == resolverAddr { //放进去了
-				break
-			}
-		}
-		break
+	if resAddr != mapperAddr[len(mapperAddr)-1] {
+		log.Fatal("address is different from remote")
 	}
-	return nil
+	log.Println("*****test pass*****")
 }
 
 func transferTo(value *big.Int, addr string) {
