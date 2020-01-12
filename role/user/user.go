@@ -30,6 +30,9 @@ type queryInfo struct {
 func (q *queryInfo) setQuery(qid string) {
 	q.Lock()
 	defer q.Unlock()
+	if q.querys == nil {
+		q.querys = make(map[string]struct{})
+	}
 	_, ok := q.querys[qid]
 	if !ok {
 		q.querys[qid] = struct{}{}

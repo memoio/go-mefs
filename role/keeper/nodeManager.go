@@ -25,6 +25,9 @@ type uInfo struct {
 func (u *uInfo) setQuery(qid string) {
 	u.Lock()
 	defer u.Unlock()
+	if u.querys == nil {
+		u.querys = make(map[string]struct{})
+	}
 	_, ok := u.querys[qid]
 	if !ok {
 		u.querys[qid] = struct{}{}
