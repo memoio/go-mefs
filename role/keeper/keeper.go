@@ -636,22 +636,7 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 }
 
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {
-	utils.MLogger.Info("add block: ", bid, "and its offset: ", offset, "for query: ", qid, " and provider: ", pid)
-
-	blockID := qid + metainfo.BLOCK_DELIMITER + bid
-
-	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	//put to local
-	value := pid + metainfo.DELIMITER + strconv.Itoa(offset)
-	err = k.ds.PutKey(ctx, kmBlock.ToString(), []byte(value), "local")
-	if err != nil {
-		utils.MLogger.Error("Delete local key error:", err)
-	}
+	utils.MLogger.Info("add block: ", bid, " and its offset: ", offset, " for query: ", qid, " and provider: ", pid)
 
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
@@ -664,39 +649,23 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {
 // flag: weather noyify provider to actual delete
 func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 	utils.MLogger.Info("delete block: ", bid, "for query: ", qid)
-	blockID := qid + metainfo.BLOCK_DELIMITER + bid
-
-	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
-	if err != nil {
-		return
-	}
 
 	ctx := context.Background()
-	//delete from local
-	err = k.ds.DeleteKey(ctx, kmBlock.ToString(), "local")
-	if err != nil {
-		utils.MLogger.Info("Delete local key error:", err)
-	}
 
 	var pid string
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
-		pid, err = gp.getBlockPos(bid)
+		pid, err := gp.getBlockPos(bid)
 		if err != nil || pid == "" {
-			// need to get from local kv
-			res, err := k.ds.GetKey(ctx, kmBlock.ToString(), "local")
-			if err != nil {
-				return
-			}
-			po := strings.Split(string(res), metainfo.DELIMITER)
-			pid = po[0]
 			return
 		}
 		// delete from mem
-		gp.deleteBlockMeta(pid, bid)
+		gp.deleteBlockMeta(bid, pid)
 	}
 
 	if flag {
+		blockID := qid + metainfo.BLOCK_DELIMITER + bid
+
 		// notify provider, to delete block
 		km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
 		if err != nil {

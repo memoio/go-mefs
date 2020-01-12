@@ -64,18 +64,18 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 
 	blockID := km.GetMid()
 
-	err := k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
-	if err != nil {
-		utils.MLogger.Info("handleBlockPos err: ", err)
-		return
-	}
-
 	sValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(sValue) < 2 {
 		utils.MLogger.Info("handleBlockPos err: ", metainfo.ErrIllegalValue)
 		return
 	}
 	offset, err := strconv.Atoi(sValue[1])
+	if err != nil {
+		utils.MLogger.Info("handleBlockPos err: ", err)
+		return
+	}
+
+	err = k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
 	if err != nil {
 		utils.MLogger.Info("handleBlockPos err: ", err)
 		return

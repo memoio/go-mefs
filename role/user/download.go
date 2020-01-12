@@ -89,7 +89,7 @@ type downloadTask struct {
 
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
-	utils.MLogger.Info("Download Object: ", objectName, "from bucket: ", bucketName)
+	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online {
 		return ErrLfsServiceNotReady
 	}

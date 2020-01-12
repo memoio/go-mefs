@@ -199,7 +199,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	return nil
 }
 
-func (g *groupInfo) deleteBlockMeta(pid, bid string) {
+func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 	thisLinfo := g.getLInfo(pid, false)
 	if thisLinfo == nil {
 		return
