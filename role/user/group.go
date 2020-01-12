@@ -628,9 +628,6 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 			continue
 		}
 
-		if !g.ds.Connect(ctx, pidstr) { //连接不上此provider
-			return pidstr, offset, ErrNoProviders
-		}
 		return pidstr, offset, nil
 	}
 	return "", 0, ErrNoProviders
@@ -655,7 +652,6 @@ func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
 
 		if !g.ds.Connect(ctx, kp) { //连接不上此keeper
 			unconKeepers = append(unconKeepers, kp)
-			continue
 		} else {
 			conKeepers = append(conKeepers, kp)
 			i++

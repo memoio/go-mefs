@@ -1306,7 +1306,7 @@ var lfsListKeepersCmd = &cmds.Command{
 
 		lfs := node.Inst.(*user.Info).GetUser(userid)
 
-		unconkeepers, conkeepers, _ := lfs.(*user.LfsInfo).GetGroup().GetKeepers(-1)
+		conkeepers, unconkeepers, _ := lfs.(*user.LfsInfo).GetGroup().GetKeepers(-1)
 		keepers := make([]PeerState, len(unconkeepers)+len(conkeepers))
 		for i := 0; i < len(conkeepers); i++ {
 			keepers[i].PeerID = conkeepers[i]

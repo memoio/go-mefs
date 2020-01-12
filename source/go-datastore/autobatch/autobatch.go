@@ -105,7 +105,11 @@ func (d *Datastore) Sync(prefix ds.Key) error {
 		if o.delete {
 			err = b.Delete(k)
 		} else {
-			err = b.Put(k, o.value)
+			if o.begin == 0 && o.end == 0 {
+				err = b.Put(k, o.value)
+			} else {
+				err = b.Append(k, o.value, o.begin, o.end)
+			}
 		}
 		if err != nil {
 			return err
