@@ -189,7 +189,23 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	for !breakFlag {
 		select {
 		case <-ctx.Done():
-			utils.MLogger.Warn("upload cancle")
+			utils.MLogger.Warn("upload cancel")
+			return nil
+		default:
+			pros, _, _ := u.gInfo.GetProviders(bc)
+			if len(pros) >= least {
+				breakFlag = true
+			}
+			utils.MLogger.Warn("cannot get enough providers")
+			time.Sleep(60 * time.Second)
+		}
+	}
+
+	breakFlag = false
+	for !breakFlag {
+		select {
+		case <-ctx.Done():
+			utils.MLogger.Warn("upload cancel")
 			return nil
 		default:
 			// clear itself

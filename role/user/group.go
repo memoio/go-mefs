@@ -130,20 +130,18 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 					continue
 				}
 
-				count++
-
 				if !utils.CheckDup(g.tempKeepers, kid) {
 					continue
 				}
 
+				g.tempKeepers = append(g.tempKeepers, kid)
+
+				count++
+
 				wg.Add(1)
 				go func(kid string) {
 					defer wg.Done()
-					if g.ds.Connect(ctx, kid) {
-						g.Lock()
-						g.tempKeepers = append(g.tempKeepers, kid)
-						g.Unlock()
-					}
+					g.ds.Connect(ctx, kid)
 				}(kid)
 			}
 
@@ -159,20 +157,18 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 					continue
 				}
 
-				count++
-
 				if !utils.CheckDup(g.tempProviders, pid) {
 					continue
 				}
 
+				count++
+
+				g.tempProviders = append(g.tempProviders, pid)
+
 				wg.Add(1)
 				go func(pid string) {
 					defer wg.Done()
-					if g.ds.Connect(ctx, pid) {
-						g.Lock()
-						g.tempProviders = append(g.tempProviders, pid)
-						g.Unlock()
-					}
+					g.ds.Connect(ctx, pid)
 				}(pid)
 			}
 
@@ -357,7 +353,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 			switch g.state {
 			case collecting:
 				timeOutCount++
-				utils.MLogger.Info("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
+				utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
 				go g.ds.BroadcastMessage(ctx, kmes)
 			case collectDone:
 				g.notify(ctx)
