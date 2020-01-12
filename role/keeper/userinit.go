@@ -234,7 +234,7 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		ui.setQuery(groupID)
 	}
 
-	kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS)
+	kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
 	if err != nil {
 		return
 	}

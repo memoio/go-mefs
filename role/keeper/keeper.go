@@ -230,27 +230,6 @@ func (k *Info) save(ctx context.Context) error {
 		for _, proID := range gp.providers {
 			k.savePay(qu.qid, proID)
 		}
-
-		pids.Reset()
-		kmkps, err := metainfo.NewKeyMeta(qu.qid, metainfo.LogFS)
-		if err != nil {
-			continue
-		}
-
-		for _, kp := range gp.keepers {
-			pids.WriteString(kp)
-		}
-
-		pids.WriteString(metainfo.DELIMITER)
-
-		for _, kp := range gp.providers {
-			pids.WriteString(kp)
-		}
-
-		err = k.ds.PutKey(ctx, kmkps.ToString(), []byte(pids.String()), "local")
-		if err != nil {
-			continue
-		}
 	}
 
 	return nil
@@ -340,53 +319,11 @@ func (k *Info) loadUser(ctx context.Context) error {
 
 					ui.setQuery(qid)
 
-					kmkps, err := metainfo.NewKeyMeta(qid, metainfo.LogFS)
+					err = k.newGroupWithFS(userID, qid, "", true)
 					if err != nil {
 						continue
 					}
 
-					kps, err := k.ds.GetKey(ctx, kmkps.ToString(), "local")
-					if err != nil {
-						continue
-					}
-
-					splitedMeta := strings.Split(string(kps), metainfo.DELIMITER)
-					var tmpKps []string
-					var tmpPros []string
-					if len(splitedMeta) == 2 {
-						ks := splitedMeta[0]
-						for i := 0; i < len(ks)/utils.IDLength; i++ {
-							kid := string(ks[i*utils.IDLength : (i+1)*utils.IDLength])
-							_, err := peer.IDB58Decode(kid)
-							if err != nil {
-								continue
-							}
-							tmpKps = append(tmpKps, kid)
-						}
-
-						pros := splitedMeta[1]
-						for i := 0; i < len(pros)/utils.IDLength; i++ {
-							kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-							_, err := peer.IDB58Decode(kid)
-							if err != nil {
-								continue
-							}
-							tmpPros = append(tmpPros, kid)
-						}
-					}
-
-					if len(tmpKps) == 0 {
-						tmpKps = append(tmpKps, qid)
-					}
-
-					if len(tmpPros) == 0 {
-						tmpPros = append(tmpPros, qid)
-					}
-
-					err = k.createGroup(userID, qid, tmpKps, tmpPros)
-					if err != nil {
-						continue
-					}
 					k.loadUserBlock(qid)
 				}
 			}(userID)
@@ -562,6 +499,57 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 	// init userConfig
 
 	return nil
+}
+
+func (k *Info) newGroupWithFS(userID, groupID string, kps string, flag bool) error {
+	if kps == "" && flag {
+		ctx := context.Background()
+		kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
+		if err != nil {
+			return err
+		}
+
+		res, err := k.ds.GetKey(ctx, kmkps.ToString(), "local")
+		if err != nil {
+			return err
+		}
+		kps = string(res)
+	}
+
+	splitedMeta := strings.Split(kps, metainfo.DELIMITER)
+	var tmpKps []string
+	var tmpPros []string
+	if len(splitedMeta) == 2 {
+		kps := splitedMeta[0]
+		for i := 0; i < len(kps)/utils.IDLength; i++ {
+			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(kid)
+			if err != nil {
+				continue
+			}
+			tmpKps = append(tmpKps, kid)
+		}
+
+		kps = splitedMeta[1]
+		for i := 0; i < len(kps)/utils.IDLength; i++ {
+			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(kid)
+			if err != nil {
+				continue
+			}
+			tmpPros = append(tmpPros, kid)
+		}
+	}
+
+	if len(tmpKps) == 0 {
+		tmpKps = append(tmpKps, groupID)
+	}
+
+	if len(tmpPros) == 0 {
+		tmpPros = append(tmpPros, groupID)
+	}
+
+	return k.createGroup(userID, groupID, tmpKps, tmpPros)
 }
 
 func (k *Info) deleteGroup(ctx context.Context, qid string) {

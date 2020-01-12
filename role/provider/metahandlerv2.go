@@ -71,6 +71,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	}
 
 	var keepers []string
+	var pros []string
 	kids := splitValue[0]
 	for i := 0; i < len(kids)/utils.IDLength; i++ {
 		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
@@ -92,6 +93,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 		if pid == p.localID {
 			has = true
 		}
+		pros = append(pros, pid)
 	}
 
 	if !has {
@@ -100,7 +102,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	uid := ops[0]
 
-	kmkps, err := metainfo.NewKeyMeta(gid, metainfo.LogFS)
+	kmkps, err := metainfo.NewKeyMeta(gid, metainfo.LogFS, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +111,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	_, ok := p.fsGroup.Load(gid)
 	if !ok {
-		gp := newGroup(p.localID, uid, gid, keepers)
+		gp := newGroup(p.localID, uid, gid, keepers, pros)
 		p.fsGroup.Store(gid, gp)
 	}
 

@@ -41,6 +41,7 @@ type groupInfo struct {
 	storageUsed  uint64
 	storageTotal uint64
 	keepers      []string
+	providers    []string
 	blsKey       *mcl.KeySet
 	upkeeping    *role.UpKeepingItem
 	channel      *role.ChannelItem
@@ -138,11 +139,12 @@ func (p *Info) Stop() error {
 	return p.save(context.Background())
 }
 
-func newGroup(localID, uid, gid string, kps []string) *groupInfo {
+func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
 	g := &groupInfo{
-		userID:  uid,
-		groupID: gid,
-		keepers: kps,
+		userID:    uid,
+		groupID:   gid,
+		keepers:   kps,
+		providers: pros,
 	}
 
 	g.loadContracts(localID)
@@ -150,13 +152,67 @@ func newGroup(localID, uid, gid string, kps []string) *groupInfo {
 	return g
 }
 
+func (p *Info) newGroupWithFS(userID, groupID string, kps string, flag bool) *groupInfo {
+	if kps == "" && flag {
+		ctx := context.Background()
+		kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
+		if err != nil {
+			return nil
+		}
+
+		res, err := p.ds.GetKey(ctx, kmkps.ToString(), "local")
+		if err != nil {
+			return nil
+		}
+		kps = string(res)
+	}
+
+	splitedMeta := strings.Split(kps, metainfo.DELIMITER)
+	var tmpKps []string
+	var tmpPros []string
+	if len(splitedMeta) == 2 {
+		kps := splitedMeta[0]
+		for i := 0; i < len(kps)/utils.IDLength; i++ {
+			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(kid)
+			if err != nil {
+				continue
+			}
+			tmpKps = append(tmpKps, kid)
+		}
+
+		kps = splitedMeta[1]
+		for i := 0; i < len(kps)/utils.IDLength; i++ {
+			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(kid)
+			if err != nil {
+				continue
+			}
+			tmpPros = append(tmpPros, kid)
+		}
+	} else {
+		return nil
+	}
+
+	if len(tmpKps) == 0 {
+		tmpKps = append(tmpKps, groupID)
+	}
+
+	if len(tmpPros) == 0 {
+		tmpPros = append(tmpPros, groupID)
+	}
+
+	gp := newGroup(p.localID, userID, groupID, tmpKps, tmpPros)
+	if gp != nil {
+		p.fsGroup.Store(groupID, gp)
+	}
+	return gp
+}
+
 func (p *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 	groupI, ok := p.fsGroup.Load(groupID)
 	if !ok {
-		if mode {
-			return newGroup(p.localID, userID, groupID, []string{userID})
-		}
-		return nil
+		return p.newGroupWithFS(userID, groupID, "", mode)
 	}
 
 	return groupI.(*groupInfo)
@@ -269,31 +325,7 @@ func (p *Info) load(ctx context.Context) error {
 
 					ui.setQuery(qid)
 
-					kmkeepers, err := metainfo.NewKeyMeta(qid, metainfo.Keepers)
-					if err != nil {
-						continue
-					}
-
-					kps, err := p.ds.GetKey(ctx, kmkeepers.ToString(), "local")
-					if err != nil {
-						continue
-					}
-
-					var tmpKps []string
-					for i := 0; i < len(kps)/utils.IDLength; i++ {
-						kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-						_, err := peer.IDB58Decode(kid)
-						if err != nil {
-							continue
-						}
-						tmpKps = append(tmpKps, kid)
-					}
-
-					gp := newGroup(localID, userID, qid, tmpKps)
-					if gp != nil {
-						continue
-					}
-					p.fsGroup.Store(qid, gp)
+					p.getGroupInfo(userID, qid, true)
 				}
 			}(userID)
 		}
@@ -379,27 +411,6 @@ func (p *Info) save(ctx context.Context) error {
 	pids.Reset()
 	for _, qu := range res {
 		p.saveChannelValue(qu.uid, qu.qid, p.localID)
-
-		fs, ok := p.fsGroup.Load(qu.qid)
-		if !ok {
-			continue
-		}
-
-		gp := fs.(*groupInfo)
-		pids.Reset()
-		kmkeepers, err := metainfo.NewKeyMeta(qu.qid, metainfo.Keepers)
-		if err != nil {
-			continue
-		}
-
-		for _, kp := range gp.keepers {
-			pids.WriteString(kp)
-		}
-
-		err = p.ds.PutKey(ctx, kmkeepers.ToString(), []byte(pids.String()), "local")
-		if err != nil {
-			continue
-		}
 	}
 
 	return nil
