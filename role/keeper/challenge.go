@@ -43,7 +43,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 					if err != nil {
 						continue
 					}
-					utils.MLogger.Debugf("Challenge: ", key)
+					utils.MLogger.Debug("Challenge: ", key)
 					go k.ds.SendMetaRequest(ctx, int32(metainfo.Get), key, value, nil, proID)
 				}
 

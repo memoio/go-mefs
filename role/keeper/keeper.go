@@ -351,13 +351,12 @@ func (k *Info) loadUserBlock(qid string) error {
 			continue
 		}
 
-		if len(km.GetMid()) > utils.IDLength {
-			if km.GetMid()[:utils.IDLength] != qid {
-				continue
-			}
+		getID := strings.SplitN(km.GetMid(), metainfo.BLOCK_DELIMITER, 2)
+		if len(getID) != 2 || (len(getID) > 0 && getID[0] != qid) {
+			continue
 		}
 
-		k.addBlockMeta(qid, km.GetMid(), pids[0], off)
+		k.addBlockMeta(qid, getID[1], pids[0], off)
 	}
 	return nil
 }
