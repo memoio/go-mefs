@@ -160,7 +160,6 @@ func (k *Info) save(ctx context.Context) error {
 		}
 	}
 
-	// persist users
 	pids.Reset()
 
 	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
@@ -177,10 +176,12 @@ func (k *Info) save(ctx context.Context) error {
 			return true
 		}
 
+		res.Reset()
 		for qid := range value.(*uInfo).querys {
 			res.WriteString(qid)
 		}
 
+		// persist queryID of one user
 		if res.Len() > 0 {
 			err = k.ds.PutKey(ctx, kmfs.ToString(), []byte(res.String()), "local")
 			if err != nil {
@@ -188,32 +189,12 @@ func (k *Info) save(ctx context.Context) error {
 			}
 		}
 
-		res.Reset()
 		return true
 	})
 
+	// persist all users
 	if pids.Len() > 0 {
 		err = k.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), "local")
-		if err != nil {
-			return err
-		}
-	}
-
-	// persist ManagedUsers: query id
-	pids.Reset()
-
-	kmQID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
-	if err != nil {
-		return err
-	}
-
-	k.ukpGroup.Range(func(qid, groupsinfo interface{}) bool {
-		pids.WriteString(qid.(string))
-		return true
-	})
-
-	if pids.Len() > 0 {
-		err = k.ds.PutKey(ctx, kmQID.ToString(), []byte(pids.String()), "local")
 		if err != nil {
 			return err
 		}
@@ -323,6 +304,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 
 					err = k.newGroupWithFS(userID, qid, "", true)
 					if err != nil {
+						utils.MLogger.Error("Load user: ", userID, " 's query: ", qid, " fail: ", err)
 						continue
 					}
 
@@ -492,14 +474,11 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 			kms := kmLast.ToString()
 			// get from leveldb
 			res, err := k.ds.GetKey(ctx, kms, "local")
-			if err != nil {
-				utils.MLogger.Info("no lastTime data, return Unix(0)")
-				return err
-			}
-			err = lin.parseLastPayKV(res)
-			if err != nil {
-				utils.MLogger.Info("parseLastPayKV err: ", err)
-				return err
+			if err == nil && len(res) > 0 {
+				err = lin.parseLastPayKV(res)
+				if err != nil {
+					utils.MLogger.Error("parseLastPayKV err: ", err)
+				}
 			}
 		}
 	}
