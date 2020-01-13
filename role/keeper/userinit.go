@@ -44,11 +44,7 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 		utils.MLogger.Info("Get k/p numbers from query contract of user: ", uid)
 		item, err := role.GetQueryInfo(uid, qid)
 		if err != nil {
-			utils.MLogger.Info("complete: ", item.Completed, " error:", err)
-			return
-		}
-		if !item.Completed {
-			utils.MLogger.Info("query complete: ", item.Completed)
+			utils.MLogger.Info("get query: ", qid, " error: ", err)
 			return
 		}
 		kc = int(item.KeeperNums)
