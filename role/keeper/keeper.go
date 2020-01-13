@@ -317,6 +317,8 @@ func (k *Info) loadUser(ctx context.Context) error {
 						continue
 					}
 
+					utils.MLogger.Info("Load user: ", userID, " 's query: ", qid)
+
 					ui.setQuery(qid)
 
 					err = k.newGroupWithFS(userID, qid, "", true)

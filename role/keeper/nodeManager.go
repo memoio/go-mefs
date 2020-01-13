@@ -250,26 +250,23 @@ func (k *Info) GetUsers() ([]string, error) {
 		return nil, errKeeperServiceNotReady
 	}
 	var res []string
-	k.ukpGroup.Range(func(uid, v interface{}) bool {
-		thisuid, ok := uid.(string)
+	k.ukpGroup.Range(func(key, v interface{}) bool {
+		qid, ok := key.(string)
 		if !ok {
-			return false
+			return true
 		}
 		thisGroupsInfo, ok := v.(*groupInfo)
 		if !ok {
-			return false
+			return true
 		}
 
-		temp := ansi.Color(thisuid+".keepers:", "green")
-		for i, keeperID := range thisGroupsInfo.keepers {
-			if i != 0 {
-				temp += "_"
-			}
-			temp += keeperID
-		}
+		uid := thisGroupsInfo.userID
+
+		temp := ansi.Color(uid+".fsID:"+qid+"has keepers:", "red")
+		temp += strings.Join(thisGroupsInfo.keepers, "/")
 		res = append(res, temp)
-		temp = ansi.Color(thisuid+".providers:", "green")
-		temp += strings.Join(thisGroupsInfo.providers, "_")
+		temp = ansi.Color(uid+".fsID:"+qid+" has providers:", "green")
+		temp += strings.Join(thisGroupsInfo.providers, "/")
 		res = append(res, temp)
 		return true
 	})
