@@ -343,11 +343,11 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 
 	// wait 20 minutes for collecting
 	timeOutCount := 0
-	tick := time.Tick(30 * time.Second)
+	tick := time.Tick(60 * time.Second)
 	for {
 		select {
 		case <-tick:
-			if timeOutCount >= 40 {
+			if timeOutCount >= 30 {
 				return ErrTimeOut
 			}
 			switch g.state {

@@ -768,6 +768,7 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 	}
 
 	if item.UserID != userID || item.ProID != proID {
+		utils.MLogger.Errorf("got queryID %s, sender %s and receiver %s are not compatabile: ", item.ChannelID, item.UserID, item.ProID)
 		return item, errors.New("sender and receiver are not compatabile")
 	}
 

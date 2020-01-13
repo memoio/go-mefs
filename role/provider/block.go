@@ -87,39 +87,40 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 		return nil, errors.New("NotMyUser")
 	}
 
-	if gp.userID != gp.groupID && gp.channel != nil {
-		chanID := gp.channel.ChannelID
-		value := gp.channel.Value
+	ctx := context.Background()
 
-		res, value, sig, err := p.verify(chanID, value, sig)
-		if err != nil {
-			utils.MLogger.Info("verify block %s failed, err is : %s", splitedNcid[0], err)
-			return nil, err
-		}
+	if gp.userID != gp.groupID {
+		if gp.channel != nil {
+			chanID := gp.channel.ChannelID
+			value := gp.channel.Value
 
-		if res {
-			b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
+			res, value, sig, err := p.verify(chanID, value, sig)
 			if err != nil {
-				return nil, errors.New("Block is not found")
-			}
-
-			key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
-			if err != nil {
+				utils.MLogger.Infof("verify block %s failed, err is : %s", splitedNcid[0], err)
 				return nil, err
 			}
 
-			err = p.ds.PutKey(context.Background(), key.ToString(), value.Bytes(), "local")
-			if err != nil {
-				utils.MLogger.Info("cmdPutErr:", err)
+			if res {
+				b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+				if err != nil {
+					utils.MLogger.Infof("get block %s from local fail: %s", splitedNcid[0], err)
+					return nil, err
+				}
+
+				key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
+				if err != nil {
+					return nil, err
+				}
+
+				p.ds.PutKey(ctx, key.ToString(), value.Bytes(), "local")
+
+				gp.channel.Value = value
+				gp.channel.Sig = sig
+
+				return b.RawData(), nil
 			}
-
-			gp.channel.Value = value
-			gp.channel.Sig = sig
-
-			return b.RawData(), nil
+			utils.MLogger.Info("verify is false %s", splitedNcid[0])
 		}
-
-		utils.MLogger.Info("verify is false %s", splitedNcid[0])
 	} else {
 		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
