@@ -407,7 +407,7 @@ func (l *lfsGateway) SetBucketPolicy(ctx context.Context, bucket string, bucketP
 
 // GetBucketPolicy will get policy on bucket.
 func (l *lfsGateway) GetBucketPolicy(ctx context.Context, bucket string) (*policy.Policy, error) {
-	return nil, nil
+	return nil, errLfsServiceNotReady
 }
 
 // DeleteBucketPolicy deletes all policies on bucket.
