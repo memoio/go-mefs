@@ -340,7 +340,13 @@ func (k *Info) loadUserBlock(qid string) error {
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
 		rec := new(recpb.Record)
-		proto.Unmarshal(e.Value, rec)
+		err := proto.Unmarshal(e.Value, rec)
+		if err != nil {
+			continue
+		}
+
+		utils.MLogger.Debug("Load block: ", string(rec.GetKey()))
+
 		km, err := metainfo.GetKeyMeta(string(rec.GetKey()))
 		if err != nil {
 			continue
