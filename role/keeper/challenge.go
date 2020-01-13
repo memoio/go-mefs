@@ -257,6 +257,8 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		return false
 	}
 
+	utils.MLogger.Debug("verify blocks: ", chal.Indices)
+
 	muByte, err := b58.Decode(spliteProof[0])
 	if err != nil {
 		return false
@@ -277,11 +279,11 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 
 	res, err := thisGroup.blsKey.VerifyProof(chal, pf)
 	if err != nil {
-		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, "verify err:", err)
+		utils.MLogger.Warn("proof of ", qid, " from provider: ", proID, "verify fails: ", err)
 		return false
 	}
 	if res {
-		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify success.")
+		utils.MLogger.Info("proof of ", qid, " from provider: ", proID, " verify success.")
 
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"

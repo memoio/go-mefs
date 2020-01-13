@@ -92,6 +92,8 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		}
 	}
 
+	utils.MLogger.Debug("gen proof for blocks: ", chal.Indices)
+
 	proof, err := blskey.GenProof(chal, data, tag, 32)
 	if err != nil {
 		utils.MLogger.Info("GenProof err: ", err)
