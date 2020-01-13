@@ -102,13 +102,6 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	uid := ops[0]
 
-	kmkps, err := metainfo.NewKeyMeta(gid, metainfo.LogFS, uid)
-	if err != nil {
-		return nil, err
-	}
-
-	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
-
 	_, ok := p.fsGroup.Load(gid)
 	if !ok {
 		gp := newGroup(p.localID, uid, gid, keepers, pros)
@@ -122,8 +115,11 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 		}
 		ui.setQuery(gid)
 		p.users.Store(uid, ui)
+	} else {
+		ui.(*uInfo).setQuery(groupID)
 	}
-	ui.(*uInfo).setQuery(groupID)
+
+	p.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
 
 	p.loadChannelValue(uid, gid)
 
