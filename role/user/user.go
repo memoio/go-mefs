@@ -63,7 +63,8 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 }
 
 // NewFS add a new user
-func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
+func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
+	utils.MLogger.Infof("create lfs service: %s for user %s", queryID, userID)
 	// check stats
 	if queryID != "" {
 		fs, ok := u.fsMap.Load(queryID)
@@ -84,9 +85,10 @@ func (u *Info) NewFS(queryID, userID, sk string, capacity, duration, price int64
 			if err != nil {
 				return nil, err
 			}
-			qItem, err := role.GetQueryInfo(userID, queryID)
+			qItem, err := role.GetQueryInfo(userID, qid)
 			if err != nil {
-				return nil, errors.New("fail to get query from chain, please restart")
+				utils.MLogger.Infof("get query %s for user %s from chain failed: %s, please restart", qid, userID, err)
+				return nil, err
 			}
 			queryID = qid
 			ginfo.queryItem = &qItem

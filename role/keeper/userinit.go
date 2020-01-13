@@ -18,7 +18,7 @@ import (
 // return kv, key: queryID/"UserInit"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
-	utils.MLogger.Info("handleUserInit: ", km.ToString(), " From: ", from)
+	utils.MLogger.Info("handleUserInit: ", km.ToString(), " from: ", from)
 	options := km.GetOptions()
 	if len(options) != 3 {
 		return
@@ -41,10 +41,10 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	price := int64(utils.STOREPRICEPEDOLLAR)
 	var response string
 	if qid != uid {
-		utils.MLogger.Info("Get k/p numbers from query contract of user: ", uid)
+		utils.MLogger.Infof("Get k/p numbers from query contract %s of user %s ", qid, uid)
 		item, err := role.GetQueryInfo(uid, qid)
 		if err != nil {
-			utils.MLogger.Info("get query: ", qid, " error: ", err)
+			utils.MLogger.Error("get query: ", qid, " error: ", err)
 			return
 		}
 		kc = int(item.KeeperNums)
@@ -63,7 +63,7 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 			return
 		}
 	}
-	utils.MLogger.Info("New user: ", qid, " keeperCount: ", kc, "providerCount: ", pc, "price: ", price)
+	utils.MLogger.Info("New fs: ", qid, " for user: ", uid, " keeperCount: ", kc, " providerCount: ", pc, " price: ", price)
 
 	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(response), nil, from)
 }

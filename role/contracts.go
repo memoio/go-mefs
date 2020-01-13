@@ -200,6 +200,7 @@ func IsProvider(userID string) (bool, error) {
 
 // DeployOffer is
 func DeployOffer(localID, sk string, capacity, duration, price int64, redo bool) (offerID string, err error) {
+	utils.MLogger.Info("Begin to deploy offer contract...")
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
 		return offerID, err
@@ -213,6 +214,7 @@ func DeployOffer(localID, sk string, capacity, duration, price int64, redo bool)
 
 	offerAddr, err := contracts.DeployOffer(localAddress, sk, capacity, duration, price, redo)
 	if err != nil {
+		utils.MLogger.Error("Fail to deploy offer contract: ", err)
 		return offerID, err
 	}
 
@@ -220,6 +222,7 @@ func DeployOffer(localID, sk string, capacity, duration, price int64, redo bool)
 	if err != nil {
 		return offerID, err
 	}
+	utils.MLogger.Info("Finish deploy offer contract: ", offerID)
 
 	return offerID, nil
 }
@@ -303,6 +306,7 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 
 // DeployQuery is
 func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, ps int, rdo bool) (queryID string, err error) {
+	utils.MLogger.Info("Begin to deploy query contract...")
 	uaddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return queryID, err
@@ -332,16 +336,18 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	// deploy query
 	queryAddr, err := contracts.DeployQuery(uaddr, sk, storeSize, storeDays, storePrice, ks, ps, rdo)
 	if err != nil {
-		utils.MLogger.Warn("fail to deploy query contract: ", err)
+		utils.MLogger.Error("fail to deploy query contract: ", err)
 		return queryID, err
 	}
 
-	utils.MLogger.Info(uaddr.String(), "has new query: ", queryAddr.String())
+	utils.MLogger.Info(uaddr.String(), " has new query: ", queryAddr.String())
 
 	queryID, err = address.GetIDFromAddress(queryAddr.String())
 	if err != nil {
 		return queryID, err
 	}
+
+	utils.MLogger.Info("Finish deploy query contract: ", queryID)
 
 	return queryID, nil
 }
@@ -450,10 +456,11 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	moneyPerDay = moneyPerDay.Mul(big.NewInt(storePrice), big.NewInt(storeSize))
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(storeDays))
 
-	utils.MLogger.Info("Begin to dploy upkeeping contract...")
+	utils.MLogger.Info("Begin to deploy upkeeping contract...")
 
 	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, storeDays, storeSize, storePrice, moneyAccount, redo)
 	if err != nil {
+		utils.MLogger.Error("Deploy upkeeping contract failed: ", err)
 		return ukID, err
 	}
 
@@ -466,6 +473,8 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	if err != nil {
 		return ukID, err
 	}
+
+	utils.MLogger.Info("Finish deploy upkeeping contract: ", ukID)
 
 	return ukID, nil
 }
@@ -641,6 +650,7 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 
 	cAddr, err := contracts.DeployChannelContract(hexSk, localAddress, queryAddress, proAddress, timeOut, moneyToChannel, redo)
 	if err != nil {
+		utils.MLogger.Error("Deploy channel contract failed: ", err)
 		return chanAddr, err
 	}
 
@@ -648,6 +658,8 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	if err != nil {
 		return chanAddr, err
 	}
+
+	utils.MLogger.Info("Finish deploy channel contract: ", chanID)
 
 	return chanID, err
 }
@@ -699,6 +711,7 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 			ChannelID: channelID,
 			UserID:    uid,
 			ProID:     pid,
+			Value:     big.NewInt(0),
 		}
 		break
 	}
