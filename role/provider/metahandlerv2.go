@@ -23,7 +23,9 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []by
 	case metainfo.UserStart:
 		return p.handleUserStart(km, metaValue, from)
 	case metainfo.Challenge:
-		go p.handleChallengeBls12(km, metaValue, from)
+		if optype == metainfo.Get {
+			go p.handleChallengeBls12(km, metaValue, from)
+		}
 	case metainfo.Repair:
 		go p.handleRepair(km, metaValue, from)
 	case metainfo.Block:

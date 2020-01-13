@@ -33,8 +33,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	}
 
 	hProto := &pb.Chalnum{}
-	hByte, _ := b58.Decode(string(metaValue))
-	err = proto.Unmarshal(hByte, hProto)
+	err = proto.Unmarshal(metaValue, hProto)
 	if err != nil {
 		utils.MLogger.Error("unmarshal h failed: ", err)
 	}

@@ -187,9 +187,10 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
 		gp.loadContracts(false)
+		return gp.sessionID.MarshalBinary()
 	}
 
-	return gp.sessionID.NodeID(), nil
+	return nil, errors.New("not my user")
 }
 
 // fillPinfo fill user's uInfo, groupInfo in ukpMap
