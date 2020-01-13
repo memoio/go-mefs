@@ -155,7 +155,7 @@ func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from str
 // key: queryID/"UserStart"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	utils.MLogger.Info("handleUserStart: ", km.ToString(), "From:", from)
+	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from:", from)
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
 		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)

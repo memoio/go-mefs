@@ -57,7 +57,7 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []by
 }
 
 func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
-	utils.MLogger.Info("handleUserStart: ", km.ToString(), "from: ", from)
+	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from: ", from)
 
 	gid := km.GetMid()
 	ops := km.GetOptions()
@@ -119,7 +119,8 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 		ui.(*uInfo).setQuery(groupID)
 	}
 
-	p.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
+	kmkps, _ := metainfo.NewKeyMeta(gid, metainfo.LogFS, uid)
+	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
 
 	p.loadChannelValue(uid, gid)
 
