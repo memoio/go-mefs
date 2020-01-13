@@ -787,7 +787,7 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew) //32Byte
 
 	//私钥格式转换
-	skECDSA, err := utils.HexskToECDSAsk(hexKey)
+	skECDSA, err := utils.EthskToECDSAsk(hexKey)
 	if err != nil {
 		return sig, err
 	}

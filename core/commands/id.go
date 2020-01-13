@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ipfs/go-ipfs-cmds"
+	cmds "github.com/ipfs/go-ipfs-cmds"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -15,6 +15,7 @@ import (
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	core "github.com/memoio/go-mefs/core"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -160,14 +161,14 @@ func printSelf(node *core.MefsNode) (interface{}, error) {
 	}
 	info.AccountAddr = tmpAddr.String()
 
-	if node.PrivateKey == nil {
+	if node.PrivateKey == "" {
 		if err := node.LoadPrivateKey(); err != nil {
 			return nil, err
 		}
 	}
 
-	pk := node.PrivateKey.GetPublic()
-	pkb, err := ic.MarshalPublicKey(pk)
+	sk := node.PrivateKey
+	pkb, err := utils.GetPkFromEthSk(sk)
 	if err != nil {
 		return nil, err
 	}

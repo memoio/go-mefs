@@ -5,7 +5,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	cr "crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -14,7 +13,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -87,12 +85,36 @@ func StoreEncryptedPrivateKey(dir string, privatekey string, peerID string, pass
 		return err
 	}
 
-	keyjson, err := EncryptKey(key, password, StandardScryptN, StandardScryptP)
+	keyjson, err := encryptKey(key, password, StandardScryptN, StandardScryptP)
 	if err != nil {
 		return err
 	}
 
 	return writeKeyFile(path, keyjson) //写入文件
+}
+
+//GetPrivateKeyFromKeystore 是从keystore中获得ethereum格式的私钥, 没有"0x"前缀
+func GetPrivateKeyFromKeystore(peerID string, password string) (privateKey string, err error) {
+	//get privatekey's filepath, the dafault is "~/.ipfs/keystore/peerID"
+	fsrepoPath, err := BestKnownPath()
+	dir, err := config.Path(fsrepoPath, Keystore)
+	filePath, err := config.Path(dir, peerID)
+	if err != nil {
+		return "", err
+	}
+	//get config.PeerID from MefsNode.Identity
+	key, err := getPrivateKeyFromKeystore(peerID, filePath, password)
+	if err != nil {
+		return "", err
+	}
+
+	if key.PeerID != peerID {
+		return "", fmt.Errorf("private key in config does not match id: %s != %s", peerID, key.PeerID)
+	}
+
+	ethSk := utils.EthSkByteToEthString(key.PrivateKey)
+
+	return ethSk, nil
 }
 
 func newKey(privatekey string, peerID string) (*Key, error) {
@@ -113,17 +135,6 @@ func newKey(privatekey string, peerID string) (*Key, error) {
 	return key, nil
 }
 
-func toISO8601(t time.Time) string {
-	var tz string
-	name, offset := t.Zone()
-	if name == "UTC" {
-		tz = "Z"
-	} else {
-		tz = fmt.Sprintf("%03d00", offset/3600)
-	}
-	return fmt.Sprintf("%04d-%02d-%02dT%02d-%02d-%02d.%09d%s", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), tz)
-}
-
 func joinPath(dir string, filename string) (path string) {
 	if filepath.IsAbs(filename) {
 		return filename
@@ -133,7 +144,7 @@ func joinPath(dir string, filename string) (path string) {
 
 // EncryptKey encrypts a key using the specified scrypt parameters into a json
 // blob that can be decrypted later on.
-func EncryptKey(key *Key, password string, scryptN, scryptP int) ([]byte, error) {
+func encryptKey(key *Key, password string, scryptN, scryptP int) ([]byte, error) {
 	passwordArray := []byte(password)
 	salt := getEntropyCSPRNG(32)                                                               //生成一个随即的32B的salt
 	derivedKey, err := scrypt.Key(passwordArray, salt, scryptN, scryptR, scryptP, scryptDKLen) //使用scrypt算法对输入的password加密，生成一个32位的derivedKey
@@ -215,14 +226,14 @@ func writeKeyFile(file string, content []byte) error {
 	return os.Rename(f.Name(), file)
 }
 
-//GetPrivateKeyFromKeystore return the key, "peerID" implements config.PeerID
-func GetPrivateKeyFromKeystore(peerID string, filepath string, password string) (*Key, error) {
+//getPrivateKeyFromKeystore return the key, "peerID" implements config.PeerID
+func getPrivateKeyFromKeystore(peerID string, filepath string, password string) (*Key, error) {
 	// Load the key from the keystore and decrypt its contents
 	keyjson, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	key, err := DecryptKey(keyjson, password)
+	key, err := decryptKey(keyjson, password)
 	if err != nil {
 		return nil, err
 	}
@@ -233,16 +244,8 @@ func GetPrivateKeyFromKeystore(peerID string, filepath string, password string) 
 	return key, nil
 }
 
-func GetPubkeyFromKey(key *Key) string {
-	pk := crypto.ToECDSAUnsafe(key.PrivateKey)
-	secpkey := (*ci.Secp256k1PrivateKey)((*btcec.PrivateKey)(pk))
-	pkbyte, _ := secpkey.GetPublic().Bytes()
-	pkstring := base64.StdEncoding.EncodeToString(pkbyte)
-	return pkstring
-}
-
-// DecryptKey decrypts a key from a json blob, returning the private key itself.
-func DecryptKey(keyjson []byte, password string) (*Key, error) {
+// decryptKey decrypts a key from a json blob, returning the private key itself.
+func decryptKey(keyjson []byte, password string) (*Key, error) {
 	// Depending on the version try to parse one way or another
 	var (
 		keyBytes []byte
@@ -335,54 +338,4 @@ func ensureInt(x interface{}) int {
 		res = int(x.(float64))
 	}
 	return res
-}
-
-//GetHexPrivKeyFromKS 是从keystore中获得ethereum格式的私钥，用于部署合约
-func GetHexPrivKeyFromKS(id peer.ID, password string) (privateKey string, err error) {
-	//get privatekey's filepath, the dafault is "~/.ipfs/keystore/peerPrivateKey"
-	fsrepoPath, err := BestKnownPath()
-	dir, err := config.Path(fsrepoPath, Keystore)
-	filePath, err := config.Path(dir, id.Pretty())
-	if err != nil {
-		return "", err
-	}
-	//get config.PeerID from MefsNode.Identity
-	peerID := peer.IDB58Encode(id)
-	key, err := GetPrivateKeyFromKeystore(peerID, filePath, password)
-	if err != nil {
-		return "", err
-	}
-
-	if key.PeerID != peerID {
-		return "", fmt.Errorf("private key in config does not match id: %s != %s", id, key.PeerID)
-	}
-
-	ethSk := utils.EthSkByteToEthString(key.PrivateKey)
-
-	return ethSk, nil
-}
-
-//GetPrivKeyFromKS 是从keystore获得mefs格式的私钥，用于ipfsNode里的privatekey字段
-func GetPrivKeyFromKS(id peer.ID, password string) (ci.PrivKey, error) {
-	//get privatekey's filepath, the dafault is "~/.mefs/keystore"
-	fsrepoPath, err := BestKnownPath()
-	dir, err := config.Path(fsrepoPath, Keystore)
-	filePath, err := config.Path(dir, id.Pretty())
-	if err != nil {
-		return nil, err
-	}
-	//get config.PeerID from MefsNode.Identity
-	peerID := peer.IDB58Encode(id)
-	key, err := GetPrivateKeyFromKeystore(peerID, filePath, password)
-	if err != nil {
-		return nil, err
-	}
-
-	if key.PeerID != peerID {
-		return nil, fmt.Errorf("private key in config does not match id: %s != %s", id, key.PeerID)
-	}
-	pk := crypto.ToECDSAUnsafe(key.PrivateKey)
-	secpkey := (*ci.Secp256k1PrivateKey)((*btcec.PrivateKey)(pk))
-
-	return secpkey, nil
 }

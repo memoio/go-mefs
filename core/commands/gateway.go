@@ -5,7 +5,6 @@ import (
 	"io"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
-	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/miniogw"
 	"github.com/memoio/go-mefs/repo/fsrepo"
@@ -69,10 +68,7 @@ var gwStartCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		rootpath, _ := fsrepo.BestKnownPath()
-		keypath, _ := config.Path(rootpath, fsrepo.Keystore)
-		keyfile, err := config.Path(keypath, uid)
-		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, keyfile, pwd)
+		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
 		if err != nil {
 			return err
 		}

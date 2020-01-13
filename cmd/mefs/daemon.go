@@ -397,12 +397,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if os.IsNotExist(err) {
 		return errRepoExists
 	}
-	userkey, err := fsrepo.GetPrivateKeyFromKeystore(node.Identity.Pretty(), keypath, node.Password)
+
+	sk, err := fsrepo.GetPrivateKeyFromKeystore(node.Identity.Pretty(), node.Password)
 	if err != nil {
 		return err
 	}
-
-	sk := utils.EthSkByteToEthString(userkey.PrivateKey)
 
 	switch cfg.Role {
 	case metainfo.RoleKeeper:

@@ -27,7 +27,6 @@ import (
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	ifconnmgr "github.com/libp2p/go-libp2p-core/connmgr"
-	ic "github.com/libp2p/go-libp2p-core/crypto"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	metrics "github.com/libp2p/go-libp2p-core/metrics"
 	smux "github.com/libp2p/go-libp2p-core/mux"
@@ -43,6 +42,8 @@ import (
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	mafilter "github.com/libp2p/go-maddr-filter"
 
+	"github.com/btcsuite/btcd/btcec"
+	cy "github.com/libp2p/go-libp2p-core/crypto"
 	p2pbhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	version "github.com/memoio/go-mefs"
 	config "github.com/memoio/go-mefs/config"
@@ -55,6 +56,7 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	dhtopts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -89,8 +91,8 @@ type MefsNode struct {
 	Repo repo.Repo
 
 	// Local node
-	PrivateKey      ic.PrivKey // the local node's private Key
-	PNetFingerprint []byte     // fingerprint of private network
+	PrivateKey      string // the local node's private Key(with format of eth, without prefix "0x")
+	PNetFingerprint []byte // fingerprint of private network
 	NetKey          string
 
 	// Services
@@ -524,33 +526,28 @@ func (n *MefsNode) loadID() error {
 	return nil
 }
 
-// GetKey will return a key from the Keystore with name `name`.
-func (n *MefsNode) GetKey(name string) (ic.PrivKey, error) {
-	if name == "self" {
-		return n.PrivateKey, nil
-	}
-	return nil, nil
-}
-
-//LoadPrivateKey load privatekey from keystore
+//LoadPrivateKey load privatekey from keystore to setup MefsNode
 func (n *MefsNode) LoadPrivateKey() error {
 	if n.Identity == "" || n.Peerstore == nil {
 		return errors.New("loaded private key out of order")
 	}
 
-	if n.PrivateKey != nil {
+	if n.PrivateKey != "" {
 		log.Warning("private key already loaded")
 		return nil
 	}
 
-	sk, err := fsrepo.GetPrivKeyFromKS(n.Identity, n.Password)
+	sk, err := fsrepo.GetPrivateKeyFromKeystore(n.Identity.Pretty(), n.Password) //format of eth without prefix "0x"
 	if err != nil {
 		return err
 	}
 
 	n.PrivateKey = sk
-	n.Peerstore.AddPrivKey(n.Identity, n.PrivateKey)
-	n.Peerstore.AddPubKey(n.Identity, sk.GetPublic())
+
+	skEcdsa, err := utils.EthskToECDSAsk(sk)
+	prik := (*cy.Secp256k1PrivateKey)((*btcec.PrivateKey)(skEcdsa))
+	n.Peerstore.AddPrivKey(n.Identity, prik)
+	n.Peerstore.AddPubKey(n.Identity, prik.GetPublic())
 	return nil
 }
 

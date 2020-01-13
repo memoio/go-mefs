@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -59,8 +58,8 @@ func main() {
 
 	localAddr := common.HexToAddress(userAddr[2:]) //将id转化成智能合约中的address格式
 
-	log.Println("===============start test deployQuery================")
-	defer log.Println("==============finish test deployQuery successfully===============")
+	log.Println("===============start test deployOffer================")
+	defer log.Println("==============finish test deployOffer successfully===============")
 
 	//ethEndPoint = *eth //用不正常的链（http://47.92.5.51:8101）部署query合约
 	log.Println("start deploy offer")
@@ -169,13 +168,10 @@ func createAddr() (string, string, error) {
 		return "", "", err
 	}
 	addressHex := address.Hex()
-	skByteEth, err := utils.IPFSskToEthskByte(identity.PrivKey)
+	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
 	if err != nil {
 		return "", "", err
 	}
-	enc := make([]byte, len(skByteEth)*2)
-	//对私钥进行十六进制编码，得到以太坊格式的私钥，此处不加上"0x"前缀
-	hex.Encode(enc, skByteEth)
 
 	var balance *big.Int
 	balance = queryBalance(addressHex)
@@ -196,10 +192,10 @@ func createAddr() (string, string, error) {
 		}
 	}
 	if balance.Cmp(big.NewInt(moneyTo)) < 0 {
-		return addressHex, string(enc), errors.New("转账失败")
+		return addressHex, sk, errors.New("转账失败")
 	}
 
-	return addressHex, string(enc), nil
+	return addressHex, sk, nil
 }
 
 func queryBalance(addr string) *big.Int {

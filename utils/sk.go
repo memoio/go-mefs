@@ -23,6 +23,17 @@ var (
 	errIpfsSkFormat = errors.New("the ipfssk'format is wrong")
 )
 
+//IPFSskToEthsk 是将mefs格式的私钥转换为ethereum格式的私钥
+func IPFSskToEthsk(sk string) (string, error) {
+	ethSkByte, err := IPFSskToEthskByte(sk)
+	if err != nil {
+		return "", err
+	}
+
+	ethSk := EthSkByteToEthString(ethSkByte)
+	return ethSk, nil
+}
+
 //IPFSskToEthskByte transfer sk in mefs format to skByte in Ethereum format
 func IPFSskToEthskByte(sk string) ([]byte, error) {
 	if len(sk) != IpfsSkLength {
@@ -51,20 +62,9 @@ func EthSkByteToEthString(sk []byte) string {
 	return string(enc)
 }
 
-//IPFSskToEthsk 是将mefs格式的私钥转换为ethereum格式的私钥
-func IPFSskToEthsk(sk string) (string, error) {
-	ethSkByte, err := IPFSskToEthskByte(sk)
-	if err != nil {
-		return "", err
-	}
-
-	ethSk := EthSkByteToEthString(ethSkByte)
-	return ethSk, nil
-}
-
-//HexskToIPFSsk transfer hexsk in Ethereum format to sk in mefs format
-func HexskToIPFSsk(hexsk string) (sk string, err error) {
-	skECDSA, err := HexskToECDSAsk(hexsk)
+//EthskToIPFSsk transfer hexsk in Ethereum format to sk in mefs format
+func EthskToIPFSsk(hexsk string) (sk string, err error) {
+	skECDSA, err := EthskToECDSAsk(hexsk)
 	if err != nil {
 		return sk, err
 	}
@@ -77,8 +77,8 @@ func HexskToIPFSsk(hexsk string) (sk string, err error) {
 	return sk, nil
 }
 
-//HexskToECDSAsk transfer hex privateKey with prefix "0x" or not to private *ecdsa.PrivateKey
-func HexskToECDSAsk(hexsk string) (sk *ecdsa.PrivateKey, err error) {
+//EthskToECDSAsk transfer hex privateKey with prefix "0x" or not to private *ecdsa.PrivateKey
+func EthskToECDSAsk(hexsk string) (sk *ecdsa.PrivateKey, err error) {
 	var src []byte
 	skLengthNoPrefix := EthSkLength - 2
 	skByteEthLength := skLengthNoPrefix / 2
@@ -110,8 +110,8 @@ func HexskToECDSAsk(hexsk string) (sk *ecdsa.PrivateKey, err error) {
 }
 
 //GetCompressedPkFromHexSk get compressed pubKey from hex private key
-func GetCompressedPkFromHexSk(sk string) (pk []byte, err error) {
-	skECDSA, err := HexskToECDSAsk(sk)
+func GetPkFromEthSk(sk string) (pk []byte, err error) {
+	skECDSA, err := EthskToECDSAsk(sk)
 	if err != nil {
 		return pk, err
 	}

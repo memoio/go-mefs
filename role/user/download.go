@@ -413,7 +413,7 @@ func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.In
 		return nil, nil, err
 	}
 	//将签名信息、user公钥、user地址、provider地址、签名金额一并发给provider
-	pubKey, err := utils.GetCompressedPkFromHexSk(hexSK)
+	pubKey, err := utils.GetPkFromEthSk(hexSK)
 	if err != nil {
 		utils.MLogger.Error("Get public key fail: ", err)
 		return nil, nil, err

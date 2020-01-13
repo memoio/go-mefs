@@ -6,7 +6,6 @@
 package commands
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 
@@ -14,7 +13,6 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -407,14 +405,7 @@ var addMasterKeeperCmd = &cmds.Command{
 
 		contracts.EndPoint = cfg.Eth
 
-		skByte, _ := node.PrivateKey.Bytes()
-		ipfsSk := base64.StdEncoding.EncodeToString(skByte)
-		hexSk, err := utils.IPFSskToEthsk(ipfsSk)
-		if err != nil {
-			fmt.Println("get HexPK Err", err)
-			return err
-		}
-
+		hexSk := node.PrivateKey
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
 
@@ -467,14 +458,7 @@ var addMyProviderCmd = &cmds.Command{
 
 		contracts.EndPoint = cfg.Eth
 
-		skByte, _ := node.PrivateKey.Bytes()
-		ipfsSk := base64.StdEncoding.EncodeToString(skByte)
-		hexSk, err := utils.IPFSskToEthsk(ipfsSk)
-		if err != nil {
-			fmt.Println("get HexPK Err", err)
-			return err
-		}
-
+		hexSk := node.PrivateKey
 		localAddr, _ := address.GetAdressFromSk(hexSk)
 		localAddress := common.HexToAddress(localAddr[2:])
 

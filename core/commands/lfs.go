@@ -245,10 +245,7 @@ var lfsKillUserCmd = &cmds.Command{
 
 		// 查看pwd是否能获取sk，确定是user发起的kill命令
 		pwd := req.Options[PassWord].(string)
-		rootpath, _ := fsrepo.BestKnownPath()
-		keypath, _ := config.Path(rootpath, fsrepo.Keystore)
-		keyfile, err := config.Path(keypath, uid)
-		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, keyfile, pwd)
+		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
 		if err != nil {
 			return err
 		}
@@ -319,7 +316,7 @@ var lfsStartUserCmd = &cmds.Command{
 				return err
 			}
 
-			sk, err = utils.HexskToIPFSsk(sk)
+			sk, err = utils.EthskToIPFSsk(sk)
 			if err != nil {
 				return err
 			}
@@ -383,20 +380,7 @@ var lfsStartUserCmd = &cmds.Command{
 		}
 
 		// 读keystore下uid文件
-		keypath, err := config.Path("", path.Join("keystore", uid))
-		if err != nil {
-			return err
-		}
-		_, err = os.Stat(keypath)
-		if os.IsNotExist(err) {
-			return err
-		}
-		userkey, err := fsrepo.GetPrivateKeyFromKeystore(uid, keypath, pwd)
-		if err != nil {
-			return err
-		}
-
-		hexSk := utils.EthSkByteToEthString(userkey.PrivateKey)
+		hexSk, err := fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
 
 		cfg, err := node.Repo.Config()
 		if err != nil {

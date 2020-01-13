@@ -352,6 +352,7 @@ func GetAddrFromResolver(localAddress common.Address, ownerAddress common.Addres
 			continue
 		}
 		if len(mapperAddr) == 0 || mapperAddr.String() == InvalidAddr {
+			log.Println("get empty addr from resolver")
 			return mapperAddr, ErrEmpty
 		}
 		return mapperAddr, nil

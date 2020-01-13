@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"flag"
 	"log"
 	"math/big"
@@ -453,13 +452,10 @@ func createAddr() (string, string, error) {
 		return "", "", err
 	}
 	addressHex := address.Hex()
-	skByteEth, err := utils.IPFSskToEthskByte(identity.PrivKey)
+	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
 	if err != nil {
 		return "", "", err
 	}
-	enc := make([]byte, len(skByteEth)*2)
-	//对私钥进行十六进制编码，得到以太坊格式的私钥，此处不加上"0x"前缀
-	hex.Encode(enc, skByteEth)
 
 	balance := queryBalance(addressHex)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
@@ -476,7 +472,7 @@ func createAddr() (string, string, error) {
 		log.Println(addressHex, "'s Balance now:", balance.String(), ", waiting for transfer success")
 	}
 
-	return addressHex, string(enc), nil
+	return addressHex, sk, nil
 }
 
 func transferTo(value *big.Int, addr string) {
