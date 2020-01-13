@@ -195,9 +195,10 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			pros, _, _ := u.gInfo.GetProviders(bc)
 			if len(pros) >= least {
 				breakFlag = true
+			} else {
+				utils.MLogger.Warn("cannot get enough providers")
+				time.Sleep(60 * time.Second)
 			}
-			utils.MLogger.Warn("cannot get enough providers")
-			time.Sleep(60 * time.Second)
 		}
 	}
 
@@ -249,7 +250,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				if atomic.LoadInt32(&parllel) < 32 {
 					break
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(time.Second)
 			}
 			atomic.AddInt32(&parllel, 1)
 			wg.Add(1)
