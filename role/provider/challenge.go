@@ -14,19 +14,21 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
+// key: qid/"Challenge"/uid/pid/kid/chaltime
 func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
-	utils.MLogger.Info("handle challenge: ", km.ToString(), "from: ", from)
+	utils.MLogger.Info("handle challenge: ", km.ToString(), " from: ", from)
 
 	ops := km.GetOptions()
-	if len(ops) < 1 {
+	if len(ops) < 4 {
 		return nil
 	}
 
-	userID := km.GetMid()
-	utils.MLogger.Info("receive: ", userID, " 's challenge from: ", from)
-	blskey, err := p.getNewUserConfig(userID, from)
+	fsID := km.GetMid()
+	userID := ops[0]
+	utils.MLogger.Info("receive: ", fsID, " 's challenge from: ", from)
+	blskey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {
-		utils.MLogger.Info("get new user`s config from: ", from, " failed: ", err)
+		utils.MLogger.Warn("get new user`s config from failed: ", err)
 		return err
 	}
 

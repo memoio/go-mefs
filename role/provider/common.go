@@ -21,7 +21,7 @@ var (
 )
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
-	gp := p.getGroupInfo(userID, groupID, false)
+	gp := p.getGroupInfo(userID, groupID, true)
 	if gp == nil {
 		return nil, errors.New("No user")
 	}

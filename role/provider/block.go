@@ -25,7 +25,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
 	qid := bids[0]
 
-	gp := p.getGroupInfo(qid, qid, false)
+	gp := p.getGroupInfo(qid, qid, true)
 	if gp == nil {
 		return errors.New("NotMyUser")
 	}
@@ -55,7 +55,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
 	qid := bids[0]
 
-	gp := p.getGroupInfo(qid, qid, false)
+	gp := p.getGroupInfo(qid, qid, true)
 	if gp == nil {
 		return errors.New("NotMyUser")
 	}
@@ -82,7 +82,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
 	qid := bids[0]
 
-	gp := p.getGroupInfo(qid, qid, false)
+	gp := p.getGroupInfo(qid, qid, true)
 	if gp == nil {
 		return nil, errors.New("NotMyUser")
 	}
