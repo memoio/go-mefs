@@ -112,11 +112,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 
 	utils.MLogger.Info("proof is right")
 
-	retKm, err := metainfo.NewKeyMeta(userID, metainfo.Challenge, ops[0])
-	if err != nil {
-		return err
-	}
-
 	mustr := b58.Encode(proof.Mu)
 	nustr := b58.Encode(proof.Nu)
 	deltastr := b58.Encode(proof.Delta)
@@ -128,7 +123,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), retKm.ToString(), []byte(retValue), nil, from)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		utils.MLogger.Info("send proof err: ", err)
 	}

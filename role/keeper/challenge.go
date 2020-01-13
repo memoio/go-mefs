@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -79,7 +80,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	// no data
 	if len(ret) == 0 || psum == 0 {
 		l.inChallenge = false
-		return "", nil, nil
+		return "", nil, errors.New("no data")
 	}
 
 	challengetime := utils.GetUnixNow()

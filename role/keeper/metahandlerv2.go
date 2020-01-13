@@ -33,7 +33,7 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 			go k.handleDeleteBlockPos(km)
 		}
 	case metainfo.Challenge:
-		if err != nil {
+		if opType == metainfo.Put {
 			go k.handleProof(km, metaValue)
 		}
 	case metainfo.Repair: //provider 修复回复
