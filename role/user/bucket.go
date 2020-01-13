@@ -26,12 +26,13 @@ func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 		return nil, ErrBucketNameInvalid
 	}
 
+	l.meta.sb.Lock()
+	defer l.meta.sb.Unlock()
+
 	if _, ok := l.meta.bucketNameToID[bucketName]; ok {
 		return nil, ErrBucketAlreadyExist
 	}
 
-	l.meta.sb.Lock()
-	defer l.meta.sb.Unlock()
 	// 多副本策略
 	switch options.Policy {
 	case dataformat.MulPolicy:

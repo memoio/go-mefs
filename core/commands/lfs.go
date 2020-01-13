@@ -1412,9 +1412,6 @@ var lfsListUsersCmd = &cmds.Command{
 		}
 
 		users := node.Inst.(*user.Info).GetAllUser()
-		if users != nil {
-			return err
-		}
 		userAddrs := make([]string, len(users))
 		for i, user := range users {
 			addr, err := address.GetAddressFromID(user)

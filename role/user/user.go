@@ -146,7 +146,7 @@ func (u *Info) Stop() error {
 		if err != nil {
 			utils.MLogger.Warnf("Sorry, something wrong in persisting for %s: %s", uInfo.userID, err)
 		} else {
-			utils.MLogger.Infof("User %s Persist completed\n", uInfo.userID)
+			utils.MLogger.Infof("User %s Persist completed", uInfo.userID)
 		}
 		uInfo.cancelFunc() //释放资源
 		return true
@@ -182,6 +182,7 @@ func (u *Info) GetUser(userID string) FileSyetem {
 
 // GetAllUser gets userInfo
 func (u *Info) GetAllUser() []string {
+	utils.MLogger.Debug("get all users")
 	res := make([]string, 0)
 	u.qMap.Range(func(k, v interface{}) bool {
 		res = append(res, k.(string))

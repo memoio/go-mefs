@@ -61,6 +61,9 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 		return nil, ErrBucketNotExist
 	}
 
+	bucket.Lock()
+	defer bucket.Unlock()
+
 	if err := checkObjectName(objectName); err != nil {
 		return nil, err
 	}
@@ -71,9 +74,6 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	if bucket.Policy != dataformat.RsPolicy && bucket.Policy != dataformat.MulPolicy {
 		return nil, ErrPolicy
 	}
-
-	bucket.Lock()
-	defer bucket.Unlock()
 
 	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " begin")
 
