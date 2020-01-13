@@ -45,7 +45,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 }
 
 func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
-	utils.MLogger.Info("handleAppendBlock: ", km.ToString(), "from: ", from)
+	utils.MLogger.Info("handleAppendBlock: ", km.ToString(), " from: ", from)
 	// key is blockID/"Block"/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 4 {
@@ -72,7 +72,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 }
 
 func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
-	utils.MLogger.Info("handleGetBlock: ", km.ToString(), "from: ", from)
+	utils.MLogger.Info("handleGetBlock: ", km.ToString(), " from: ", from)
 
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {

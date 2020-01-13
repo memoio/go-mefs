@@ -152,8 +152,8 @@ func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo 
 	return g
 }
 
-func (p *Info) newGroupWithFS(userID, groupID string, kps string, flag bool) *groupInfo {
-	if kps == "" && flag {
+func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *groupInfo {
+	if kpids == "" && flag {
 		ctx := context.Background()
 		kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
 		if err != nil {
@@ -164,10 +164,10 @@ func (p *Info) newGroupWithFS(userID, groupID string, kps string, flag bool) *gr
 		if err != nil {
 			return nil
 		}
-		kps = string(res)
+		kpids = string(res)
 	}
 
-	splitedMeta := strings.Split(kps, metainfo.DELIMITER)
+	splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
 	var tmpKps []string
 	var tmpPros []string
 	if len(splitedMeta) == 2 {
@@ -190,8 +190,6 @@ func (p *Info) newGroupWithFS(userID, groupID string, kps string, flag bool) *gr
 			}
 			tmpPros = append(tmpPros, kid)
 		}
-	} else {
-		return nil
 	}
 
 	if len(tmpKps) == 0 {
