@@ -145,6 +145,7 @@ func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo 
 		groupID:   gid,
 		keepers:   kps,
 		providers: pros,
+		sessionID: uuid.New(),
 	}
 
 	g.loadContracts(localID)

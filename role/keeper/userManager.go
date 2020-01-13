@@ -40,6 +40,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 		masterKeeper: qid,
 		keepers:      keepers,
 		providers:    providers,
+		sessionID:    uuid.New(),
 	}
 
 	if qid != uid {
