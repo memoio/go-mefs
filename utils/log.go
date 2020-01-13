@@ -16,11 +16,11 @@ var MLogger *zap.SugaredLogger
 var MLoglevel zap.AtomicLevel
 
 // StartLogger starts
-func StartLogger() {
+func StartLoggerWithLevel() {
 
 	MLoglevel = zap.NewAtomicLevel()
 
-	writerSyncer := getLogWriter()
+	writerSyncer := getLogWriter("mefs")
 
 	encoder := getEncoder()
 
@@ -35,6 +35,36 @@ func StartLogger() {
 	MLogger.Info("Mefs Logger init success")
 }
 
+// StartLogger starts
+func StartLogger() {
+
+	infoLevel := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl < zapcore.WarnLevel
+	})
+
+	warnLevel := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl >= zapcore.WarnLevel
+	})
+
+	// 获取 info、warn日志文件的io.Writer 抽象 getWriter() 在下方实现
+	infoWriter := getLogWriter("info")
+	warnWriter := getLogWriter("error")
+
+	encoder := getEncoder()
+
+	// 最后创建具体的Logger
+	core := zapcore.NewTee(
+		zapcore.NewCore(encoder, infoWriter, infoLevel),
+		zapcore.NewCore(encoder, warnWriter, warnLevel),
+	)
+
+	logger := zap.New(core, zap.AddCaller())
+
+	MLogger = logger.Sugar()
+
+	MLogger.Info("Mefs Logger init success")
+}
+
 func getEncoder() zapcore.Encoder {
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
@@ -44,8 +74,8 @@ func getEncoder() zapcore.Encoder {
 		MessageKey:     "msg",
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.LowercaseLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     zapcore.RFC3339TimeEncoder,
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
@@ -53,15 +83,15 @@ func getEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(encoderConfig)
 }
 
-func getLogWriter() zapcore.WriteSyncer {
+func getLogWriter(filename string) zapcore.WriteSyncer {
 	root, err := mefsPath()
 	if err != nil {
 		root = "~/.mefs"
 	}
 
 	lumberJackLogger := &lumberjack.Logger{
-		Filename:   root + "/mefs.log",
-		MaxSize:    1024, //MB
+		Filename:   root + "/logs/" + filename + ".log",
+		MaxSize:    100, //MB
 		MaxBackups: 3,
 		MaxAge:     30, //days
 		Compress:   false,

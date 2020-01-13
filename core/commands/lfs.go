@@ -410,10 +410,11 @@ var lfsStartUserCmd = &cmds.Command{
 		} else {
 			qitem, err := role.GetLatestQuery(uid)
 			if err != nil {
-				return err
+				rdo = true
+				qid = ""
+			} else {
+				qid = qitem.QueryID
 			}
-			qid = qitem.QueryID
-
 		}
 
 		lfs, err := node.Inst.(*user.Info).NewFS(uid, qid, hexSk, capacity, duration, price, ks, ps, rdo)

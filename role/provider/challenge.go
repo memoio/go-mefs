@@ -91,23 +91,22 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		}
 	}
 
-	utils.MLogger.Debug("gen proof for blocks: ", chal.Indices)
-
 	proof, err := blskey.GenProof(chal, data, tag, 32)
 	if err != nil {
-		utils.MLogger.Info("GenProof err: ", err)
+		utils.MLogger.Error("GenProof err: ", err)
 		return err
 	}
 
 	// 在发送之前检查生成的proof
 	boo, err := blskey.VerifyProof(chal, proof)
 	if err != nil {
-		utils.MLogger.Info("verify proof failed, err is: ", err)
+		utils.MLogger.Error("verify proof failed, err is: ", err)
+		utils.MLogger.Error("gen proof for blocks: ", chal.Indices)
 		return err
 	}
 
 	if !boo {
-		utils.MLogger.Info("proof is false")
+		utils.MLogger.Warn("proof is false")
 		return mcl.ErrProofVerifyInProvider
 	}
 
