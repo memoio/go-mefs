@@ -118,7 +118,6 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 
 		utils.MLogger.Info("Test user: ", g.userID, " has keepers and providers: ", string(res))
 
-		var wg sync.WaitGroup
 		splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
 		if len(splitedMeta) == 2 {
 			count := 0
@@ -135,14 +134,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 				}
 
 				g.tempKeepers = append(g.tempKeepers, kid)
-
 				count++
-
-				wg.Add(1)
-				go func(kid string) {
-					defer wg.Done()
-					g.ds.Connect(ctx, kid)
-				}(kid)
 			}
 
 			g.keeperSLA = count
@@ -161,20 +153,11 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 					continue
 				}
 
-				count++
-
 				g.tempProviders = append(g.tempProviders, pid)
-
-				wg.Add(1)
-				go func(pid string) {
-					defer wg.Done()
-					g.ds.Connect(ctx, pid)
-				}(pid)
+				count++
 			}
 
 			g.providerSLA = count
-
-			wg.Wait()
 
 			utils.MLogger.Info("Start test user: ", g.userID, " and its lfs:", g.groupID)
 
@@ -205,12 +188,31 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	defer g.Unlock()
 
 	utils.MLogger.Info("Connect keepers and providers for user: ", g.userID)
+	var wg sync.WaitGroup
 	for _, kid := range g.tempKeepers {
 		tempKeeper := &keeperInfo{
 			keeperID: kid,
 		}
 		g.keepers[kid] = tempKeeper
+		wg.Add(1)
+		go func(pid string) {
+			defer wg.Done()
+			g.ds.Connect(ctx, pid)
+		}(kid)
 	}
+
+	for _, pid := range g.tempProviders {
+		tempPro := &providerInfo{
+			providerID: pid,
+		}
+		g.providers[pid] = tempPro
+		go func(pid string) {
+			defer wg.Done()
+			g.ds.Connect(ctx, pid)
+		}(pid)
+	}
+
+	wg.Wait()
 
 	connectTryCount := 5
 	failNum := 0
@@ -238,13 +240,6 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	// all fails
 	if failNum == g.keeperSLA {
 		return ErrNoEnoughKeeper
-	}
-
-	for _, pid := range g.tempProviders {
-		tempPro := &providerInfo{
-			providerID: pid,
-		}
-		g.providers[pid] = tempPro
 	}
 
 	failNum = 0
