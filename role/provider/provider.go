@@ -100,19 +100,18 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	go func() {
 		for {
-			_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
-			if err != nil {
-				utils.MLogger.Error("provider deploying resolver and offer failed: ", err)
-				time.Sleep(2 * time.Minute)
-			} else {
-				break
+			err := m.loadContracts()
+			if err != nil || reDeployOffer {
+				_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
+				if err != nil {
+					utils.MLogger.Error("provider deploying resolver and offer failed: ", err)
+					time.Sleep(2 * time.Minute)
+				} else {
+					break
+				}
 			}
 		}
 
-		err = m.loadContracts()
-		if err != nil {
-			utils.MLogger.Info("Save ", m.localID, " 's provider info err: ", err)
-		}
 	}()
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")

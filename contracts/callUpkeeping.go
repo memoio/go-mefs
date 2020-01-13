@@ -48,7 +48,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = moneyAccount
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
-		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, userAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price))
+		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price))
 		if err != nil {
 			if retryCount > 5 {
 				log.Println("deploy Uk Err:", err)
