@@ -91,7 +91,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		localID: id,
 		sk:      sk,
 		ds:      ds,
-		offers:  make([]*role.OfferItem, 1),
+		offers:  make([]*role.OfferItem, 0, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
