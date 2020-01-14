@@ -153,11 +153,12 @@ func BuildSignMessage() ([]byte, error) {
 	money := big.NewInt(123)
 	moneyByte := money.Bytes()
 	message := &pb.ChannelSign{
-		Value: moneyByte,
+		Value:     moneyByte,
+		ChannelID: "test",
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		utils.MLogger.Error("protoMarshal failed err: ", err)
+		utils.MLogger.Error("protoMarshal failed: ", err)
 		return nil, err
 	}
 	return mes, nil

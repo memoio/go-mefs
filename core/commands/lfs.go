@@ -1403,7 +1403,7 @@ var lfsListUsersCmd = &cmds.Command{
 				continue
 			}
 
-			userAddrs[i] = addr.String()
+			userAddrs[i] = user + "(" + addr.String() + ")"
 		}
 		list := &StringList{
 			ChildLists: userAddrs,

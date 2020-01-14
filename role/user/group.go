@@ -801,7 +801,6 @@ func (g *groupInfo) loadContracts() error {
 				return err
 			}
 			proInfo.chanItem = &cItem
-
 		}
 	}
 

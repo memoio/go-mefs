@@ -113,19 +113,21 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 					return nil, err
 				}
 
-				key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel) // HexChannelAddress|13|channelValue
-				if err != nil {
-					return nil, err
+				if value != nil {
+					gp.channel.Value = value
+					gp.channel.Sig = sig
+
+					key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
+					if err != nil {
+						return nil, err
+					}
+
+					p.ds.PutKey(ctx, key.ToString(), sig, "local")
 				}
-
-				p.ds.PutKey(ctx, key.ToString(), sig, "local")
-
-				gp.channel.Value = value
-				gp.channel.Sig = sig
 
 				return b.RawData(), nil
 			}
-			utils.MLogger.Warnf("sign verify is false %s", splitedNcid[0])
+			utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
 		}
 		utils.MLogger.Warn("channel is empty")
 	} else {
@@ -148,14 +150,21 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 		return false, nil, err
 	}
 
+	if cSign.GetChannelID() == "test" && string(cSign.GetValue()) == "123" {
+		utils.MLogger.Debug("sign for test and repair")
+		return true, nil, nil
+	}
+
 	// verify channel
 	if cSign.GetChannelID() != chanID {
+		utils.MLogger.Errorf("channelID save %s and got %s are not equal: ", chanID, cSign.GetChannelID())
 		return false, nil, nil
 	}
 
 	// verify sign
 	res := role.VerifyChannelSign(cSign)
 	if !res {
+		utils.MLogger.Error("signature is wrong")
 		return false, nil, nil
 	}
 

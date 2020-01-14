@@ -84,7 +84,7 @@ func lfsTest() error {
 
 	log.Println("3. test rs create bucket")
 
-	bucketName := time.Now().Format(utils.BASETIME)
+	bucketName := strconv.FormatInt(time.Now().Unix(), 10)
 	var opts []func(*shell.RequestBuilder) error
 	//set option of bucket
 	opts = append(opts, shell.SetAddress(addr))
@@ -104,7 +104,7 @@ func lfsTest() error {
 	fmt.Println(bk.Buckets)
 
 	if bk.Buckets[0].BucketName != bucketName {
-		log.Println("create bucket", bucketName, "fails")
+		log.Println("create bucket", bucketName, "fails, but got:", bk.Buckets[0].BucketName)
 	}
 
 	if bk.Buckets[0].Policy != df.RsPolicy {
@@ -172,7 +172,7 @@ func lfsTest() error {
 
 	log.Println("6. test mul create bucket")
 
-	mbucketName := "mtest" + time.Now().Format(utils.BASETIME)
+	mbucketName := "mtest" + strconv.FormatInt(time.Now().Unix(), 10)
 	var mopts []func(*shell.RequestBuilder) error
 	mopts = append(mopts, shell.SetAddress(addr))
 	mopts = append(mopts, shell.SetDataCount(dataCount))
