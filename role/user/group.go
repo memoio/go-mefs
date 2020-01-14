@@ -207,6 +207,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			providerID: pid,
 		}
 		g.providers[pid] = tempPro
+		wg.Add(1)
 		go func(pid string) {
 			defer wg.Done()
 			g.ds.Connect(ctx, pid)
