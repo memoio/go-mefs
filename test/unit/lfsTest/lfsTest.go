@@ -79,12 +79,12 @@ func lfsTest() error {
 	err := sh.StartUser(addr, startOpts...)
 	if err != nil {
 		log.Println("Start user failed :", err)
-		return err
+		//return err
 	}
 
 	log.Println("3. test rs create bucket")
 
-	bucketName := "Bucket3"
+	bucketName := time.Now().Format(utils.BASETIME)
 	var opts []func(*shell.RequestBuilder) error
 	//set option of bucket
 	opts = append(opts, shell.SetAddress(addr))
@@ -172,7 +172,7 @@ func lfsTest() error {
 
 	log.Println("6. test mul create bucket")
 
-	mbucketName := "Bucket1"
+	mbucketName := "mtest" + time.Now().Format(utils.BASETIME)
 	var mopts []func(*shell.RequestBuilder) error
 	mopts = append(mopts, shell.SetAddress(addr))
 	mopts = append(mopts, shell.SetDataCount(dataCount))

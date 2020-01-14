@@ -91,24 +91,25 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 	if gp.userID != gp.groupID {
 		if gp.channel == nil {
-			utils.MLogger.Info("channel is empty, reget it")
+			utils.MLogger.Warn("channel is empty, reget it")
 			gp.loadContracts(p.localID)
 		}
 
 		if gp.channel != nil {
+			utils.MLogger.Infof("get block %s form local", splitedNcid[0])
 			chanID := gp.channel.ChannelID
 			value := gp.channel.Value
 
 			res, value, err := p.verify(chanID, value, sig)
 			if err != nil {
-				utils.MLogger.Infof("verify block %s failed, err is : %s", splitedNcid[0], err)
+				utils.MLogger.Errorf("verify block %s failed, err is : %s", splitedNcid[0], err)
 				return nil, err
 			}
 
 			if res {
 				b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
 				if err != nil {
-					utils.MLogger.Infof("get block %s from local fail: %s", splitedNcid[0], err)
+					utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
 					return nil, err
 				}
 
@@ -124,7 +125,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 				return b.RawData(), nil
 			}
-			utils.MLogger.Info("verify is false %s", splitedNcid[0])
+			utils.MLogger.Warnf("sign verify is false %s", splitedNcid[0])
 		}
 		utils.MLogger.Warn("channel is empty")
 	} else {
