@@ -106,7 +106,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 				return nil, err
 			}
 
-			if value.Cmp(gp.channel.Money) > 0 {
+			if value != nil && value.Cmp(gp.channel.Money) > 0 {
 				utils.MLogger.Errorf("verify block %s failed, money is not enough", splitedNcid[0], err)
 				return nil, errors.New("money is not enough")
 			}

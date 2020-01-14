@@ -65,10 +65,10 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 // NewFS add a new user
 func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
 	utils.MLogger.Infof("create lfs service: %s for user %s", queryID, userID)
-	// check stats
-	if queryID != "" {
-		fs, ok := u.fsMap.Load(queryID)
-		if ok {
+	if !rdo {
+		// check stats
+		fs := u.GetUser(userID)
+		if fs != nil && fs.Online() {
 			return fs.(*LfsInfo), errors.New("user exists")
 		}
 	}
