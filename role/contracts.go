@@ -736,6 +736,7 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 
 // GetLatestChannel gets
 func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
+	utils.MLogger.Debugf("get channel for user %s, provider %s, and query %s", userID, proID, queryID)
 	var item ChannelItem
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {

@@ -320,7 +320,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			pinfo.chanItem.Value = money
 			pinfo.chanItem.Sig = mes
 			pinfo.chanItem.Dirty = true
-			utils.MLogger.Info("Wownload success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
+			utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
 		}
 
 		if ds.decoder.Prefix.Policy == dataformat.RsPolicy {
@@ -349,6 +349,8 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		utils.MLogger.Errorf("Download failed due to decode err: ", err)
 		return 0, err
 	}
+
+	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, offset)
 
 	if ds.encrypt {
 		padding := aes.BlockSize - ((offset+remain-1)%aes.BlockSize + 1)

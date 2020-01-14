@@ -134,7 +134,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	bucket.NextOffset = ul.curOffset
 	bucket.dirty = true
 
-	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end")
+	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end, length is: ", object.Length)
 	return &object.ObjectInfo, nil
 }
 
@@ -211,8 +211,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		default:
 			// clear itself
 			data := make([]byte, 0, readByte)
-			readLen := readByte - int(u.curOffset)*readUnit - len(extra)
-			if len(extra) > 0 {
+			extraLen := len(extra)
+			readLen := readByte - int(u.curOffset)*readUnit - extraLen
+			if extraLen > 0 {
 				data = append(data, extra...)
 				extra = extra[:0]
 			}
@@ -233,10 +234,15 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				data = append(data, rdata[:n]...)
 			}
 
+			// plus extra
+			n += extraLen
+
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			endOffset := int(u.curOffset) + (len(data)-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+
+			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, length: %d", u.curStripe, u.curOffset, n)
 
 			// handle it before
 			if endOffset >= int(u.encoder.Prefix.GetSegmentCount()) {

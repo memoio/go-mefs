@@ -794,7 +794,10 @@ func (g *groupInfo) loadContracts() error {
 			}
 			proInfo.offerItem = &oItem
 		}
+	}
 
+	for _, proInfo := range g.providers {
+		proID := proInfo.providerID
 		if proInfo.chanItem == nil {
 			cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
 			if err != nil {

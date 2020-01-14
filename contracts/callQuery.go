@@ -76,7 +76,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 //GetQueryAddrs get all querys
 func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common.Address, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "query", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "query", "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common
 //GetLatestQuery get latest query
 func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.Address, queryInstance *market.Query, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "query", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "query", "", false)
 	if err != nil {
 		return queryAddr, queryInstance, err
 	}

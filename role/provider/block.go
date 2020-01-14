@@ -96,7 +96,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 		}
 
 		if gp.channel != nil {
-			utils.MLogger.Infof("get block %s form local", splitedNcid[0])
+			utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
 			chanID := gp.channel.ChannelID
 			value := gp.channel.Value
 
