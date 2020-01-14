@@ -354,19 +354,18 @@ func (k *Info) getUnpaidUsers() []string {
 // getGroupsInfo wrap get and create if "mode" is true
 func (k *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 	thisIgroup, ok := k.ukpGroup.Load(groupID)
-	if !ok {
-		if mode {
-			ginfo, err := newGroup(k.localID, userID, groupID, []string{groupID}, []string{groupID})
-			if err != nil {
-				return nil
-			}
-			k.ukpGroup.Store(groupID, ginfo)
-			return ginfo
-		}
-		return nil
+	if ok {
+		return thisIgroup.(*groupInfo)
 	}
 
-	return thisIgroup.(*groupInfo)
+	if mode {
+		ginfo, err := k.createGroup(userID, groupID, []string{groupID}, []string{groupID})
+		if err != nil {
+			return nil
+		}
+		return ginfo
+	}
+	return nil
 }
 
 // getLInfo wrap get and create if "mode" is true

@@ -448,12 +448,12 @@ func (k *Info) cleanTestUsersRegular(ctx context.Context) {
 	}
 }
 
-func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
-	_, ok := k.ukpGroup.Load(qid)
+func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*groupInfo, error) {
+	gp, ok := k.ukpGroup.Load(qid)
 	if !ok {
 		gInfo, err := newGroup(k.localID, uid, qid, keepers, providers)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		k.ukpGroup.Store(qid, gInfo)
 		ctx := context.Background()
@@ -467,12 +467,10 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 
 			kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
 			if err != nil {
-				return err
+				continue
 			}
 
-			kms := kmLast.ToString()
-			// get from leveldb
-			res, err := k.ds.GetKey(ctx, kms, "local")
+			res, err := k.ds.GetKey(ctx, kmLast.ToString(), "local")
 			if err == nil && len(res) > 0 {
 				err = lin.parseLastPayKV(res)
 				if err != nil {
@@ -480,11 +478,12 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) error {
 				}
 			}
 		}
+		go gInfo.loadContracts(true)
+		go k.loadUserBlock(qid)
+		return gInfo, nil
 	}
-
 	// init userConfig
-
-	return nil
+	return gp.(*groupInfo), nil
 }
 
 func (k *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) error {
@@ -535,7 +534,8 @@ func (k *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) e
 		tmpPros = append(tmpPros, groupID)
 	}
 
-	return k.createGroup(userID, groupID, tmpKps, tmpPros)
+	_, err := k.createGroup(userID, groupID, tmpKps, tmpPros)
+	return err
 }
 
 func (k *Info) deleteGroup(ctx context.Context, qid string) {

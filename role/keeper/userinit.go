@@ -186,7 +186,6 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
-		gp.loadContracts(true)
 		return gp.sessionID.MarshalBinary()
 	}
 
@@ -194,12 +193,12 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 }
 
 // fillPinfo fill user's uInfo, groupInfo in ukpMap
-func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, from string) {
+func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, from string) (*groupInfo, error) {
 	//将value切分，生成好对应的keepers和providers列表
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
 		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
-		return
+		return nil, errors.New("metavalue is not right")
 	}
 
 	keepers := make([]string, kc)
@@ -225,9 +224,9 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		providers = append(providers, providerID)
 	}
 
-	err := k.createGroup(userID, groupID, keepers, providers)
+	gp, err := k.createGroup(userID, groupID, keepers, providers)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	ui, _ := k.getUInfo(userID)
@@ -237,9 +236,9 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 
 	kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	k.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
-	return
+	return gp, nil
 }
