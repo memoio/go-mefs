@@ -751,12 +751,10 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 		return item, err
 	}
 
-	channels, err := contracts.GetChannelAddrs(userAddr, userAddr, proAddr, queryAddr)
+	channelAddr, _, err := contracts.GetLatestChannel(userAddr, userAddr, proAddr, queryAddr)
 	if err != nil {
 		return item, err
 	}
-
-	channelAddr := channels[len(channels)-1]
 
 	channelID, err := address.GetIDFromAddress(channelAddr.String())
 	if err != nil {
@@ -767,6 +765,8 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 	if err != nil {
 		return item, err
 	}
+
+	utils.MLogger.Debugf("get channel %s for user %s, provider %s, and query %s", channelID, userID, proID, queryID)
 
 	if item.UserID != userID || item.ProID != proID {
 		utils.MLogger.Errorf("got queryID %s, sender %s and receiver %s are not compatabile: ", item.ChannelID, item.UserID, item.ProID)
