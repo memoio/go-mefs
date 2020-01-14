@@ -218,18 +218,6 @@ func testCloseChannel() (err error) {
 		return err
 	}
 
-	//账户验证签名
-	pubKey, err := utils.GetPkFromEthSk(userSk)
-	if err != nil {
-		log.Fatal("GetCompressedPkFromHexSkErr:", err)
-		return err
-	}
-	verify, err := role.VerifySig(chanID, value, sig, pubKey)
-	if err != nil || !verify {
-		log.Fatal("verifyErr:", err)
-		return err
-	}
-
 	//provider触发CloseChannel()
 	err = contracts.CloseChannel(channelAddr, proSk, sig, value)
 	if err != nil {
