@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
-	pb "github.com/memoio/go-mefs/role/user/pb"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -90,11 +90,16 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 	ctx := context.Background()
 
 	if gp.userID != gp.groupID {
+		if gp.channel == nil {
+			utils.MLogger.Info("channel is empty, reget it")
+			gp.loadContracts(p.localID)
+		}
+
 		if gp.channel != nil {
 			chanID := gp.channel.ChannelID
 			value := gp.channel.Value
 
-			res, value, sig, err := p.verify(chanID, value, sig)
+			res, value, err := p.verify(chanID, value, sig)
 			if err != nil {
 				utils.MLogger.Infof("verify block %s failed, err is : %s", splitedNcid[0], err)
 				return nil, err
@@ -112,7 +117,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 					return nil, err
 				}
 
-				p.ds.PutKey(ctx, key.ToString(), value.Bytes(), "local")
+				p.ds.PutKey(ctx, key.ToString(), sig, "local")
 
 				gp.channel.Value = value
 				gp.channel.Sig = sig
@@ -121,6 +126,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 			}
 			utils.MLogger.Info("verify is false %s", splitedNcid[0])
 		}
+		utils.MLogger.Warn("channel is empty")
 	} else {
 		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
@@ -133,39 +139,35 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 }
 
 // verify verifies the transaction
-func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.Int, []byte, error) {
-	signForChannel := &pb.SignForChannel{}
-	err := proto.Unmarshal(mes, signForChannel)
+func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.Int, error) {
+	cSign := &pb.ChannelSign{}
+	err := proto.Unmarshal(mes, cSign)
 	if err != nil {
 		utils.MLogger.Error("proto.Unmarshal when provider verify err:", err)
-		return false, nil, nil, err
+		return false, nil, err
 	}
 
-	//解析传过来的参数
-	var money = new(big.Int)
-	money = money.SetBytes(signForChannel.GetMoney())
-	sig := signForChannel.GetSig()
-	utils.MLogger.Info("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
-	if sig == nil {
-		return true, nil, nil, nil
+	// verify channel
+	if cSign.GetChannelID() != chanID {
+		return false, nil, nil
 	}
 
-	//verify value： value ?= oldValue + 100
+	// verify sign
+	res := role.VerifyChannelSign(cSign)
+	if !res {
+		return false, nil, nil
+	}
+
+	//verify value;： value ?= oldValue + 100
+	value := new(big.Int).SetBytes(cSign.GetValue())
 	addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-	value := big.NewInt(0)
-	value = value.Add(oldValue, big.NewInt(addValue))
-	if money.Cmp(value) < 0 {
-		utils.MLogger.Info("value is less than money,  value is: ", value.String())
-		// to test
-		//return false, nil, nil, nil
+	oldValue = oldValue.Add(oldValue, big.NewInt(addValue))
+	if value.Cmp(oldValue) < 0 {
+		utils.MLogger.Warn(value.String, " received is less than calculated: ", oldValue.String())
+		return false, nil, nil
 	}
 
-	//判断签名是否正确
-	res, err := role.VerifySig(chanID, money, sig, signForChannel.GetUserPK())
-	if err != nil {
-		return false, nil, nil, err
-	}
-	return res, value, sig, nil
+	return res, value, nil
 }
 
 func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {

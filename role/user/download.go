@@ -13,10 +13,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
-	pb "github.com/memoio/go-mefs/role/user/pb"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -118,17 +117,17 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 
 	length := opts.Length
 	if opts.Length < 0 {
-		length = object.GetSize() - opts.Start
+		length = object.GetLength() - opts.Start
 	}
 
-	if opts.Start+length > object.Size {
+	if opts.Start+length > object.Length {
 		return ErrObjectOptionsInvalid
 	}
 
 	stripeSize := int64(utils.BlockSize * bucket.DataCount)
 	segStripeSize := int64(bucket.SegmentSize) * int64(bucket.DataCount)
 	//计算出下载的起始参数
-	segStart := object.OffsetStart * segStripeSize //在此object之前同一个stripe由其他object占据的空间
+	segStart := object.Offset * segStripeSize //在此object之前同一个stripe由其他object占据的空间
 	// 下载的开始条带
 	stripePos := (opts.Start+segStart)/stripeSize + object.StripeStart
 	// 下载开始的segment
@@ -287,7 +286,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 
 		//user给channel合约签名，发给provider
-		mes, money, err := ds.getMessage(ncid, provider)
+		mes, money, err := ds.getChannelSign(ncid, provider)
 		if err != nil {
 			continue
 		}
@@ -319,6 +318,8 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		}
 		if pinfo.chanItem != nil {
 			pinfo.chanItem.Value = money
+			pinfo.chanItem.Sig = mes
+			pinfo.chanItem.Dirty = true
 			utils.MLogger.Info("Wownload success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
 		}
 
@@ -379,56 +380,47 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	return remain, nil
 }
 
-func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.Int, error) {
+func (ds *downloadJob) getChannelSign(ncid string, provider string) ([]byte, *big.Int, error) {
+	// for test
 	money := big.NewInt(0)
-	//user给channel合约签名，发给provider
-	userID := ds.group.userID
 	hexSK := ds.group.privKey
-
-	providerAddress, err := address.GetAddressFromID(provider)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	localAddress, err := address.GetAddressFromID(userID)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	channelID := ds.fsID
+
 	pinfo, ok := ds.group.providers[provider]
 	if !ok {
-		return nil, nil, errors.New("No provider")
+		utils.MLogger.Warn(provider, " is not my provider")
+		return nil, nil, errors.New("No such provider")
 	}
+
 	if pinfo.chanItem != nil {
 		channelID = pinfo.chanItem.ChannelID
 		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 
-	//签名
 	sig, err := role.SignForChannel(channelID, hexSK, money)
 	if err != nil {
 		utils.MLogger.Errorf("Signature about Block %s from %s failed.", ncid, provider)
 		return nil, nil, err
 	}
-	//将签名信息、user公钥、user地址、provider地址、签名金额一并发给provider
+
 	pubKey, err := utils.GetPkFromEthSk(hexSK)
 	if err != nil {
 		utils.MLogger.Error("Get public key fail: ", err)
 		return nil, nil, err
 	}
 
-	message := &pb.SignForChannel{
-		Sig:             sig,
-		UserPK:          pubKey,
-		UserAddress:     localAddress.String(),
-		ProviderAddress: providerAddress.String(),
-		Money:           money.Bytes(),
+	message := &pb.ChannelSign{
+		Sig:       sig,
+		PubKey:    pubKey,
+		Value:     money.Bytes(),
+		ChannelID: channelID,
 	}
+
 	mes, err := proto.Marshal(message)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return mes, money, nil
 }

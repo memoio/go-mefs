@@ -9,14 +9,14 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
+	pb "github.com/memoio/go-mefs/proto"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
-	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 type DataCoder struct {
-	Prefix     *pb.Prefix
+	Prefix     *pb.BucketOptions
 	BlsKey     *mcl.KeySet
 	Repair     bool
 	DataCount  int // recover how many fields
@@ -48,7 +48,7 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 		return nil
 	}
 
-	pre := &pb.Prefix{
+	pre := &pb.BucketOptions{
 		Version:      int32(version),
 		Policy:       int32(policy),
 		DataCount:    int32(dataCount),
@@ -62,7 +62,7 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 }
 
 // NewDataCoderWithPrefix creates a new datacoder with prefix
-func NewDataCoderWithPrefix(p *pb.Prefix, k *mcl.KeySet) *DataCoder {
+func NewDataCoderWithPrefix(p *pb.BucketOptions, k *mcl.KeySet) *DataCoder {
 	d := &DataCoder{
 		Prefix: p,
 		BlsKey: k,
@@ -405,8 +405,8 @@ func createFields(stripe, dataGroup, tagGroup [][]byte) [][]byte {
 }
 
 // 解析一个Stripe中单独一个BLock的Prefix、大小、最多拥有的Field数量和该Stripe实际含有的未D丢失数据块的数量
-func decodeStripe(data [][]byte) (*pb.Prefix, int, error) {
-	var prefix *pb.Prefix
+func decodeStripe(data [][]byte) (*pb.BucketOptions, int, error) {
+	var prefix *pb.BucketOptions
 	var avaNum int
 	lengths := make([]int, len(data))
 	for i := 0; i < len(data); i++ {

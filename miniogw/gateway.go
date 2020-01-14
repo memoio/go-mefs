@@ -12,10 +12,9 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/core"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role/user"
-	pb "github.com/memoio/go-mefs/role/user/pb"
-	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 
 	"github.com/minio/cli"
@@ -160,7 +159,7 @@ func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio
 		return bi, err
 	}
 	bi.Name = bucket
-	bi.Created, _ = time.Parse(utils.BASETIME, bucketInfo.Ctime)
+	bi.Created = time.Unix(bucketInfo.Ctime, 0).In(time.Local)
 	return bi, nil
 }
 
@@ -177,7 +176,7 @@ func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 	buckets = make([]minio.BucketInfo, len(bucketsInfo))
 	for i, v := range bucketsInfo {
 		buckets[i].Name = v.Name
-		buckets[i].Created, _ = time.Parse(utils.BASETIME, v.Ctime)
+		buckets[i].Created = time.Unix(v.Ctime, 0).In(time.Local)
 	}
 	return buckets, nil
 }
@@ -212,8 +211,8 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 		loi.Objects[i].Bucket = bucket
 		loi.Objects[i].ETag = v.ETag
 		loi.Objects[i].Name = v.Name
-		loi.Objects[i].Size = v.Size
-		loi.Objects[i].ModTime, _ = time.Parse(utils.BASETIME, v.Ctime)
+		loi.Objects[i].Size = v.Length
+		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).In(time.Local)
 	}
 	return loi, nil
 }
@@ -238,8 +237,8 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 		loi.Objects[i].Bucket = bucket
 		loi.Objects[i].ETag = v.ETag
 		loi.Objects[i].Name = v.Name
-		loi.Objects[i].Size = v.Size
-		loi.Objects[i].ModTime, _ = time.Parse(utils.BASETIME, v.Ctime)
+		loi.Objects[i].Size = v.Length
+		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).In(time.Local)
 	}
 	return loi, nil
 }
@@ -325,7 +324,7 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 		IsDir:       obj.Dir,
 		ETag:        obj.ETag,
 		ContentType: obj.ContentType,
-		Size:        obj.Size,
+		Size:        obj.Length,
 	}
 
 	return objInfo, nil
@@ -350,7 +349,7 @@ func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *mi
 		IsDir:       obj.Dir,
 		ETag:        obj.ETag,
 		ContentType: obj.ContentType,
-		Size:        obj.Size,
+		Size:        obj.Length,
 	}
 
 	return objInfo, err

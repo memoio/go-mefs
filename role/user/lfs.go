@@ -13,7 +13,7 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	mcl "github.com/memoio/go-mefs/bls12"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
@@ -709,7 +709,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				return err
 			}
 
-			if object.Size == 0 {
+			if object.Length == 0 {
 				continue
 			}
 

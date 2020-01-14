@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	pb "github.com/memoio/go-mefs/proto"
 )
 
 // FileSyetem defines user's function

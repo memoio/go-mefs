@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	b58 "github.com/mr-tron/base58/base58"
 )
 
 const (
@@ -827,18 +828,18 @@ func (g *groupInfo) loadChannelValue() error {
 				valueByte, _ = g.ds.GetKey(ctx, km.ToString(), proID)
 			}
 
-			value := big.NewInt(0)
-			var sig []byte
-			vals := strings.Split(string(valueByte), metainfo.DELIMITER)
-			if len(vals) == 2 {
-				value.SetString(vals[0], 10)
-				sig, _ = b58.Decode(vals[1])
+			cSign := &pb.ChannelSign{}
+			err = proto.Unmarshal(valueByte, cSign)
+			if err != nil {
+				utils.MLogger.Error("proto.Unmarshal err:", err)
+				return err
 			}
 
+			value := new(big.Int).SetBytes(cSign.GetValue())
 			utils.MLogger.Info("channel value are:", value.String())
 			if value.Cmp(proInfo.chanItem.Value) > 0 {
 				proInfo.chanItem.Value = value
-				proInfo.chanItem.Sig = sig
+				proInfo.chanItem.Sig = cSign.GetSig()
 			}
 		}
 	}
@@ -853,18 +854,14 @@ func (g *groupInfo) saveChannelValue() error {
 
 	ctx := context.Background()
 	for _, proInfo := range g.providers {
-		if proInfo.chanItem != nil && proInfo.chanItem.Dirty {
+		if proInfo.chanItem != nil && proInfo.chanItem.Sig != nil && proInfo.chanItem.Dirty {
 
 			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelID, metainfo.Channel)
 			if err != nil {
 				continue
 			}
 
-			sig := b58.Encode(proInfo.chanItem.Sig)
-			value := proInfo.chanItem.Value.String()
-
-			metavalue := value + metainfo.DELIMITER + sig
-			g.ds.PutKey(ctx, km.ToString(), []byte(metavalue), "local")
+			g.ds.PutKey(ctx, km.ToString(), proInfo.chanItem.Sig, "local")
 		}
 	}
 

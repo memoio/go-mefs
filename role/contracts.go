@@ -13,6 +13,7 @@ import (
 	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -67,7 +68,7 @@ type ChannelItem struct {
 	QueryID   string   //belongs to which
 	Money     *big.Int // channel has balance
 	Value     *big.Int
-	Sig       []byte // signature(channel addr, value)
+	Sig       []byte // pb.Channelsignature(channel addr, value)
 	StartTime int64  // 部署的时间
 	Duration  int64  // timeout
 	Dirty     bool   //  value is change?
@@ -800,20 +801,19 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	return sig, nil
 }
 
-//VerifySig provider used to verify user's signature for channel-contract
-func VerifySig(channelID string, value *big.Int, sig, userPubKey []byte) (verify bool, err error) {
-	channelAddr, err := address.GetAddressFromID(channelID)
+//VerifyChannelSig provider used to verify user's signature for channel-contract
+func VerifyChannelSign(cSign *pb.ChannelSign) (verify bool) {
+	channelAddr, err := address.GetAddressFromID(cSign.GetChannelID())
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	//(channelAddress, value)的哈希值
-	valueNew := common.LeftPadBytes(value.Bytes(), 32)
+	valueNew := common.LeftPadBytes(cSign.GetValue(), 32)
 	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew)
 
 	//验证签名
-	verify = crypto.VerifySignature(userPubKey, hash, sig[:64])
-	return verify, nil
+	return crypto.VerifySignature(cSign.GetPubKey(), hash, cSign.GetSig()[:64])
 }
 
 // GetKeepersOfPro get keepers of some provider

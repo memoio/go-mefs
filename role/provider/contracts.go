@@ -3,14 +3,14 @@ package provider
 import (
 	"context"
 	"math/big"
-	"strings"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	b58 "github.com/mr-tron/base58/base58"
 )
 
 func (p *Info) loadContracts() error {
@@ -66,18 +66,14 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 	}
 
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil && gp.userID != gp.groupID && gp.channel != nil {
+	if gp != nil && gp.userID != gp.groupID && gp.channel != nil && gp.channel.Sig != nil {
 		ctx := context.Background()
 		km, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
 		if err != nil {
 			return err
 		}
 
-		sig := b58.Encode(gp.channel.Sig)
-		value := gp.channel.Value.String()
-
-		metavalue := value + metainfo.DELIMITER + sig
-		p.ds.PutKey(ctx, km.ToString(), []byte(metavalue), "local")
+		p.ds.PutKey(ctx, km.ToString(), gp.channel.Sig, "local")
 	}
 
 	return nil
@@ -101,18 +97,18 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 			valueByte, _ = p.ds.GetKey(ctx, km.ToString(), gp.userID)
 		}
 
-		value := big.NewInt(0)
-		var sig []byte
-		vals := strings.Split(string(valueByte), metainfo.DELIMITER)
-		if len(vals) == 2 {
-			value.SetString(vals[0], 10)
-			sig, _ = b58.Decode(vals[1])
+		cSign := &pb.ChannelSign{}
+		err = proto.Unmarshal(valueByte, cSign)
+		if err != nil {
+			utils.MLogger.Error("proto.Unmarshal err:", err)
+			return err
 		}
 
+		value := new(big.Int).SetBytes(cSign.GetValue())
 		utils.MLogger.Info("channel value are:", value.String())
 		if value.Cmp(gp.channel.Value) > 0 {
 			gp.channel.Value = value
-			gp.channel.Sig = sig
+			gp.channel.Sig = cSign.GetSig()
 		}
 	}
 

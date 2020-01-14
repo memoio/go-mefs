@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -157,7 +157,7 @@ func (l *LfsInfo) ShowStorage() (uint64, error) {
 				continue
 			}
 
-			storageSpace += uint64(object.GetSize())
+			storageSpace += uint64(object.GetLength())
 		}
 	}
 
@@ -191,7 +191,7 @@ func (l *LfsInfo) ShowBucketStorage(bucketName string) (uint64, error) {
 		if !ok || object.Deletion {
 			continue
 		}
-		storageSpace += uint64(object.GetSize())
+		storageSpace += uint64(object.GetLength())
 	}
 	return storageSpace, nil
 }

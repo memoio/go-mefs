@@ -6,8 +6,7 @@ import (
 	"time"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
-	"github.com/memoio/go-mefs/utils"
+	pb "github.com/memoio/go-mefs/proto"
 )
 
 // CreateBucket create a bucket for a specified LFSservice
@@ -56,7 +55,7 @@ func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 			ParityCount: options.ParityCount,
 			CurStripe:   0,
 			NextOffset:  0,
-			Ctime:       time.Now().Format(utils.BASETIME),
+			Ctime:       time.Now().Unix(),
 			SegmentSize: options.SegmentSize,
 			TagFlag:     options.TagFlag,
 			Deletion:    false,

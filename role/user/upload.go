@@ -14,7 +14,7 @@ import (
 
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -81,9 +81,9 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 		ObjectInfo: pb.ObjectInfo{
 			Name:        objectName,
 			BucketID:    bucketID,
-			Ctime:       time.Now().Format(utils.BASETIME),
+			Ctime:       time.Now().Unix(),
 			StripeStart: bucket.CurStripe,
-			OffsetStart: bucket.NextOffset,
+			Offset:      bucket.NextOffset,
 			Deletion:    false,
 			Dir:         false,
 		},
@@ -116,7 +116,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	if err != nil {
 		if ul.length > 0 {
 			object.ETag = ul.etag
-			object.Size = ul.length
+			object.Length = ul.length
 			bucket.CurStripe = ul.curStripe
 			bucket.NextOffset = ul.curOffset
 			bucket.dirty = true //需要记录，可能上传一部分然后失败，空间已占用
@@ -129,7 +129,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	}
 
 	object.ETag = ul.etag
-	object.Size = ul.length
+	object.Length = ul.length
 	bucket.CurStripe = ul.curStripe
 	bucket.NextOffset = ul.curOffset
 	bucket.dirty = true

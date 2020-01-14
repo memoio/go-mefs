@@ -505,10 +505,10 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if err != nil {
 			availTim = time.Unix(0, 0)
 		}
-		ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
+		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:           object.GetName(),
-			Size:           object.GetSize(),
+			Size:           object.GetLength(),
 			MD5:            object.GetETag(),
 			Ctime:          ctime.Format(utils.SHOWTIME),
 			Dir:            false,
@@ -601,10 +601,10 @@ var lfsPutObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
+		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetName(),
-			Size:  object.GetSize(),
+			Size:  object.GetLength(),
 			MD5:   object.GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
@@ -817,7 +817,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			Method: "List Objects",
 		}
 		for _, object := range objects {
-			ctime, _ := time.Parse(utils.BASETIME, object.GetCtime())
+			ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
@@ -831,7 +831,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			}
 			tempObState := ObjectStat{
 				Name:           object.GetName(),
-				Size:           object.GetSize(),
+				Size:           object.GetLength(),
 				MD5:            object.GetETag(),
 				Ctime:          ctime.Format(utils.SHOWTIME),
 				Dir:            false,
@@ -902,15 +902,13 @@ var lfsDeleteObjectCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		time, err := time.Parse(utils.BASETIME, object.GetCtime())
-		if err != nil {
-			return err
-		}
+
+		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetName(),
-			Size:  object.GetSize(),
+			Size:  object.GetLength(),
 			MD5:   object.GetETag(),
-			Ctime: time.Format(utils.SHOWTIME),
+			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}
 		return cmds.EmitOnce(res, &Objects{
@@ -979,11 +977,11 @@ var lfsHeadBucketCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		time, _ := time.Parse(utils.BASETIME, bucket.Ctime)
+		ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
-			Ctime:       time.Format(utils.SHOWTIME),
+			Ctime:       ctime.Format(utils.SHOWTIME),
 			Policy:      bucket.Policy,
 			DataCount:   bucket.DataCount,
 			ParityCount: bucket.ParityCount,
@@ -1084,11 +1082,12 @@ var lfsCreateBucketCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		time, err := time.Parse(utils.BASETIME, bucket.Ctime)
+
+		ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
-			Ctime:       time.Format(utils.SHOWTIME),
+			Ctime:       ctime.Format(utils.SHOWTIME),
 			Policy:      bucket.Policy,
 			DataCount:   bucket.DataCount,
 			ParityCount: bucket.ParityCount,
@@ -1159,11 +1158,11 @@ It outputs the following to stdout:
 			Method: "List Buckets",
 		}
 		for _, bucket := range buckets {
-			time, _ := time.Parse(utils.BASETIME, bucket.Ctime)
+			ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
 			bucketStat := BucketStat{
 				Name:        bucket.Name,
 				BucketID:    bucket.BucketID,
-				Ctime:       time.Format(utils.SHOWTIME),
+				Ctime:       ctime.Format(utils.SHOWTIME),
 				Policy:      bucket.Policy,
 				DataCount:   bucket.DataCount,
 				ParityCount: bucket.ParityCount,
@@ -1234,11 +1233,12 @@ It outputs the following to stdout:
 		if err != nil {
 			return err
 		}
-		time, _ := time.Parse(utils.BASETIME, bucket.Ctime)
+
+		ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
-			Ctime:       time.Format(utils.SHOWTIME),
+			Ctime:       ctime.Format(utils.SHOWTIME),
 			Policy:      bucket.Policy,
 			DataCount:   bucket.DataCount,
 			ParityCount: bucket.ParityCount,

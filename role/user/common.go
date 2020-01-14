@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 )
 
@@ -152,8 +152,8 @@ func checkBucketNameCommon(bucketName string, strict bool) (err error) {
 func BuildSignMessage() ([]byte, error) {
 	money := big.NewInt(123)
 	moneyByte := money.Bytes()
-	message := &pb.SignForChannel{
-		Money: moneyByte,
+	message := &pb.ChannelSign{
+		Value: moneyByte,
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {

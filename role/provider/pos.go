@@ -10,8 +10,8 @@ import (
 
 	"github.com/memoio/go-mefs/crypto/aes"
 	df "github.com/memoio/go-mefs/data-format"
+	pb "github.com/memoio/go-mefs/proto"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	pb "github.com/memoio/go-mefs/source/go-block-format/pb"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -37,7 +37,7 @@ var inGenerate int
 var keeperIDs []string
 var posSkByte []byte
 
-var pre = &pb.Prefix{
+var pre = &pb.BucketOptions{
 	Version:     1,
 	Policy:      df.MulPolicy,
 	DataCount:   1,
