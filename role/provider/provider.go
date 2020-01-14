@@ -111,7 +111,6 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 				}
 			}
 		}
-
 	}()
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")

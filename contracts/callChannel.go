@@ -144,6 +144,7 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 
 	//用user的签名来触发closeChannel()
 	key, _ := crypto.HexToECDSA(hexKey)
+
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	auth.GasLimit = 8000000

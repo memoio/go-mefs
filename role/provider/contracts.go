@@ -34,10 +34,6 @@ func (p *Info) loadContracts() error {
 		return err
 	}
 
-	if len(offers) >= len(p.offers) {
-		return nil
-	}
-
 	for _, offAddr := range offers {
 		offerID, err := address.GetIDFromAddress(offAddr.String())
 		if err != nil {
@@ -54,6 +50,7 @@ func (p *Info) loadContracts() error {
 		if err != nil {
 			continue
 		}
+
 		p.offers = append(p.offers, &oItem)
 	}
 
@@ -93,8 +90,8 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 
 		valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
 		if err != nil {
-			utils.MLogger.Info("try to get channel value from: ", gp.userID)
-			valueByte, _ = p.ds.GetKey(ctx, km.ToString(), gp.userID)
+			utils.MLogger.Error("get channel value from local fails: ", err)
+			return err
 		}
 
 		cSign := &pb.ChannelSign{}
@@ -108,7 +105,26 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 		utils.MLogger.Info("channel value are:", value.String())
 		if value.Cmp(gp.channel.Value) > 0 {
 			gp.channel.Value = value
-			gp.channel.Sig = cSign.GetSig()
+			gp.channel.Sig = valueByte
+		}
+
+		if gp.channel.Value.Cmp(gp.channel.Money) >= 0 {
+			cSign := new(pb.ChannelSign)
+			err = proto.Unmarshal(gp.channel.Sig, cSign)
+			if err != nil {
+				return nil
+			}
+
+			// need verify value again
+			retry := 3
+			for retry > 0 {
+				retry--
+				err = role.CloseChannel(gp.channel.ChannelID, p.sk, cSign.GetSig(), gp.channel.Value)
+				if err != nil {
+					continue
+				}
+				break
+			}
 		}
 	}
 
@@ -141,6 +157,7 @@ func (g *groupInfo) loadContracts(proID string) error {
 		if err != nil {
 			return err
 		}
+
 		g.channel = &cItem
 	}
 

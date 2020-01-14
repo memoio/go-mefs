@@ -728,6 +728,7 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
+
 		item.Money = balance
 		return item, nil
 	}
@@ -815,6 +816,16 @@ func VerifyChannelSign(cSign *pb.ChannelSign) (verify bool) {
 
 	//验证签名
 	return crypto.VerifySignature(cSign.GetPubKey(), hash, cSign.GetSig()[:64])
+}
+
+// CloseChannel closes channel by provider
+func CloseChannel(channelID, sk string, sign []byte, value *big.Int) error {
+	chanAddress, err := address.GetAddressFromID(channelID)
+	if err != nil {
+		return err
+	}
+
+	return contracts.CloseChannel(chanAddress, sk, sign, value)
 }
 
 // GetKeepersOfPro get keepers of some provider

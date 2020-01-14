@@ -790,7 +790,7 @@ func (g *groupInfo) loadContracts() error {
 		if proInfo.offerItem == nil {
 			oItem, err := role.GetLatestOffer(g.userID, proID)
 			if err != nil {
-				return err
+				continue
 			}
 			proInfo.offerItem = &oItem
 		}
@@ -798,8 +798,21 @@ func (g *groupInfo) loadContracts() error {
 		if proInfo.chanItem == nil {
 			cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
 			if err != nil {
-				return err
+				continue
 			}
+
+			if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+				_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+				if err != nil {
+					continue
+				}
+
+				cItem, err = role.GetLatestChannel(g.userID, g.groupID, proID)
+				if err != nil {
+					continue
+				}
+			}
+
 			proInfo.chanItem = &cItem
 		}
 	}
@@ -823,23 +836,37 @@ func (g *groupInfo) loadChannelValue() error {
 			}
 
 			valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
-			if err != nil {
-				utils.MLogger.Info("try to get channel value from: ", proID)
-				valueByte, _ = g.ds.GetKey(ctx, km.ToString(), proID)
-			}
+			if err == nil && len(valueByte) > 0 {
+				cSign := &pb.ChannelSign{}
+				err = proto.Unmarshal(valueByte, cSign)
+				if err == nil {
+					ok := role.VerifyChannelSign(cSign)
+					if ok {
+						value := new(big.Int).SetBytes(cSign.GetValue())
+						utils.MLogger.Info("channel value in local is:", value.String())
+						if value.Cmp(proInfo.chanItem.Value) > 0 {
+							proInfo.chanItem.Value = value
+							proInfo.chanItem.Sig = valueByte
+						}
+					}
+				}
 
-			cSign := &pb.ChannelSign{}
-			err = proto.Unmarshal(valueByte, cSign)
-			if err != nil {
-				utils.MLogger.Error("proto.Unmarshal err:", err)
-				return err
-			}
-
-			value := new(big.Int).SetBytes(cSign.GetValue())
-			utils.MLogger.Info("channel value are:", value.String())
-			if value.Cmp(proInfo.chanItem.Value) > 0 {
-				proInfo.chanItem.Value = value
-				proInfo.chanItem.Sig = cSign.GetSig()
+				utils.MLogger.Info("try to get channel value from remote: ", proID)
+				valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
+				if err == nil {
+					err = proto.Unmarshal(valueRemote, cSign)
+					if err == nil {
+						ok := role.VerifyChannelSign(cSign)
+						if ok {
+							value := new(big.Int).SetBytes(cSign.GetValue())
+							utils.MLogger.Info("channel value from remote is:", value.String())
+							if value.Cmp(proInfo.chanItem.Value) > 0 {
+								proInfo.chanItem.Value = value
+								proInfo.chanItem.Sig = valueRemote
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -855,7 +882,6 @@ func (g *groupInfo) saveChannelValue() error {
 	ctx := context.Background()
 	for _, proInfo := range g.providers {
 		if proInfo.chanItem != nil && proInfo.chanItem.Sig != nil && proInfo.chanItem.Dirty {
-
 			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelID, metainfo.Channel)
 			if err != nil {
 				continue
