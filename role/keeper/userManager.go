@@ -364,7 +364,6 @@ func (k *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 			return ginfo
 		}
 		return nil
-
 	}
 
 	return thisIgroup.(*groupInfo)

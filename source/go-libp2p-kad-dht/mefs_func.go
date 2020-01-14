@@ -83,10 +83,19 @@ func (dht *KadDHT) SendRequest(ctx context.Context, typ int32, metaKey string, m
 		log.Println("Send metainfo to:", p.Pretty(), "error: ", err)
 		return nil, err
 	}
-	response := rpmes.Record.GetValue()
-	if response != nil {
-		return response, nil
+
+	if rpmes.GetErrMsg() {
+		errMsg := rpmes.Record.GetValue()
+		if errMsg != nil {
+			return nil, errors.New(string(errMsg))
+		}
+	} else {
+		response := rpmes.Record.GetValue()
+		if response != nil {
+			return response, nil
+		}
 	}
+
 	return nil, errInvalidRecord
 }
 
@@ -263,11 +272,16 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, sig, p.Pretty())
 	if err != nil {
 		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\n", err, metaKey, p.Pretty())
+		rpmes.ErrMsg = true
 	}
 
 	if rec == nil {
 		rec = MakePutRecord(metaKey, res)
 		rpmes.Record = rec
+	}
+
+	if err != nil {
+		rpmes.Record.Value = []byte(err.Error())
 	} else {
 		rpmes.Record.Value = res
 	}

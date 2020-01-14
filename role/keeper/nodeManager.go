@@ -262,7 +262,7 @@ func (k *Info) GetUsers() ([]string, error) {
 
 		uid := thisGroupsInfo.userID
 
-		temp := ansi.Color(uid+".fsID:"+qid+"has keepers:", "red")
+		temp := ansi.Color(uid+".fsID:"+qid+" has keepers:", "red")
 		temp += strings.Join(thisGroupsInfo.keepers, "/")
 		res = append(res, temp)
 		temp = ansi.Color(uid+".fsID:"+qid+" has providers:", "green")

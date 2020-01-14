@@ -186,7 +186,7 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
-		gp.loadContracts(false)
+		gp.loadContracts(true)
 		return gp.sessionID.MarshalBinary()
 	}
 

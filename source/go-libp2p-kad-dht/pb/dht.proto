@@ -71,6 +71,8 @@ message Message {
 	// PUT_VALUE, GET_VALUE
 	Record record = 4;
 
+	bool errMsg = 5;
+
 	// Used to return peers closer to a key in a query
 	// GET_VALUE, GET_PROVIDERS, FIND_NODE
 	repeated Peer closerPeers = 8;
