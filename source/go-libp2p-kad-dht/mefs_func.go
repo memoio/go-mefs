@@ -78,7 +78,7 @@ func (dht *KadDHT) SendRequest(ctx context.Context, typ int32, metaKey string, m
 		}
 	}
 
-	rpmes, err := dht.sendRequest(ctx, p, pmes) //得到返回信息
+	rpmes, err := dht.sendRequest(ctx, p, pmes)
 	if err != nil {
 		log.Println("Send metainfo to:", p.Pretty(), "error: ", err)
 		return nil, err
@@ -286,7 +286,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 		rpmes.Record.Value = res
 	}
 
-	return rpmes, err
+	return rpmes, nil
 }
 
 //广播的Meta操作的回调，在操作最后，会在返回信息中添加与本节点相连的最近节点
