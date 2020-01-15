@@ -63,7 +63,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		} else {
 			electedOffset = 0
 		}
-		buf.WriteString(userID)
+		buf.WriteString(fsID)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(bid)
 		blockID := cid.NewCidV2([]byte(buf.String()))
@@ -116,7 +116,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		return mcl.ErrProofVerifyInProvider
 	}
 
-	utils.MLogger.Info("proof is right")
+	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
 
 	mustr := b58.Encode(proof.Mu)
 	nustr := b58.Encode(proof.Nu)
