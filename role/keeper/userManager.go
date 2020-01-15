@@ -36,7 +36,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 	tempInfo := &groupInfo{
 		groupID:      qid,
 		userID:       uid,
-		localKeeper:  qid,
+		localKeeper:  localID,
 		masterKeeper: qid,
 		keepers:      keepers,
 		providers:    providers,
@@ -49,14 +49,15 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 			return nil, err
 		}
 	} else {
+		flag := false
 		for _, keeperID := range tempInfo.keepers {
 			if localID == keeperID {
-				tempInfo.localKeeper = localID
+				flag = true
 			}
 		}
 
 		// not my user
-		if tempInfo.localKeeper != localID {
+		if !flag {
 			utils.MLogger.Warn(uid, " is not my user, keepers are: ", keepers)
 			return nil, errors.New("Not my user")
 		}
