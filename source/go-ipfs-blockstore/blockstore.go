@@ -155,9 +155,6 @@ func (bs *blockstore) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, er
 	}
 
 	segment, tag, err := bs.datastore.GetSegAndTag(dshelp.CidToDsKey(k), offset)
-	if err == ds.ErrNotFound {
-		return nil, nil, ErrNotFound
-	}
 	if err != nil {
 		return nil, nil, err
 	}

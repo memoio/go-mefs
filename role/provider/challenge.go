@@ -72,7 +72,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		electedIndex := buf.String()
 		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
-			utils.MLogger.Debugf("get %s data and tag failed: %s", blockID, err)
+			utils.MLogger.Warnf("get %s data and tag  at %d failed: %s", blockID, electedOffset, err)
 			faultBlocks = append(faultBlocks, index)
 		} else {
 			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
