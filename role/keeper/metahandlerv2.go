@@ -37,7 +37,9 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 			go k.handleProof(km, metaValue)
 		}
 	case metainfo.Repair: //provider 修复回复
-		go k.handleRepairResult(km, metaValue, from)
+		if opType == metainfo.Put {
+			go k.handleRepairResult(km, metaValue, from)
+		}
 	case metainfo.Storage:
 		go k.handleStorage(km, metaValue, from)
 	case metainfo.ExternalAddress:

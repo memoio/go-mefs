@@ -38,8 +38,12 @@ func StartLoggerWithLevel() {
 // StartLogger starts
 func StartLogger() {
 
+	debugLevel := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl < zapcore.InfoLevel
+	})
+
 	infoLevel := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl < zapcore.WarnLevel
+		return lvl == zapcore.InfoLevel
 	})
 
 	warnLevel := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
@@ -47,6 +51,7 @@ func StartLogger() {
 	})
 
 	// 获取 info、warn日志文件的io.Writer 抽象 getWriter() 在下方实现
+	debugWriter := getLogWriter("debug")
 	infoWriter := getLogWriter("info")
 	warnWriter := getLogWriter("error")
 
@@ -54,6 +59,7 @@ func StartLogger() {
 
 	// 最后创建具体的Logger
 	core := zapcore.NewTee(
+		zapcore.NewCore(encoder, debugWriter, debugLevel),
 		zapcore.NewCore(encoder, infoWriter, infoLevel),
 		zapcore.NewCore(encoder, warnWriter, warnLevel),
 	)

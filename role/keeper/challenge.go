@@ -207,7 +207,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	// key: bucketid_stripeid_blockid
 	cset := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
-		utils.MLogger.Info("Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
+		utils.MLogger.Debug(proID, " Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
 		for _, s := range splitedindex {
 			if len(s) == 0 {
 				continue

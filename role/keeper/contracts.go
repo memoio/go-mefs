@@ -41,7 +41,7 @@ func (g *groupInfo) loadContracts(mode bool) error {
 
 		// not my user
 		if !flag {
-			utils.MLogger.Info(g.userID, " is not my user")
+			utils.MLogger.Warnf("user %s 's fsID %s not my user", g.userID, g.groupID)
 			return errors.New("Not my user")
 		}
 
