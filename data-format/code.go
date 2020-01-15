@@ -326,7 +326,7 @@ func (d *DataCoder) recoverField(stripe [][]byte) ([][]byte, error) {
 
 	tmpTag := make([][]byte, d.blockCount*d.tagCount)
 	// 解析出data、tag、tagP
-	for j := 0; j < d.tagCount; {
+	for j := 0; j < d.tagCount; j++ {
 		for i := 0; i < d.blockCount; i++ {
 			if stripe[i] != nil {
 				tmpTag[i+j*d.blockCount] = stripe[i][d.segSize+j*d.tagSize : d.segSize+(j+1)*d.tagSize]
@@ -471,10 +471,10 @@ func decodeStripe(data [][]byte) (*pb.BucketOptions, int, int, error) {
 
 	sort.Sort(sort.Reverse(sort.IntSlice(lengths)))
 
-	if lengths[prefix.DataCount] <= 0 {
+	if lengths[prefix.DataCount-1] <= 0 {
 		utils.MLogger.Error("repair crash after sort: need count: ", prefix.DataCount, ", but got avaNum again: ", avaNum)
 		return nil, 0, 0, ErrRepairCrash
 	}
 
-	return prefix, preLen, lengths[prefix.DataCount], nil
+	return prefix, preLen, lengths[prefix.DataCount-1], nil
 }
