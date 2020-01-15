@@ -55,7 +55,12 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		repch:   make(chan string, 1024),
 	}
 
-	err := m.load(ctx) //连接节点
+	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.load(ctx) //连接节点
 	if err != nil {
 		utils.MLogger.Error("load err:", err)
 		return nil, err
@@ -65,11 +70,6 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	m.enableBft = false
 	if !m.enableBft {
 		utils.MLogger.Info("Use simple mode")
-	}
-
-	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
-	if err != nil {
-		return nil, err
 	}
 
 	go m.persistRegular(ctx)
