@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	df "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	shell "github.com/memoio/mefs-go-http-client"
 )
 
@@ -45,41 +46,40 @@ func lfsTest() error {
 	sh := shell.NewShell("localhost:5001")
 
 	log.Println("1. test create user")
-	/*
-		_, err := sh.CreateUser()
-		if err != nil {
-			log.Fatal("Create user failed :", err)
-			return err
-		}
 
-		addr := "0xf333257363F751858c5b93763E2d9185Ef7A1AFA"
-		_, err = address.GetIDFromAddress(addr)
-		if err != nil {
-			log.Fatal("address to id failed")
-			return err
-		}
+	testuser, err := sh.CreateUser()
+	if err != nil {
+		log.Fatal("Create user failed :", err)
+		return err
+	}
 
-		transferTo(big.NewInt(moneyTo), addr)
-		time.Sleep(90 * time.Second)
-		for {
-			time.Sleep(30 * time.Second)
-			balance := queryBalance(addr)
-			if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-				break
-			}
-			log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+	addr := testuser.Address
+	_, err = address.GetIDFromAddress(addr)
+	if err != nil {
+		log.Fatal("address to id failed")
+		return err
+	}
+
+	transferTo(big.NewInt(moneyTo), addr)
+	time.Sleep(90 * time.Second)
+	for {
+		time.Sleep(30 * time.Second)
+		balance := queryBalance(addr)
+		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
+			break
 		}
-	*/
+		log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+	}
+
 	log.Println("2. test start lfs")
-	addr := "0xf333257363F751858c5b93763E2d9185Ef7A1AFA"
 	var startOpts []func(*shell.RequestBuilder) error
 	//set option of bucket
 	startOpts = append(startOpts, shell.SetOp("ks", "2"))
 	startOpts = append(startOpts, shell.SetOp("ps", "6"))
-	err := sh.StartUser(addr, startOpts...)
+	err = sh.StartUser(addr, startOpts...)
 	if err != nil {
 		log.Println("Start user failed :", err)
-		//return err
+		return err
 	}
 
 	log.Println("3. test rs create bucket")
