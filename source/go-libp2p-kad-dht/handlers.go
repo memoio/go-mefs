@@ -6,15 +6,15 @@ import (
 	"errors"
 	"fmt"
 
+	proto "github.com/gogo/protobuf/proto"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-
-	proto "github.com/gogo/protobuf/proto"
-	"github.com/ipfs/go-cid"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 // The number of closer peers to send on requests.
@@ -49,6 +49,10 @@ func (dht *KadDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 	logger.SetTag(ctx, "peer", p)
 	defer func() { logger.FinishWithErr(ctx, err) }()
 	logger.Debugf("%s handleGetValue for key: %s", dht.self, pmes.GetKey())
+
+	if pmes.GetOpType() == int32(metainfo.BroadCast) {
+		dht.handleMetaInfo(ctx, p, pmes)
+	}
 
 	// setup response
 	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), 0)

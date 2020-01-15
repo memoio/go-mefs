@@ -221,7 +221,7 @@ func (dht *KadDHT) getValueSingle(ctx context.Context, p peer.ID, key string) (*
 	bkey := strings.SplitN(key, metainfo.DELIMITER, 3)
 	if len(bkey) == 3 {
 		if bkey[1] == strconv.Itoa(metainfo.UserInit) {
-			pmes = pb.NewMessage(pb.Message_MetaInfo, []byte(key), 0)
+			pmes.OpType = int32(metainfo.BroadCast)
 		}
 	}
 

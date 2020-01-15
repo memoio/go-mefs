@@ -37,6 +37,7 @@ const (
 	Get
 	Append
 	Delete
+	BroadCast
 	Test = 99
 )
 
