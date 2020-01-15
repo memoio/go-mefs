@@ -162,6 +162,10 @@ func splitSegmentToAtoms(data []byte, typ int) ([][]byte, error) {
 // typ: 32B atom or 24B atom
 // mode: sign or not
 func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool) ([]byte, error) {
+	if k == nil || k.Pk == nil {
+		return nil, ErrKeyIsNil
+	}
+
 	var uMiDel G1
 
 	atoms, err := splitSegmentToAtoms(segments, typ)
@@ -257,6 +261,10 @@ func VerifyChalNum(src int64, chalNum int) bool {
 
 // VerifyTag check segment和tag是否对应
 func (k *KeySet) VerifyTag(segment, tag []byte, index string) bool {
+	if k == nil || k.Pk == nil {
+		return false
+	}
+
 	var HWi, mido, midt, formula, t G1
 	var left, right GT
 	formula.Clear()
@@ -295,6 +303,9 @@ func (k *KeySet) VerifyTag(segment, tag []byte, index string) bool {
 
 // GenProof gens
 func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Proof, error) {
+	if k == nil || k.Pk == nil {
+		return nil, ErrKeyIsNil
+	}
 	var m Fr
 	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
 	sums := make([]Fr, TagAtomNum)
@@ -363,6 +374,9 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 
 // VerifyProof verify proof
 func (k *KeySet) VerifyProof(chal Challenge, pf *Proof) (bool, error) {
+	if k == nil || k.Pk == nil {
+		return false, ErrKeyIsNil
+	}
 	var mu, delta G1
 	var nu G2
 	err := mu.Deserialize(pf.Mu)
