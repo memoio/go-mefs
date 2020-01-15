@@ -205,32 +205,36 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 	return stripe, start + endSegment - 1, nil
 }
 
-func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) {
+func (d *DataCoder) Decode(stripe [][]byte, start, length int) ([]byte, error) {
 	var data [][]byte
-	var err error
 
-	segStart := start
-	segLength := 1 + (length-1)/(int(d.Prefix.DataCount)*d.segSize)
-
-	if length == -1 {
-		segLength = 1 + (len(data[0])-d.prefixSize-1)/d.fieldSize - segStart
+	_, _, minLen, err := decodeStripe(stripe)
+	if err != nil {
+		return nil, err
 	}
 
 	switch d.Prefix.Policy {
 	case RsPolicy:
 		if d.Repair {
-			d.RLength = (segStart + segLength) * d.fieldSize
-			data, _, err = d.recover(rawData)
+			d.RLength = minLen
+			data, _, err = d.recover(stripe)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			data = rawData
+			data = stripe
 		}
 	case MulPolicy:
-		data = rawData
+		data = stripe
 	default:
 		return nil, ErrWrongPolicy
+	}
+
+	segStart := start
+	segLength := 1 + (length-1)/(int(d.Prefix.DataCount)*d.segSize)
+
+	if length == -1 {
+		segLength = 1 + (minLen-d.prefixSize-1)/d.fieldSize - segStart
 	}
 
 	res := make([]byte, 0, segLength*int(d.Prefix.DataCount)*d.segSize)
