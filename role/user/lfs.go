@@ -69,7 +69,7 @@ type objectInfo struct {
 }
 
 // Start starts user's info
-func (l *LfsInfo) Start() error {
+func (l *LfsInfo) Start(ctx context.Context) error {
 	// 证明该user已经启动
 	if l.online || (l.gInfo != nil && l.gInfo.state > starting) {
 		return errors.New("The user is running")
@@ -77,7 +77,7 @@ func (l *LfsInfo) Start() error {
 
 	l.online = false
 
-	has, err := l.gInfo.start(l.context)
+	has, err := l.gInfo.start(ctx)
 	if err != nil {
 		utils.MLogger.Error("Start group: ", l.fsID, " for: ", l.userID, " fail: ", err)
 		return err
@@ -101,7 +101,7 @@ func (l *LfsInfo) Start() error {
 		l.putUserConfig()
 	}
 
-	err = l.startLfs(l.context)
+	err = l.startLfs(ctx)
 	if err != nil {
 		utils.MLogger.Error("Start lfs: ", l.fsID, " for: ", l.userID, " fail: ", err)
 		return err

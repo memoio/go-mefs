@@ -9,7 +9,7 @@ import (
 
 // FileSyetem defines user's function
 type FileSyetem interface {
-	Start() error
+	Start(ctx context.Context) error
 	Stop() error
 	Fsync(bool) error
 	Online() bool

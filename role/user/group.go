@@ -350,7 +350,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 			switch g.state {
 			case collecting:
 				timeOutCount++
-				utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...\n", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
+				utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
 				go g.ds.BroadcastMessage(ctx, kmes)
 			case collectDone:
 				g.notify(ctx)
@@ -362,7 +362,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return nil
+			return errors.New("cancel init")
 		}
 	}
 }

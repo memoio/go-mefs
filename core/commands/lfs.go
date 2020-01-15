@@ -407,7 +407,7 @@ var lfsStartUserCmd = &cmds.Command{
 			return err
 		}
 
-		err = lfs.Start()
+		err = lfs.Start(req.Context)
 		if err != nil {
 			node.Inst.(*user.Info).KillUser(uid)
 			return err

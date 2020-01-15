@@ -45,27 +45,28 @@ func (k *Info) checkLedger(ctx context.Context) {
 						continue
 					}
 
+					pre := pu.uid + metainfo.BLOCK_DELIMITER + pu.qid
 					thislinfo.blockMap.Range(func(key, value interface{}) bool {
 						thisinfo := value.(*blockInfo)
 						eclasped := utils.GetUnixNow() - thisinfo.availtime
 						switch thisinfo.repair {
 						case 0:
 							if EXPIRETIME < eclasped {
-								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
 								utils.MLogger.Info("Need repair cid first time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 1:
 							if 4*EXPIRETIME < eclasped {
-								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
 								utils.MLogger.Info("Need repair cid second time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 2:
 							if 16*EXPIRETIME < eclasped {
-								cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
 								utils.MLogger.Info("Need repair cid third time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
@@ -75,7 +76,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 							if 480*EXPIRETIME >= eclasped {
 								// try every 32 hours
 								if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
-									cid := pu.qid + metainfo.BLOCK_DELIMITER + key.(string)
+									cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
 									utils.MLogger.Info("Need repair cid tried: ", cid)
 									thisinfo.repair++
 									k.repch <- cid
@@ -110,24 +111,27 @@ func (k *Info) repairRegular(ctx context.Context) {
 // 1.search a new provider,we do it in func SearchNewProvider
 // 2.put chunk to this provider
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
-// value: chunkID1_pid1_offset1/chunkID2_pid2_offset2/...
-func (k *Info) repairBlock(ctx context.Context, blockID string) {
+// value: chunkID1_pid1/chunkID2_pid2/...
+func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 
 	var response string
-	// qid_bid_sid_bid
-	blkinfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
-	if len(blkinfo) < 4 {
+	// uid_qid_bid_sid_bid
+	blkinfo := strings.Split(rBlockID, metainfo.BLOCK_DELIMITER)
+	if len(blkinfo) < 5 {
 		return
 	}
 
-	qid := blkinfo[0]
+	blockID := strings.Join(blkinfo[1:], metainfo.BLOCK_DELIMITER)
 
-	gp := k.getGroupInfo(qid, qid, false)
+	uid := blkinfo[0]
+	qid := blkinfo[1]
+
+	gp := k.getGroupInfo(uid, qid, false)
 	if gp == nil {
 		return
 	}
 
-	thisbucket := k.getBucketInfo(qid, qid, blkinfo[1], false)
+	thisbucket := k.getBucketInfo(qid, qid, blkinfo[2], false)
 	if thisbucket == nil {
 		return
 	}
@@ -140,7 +144,7 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 	var res strings.Builder
 	for i := 0; i < count; i++ {
 		res.Reset()
-		res.WriteString(blkinfo[2])
+		res.WriteString(blkinfo[3])
 		res.WriteString(metainfo.BLOCK_DELIMITER)
 		res.WriteString(strconv.Itoa(i))
 		thisinfo, ok := thisbucket.stripes.Load(res.String())
@@ -152,21 +156,17 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 		res.WriteString(strconv.Itoa(i))
 		res.WriteString(metainfo.BLOCK_DELIMITER)
 
-		offset := thisinfo.(*blockInfo).offset
 		pid := thisinfo.(*blockInfo).storedOn
 
 		// recheck the status
-		if strconv.Itoa(i) == blkinfo[3] {
+		if strconv.Itoa(i) == blkinfo[4] {
 			if thisinfo.(*blockInfo).repair == 0 {
 				return
 			}
 			response = pid
 		}
 
-		res.WriteString(metainfo.BLOCK_DELIMITER)
 		res.WriteString(pid)
-		res.WriteString(metainfo.BLOCK_DELIMITER)
-		res.WriteString(strconv.Itoa(offset))
 		cpids = append(cpids, res.String())
 		ugid = append(ugid, pid)
 	}
@@ -191,10 +191,10 @@ func (k *Info) repairBlock(ctx context.Context, blockID string) {
 		}
 	}
 
-	// cid1_pid1_offset1|cid1_pid1_offset1
+	// cid1_pid1/cid2_pid2
 	metaValue := strings.Join(cpids, metainfo.DELIMITER)
 
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair)
+	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair, uid)
 	if err != nil {
 		utils.MLogger.Info("construct repair KV error: ", err)
 		return

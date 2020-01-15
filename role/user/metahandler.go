@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -17,8 +18,11 @@ func (u *Info) HandleMetaMessage(dt int, metaKey string, metaValue, sig []byte, 
 	switch keytype {
 	case metainfo.UserInit: //handle init response from keeper
 		if dt == metainfo.Put {
-			uInfo := u.GetUser(km.GetOptions()[0])
-			go uInfo.(*LfsInfo).gInfo.handleUserInit(km, metaValue, from)
+			fs, ok := u.fsMap.Load(km.GetMid())
+			if !ok {
+				utils.MLogger.Warn("no lfs for: ", km.GetMid())
+			}
+			go fs.(*LfsInfo).gInfo.handleUserInit(km, metaValue, from)
 		}
 	default: //没有匹配的信息，报错
 		return nil, metainfo.ErrWrongType

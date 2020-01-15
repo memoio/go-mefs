@@ -19,7 +19,7 @@ type DataCoder struct {
 	Prefix     *pb.BucketOptions
 	BlsKey     *mcl.KeySet
 	Repair     bool
-	DataCount  int // recover how many fields
+	RLength    int // recover how long
 	blockCount int
 	tagCount   int
 	tagSize    int
@@ -208,10 +208,19 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) {
 	var data [][]byte
 	var err error
+
+	segStart := start
+	segLength := 1 + (length-1)/(int(d.Prefix.DataCount)*d.segSize)
+
+	if length == -1 {
+		segLength = 1 + (len(data[0])-d.prefixSize-1)/d.fieldSize - segStart
+	}
+
 	switch d.Prefix.Policy {
 	case RsPolicy:
 		if d.Repair {
-			data, err = d.recover(rawData)
+			d.RLength = (segStart + segLength) * d.fieldSize
+			data, _, err = d.recover(rawData)
 			if err != nil {
 				return nil, err
 			}
@@ -222,13 +231,6 @@ func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) 
 		data = rawData
 	default:
 		return nil, ErrWrongPolicy
-	}
-
-	segStart := start
-	segLength := 1 + (length-1)/(int(d.Prefix.DataCount)*d.segSize)
-
-	if length == -1 {
-		segLength = 1 + (len(data[0])-d.prefixSize-1)/d.fieldSize - segStart
 	}
 
 	res := make([]byte, 0, segLength*int(d.Prefix.DataCount)*d.segSize)
@@ -242,103 +244,133 @@ func (d *DataCoder) Decode(rawData [][]byte, start, length int) ([]byte, error) 
 	return res, nil
 }
 
-func Repair(stripe [][]byte) ([][]byte, error) {
-	prefix, _, err := decodeStripe(stripe)
+// Repair stripes
+func Repair(stripe [][]byte) ([][]byte, int, error) {
+	prefix, _, minLen, err := decodeStripe(stripe)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	// 如果avaNum>=DataCount，但是stripe数量不够DataCount+ParityCount，可修复但得补够
-	if len(stripe) < int(prefix.DataCount+prefix.ParityCount) {
-		for i := len(stripe); i < int(prefix.DataCount+prefix.ParityCount); i++ {
+	coder := NewDataCoderWithPrefix(prefix, nil)
+
+	coder.RLength = minLen
+
+	return coder.recover(stripe)
+}
+
+func (d *DataCoder) recover(stripe [][]byte) ([][]byte, int, error) {
+	if len(stripe) < d.blockCount {
+		for i := len(stripe); i < d.blockCount; i++ {
 			stripe = append(stripe, nil)
 		}
 	}
 
-	switch prefix.Policy {
-	case MulPolicy:
-	case RsPolicy:
-	default:
-		return nil, ErrWrongPolicy
+	preData, preLen, err := bf.PrefixEncode(d.Prefix)
+	if err != nil {
+		return nil, 0, err
 	}
-	return nil, ErrRepairCrash
+
+	fieldStripe := make([][]byte, d.blockCount)
+	fieldSize := d.fieldSize
+	fieldCount := 1 + (d.RLength-preLen-1)/fieldSize
+
+	for i := 0; i < d.blockCount; i++ {
+		if stripe[i] == nil {
+			stripe[i] = make([]byte, 0, preLen)
+			stripe[i] = append(stripe[i], preData...)
+		}
+	}
+
+	for i := 0; i < fieldCount; i++ {
+		for j := 0; j < d.blockCount; j++ {
+			if len(stripe[j]) >= preLen+(i+1)*fieldSize {
+				fieldStripe[j] = stripe[j][preLen+i*fieldSize : preLen+(i+1)*fieldSize]
+			} else {
+				fieldStripe[j] = nil
+			}
+
+		}
+		fieldStripe, err = d.recoverField(fieldStripe)
+		if err != nil {
+			return nil, i, err
+		}
+		for j := 0; j < d.blockCount; j++ {
+			if len(stripe[j]) == preLen+i*fieldSize {
+				stripe[j] = append(stripe[j], fieldStripe[j]...)
+			}
+		}
+	}
+
+	return stripe, fieldCount, nil
 }
 
-func (d *DataCoder) RecoverStripe(stripe [][]byte) ([][]byte, error) {
-	preData, preLen, err := bf.PrefixEncode(d.Prefix)
+func (d *DataCoder) recoverField(stripe [][]byte) ([][]byte, error) {
+	tmpData := make([][]byte, d.blockCount)
+	// 解析出data、tag、tagP
+	for i := 0; i < d.blockCount; i++ {
+		if stripe[i] != nil {
+			tmpData[i] = stripe[i][:d.segSize]
+		} else {
+			tmpData[i] = nil
+		}
+	}
+
+	datas, err := d.recoverData(tmpData, int(d.Prefix.DataCount), int(d.Prefix.ParityCount))
 	if err != nil {
 		return nil, err
 	}
 
-	avai := 0
-	// 构建丢失的块并加上prefix
-	for i := 0; i < d.blockCount; i++ {
-		if len(stripe[i]) == 0 {
-			stripe[i] = make([]byte, 0, d.prefixSize+d.DataCount*d.fieldSize)
-			stripe[i] = append(stripe[i], preData...)
-		} else {
-			avai = i
-		}
-	}
-
-	// 创建临时Data组用以恢复segment，临时tag组用以恢复tag和tagp
-	tmpData := createGroup(d.blockCount, int(d.segSize))
-	tmpTag := createGroup(d.blockCount*d.tagCount, d.tagSize)
+	tmpTag := make([][]byte, d.blockCount*d.tagCount)
 	// 解析出data、tag、tagP
-	for i := 0; i < d.DataCount; i++ {
-		clearGroup(tmpData)
-		clearGroup(tmpTag)
-		for j := 0; j < d.blockCount; j++ {
-			if len(stripe[j]) != preLen+d.fieldSize*i {
-				rawdata, tags := d.decodeField(stripe[j][preLen+i*d.fieldSize:preLen+(i+1)*d.fieldSize], d.tagCount)
-				copy(tmpData[j], rawdata)
-				for k := 0; k < d.tagCount; k++ {
-					copy(tmpTag[j+d.blockCount*k], tags[k])
-				}
-			}
-		}
-
-		// recover data
-		switch d.Prefix.Policy {
-		case MulPolicy:
-			for j := 0; j < d.blockCount; j++ {
-				if len(stripe[j]) == preLen+i*d.fieldSize {
-					copy(tmpData[j], tmpData[avai])
-				}
-			}
-		case RsPolicy:
-			tmpData, err = d.recover(tmpData)
-			if err != nil {
-				return nil, err
-			}
-		default:
-			return nil, ErrWrongPolicy
-
-		}
-
-		// recover tag
-		tmpTag, err = d.recover(tmpTag)
-		if err != nil {
-			return nil, err
-		}
-
-		// 将恢复的数据放回stripe内
-		for j := 0; j < d.blockCount; j++ {
-			if len(stripe[j]) == preLen+i*d.fieldSize {
-				stripe[j] = append(stripe[j], tmpData[j]...)
-				for k := 0; k < d.tagCount; k++ {
-					stripe[j] = append(stripe[j], tmpTag[j+k*d.blockCount]...)
-				}
+	for j := 0; j < d.tagCount; {
+		for i := 0; i < d.blockCount; i++ {
+			if stripe[i] != nil {
+				tmpTag[i+j*d.blockCount] = stripe[i][d.segSize+j*d.tagSize : d.segSize+(j+1)*d.tagSize]
+			} else {
+				tmpTag[i+j*d.blockCount] = nil
 			}
 		}
 	}
-	return stripe, nil
+
+	tags, err := d.recoverData(tmpTag, d.blockCount, d.blockCount*(d.tagCount-1))
+	if err != nil {
+		return nil, err
+	}
+
+	for j := 0; j < d.blockCount*d.tagCount; {
+		for k := 0; k < d.blockCount; k++ {
+			datas[k] = append(datas[k], tags[j]...)
+			j++
+		}
+	}
+
+	return datas, nil
 }
 
 // 将传入的数据冗余块组恢复，返回想要恢复的块，若index为-1则返回个块组
-func (d *DataCoder) recover(data [][]byte) ([][]byte, error) {
-	// 根据传入的参数，恢复整个块组
-	enc, err := reedsolomon.New(int(d.Prefix.DataCount), int(d.Prefix.ParityCount))
+func (d *DataCoder) recoverData(data [][]byte, dc, pc int) ([][]byte, error) {
+	if dc == 1 {
+		var i int
+		for i = 0; i < d.blockCount; i++ {
+			if data[i] != nil {
+				break
+			}
+		}
+
+		if i == d.blockCount {
+			return nil, errors.New("no available")
+		}
+
+		for j := 0; j < d.blockCount; j++ {
+			if data[j] == nil {
+				data[j] = make([]byte, 0)
+				data[j] = append(data[j], data[i]...)
+			}
+		}
+		return data, nil
+	}
+
+	enc, err := reedsolomon.New(dc, pc)
 	if err != nil {
 		return nil, err
 	}
@@ -404,19 +436,20 @@ func createFields(stripe, dataGroup, tagGroup [][]byte) [][]byte {
 	return stripe
 }
 
-// 解析一个Stripe中单独一个BLock的Prefix、大小、最多拥有的Field数量和该Stripe实际含有的未D丢失数据块的数量
-func decodeStripe(data [][]byte) (*pb.BucketOptions, int, error) {
+// decode stripe returns prefix, min len
+func decodeStripe(data [][]byte) (*pb.BucketOptions, int, int, error) {
 	var prefix *pb.BucketOptions
-	var avaNum int
+	var avaNum, preLen int
 	lengths := make([]int, len(data))
 	for i := 0; i < len(data); i++ {
 		lengths[i] = len(data[i])
 		if len(data[i]) != 0 {
-			if prefix == nil {
-				pre, _, err := bf.PrefixDecode(data[i])
+			if prefix == nil || preLen == 0 {
+				pre, pLen, err := bf.PrefixDecode(data[i])
 				if err != nil {
 					continue
 				}
+				preLen = pLen
 				prefix = pre
 			}
 			avaNum++
@@ -424,20 +457,20 @@ func decodeStripe(data [][]byte) (*pb.BucketOptions, int, error) {
 	}
 
 	if avaNum == 0 {
-		return nil, 0, errors.New("no available block")
+		return nil, 0, 0, errors.New("no available block")
 	}
 
 	if prefix != nil && (int(prefix.DataCount) > avaNum || int(prefix.DataCount) > len(lengths)) {
 		utils.MLogger.Error("repair crash, need data count: ", prefix.DataCount, ", but got avaNum: ", avaNum)
-		return nil, 0, ErrRepairCrash
+		return nil, 0, 0, ErrRepairCrash
 	}
 
 	sort.Sort(sort.Reverse(sort.IntSlice(lengths)))
 
 	if lengths[prefix.DataCount] <= 0 {
 		utils.MLogger.Error("repair crash after sort: need count: ", prefix.DataCount, ", but got avaNum again: ", avaNum)
-		return nil, 0, ErrRepairCrash
+		return nil, 0, 0, ErrRepairCrash
 	}
 
-	return prefix, lengths[prefix.DataCount], nil
+	return prefix, preLen, lengths[prefix.DataCount], nil
 }
