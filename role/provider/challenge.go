@@ -72,11 +72,12 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		electedIndex := buf.String()
 		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
+			utils.MLogger.Debugf("get %s data and tag failed: %s", blockID, err)
 			faultBlocks = append(faultBlocks, index)
 		} else {
 			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
 			if !isTrue {
-				utils.MLogger.Info("verify tag failed")
+				utils.MLogger.Warnf("verify %s data and tag failed", blockID)
 				//验证失败，则在本地删除此块
 				err := p.ds.DeleteBlock(context.Background(), blockID.String(), "local")
 				if err != nil {
@@ -89,6 +90,11 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 				chal.Indices = append(chal.Indices, electedIndex)
 			}
 		}
+	}
+
+	if len(chal.Indices) == 0 {
+		utils.MLogger.Error("GenProof fails due to no available data")
+		return nil
 	}
 
 	proof, err := blskey.GenProof(chal, data, tag, 32)
