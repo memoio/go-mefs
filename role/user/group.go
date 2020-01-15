@@ -350,8 +350,10 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 			switch g.state {
 			case collecting:
 				timeOutCount++
-				utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...", len(g.tempKeepers), len(g.tempProviders), g.keeperSLA, g.providerSLA)
-				go g.ds.BroadcastMessage(ctx, kmes)
+				ok := g.collect(ctx)
+				if ok {
+					go g.ds.BroadcastMessage(ctx, kmes)
+				}
 			case collectDone:
 				g.notify(ctx)
 			case deploying:
@@ -385,6 +387,8 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 	}
 
 	ctx := context.Background()
+	kcount := 0
+	pcount := 0
 	keepers := splitedMeta[0]
 	for i := 0; i < len(keepers)/utils.IDLength; i++ {
 		kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
@@ -395,8 +399,10 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 		if !utils.CheckDup(g.tempKeepers, kid) {
 			continue
 		}
+
+		g.tempKeepers = append(g.tempKeepers, kid)
 		if g.ds.Connect(ctx, kid) {
-			g.tempKeepers = append(g.tempKeepers, kid)
+			kcount++
 		}
 	}
 
@@ -406,13 +412,47 @@ func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from 
 		if !utils.CheckDup(g.tempProviders, pid) {
 			continue
 		}
+
+		g.tempProviders = append(g.tempProviders, pid)
 		if g.ds.Connect(ctx, pid) {
-			g.tempProviders = append(g.tempProviders, pid)
+			pcount++
 		}
 	}
 
-	if len(g.tempKeepers) >= g.keeperSLA && len(g.tempProviders) >= g.providerSLA {
+	if kcount >= g.keeperSLA && pcount >= g.providerSLA {
 		g.state = collectDone
+	}
+}
+
+func (g *groupInfo) collect(ctx context.Context) bool {
+	g.Lock()
+	defer g.Unlock()
+
+	if g.state != collecting {
+		return false
+	}
+
+	kcount := 0
+	pcount := 0
+
+	for _, kid := range g.tempKeepers {
+		if g.ds.Connect(ctx, kid) {
+			kcount++
+		}
+	}
+
+	for _, kid := range g.tempProviders {
+		if g.ds.Connect(ctx, kid) {
+			pcount++
+		}
+	}
+
+	if kcount >= g.keeperSLA && pcount >= g.providerSLA {
+		g.state = collectDone
+		return false
+	} else {
+		utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...", kcount, pcount, g.keeperSLA, g.providerSLA)
+		return true
 	}
 }
 
