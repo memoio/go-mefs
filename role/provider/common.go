@@ -53,6 +53,9 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			p.ds.PutKey(ctx, userconfigkey, userconfigbyte, "local")
+
 			gp.blsKey = mkey
 			return mkey, nil
 		}

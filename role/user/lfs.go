@@ -99,7 +99,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		}
 
 		l.keySet = mkey
-		l.putUserConfig()
+		go l.putUserConfig()
 	}
 
 	err = l.startLfs(ctx)
