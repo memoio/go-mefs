@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
@@ -128,6 +129,10 @@ func (l *LfsInfo) loadBLS12Config() error {
 		}
 	}
 
-	utils.MLogger.Info("BlS12 SK and Pk is loaded for ", l.fsID)
-	return nil
+	if l.keySet != nil {
+		utils.MLogger.Info("BlS12 SK and Pk is loaded for ", l.fsID)
+		return nil
+	}
+
+	return errors.New("No bls key")
 }

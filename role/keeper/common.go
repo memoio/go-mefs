@@ -68,9 +68,11 @@ func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
 	}
 
 	for _, keeperID := range gp.keepers {
-		userconfigbyte, err = k.ds.GetKey(ctx, userconfigkey, keeperID)
-		if err == nil && userconfigbyte != nil {
-			return userconfigbyte, nil
+		if keeperID != k.localID {
+			userconfigbyte, err = k.ds.GetKey(ctx, userconfigkey, keeperID)
+			if err == nil && userconfigbyte != nil {
+				return userconfigbyte, nil
+			}
 		}
 	}
 
