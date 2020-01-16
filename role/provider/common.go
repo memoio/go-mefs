@@ -37,28 +37,25 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 
 	ctx := context.Background()
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, "local")
-	if err != nil {
-		return nil, err
-	}
-
-	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
-	if err == nil && mkey != nil {
-		gp.blsKey = mkey
-		return mkey, nil
+	userconfigbyte, _ := p.ds.GetKey(ctx, userconfigkey, "local")
+	if len(userconfigbyte) > 0 {
+		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
+		if err == nil && mkey != nil {
+			gp.blsKey = mkey
+			return mkey, nil
+		}
 	}
 
 	for _, kid := range gp.keepers {
-		userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, kid)
-		if err != nil {
-			return nil, err
+		userconfigbyte, _ := p.ds.GetKey(ctx, userconfigkey, kid)
+		if len(userconfigbyte) > 0 {
+			mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
+			if err != nil {
+				return nil, err
+			}
+			gp.blsKey = mkey
+			return mkey, nil
 		}
-		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
-		if err != nil {
-			return nil, err
-		}
-		gp.blsKey = mkey
-		return mkey, nil
 	}
 
 	return nil, errors.New("No bls config")

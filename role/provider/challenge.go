@@ -77,7 +77,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		electedIndex := buf.String()
 		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
-			utils.MLogger.Warnf("get %s data and tag  at %d failed: %s", blockID, electedOffset, err)
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
 			faultBlocks = append(faultBlocks, index)
 		} else {
 			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
@@ -98,7 +98,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	}
 
 	if len(chal.Indices) == 0 {
-		utils.MLogger.Error("GenProof fails due to no available data")
+		utils.MLogger.Errorf("GenProof for %s fails due to no available data", fsID)
 		return nil
 	}
 

@@ -45,8 +45,23 @@ func (l *LfsInfo) putUserConfig() {
 	// put to local first
 	l.ds.PutKey(ctx, blskey, userBLS12Config, "local")
 
-	//最后发送本节点的BLS12公钥到自己的keeper上保存
+	//put config to
 	for _, kid := range l.gInfo.tempKeepers {
+		retry := 0
+		for retry < 10 {
+			err := l.ds.PutKey(ctx, blskey, userBLS12Config, kid)
+			if err != nil {
+				retry++
+				if retry >= 10 {
+					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
+				}
+				time.Sleep(60 * time.Second)
+			}
+			break
+		}
+	}
+
+	for _, kid := range l.gInfo.tempProviders {
 		retry := 0
 		for retry < 10 {
 			err := l.ds.PutKey(ctx, blskey, userBLS12Config, kid)

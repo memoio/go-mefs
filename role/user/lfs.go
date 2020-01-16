@@ -90,6 +90,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 			utils.MLogger.Warn("Load bls config fail: ", err)
 		}
 	}
+
 	if !has || err != nil {
 		mkey, err := initBLS12Config()
 		if err != nil {
