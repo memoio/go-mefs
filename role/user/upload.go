@@ -51,6 +51,10 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 		return nil, ErrBucketNotExist
 	}
 
+	if err := checkObjectName(objectName); err != nil {
+		return nil, err
+	}
+
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
@@ -64,9 +68,6 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 	bucket.Lock()
 	defer bucket.Unlock()
 
-	if err := checkObjectName(objectName); err != nil {
-		return nil, err
-	}
 	if objectElement, ok := bucket.objects[objectName]; ok || objectElement != nil {
 		return nil, ErrObjectAlreadyExist
 	}

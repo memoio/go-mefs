@@ -102,6 +102,10 @@ func PrefixLen(data []byte) (int, int, error) {
 }
 
 func PrefixDecode(data []byte) (*pb.BucketOptions, int, error) {
+	if len(data) < 10 {
+		log.Println("wrong proto prefix len")
+		return nil, 0, errors.New("wrong proto prefix length")
+	}
 	x, n := proto.DecodeVarint(data[:10])
 	if n <= 0 || x == 0 {
 		log.Println("wrong proto prefix message:", x, n)

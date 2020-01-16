@@ -138,7 +138,7 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
 		}
 	}
-	utils.MLogger.Info("Lfs Service is ready for: ", l.userID)
+	utils.MLogger.Infof("Lfs Service %s is ready for: %s", l.fsID, l.userID)
 	l.online = true
 	go l.persistMetaBlock(ctx)
 	return nil
@@ -226,8 +226,6 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 		return ErrLfsServiceNotReady
 	}
 
-	l.gInfo.saveChannelValue()
-
 	l.meta.sb.RLock()
 	if l.meta.sb.dirty || isForce { //将超级块信息保存在本地
 		err := l.flushSuperBlock()
@@ -245,6 +243,8 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			return err
 		}
 	}
+
+	l.gInfo.saveChannelValue()
 
 	return nil
 }
@@ -314,7 +314,7 @@ func (l *LfsInfo) flushSuperBlock() error {
 		}
 	}
 
-	utils.MLogger.Info(l.fsID, " superblock persist. User is ", l.userID)
+	utils.MLogger.Infof("user %s lfs %s superblock persist. ", l.userID, l.fsID)
 	return nil
 }
 
