@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+	df "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
@@ -33,6 +34,16 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 	ctx := context.Background()
 
 	go func() {
+		if Debug {
+			blskey, _ := p.getNewUserConfig(gp.userID, qid)
+			if blskey != nil && blskey.Pk != nil {
+				ok := df.VerifyBlock(value, splitedNcid[0], blskey)
+				if !ok {
+					utils.MLogger.Warnf("Verify data for %s fails", splitedNcid[0])
+				}
+			}
+
+		}
 		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {
 			utils.MLogger.Info("Error writing block to datastore: %s", err)
