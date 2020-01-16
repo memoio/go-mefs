@@ -28,8 +28,13 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	utils.MLogger.Info("receive: ", fsID, " 's challenge from: ", from)
 	blskey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {
-		utils.MLogger.Warn("get new user`s config from failed: ", err)
+		utils.MLogger.Warnf("get new user %s config from failed: %s ", fsID, err)
 		return err
+	}
+
+	if blskey == nil || blskey.Pk == nil {
+		utils.MLogger.Warn("get empty user`s config for: ", fsID)
+		return nil
 	}
 
 	hProto := &pb.Chalnum{}
