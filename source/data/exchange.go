@@ -198,10 +198,6 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		return nil, err
 	}
 
-	if string(bdata) == "complete" {
-		return nil, errors.New("get block failed")
-	}
-
 	c := cid.NewCidV2([]byte(key))
 	b, err := blocks.NewBlockWithCid([]byte(bdata), c)
 	if err != nil {

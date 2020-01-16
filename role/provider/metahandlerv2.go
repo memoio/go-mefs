@@ -37,12 +37,7 @@ func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []by
 				return nil, err
 			}
 		case metainfo.Get:
-			res, err := p.handleGetBlock(km, metaValue, sig, from)
-			if err != nil {
-				utils.MLogger.Error("get blcok error: ", err)
-			} else {
-				return res, nil
-			}
+			return p.handleGetBlock(km, metaValue, sig, from)
 		case metainfo.Append:
 			err := p.handleAppendBlock(km, metaValue, from)
 			if err != nil {
