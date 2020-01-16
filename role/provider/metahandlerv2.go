@@ -3,9 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
-	"strings"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -69,47 +67,13 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 		return nil, errors.New("wrong key")
 	}
 
-	splitValue := strings.Split(string(metaValue), metainfo.DELIMITER)
-	if len(splitValue) != 2 {
-		return nil, errors.New("wrong value")
-	}
-
-	var keepers []string
-	var pros []string
-	kids := splitValue[0]
-	for i := 0; i < len(kids)/utils.IDLength; i++ {
-		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
-		_, err := peer.IDB58Decode(keeper)
-		if err != nil {
-			continue
-		}
-		keepers = append(keepers, keeper)
-	}
-
-	pids := splitValue[1]
-	has := false
-	for i := 0; i < len(pids)/utils.IDLength; i++ {
-		pid := string(pids[i*utils.IDLength : (i+1)*utils.IDLength])
-		_, err := peer.IDB58Decode(pid)
-		if err != nil {
-			continue
-		}
-		if pid == p.localID {
-			has = true
-		}
-		pros = append(pros, pid)
-	}
-
-	if !has {
-		return nil, errors.New("Not my user")
-	}
-
 	uid := ops[0]
-
 	_, ok := p.fsGroup.Load(gid)
 	if !ok {
-		gp := newGroup(p.localID, uid, gid, keepers, pros)
-		p.fsGroup.Store(gid, gp)
+		gp := p.newGroupWithFS(uid, gid, string(metaValue), false)
+		if gp == nil {
+			return nil, errors.New("Not my user")
+		}
 	}
 
 	ui, ok := p.users.Load(uid)
@@ -125,8 +89,6 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	kmkps, _ := metainfo.NewKeyMeta(gid, metainfo.LogFS, uid)
 	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
-
-	p.loadChannelValue(uid, gid)
 
 	return []byte("ok"), nil
 }

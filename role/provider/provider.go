@@ -169,6 +169,7 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *
 	splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
 	var tmpKps []string
 	var tmpPros []string
+	has := false
 	if len(splitedMeta) == 2 {
 		kps := splitedMeta[0]
 		for i := 0; i < len(kps)/utils.IDLength; i++ {
@@ -182,17 +183,28 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *
 
 		kps = splitedMeta[1]
 		for i := 0; i < len(kps)/utils.IDLength; i++ {
-			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-			_, err := peer.IDB58Decode(kid)
+			pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(pid)
 			if err != nil {
 				continue
 			}
-			tmpPros = append(tmpPros, kid)
+
+			if pid == p.localID {
+				has = true
+			}
+
+			tmpPros = append(tmpPros, pid)
 		}
 	}
 
-	if len(tmpKps) == 0 {
-		tmpKps = append(tmpKps, groupID)
+	if userID == groupID && (len(tmpKps) == 0 || len(tmpPros) == 0) {
+		utils.MLogger.Warn(groupID, " has no keeper or providers")
+		return nil
+	}
+
+	if !has {
+		utils.MLogger.Warn(groupID, " is not my user")
+		return nil
 	}
 
 	if len(tmpPros) == 0 {
@@ -203,6 +215,8 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *
 	if gp != nil {
 		p.fsGroup.Store(groupID, gp)
 	}
+
+	p.loadChannelValue(userID, groupID)
 	return gp
 }
 

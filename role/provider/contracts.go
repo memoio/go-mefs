@@ -150,6 +150,8 @@ func (g *groupInfo) loadContracts(proID string) error {
 			return err
 		}
 		g.upkeeping = &uItem
+		g.keepers = uItem.KeeperIDs
+		g.providers = uItem.ProviderIDs
 	}
 
 	if g.channel == nil {
