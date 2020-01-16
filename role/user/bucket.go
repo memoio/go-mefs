@@ -7,6 +7,7 @@ import (
 
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/utils"
 )
 
 // CreateBucket create a bucket for a specified LFSservice
@@ -31,6 +32,8 @@ func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 	if _, ok := l.meta.bucketNameToID[bucketName]; ok {
 		return nil, ErrBucketAlreadyExist
 	}
+
+	utils.MLogger.Infof("create bucket %s in lfs %s", bucketName, l.fsID)
 
 	// 多副本策略
 	switch options.Policy {

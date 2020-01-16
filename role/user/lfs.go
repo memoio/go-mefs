@@ -102,7 +102,8 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		go l.putUserConfig()
 	}
 
-	err = l.startLfs(ctx)
+	// in case persist is cancel
+	err = l.startLfs(l.context)
 	if err != nil {
 		utils.MLogger.Error("Start lfs: ", l.fsID, " for: ", l.userID, " fail: ", err)
 		return err
@@ -139,7 +140,6 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 		}
 	}
 	utils.MLogger.Infof("Lfs Service %s is ready for: %s", l.fsID, l.userID)
-	l.online = true
 	go l.persistMetaBlock(ctx)
 	return nil
 }
@@ -196,8 +196,8 @@ func (l *LfsInfo) GetGroup() *groupInfo {
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
-	persistMetaInterval := 30 * time.Second
-	tick := time.NewTicker(persistMetaInterval)
+	utils.MLogger.Infof("Persist Lfs %s is ready for: %s", l.fsID, l.userID)
+	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
 	for {
 		select {
@@ -233,9 +233,12 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			l.meta.sb.RUnlock()
 			return err
 		}
-		l.meta.sb.dirty = false
 	}
 	l.meta.sb.RUnlock()
+
+	l.meta.sb.Lock()
+	l.meta.sb.dirty = false
+	l.meta.sb.Unlock()
 
 	for _, bucket := range l.meta.bucketByID {
 		err := l.flushBucketAndObjects(bucket, isForce)
