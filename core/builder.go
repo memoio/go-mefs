@@ -90,7 +90,7 @@ func NewNode(ctx context.Context, cfg *BuildCfg, password, nKey string) (*MefsNo
 		Repo:      cfg.Repo,
 		ctx:       ctx,
 		Peerstore: pstoremem.NewPeerstore(),
-		Password:  password,
+		password:  password,
 		NetKey:    nKey,
 	}
 

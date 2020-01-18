@@ -8,7 +8,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"path"
 	"runtime"
 	"sort"
 	"sync"
@@ -19,7 +18,6 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	utilmain "github.com/memoio/go-mefs/cmd/mefs/util"
 	oldcmds "github.com/memoio/go-mefs/commands"
-	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/core/commands"
@@ -65,8 +63,8 @@ const (
 )
 
 var (
-	errWrongInput = errors.New("The input option is wrong.")
-	errRepoExists = errors.New(`mefs configuration file already exists, reinitializing would overwrite your keys`)
+	errWrongInput = errors.New("The input option is wrong")
+	errRepoExists = errors.New("mefs configuration file already exists, reinitializing would overwrite your keys")
 )
 
 var daemonCmd = &cmds.Command{
@@ -141,8 +139,8 @@ environment variable:
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(utils.DefaultPassword),
-		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
@@ -388,24 +386,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
-	// 读keystore下uid文件
-	keypath, err := config.Path("", path.Join("keystore", node.Identity.Pretty()))
-	if err != nil {
-		return errRepoExists
-	}
-	_, err = os.Stat(keypath)
-	if os.IsNotExist(err) {
-		return errRepoExists
-	}
-
-	sk, err := fsrepo.GetPrivateKeyFromKeystore(node.Identity.Pretty(), node.Password)
-	if err != nil {
-		return err
-	}
-
 	switch cfg.Role {
 	case metainfo.RoleKeeper:
-		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), sk, node.Data, node.Routing)
+		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start keeper service fails; please restart")
 		}
@@ -424,7 +407,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("started as a provider")
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), sk, node.Data, node.Routing, capacity, duration, price, rdo)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err

@@ -36,8 +36,8 @@ environment variable:
 		cmds.FileArg("default-config", false, false, "Initialize with the given configuration.").EnableStdin(),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the privateKey").WithDefault(utils.DefaultPassword),
-		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the PrivateKey").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 	},
 	PreRun: func(req *cmds.Request, env cmds.Environment) error {

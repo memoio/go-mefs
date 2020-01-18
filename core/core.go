@@ -86,7 +86,7 @@ type MefsNode struct {
 
 	// Self
 	Identity peer.ID // the local node's identity
-	Password string  // to decrypt the privateKey
+	password string  // to decrypt the PrivateKey
 
 	Repo repo.Repo
 
@@ -537,7 +537,7 @@ func (n *MefsNode) LoadPrivateKey() error {
 		return nil
 	}
 
-	sk, err := fsrepo.GetPrivateKeyFromKeystore(n.Identity.Pretty(), n.Password) //format of eth without prefix "0x"
+	sk, err := fsrepo.GetPrivateKeyFromKeystore(n.Identity.Pretty(), n.password) //format of eth without prefix "0x"
 	if err != nil {
 		return err
 	}
