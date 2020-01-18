@@ -182,11 +182,11 @@ func (m *measure) Put(key datastore.Key, value []byte) error {
 	return err
 }
 
-func (m *measure) Append(key datastore.Key, value []byte, beginoffset, endoffset int) error {
+func (m *measure) Append(key datastore.Key, value []byte, begin, length int) error {
 	defer recordLatency(m.putLatency, time.Now())
 	m.putNum.Inc()
 	m.putSize.Observe(float64(len(value)))
-	err := m.backend.Append(key, value, beginoffset, endoffset)
+	err := m.backend.Append(key, value, begin, length)
 	if err != nil {
 		m.putErr.Inc()
 	}
@@ -348,11 +348,11 @@ func (mt *measuredBatch) Put(key datastore.Key, val []byte) error {
 	}
 	return err
 }
-func (mt *measuredBatch) Append(key datastore.Key, val []byte, beginoffset, endoffset int) error {
+func (mt *measuredBatch) Append(key datastore.Key, val []byte, begin, length int) error {
 	defer recordLatency(mt.m.batchPutLatency, time.Now())
 	mt.m.batchPutNum.Inc()
 	mt.m.batchPutSize.Observe(float64(len(val)))
-	err := mt.b.Append(key, val, beginoffset, endoffset)
+	err := mt.b.Append(key, val, begin, length)
 	if err != nil {
 		mt.m.batchPutErr.Inc()
 	}

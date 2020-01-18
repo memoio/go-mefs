@@ -80,7 +80,7 @@ func (a *accessor) Put(key ds.Key, value []byte) (err error) {
 	return a.ldb.Put(key.Bytes(), value, &opt.WriteOptions{Sync: a.syncWrites})
 }
 
-func (a *accessor) Append(key ds.Key, value []byte, beginoffset, endoffset int) (err error) {
+func (a *accessor) Append(key ds.Key, value []byte, begin, length int) (err error) {
 	return nil
 }
 
@@ -211,7 +211,7 @@ func (b *leveldbBatch) Put(key ds.Key, value []byte) error {
 	return nil
 }
 
-func (b *leveldbBatch) Append(key ds.Key, value []byte, beginoffset, endoffset int) error {
+func (b *leveldbBatch) Append(key ds.Key, value []byte, begin, length int) error {
 	return nil
 }
 

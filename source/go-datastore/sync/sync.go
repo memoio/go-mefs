@@ -34,10 +34,10 @@ func (d *MutexDatastore) Put(key ds.Key, value []byte) (err error) {
 }
 
 // Append implements Datastore.Append
-func (d *MutexDatastore) Append(key ds.Key, value []byte, beginoffset, endoffset int) (err error) {
+func (d *MutexDatastore) Append(key ds.Key, value []byte, begin, length int) (err error) {
 	d.Lock()
 	defer d.Unlock()
-	return d.child.Append(key, value, beginoffset, endoffset)
+	return d.child.Append(key, value, begin, length)
 }
 
 // Sync implements Datastore.Sync
@@ -148,10 +148,10 @@ func (b *syncBatch) Put(key ds.Key, val []byte) error {
 	return b.batch.Put(key, val)
 }
 
-func (b *syncBatch) Append(key ds.Key, val []byte, beginoffset, endoffset int) error {
+func (b *syncBatch) Append(key ds.Key, val []byte, begin, length int) error {
 	b.mds.Lock()
 	defer b.mds.Unlock()
-	return b.batch.Append(key, val, beginoffset, endoffset)
+	return b.batch.Append(key, val, begin, length)
 }
 
 func (b *syncBatch) Delete(key ds.Key) error {

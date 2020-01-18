@@ -11,4 +11,5 @@ message BucketOptions {
 	// number of segments
 	int32 SegmentCount = 7;
 	bool Encryption = 8; 
+	int32 Start = 11;
 }

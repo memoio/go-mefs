@@ -3,7 +3,7 @@ package datastore
 type op struct {
 	delete bool
 	begin  int
-	end    int
+	length int
 	value  []byte
 }
 
@@ -27,11 +27,11 @@ func (bt *basicBatch) Put(key Key, val []byte) error {
 	return nil
 }
 
-func (bt *basicBatch) Append(key Key, val []byte, beginoffset, endoffset int) error {
+func (bt *basicBatch) Append(key Key, val []byte, begin, length int) error {
 	bt.ops[key] = op{
-		value: val,
-		begin: beginoffset,
-		end:   endoffset,
+		value:  val,
+		begin:  begin,
+		length: length,
 	}
 	return nil
 }
@@ -47,10 +47,10 @@ func (bt *basicBatch) Commit() error {
 		if op.delete {
 			err = bt.target.Delete(k)
 		} else {
-			if op.begin == 0 && op.end == 0 {
+			if op.begin == 0 && op.length == 0 {
 				err = bt.target.Put(k, op.value)
 			} else {
-				err = bt.target.Append(k, op.value, op.begin, op.end)
+				err = bt.target.Append(k, op.value, op.begin, op.length)
 			}
 
 		}

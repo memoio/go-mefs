@@ -101,23 +101,16 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 	blockSize := d.fieldSize * endSegment
 
-	var stripe [][]byte
-	if start == 0 {
-		preData, preLen, err := bf.PrefixEncode(d.Prefix)
-		if err != nil {
-			return nil, 0, err
-		}
+	d.Prefix.Start = int32(start)
+	preData, preLen, err := bf.PrefixEncode(d.Prefix)
+	if err != nil {
+		return nil, 0, err
+	}
 
-		stripe = make([][]byte, d.blockCount)
-		for i := 0; i < d.blockCount; i++ {
-			stripe[i] = make([]byte, 0, blockSize+preLen)
-			stripe[i] = append(stripe[i], preData...)
-		}
-	} else {
-		stripe = make([][]byte, d.blockCount)
-		for i := 0; i < len(stripe); i++ {
-			stripe[i] = make([]byte, 0, blockSize)
-		}
+	stripe := make([][]byte, d.blockCount)
+	for i := 0; i < d.blockCount; i++ {
+		stripe[i] = make([]byte, 0, blockSize+preLen)
+		stripe[i] = append(stripe[i], preData...)
 	}
 
 	// 生成临时块组保存data切分后的segment

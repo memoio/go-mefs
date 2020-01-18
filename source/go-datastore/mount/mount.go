@@ -187,12 +187,12 @@ func (d *Datastore) Put(key ds.Key, value []byte) error {
 	return cds.Put(k, value)
 }
 
-func (d *Datastore) Append(key ds.Key, value []byte, beginoffset, endoffset int) error {
+func (d *Datastore) Append(key ds.Key, value []byte, begin, length int) error {
 	cds, _, k := d.lookup(key)
 	if cds == nil {
 		return ErrNoMount
 	}
-	return cds.Append(k, value, beginoffset, endoffset)
+	return cds.Append(k, value, begin, length)
 }
 
 // Sync implements Datastore.Sync
@@ -376,13 +376,13 @@ func (mt *mountBatch) Put(key ds.Key, val []byte) error {
 	return t.Put(rest, val)
 }
 
-func (mt *mountBatch) Append(key ds.Key, val []byte, beginoffset, endoffset int) error {
+func (mt *mountBatch) Append(key ds.Key, val []byte, begin, length int) error {
 	t, rest, err := mt.lookupBatch(key)
 	if err != nil {
 		return err
 	}
 
-	return t.Append(rest, val, beginoffset, endoffset)
+	return t.Append(rest, val, begin, length)
 }
 
 func (mt *mountBatch) Delete(key ds.Key) error {

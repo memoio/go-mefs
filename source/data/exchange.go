@@ -241,7 +241,7 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	return nil
 }
 
-// key: blockID/"Block"/start/end
+// key: blockID/"Block"/start/length (segSize)
 func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
 		return errNoRouting

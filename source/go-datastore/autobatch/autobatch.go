@@ -20,7 +20,7 @@ type Datastore struct {
 type op struct {
 	delete bool
 	begin  int
-	end    int
+	length int
 	value  []byte
 }
 
@@ -72,13 +72,13 @@ func (d *Datastore) Put(k ds.Key, val []byte) error {
 }
 
 // Append appends block
-func (d *Datastore) Append(k ds.Key, val []byte, beginoffset, endoffset int) error {
+func (d *Datastore) Append(k ds.Key, val []byte, beginoffset, length int) error {
 	d.Flush()
 
 	d.buffer[k] = op{
-		value: val,
-		begin: beginoffset,
-		end:   endoffset,
+		value:  val,
+		begin:  beginoffset,
+		length: length,
 	}
 
 	if len(d.buffer) > d.maxBufferEntries {
@@ -105,10 +105,10 @@ func (d *Datastore) Sync(prefix ds.Key) error {
 		if o.delete {
 			err = b.Delete(k)
 		} else {
-			if o.begin == 0 && o.end == 0 {
+			if o.begin == 0 && o.length == 0 {
 				err = b.Put(k, o.value)
 			} else {
-				err = b.Append(k, o.value, o.begin, o.end)
+				err = b.Append(k, o.value, o.begin, o.length)
 			}
 		}
 		if err != nil {
@@ -133,10 +133,10 @@ func (d *Datastore) Flush() error {
 		if o.delete {
 			err = b.Delete(k)
 		} else {
-			if o.begin == 0 && o.end == 0 {
+			if o.begin == 0 && o.length == 0 {
 				err = b.Put(k, o.value)
 			} else {
-				err = b.Append(k, o.value, o.begin, o.end)
+				err = b.Append(k, o.value, o.begin, o.length)
 			}
 
 		}

@@ -154,8 +154,8 @@ func (b *arccache) Put(bl blocks.Block) error {
 	return err
 }
 
-func (b *arccache) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
-	return b.blockstore.Append(c, field, beginoffset, endoffset)
+func (b *arccache) Append(c cid.Cid, field []byte, begin, length int) error {
+	return b.blockstore.Append(c, field, begin, length)
 }
 
 func (b *arccache) PutMany(bs []blocks.Block) error {

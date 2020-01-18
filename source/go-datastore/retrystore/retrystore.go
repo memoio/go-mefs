@@ -86,9 +86,9 @@ func (d *Datastore) Put(k ds.Key, val []byte) error {
 }
 
 // Append append a block
-func (d *Datastore) Append(k ds.Key, val []byte, beginoffset, endoffset int) error {
+func (d *Datastore) Append(k ds.Key, val []byte, begin, length int) error {
 	return d.runOp(func() error {
-		return d.Batching.Append(k, val, beginoffset, endoffset)
+		return d.Batching.Append(k, val, begin, length)
 	})
 }
 

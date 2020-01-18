@@ -38,8 +38,8 @@ func (d *Datastore) Put(key ds.Key, value []byte) (err error) {
 }
 
 // Append
-func (d *Datastore) Append(key ds.Key, value []byte, beginoffset, endoffset int) (err error) {
-	return d.child.Append(d.ConvertKey(key), value, beginoffset, endoffset)
+func (d *Datastore) Append(key ds.Key, value []byte, begin, length int) (err error) {
+	return d.child.Append(d.ConvertKey(key), value, begin, length)
 }
 
 // Sync implements Datastore.Sync
@@ -234,8 +234,8 @@ func (t *transformBatch) Put(key ds.Key, val []byte) error {
 	return t.dst.Put(t.f(key), val)
 }
 
-func (t *transformBatch) Append(key ds.Key, val []byte, beginoffset, endoffset int) error {
-	return t.dst.Append(t.f(key), val, beginoffset, endoffset)
+func (t *transformBatch) Append(key ds.Key, val []byte, begin, length int) error {
+	return t.dst.Append(t.f(key), val, begin, length)
 }
 
 func (t *transformBatch) Delete(key ds.Key) error {

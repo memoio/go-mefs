@@ -28,9 +28,9 @@ func (dds *Delayed) Put(key ds.Key, value []byte) (err error) {
 	return dds.ds.Put(key, value)
 }
 
-func (dds *Delayed) Append(key ds.Key, value []byte, beginoffset, endoffset int) (err error) {
+func (dds *Delayed) Append(key ds.Key, value []byte, begin, length int) (err error) {
 	dds.delay.Wait()
-	return dds.ds.Append(key, value, beginoffset, endoffset)
+	return dds.ds.Append(key, value, begin, length)
 }
 
 // Sync implements Datastore.Sync

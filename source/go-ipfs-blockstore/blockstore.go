@@ -43,7 +43,7 @@ type Blockstore interface {
 	Put(blocks.Block) error
 
 	// Append appends
-	Append(c cid.Cid, field []byte, beginoffset, endoffset int) error
+	Append(c cid.Cid, field []byte, begin, length int) error
 
 	// GetSegAndTag
 	GetSegAndTag(cid.Cid, uint64) ([]byte, []byte, error)
@@ -172,11 +172,11 @@ func (bs *blockstore) Put(block blocks.Block) error {
 	return bs.datastore.Put(k, block.RawData())
 }
 
-func (bs *blockstore) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
+func (bs *blockstore) Append(c cid.Cid, field []byte, begin, length int) error {
 	k := dshelp.CidToDsKey(c)
 
 	//we can append only when the block exists
-	return bs.datastore.Append(k, field, beginoffset, endoffset)
+	return bs.datastore.Append(k, field, begin, length)
 }
 
 func (bs *blockstore) PutMany(blocks []blocks.Block) error {

@@ -154,13 +154,13 @@ type opT int
 
 // op wraps useful arguments of write operations
 type op struct {
-	typ         opT           // operation type
-	key         datastore.Key // datastore key. Mandatory.
-	tmp         string        // temp file path
-	path        string        // file path
-	v           []byte        // value
-	beginoffset int           //在append时候offset用于检查
-	endoffset   int
+	typ    opT           // operation type
+	key    datastore.Key // datastore key. Mandatory.
+	tmp    string        // temp file path
+	path   string        // file path
+	v      []byte        // value
+	begin  int           //在append时候offset用于检查
+	length int
 }
 
 type opMap struct {
@@ -408,17 +408,17 @@ func (fs *Datastore) Put(key datastore.Key, value []byte) error {
 }
 
 // Append appends
-func (fs *Datastore) Append(key datastore.Key, value []byte, beginoffset, endoffset int) error {
+func (fs *Datastore) Append(key datastore.Key, value []byte, begin, length int) error {
 	fs.shutdownLock.RLock()
 	defer fs.shutdownLock.RUnlock()
 	var err error
 	for i := 1; i <= putMaxRetries; i++ {
 		err = fs.doWriteOp(&op{
-			typ:         opAppend,
-			key:         key,
-			v:           value,
-			beginoffset: beginoffset,
-			endoffset:   endoffset,
+			typ:    opAppend,
+			key:    key,
+			v:      value,
+			begin:  begin,
+			length: length,
 		})
 		if err == nil {
 			break
@@ -453,7 +453,7 @@ func (fs *Datastore) doOp(oper *op) error {
 	case opRename:
 		return fs.renameAndUpdateDiskUsage(oper.tmp, oper.path)
 	case opAppend:
-		return fs.doAppend(oper.key, oper.v, oper.beginoffset, oper.endoffset)
+		return fs.doAppend(oper.key, oper.v, oper.begin, oper.length)
 	default:
 		panic("bad operation, this is a bug")
 	}
@@ -534,11 +534,7 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 	return nil
 }
 
-func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, endoffset int) error {
-	if endoffset < beginoffset {
-		return errUnmatchOffset
-	}
-
+func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length int) error {
 	dir, path := fs.encode(key)
 	fi, err := os.Lstat(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -553,19 +549,9 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 		return ErrNotExist
 	}
 	fsize := fi.Size()
-	f, err := os.OpenFile(path, os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
 
-	fReader := bufio.NewReader(f)
-	prefix := make([]byte, 8*binary.MaxVarintLen64)
-	_, err = fReader.Read(prefix)
-	if err != nil {
-		return err
-	}
-	pre, preLen, err := bf.PrefixDecode(prefix)
+	// load new pre
+	pre, preLen, err := bf.PrefixDecode(fields)
 	if err != nil {
 		return err
 	}
@@ -581,29 +567,49 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 		return dataformat.ErrWrongField
 	}
 
-	if (endoffset-beginoffset+1)*int(fieldSize) != len(fields) {
+	if length*int(fieldSize) != len(fields)-preLen {
 		return errUnmatchOffset
 	}
 
-	writeStart := fsize
-
-	segStart := ((int(fsize)-preLen)-1)/int(fieldSize) + 1
-	if segStart > beginoffset {
-		writeStart = int64(preLen + beginoffset*int(fieldSize))
-		err = f.Truncate(writeStart)
-		if err != nil {
-			return err
-		}
-	} else if segStart < beginoffset {
-		return errUnmatchOffset
+	f, err := os.OpenFile(path, os.O_RDWR, 0666)
+	if err != nil {
+		return err
 	}
+	defer f.Close()
+	fReader := bufio.NewReader(f)
 
-	n, err := f.WriteAt(fields, writeStart)
+	prefix := make([]byte, 10*binary.MaxVarintLen64)
+	_, err = fReader.Read(prefix)
 	if err != nil {
 		return err
 	}
 
-	if n != len(fields) {
+	_, oldpreLen, err := bf.PrefixDecode(prefix)
+	if err != nil {
+		return err
+	}
+
+	// need compare old and new
+
+	writeStart := fsize
+
+	segStart := ((int(fsize)-oldpreLen)-1)/int(fieldSize) + 1
+	if segStart > begin {
+		writeStart = int64(oldpreLen + begin*int(fieldSize))
+		err = f.Truncate(writeStart)
+		if err != nil {
+			return err
+		}
+	} else if segStart < begin {
+		return errUnmatchOffset
+	}
+
+	n, err := f.WriteAt(fields[preLen:], writeStart)
+	if err != nil {
+		return err
+	}
+
+	if n != len(fields)-preLen {
 		log.Error("append file fails")
 	}
 
@@ -612,7 +618,7 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, beginoffset, end
 			return err
 		}
 	}
-	addSize := writeStart + int64(len(fields)) - fsize
+	addSize := int64(len(fields) - preLen)
 	fs.updateDiskUsageinAppend(addSize)
 	if fs.sync {
 		if err := syncDir(dir); err != nil {
@@ -1306,7 +1312,7 @@ func (bt *flatfsBatch) Put(key datastore.Key, val []byte) error {
 	return nil
 }
 
-func (bt *flatfsBatch) Append(key datastore.Key, val []byte, beginoffset, endoffset int) error {
+func (bt *flatfsBatch) Append(key datastore.Key, val []byte, begin, length int) error {
 	bt.appends[key] = val
 	return nil
 }

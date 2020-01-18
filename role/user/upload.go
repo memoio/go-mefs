@@ -315,7 +315,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						for i := 0; i < bc; i++ {
 							bm.SetCid(strconv.Itoa(i))
 							ncid := bm.ToString()
-							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(offset))
+							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
 							blockMetas[i].cid = ncid
 							blockMetas[i].offset = offset
 							blockMetas[i].provider = u.fsID

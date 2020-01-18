@@ -176,8 +176,8 @@ func (b *bloomcache) Put(bl blocks.Block) error {
 	return err
 }
 
-func (b *bloomcache) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
-	err := b.blockstore.Append(c, field, beginoffset, endoffset)
+func (b *bloomcache) Append(c cid.Cid, field []byte, begin, length int) error {
+	err := b.blockstore.Append(c, field, begin, length)
 	if err == nil {
 		b.bloom.AddTS(c.Bytes())
 	}

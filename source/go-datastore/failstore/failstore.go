@@ -141,12 +141,12 @@ func (b *FailBatch) Put(k ds.Key, val []byte) error {
 	return b.cb.Put(k, val)
 }
 
-func (b *FailBatch) Append(k ds.Key, val []byte, beginoffset, endoffset int) error {
+func (b *FailBatch) Append(k ds.Key, val []byte, begin, length int) error {
 	if err := b.dstore.errfunc("batch-append"); err != nil {
 		return err
 	}
 
-	return b.cb.Append(k, val, beginoffset, endoffset)
+	return b.cb.Append(k, val, begin, length)
 }
 
 // Delete does a batch delete.

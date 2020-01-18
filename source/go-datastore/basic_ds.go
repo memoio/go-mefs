@@ -29,7 +29,7 @@ func (d *MapDatastore) Put(key Key, value []byte) (err error) {
 }
 
 // Append implements Datastore.Put
-func (d *MapDatastore) Append(key Key, value []byte, beginoffset, endoffset int) (err error) {
+func (d *MapDatastore) Append(key Key, value []byte, begin, length int) (err error) {
 	v := d.values[key]
 	values := append(v, value...)
 	d.values[key] = values
@@ -114,7 +114,7 @@ func (d *NullDatastore) Put(key Key, value []byte) (err error) {
 }
 
 // Append implements Datastore.Append
-func (d *NullDatastore) Append(key Key, value []byte, beginoffset, endoffset int) (err error) {
+func (d *NullDatastore) Append(key Key, value []byte, begin, length int) (err error) {
 	return nil
 }
 
@@ -195,9 +195,9 @@ func (d *LogDatastore) Put(key Key, value []byte) (err error) {
 }
 
 // Append implements Datastore.Append
-func (d *LogDatastore) Append(key Key, value []byte, beginoffset, endoffset int) (err error) {
+func (d *LogDatastore) Append(key Key, value []byte, begin, length int) (err error) {
 	log.Printf("%s: Append %s\n", d.Name, key)
-	return d.child.Append(key, value, beginoffset, endoffset)
+	return d.child.Append(key, value, begin, length)
 }
 
 // Sync implements Datastore.Sync
@@ -284,9 +284,9 @@ func (d *LogBatch) Put(key Key, value []byte) (err error) {
 }
 
 // Append implements Batch.Append
-func (d *LogBatch) Append(key Key, value []byte, beginoffset, endoffset int) (err error) {
+func (d *LogBatch) Append(key Key, value []byte, begin, length int) (err error) {
 	log.Printf("%s: BatchAppend %s\n", d.Name, key)
-	return d.child.Append(key, value, beginoffset, endoffset)
+	return d.child.Append(key, value, begin, length)
 }
 
 // Delete implements Batch.Delete

@@ -58,7 +58,7 @@ type Write interface {
 	Put(key Key, value []byte) error
 
 	// Append the designated block
-	Append(key Key, value []byte, beginoffset, endoffset int) error
+	Append(key Key, value []byte, begin, length int) error
 	// Delete removes the value for given `key`. If the key is not in the
 	// datastore, this method returns no error.
 	Delete(key Key) error
