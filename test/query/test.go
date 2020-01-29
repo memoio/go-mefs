@@ -50,7 +50,7 @@ func main() {
 		price    int64 = 100000
 		ks             = 3
 		ps             = 5
-		reDeploy       = false
+		reDeploy       = true
 	)
 
 	//ethEndPoint = *qeth //用正常的链（http://39.100.146.21:8101）给新建账户转账
@@ -72,12 +72,6 @@ func main() {
 		log.Fatal("deploy Query fails", err)
 	}
 
-	log.Println("start set completed")
-	err = contracts.SetQueryCompleted(userSk, queryAddr)
-	if err != nil {
-		log.Fatal("set query completed fails:", err)
-	}
-
 	contracts.EndPoint = qethEndPoint
 	log.Println("start get 'completed' params")
 	localID, _ := address.GetIDFromAddress(localAddr.String())
@@ -89,6 +83,24 @@ func main() {
 
 	if qItem.Capacity != capacity || qItem.Duration != duration || qItem.Price != price || qItem.KeeperNums != int32(ks) || qItem.ProviderNums != int32(ps) {
 		log.Fatal("query info is different from set")
+	}
+
+	if qItem.Completed {
+		log.Fatal("completed info is wrong")
+	}
+
+	log.Println("start set completed")
+	contracts.EndPoint = ethEndPoint
+	err = contracts.SetQueryCompleted(userSk, queryAddr)
+	if err != nil {
+		log.Fatal("set query completed fails:", err)
+	}
+
+	contracts.EndPoint = qethEndPoint
+	log.Println("start get 'completed' params")
+	qItem, err = role.GetQueryInfo(localID, queryID)
+	if err != nil {
+		log.Fatal("get query fails:", err)
 	}
 
 	if !qItem.Completed {

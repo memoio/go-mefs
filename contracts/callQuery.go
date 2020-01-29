@@ -125,15 +125,26 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = query.SetCompleted(auth)
+		tx, err := query.SetCompleted(auth)
 		if err != nil {
-			if retryCount > 5 {
-				log.Println("set query Completed Err:", err)
+			if retryCount > 10 {
+				log.Println("set query Completed fails: ", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("set query completed transaction fails", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
 		break
 	}
 

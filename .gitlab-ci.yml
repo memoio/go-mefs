@@ -116,7 +116,7 @@ role_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - GO111MODULE=off go run test/role/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+    - GO111MODULE=off go run test/roleContract/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:
@@ -176,7 +176,7 @@ pos_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - GO111MODULE=off go run test/unit/posTest/posTest.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+    - GO111MODULE=off go run test/pos/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
   only:

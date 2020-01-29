@@ -780,7 +780,6 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 
 //SignForChannel user sends a private key signature to the provider
 func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err error) {
-	utils.MLogger.Debugf("sign for channel: %s and its value %s", channelID, value.String())
 	channelAddr, err := address.GetAddressFromID(channelID)
 	if err != nil {
 		return nil, err
