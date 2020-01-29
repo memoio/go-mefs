@@ -1,0 +1,9 @@
+syntax = "proto3";
+package proto;
+
+message ChannelSign {
+  string ChannelID = 1;
+  bytes Value = 2;
+  bytes Sig = 3;    //user签名信息
+  bytes PubKey = 4; //user公钥
+}

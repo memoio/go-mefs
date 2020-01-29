@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"testing"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -28,8 +29,8 @@ var testcases = map[string]string{
 //
 //  d, close := newDS(t)
 //  defer close()
-func newDS(t *testing.T) (*datastore, func()) {
-	path, err := ioutil.TempDir("/tmp", "testing_leveldb_")
+func newDS(t *testing.T) (*Datastore, func()) {
+	path, err := ioutil.TempDir("", "testing_leveldb_")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +46,7 @@ func newDS(t *testing.T) (*datastore, func()) {
 }
 
 // newDSMem returns an in-memory datastore.
-func newDSMem(t *testing.T) *datastore {
+func newDSMem(t *testing.T) *Datastore {
 	d, err := NewDatastore("", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +54,7 @@ func newDSMem(t *testing.T) *datastore {
 	return d
 }
 
-func addTestCases(t *testing.T, d *datastore, testcases map[string]string) {
+func addTestCases(t *testing.T, d *Datastore, testcases map[string]string) {
 	for k, v := range testcases {
 		dsk := ds.NewKey(k)
 		if err := d.Put(dsk, []byte(v)); err != nil {
@@ -74,7 +75,7 @@ func addTestCases(t *testing.T, d *datastore, testcases map[string]string) {
 
 }
 
-func testQuery(t *testing.T, d *datastore) {
+func testQuery(t *testing.T, d *Datastore) {
 	addTestCases(t, d, testcases)
 
 	rs, err := d.Query(dsq.Query{Prefix: "/a/"})
@@ -101,6 +102,33 @@ func testQuery(t *testing.T, d *datastore) {
 		"/a/b/d",
 		"/a/c",
 	}, rs)
+
+	// test order
+
+	rs, err = d.Query(dsq.Query{Orders: []dsq.Order{dsq.OrderByKey{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys := make([]string, 0, len(testcases))
+	for k := range testcases {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	expectOrderedMatches(t, keys, rs)
+
+	rs, err = d.Query(dsq.Query{Orders: []dsq.Order{dsq.OrderByKeyDescending{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// reverse
+	for i, j := 0, len(keys)-1; i < j; i, j = i+1, j-1 {
+		keys[i], keys[j] = keys[j], keys[i]
+	}
+
+	expectOrderedMatches(t, keys, rs)
 }
 
 func TestQuery(t *testing.T) {
@@ -125,6 +153,7 @@ func TestQueryRespectsProcessMem(t *testing.T) {
 }
 
 func expectMatches(t *testing.T, expect []string, actualR dsq.Results) {
+	t.Helper()
 	actual, err := actualR.Rest()
 	if err != nil {
 		t.Error(err)
@@ -146,7 +175,24 @@ func expectMatches(t *testing.T, expect []string, actualR dsq.Results) {
 	}
 }
 
-func testBatching(t *testing.T, d *datastore) {
+func expectOrderedMatches(t *testing.T, expect []string, actualR dsq.Results) {
+	t.Helper()
+	actual, err := actualR.Rest()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(actual) != len(expect) {
+		t.Error("not enough", expect, actual)
+	}
+	for i := range expect {
+		if expect[i] != actual[i].Key {
+			t.Errorf("expected %q, got %q", expect[i], actual[i].Key)
+		}
+	}
+}
+
+func testBatching(t *testing.T, d *Datastore) {
 	b, err := d.Batch()
 	if err != nil {
 		t.Fatal(err)

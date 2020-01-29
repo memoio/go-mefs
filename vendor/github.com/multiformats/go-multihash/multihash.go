@@ -36,7 +36,9 @@ func (e ErrInconsistentLen) Error() string {
 
 // constants
 const (
-	ID         = 0x00
+	IDENTITY = 0x00
+	// Deprecated: use IDENTITY
+	ID         = IDENTITY
 	SHA1       = 0x11
 	SHA2_256   = 0x12
 	SHA2_512   = 0x13
@@ -63,7 +65,9 @@ const (
 
 	DBL_SHA2_256 = 0x56
 
-	MURMUR3 = 0x22
+	MURMUR3_128 = 0x22
+	// Deprecated: use MURMUR3_128
+	MURMUR3 = MURMUR3_128
 
 	X11 = 0x1100
 )
@@ -90,7 +94,7 @@ func init() {
 
 // Names maps the name of a hash to the code
 var Names = map[string]uint64{
-	"id":           ID,
+	"identity":     IDENTITY,
 	"sha1":         SHA1,
 	"sha2-256":     SHA2_256,
 	"sha2-512":     SHA2_512,
@@ -100,7 +104,7 @@ var Names = map[string]uint64{
 	"sha3-384":     SHA3_384,
 	"sha3-512":     SHA3_512,
 	"dbl-sha2-256": DBL_SHA2_256,
-	"murmur3":      MURMUR3,
+	"murmur3-128":  MURMUR3_128,
 	"keccak-224":   KECCAK_224,
 	"keccak-256":   KECCAK_256,
 	"keccak-384":   KECCAK_384,
@@ -114,7 +118,7 @@ var Names = map[string]uint64{
 
 // Codes maps a hash code to it's name
 var Codes = map[uint64]string{
-	ID:           "id",
+	IDENTITY:     "identity",
 	SHA1:         "sha1",
 	SHA2_256:     "sha2-256",
 	SHA2_512:     "sha2-512",
@@ -123,7 +127,7 @@ var Codes = map[uint64]string{
 	SHA3_384:     "sha3-384",
 	SHA3_512:     "sha3-512",
 	DBL_SHA2_256: "dbl-sha2-256",
-	MURMUR3:      "murmur3",
+	MURMUR3_128:  "murmur3-128",
 	KECCAK_224:   "keccak-224",
 	KECCAK_256:   "keccak-256",
 	KECCAK_384:   "keccak-384",
@@ -137,7 +141,7 @@ var Codes = map[uint64]string{
 
 // DefaultLengths maps a hash code to it's default length
 var DefaultLengths = map[uint64]int{
-	ID:           -1,
+	IDENTITY:     -1,
 	SHA1:         20,
 	SHA2_256:     32,
 	SHA2_512:     64,
@@ -148,7 +152,7 @@ var DefaultLengths = map[uint64]int{
 	DBL_SHA2_256: 32,
 	KECCAK_224:   28,
 	KECCAK_256:   32,
-	MURMUR3:      4,
+	MURMUR3_128:  4,
 	KECCAK_384:   48,
 	KECCAK_512:   64,
 	KECCAK_160:   20,
@@ -236,36 +240,19 @@ func Cast(buf []byte) (Multihash, error) {
 
 // Decode parses multihash bytes into a DecodedMultihash.
 func Decode(buf []byte) (*DecodedMultihash, error) {
-
-	if len(buf) < 2 {
-		return nil, ErrTooShort
-	}
-
-	var err error
-	var code, length uint64
-
-	code, buf, err = uvarint(buf)
+	rlen, code, hdig, err := readMultihashFromBuf(buf)
 	if err != nil {
 		return nil, err
-	}
-
-	length, buf, err = uvarint(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if length > math.MaxInt32 {
-		return nil, errors.New("digest too long, supporting only <= 2^31-1")
 	}
 
 	dm := &DecodedMultihash{
 		Code:   code,
 		Name:   Codes[code],
-		Length: int(length),
-		Digest: buf,
+		Length: len(hdig),
+		Digest: hdig,
 	}
 
-	if len(dm.Digest) != dm.Length {
+	if len(buf) != rlen {
 		return nil, ErrInconsistentLen{dm}
 	}
 
@@ -299,4 +286,49 @@ func EncodeName(buf []byte, name string) ([]byte, error) {
 func ValidCode(code uint64) bool {
 	_, ok := Codes[code]
 	return ok
+}
+
+// readMultihashFromBuf reads a multihash from the given buffer, returning the
+// individual pieces of the multihash.
+// Note: the returned digest is a slice over the passed in data and should be
+// copied if the buffer will be reused
+func readMultihashFromBuf(buf []byte) (int, uint64, []byte, error) {
+	bufl := len(buf)
+	if bufl < 2 {
+		return 0, 0, nil, ErrTooShort
+	}
+
+	var err error
+	var code, length uint64
+
+	code, buf, err = uvarint(buf)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	length, buf, err = uvarint(buf)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	if length > math.MaxInt32 {
+		return 0, 0, nil, errors.New("digest too long, supporting only <= 2^31-1")
+	}
+	if int(length) > len(buf) {
+		return 0, 0, nil, errors.New("length greater than remaining number of bytes in buffer")
+	}
+
+	rlen := (bufl - len(buf)) + int(length)
+	return rlen, code, buf[:length], nil
+}
+
+// MHFromBytes reads a multihash from the given byte buffer, returning the
+// number of bytes read as well as the multihash
+func MHFromBytes(buf []byte) (int, Multihash, error) {
+	nr, _, _, err := readMultihashFromBuf(buf)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return nr, Multihash(buf[:nr]), nil
 }

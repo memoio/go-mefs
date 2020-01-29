@@ -1,20 +1,16 @@
 package provider
 
 import (
+	"context"
 	"errors"
-	"log"
-	"runtime"
-	"sync"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
-	ds "github.com/memoio/go-mefs/source/go-datastore"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 const (
+	Debug                 = true
 	DefaultCapacity int64 = 100000 //单位：MB
 	DefaultDuration int64 = 365    //单位：天
 )
@@ -25,107 +21,108 @@ var (
 	errGetContractItem         = errors.New("Can't get contract Item")
 )
 
-type providerContracts struct {
-	upKeepingBook sync.Map // K-user的id, V-upkeeping
-	channelBook   sync.Map // K-user的id, V-Channel
-	queryBook     sync.Map // K-user的id, V-Query
-	offer         contracts.OfferItem
-	proInfo       contracts.ProviderItem
-}
-
-func putKeyTo(key, value, node string) error {
-	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
-}
-
-func getKeyFrom(key, node string) ([]byte, error) {
-	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
-}
-
-func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
-}
-
-func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
-}
-
-func getNewUserConfig(userID, keeperID string) (*mcl.PublicKey, error) {
-	pubKeyI, ok := usersConfigs.Load(userID)
-	if ok {
-		return pubKeyI.(*mcl.PublicKey), nil
+func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
+	gp := p.getGroupInfo(userID, groupID, true)
+	if gp == nil {
+		return nil, errors.New("No user")
 	}
 
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+	if gp.blsKey != nil {
+		return gp.blsKey, nil
+	}
+
+	kmBls12, err := metainfo.NewKeyMeta(groupID, metainfo.Config, userID)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx := context.Background()
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := getKeyFrom(userconfigkey, keeperID)
-	if err != nil {
-		return nil, err
+	userconfigbyte, _ := p.ds.GetKey(ctx, userconfigkey, "local")
+	if len(userconfigbyte) > 0 {
+		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
+		if err == nil && mkey != nil {
+			gp.blsKey = mkey
+			return mkey, nil
+		}
 	}
 
-	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
-	if err != nil {
-		return nil, err
+	for _, kid := range gp.keepers {
+		userconfigbyte, _ := p.ds.GetKey(ctx, userconfigkey, kid)
+		if len(userconfigbyte) > 0 {
+			mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			p.ds.PutKey(ctx, userconfigkey, userconfigbyte, "local")
+
+			gp.blsKey = mkey
+			return mkey, nil
+		}
 	}
 
-	usersConfigs.Store(userID, mkey.Pk)
-
-	return mkey.Pk, nil
+	return nil, errors.New("No bls config")
 }
 
-func getUserPrivateKey(userID, keeperID string) (*mcl.SecretKey, error) {
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error) {
+	gp := p.getGroupInfo(userID, groupID, true)
+	if gp == nil {
+		return nil, errors.New("No user")
+	}
+
+	if gp.blsKey != nil && gp.blsKey.Sk != nil {
+		return gp.blsKey.Sk, nil
+	}
+
+	kmBls12, err := metainfo.NewKeyMeta(groupID, metainfo.Config, userID)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx := context.Background()
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := getKeyFrom(userconfigkey, keeperID)
+	userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, "local")
 	if err != nil {
 		return nil, err
 	}
 
 	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
-	if err != nil {
-		return nil, err
+	if err == nil && mkey != nil {
+		gp.blsKey = mkey
+		return mkey.Sk, nil
 	}
 
-	return mkey.Sk, nil
+	for _, kid := range gp.keepers {
+		userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, kid)
+		if err != nil {
+			return nil, err
+		}
+		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
+		if err != nil {
+			return nil, err
+		}
+
+		p.ds.PutKey(ctx, userconfigkey, userconfigbyte, "local")
+
+		return mkey.Sk, nil
+	}
+
+	return nil, errors.New("No bls config")
 }
 
 // getDiskUsage gets the disk usage
-func getDiskUsage() (uint64, error) {
-	dataStore := localNode.Repo.Datastore()
-	DataSpace, err := ds.DiskUsage(dataStore)
-	if err != nil {
-		log.Println("get disk usage failed :", err)
-		return 0, err
-	}
-	return DataSpace, nil
+func (p *Info) getDiskUsage() (uint64, error) {
+	return 0, nil
 }
 
 // getDiskTotal gets the disk total space which is set in config
-func getDiskTotal() uint64 {
-	var maxSpaceInByte uint64
-	proItem, err := getProInfo()
-	if err != nil {
-		maxSpaceInByte = 10 * 1024 * 1024 * 1024
-	} else {
-		if proItem.Capacity == 0 {
-			maxSpaceInByte = 10 * 1024 * 1024 * 1024
-		} else {
-			maxSpaceInByte = uint64(proItem.Capacity) * 1024 * 1024
+// default is 10TB
+func (p *Info) getDiskTotal() uint64 {
+	maxSpaceInByte := uint64(1024 * 1024 * 1024 * 1024)
+	if p.proContract != nil {
+		if p.proContract.Capacity != 0 {
+			maxSpaceInByte = uint64(p.proContract.Capacity) * 1024 * 1024
 		}
 	}
 	return maxSpaceInByte

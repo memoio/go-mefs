@@ -2,7 +2,7 @@ package contracts
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
 	"time"
 
@@ -10,32 +10,32 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
-	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
-//DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress in mapper
-func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []common.Address, providerAddress []common.Address, days int64, size int64, price int64, moneyAccount *big.Int) error {
-	fmt.Println("begin deploy upKeeping...")
+const ukey = "memoriae"
+
+//DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
+func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
+	log.Println("begin deploy upKeeping...")
 
 	var ukAddr common.Address
 
-	//获得resolver
-	_, resolver, err := GetResolverFromIndexer(userAddress, "memoriae")
+	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, ukey, hexKey, true)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
-		return err
-	}
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		fmt.Println("HexToECDSAErr:", err)
-		return err
+		return ukAddr, err
 	}
 
-	//获得mapper
-	_, mapperInstance, err := DeployMapper(userAddress, userAddress, resolver, hexKey)
+	if !redo {
+		ukAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
+		if err == nil {
+			return ukAddr, nil
+		}
+	}
+
+	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
-		return err
+		log.Println("HexToECDSAErr:", err)
+		return ukAddr, err
 	}
 
 	// 部署UpKeeping
@@ -48,68 +48,114 @@ func DeployUpkeeping(hexKey string, userAddress common.Address, keeperAddress []
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = moneyAccount
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
-		ukAddr, _, _, err = upKeeping.DeployUpKeeping(auth, client, userAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price))
+		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price))
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("deploy Uk Err:", err)
-				return err
+				log.Println("deploy Uk Err:", err)
+				return ukAddr, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("deploy upkeeping transaction fails", err)
+				return ukAddr, err
+			}
+			continue
+		}
+		ukAddr = ukAddress
 		break
 	}
 
 	//uk放进mapper
-	err = addToMapper(userAddress, mapperInstance, ukAddr, hexKey)
+	err = AddToMapper(userAddress, ukAddr, hexKey, mapperInstance)
 	if err != nil {
-		fmt.Println("add uk Err:", err)
-		return err
+		log.Println("add uk Err:", err)
+		return ukAddr, err
 	}
-	fmt.Println("upKeeping-contract have been successfully deployed!")
-	return nil
+	log.Println("upKeeping-contract have been successfully deployed!")
+	return ukAddr, nil
 }
 
-//GetUKFromResolver get upKeeping-contract from the mapper, and get the mapper from the resolver
-func GetUKFromResolver(localAddress common.Address) (ukaddr string, uk *upKeeping.UpKeeping, err error) {
-	//获得resolver
-	_, resolverInstance, err := GetResolverFromIndexer(localAddress, "memoriae")
+//GetUpkeepingAddrs get all upKeeping address
+func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]common.Address, error) {
+	//获得userIndexer, key is userAddr
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
 	if err != nil {
-		fmt.Println("GetResolverErr:", err)
-		return InvalidAddr, uk, err
+		return nil, err
 	}
 
-	// 获得mapper
-	_, mapperInstance, err := getMapperInstance(localAddress, localAddress, resolverInstance)
+	return GetAddrsFromMapper(localAddress, mapperInstance)
+}
+
+//GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
+func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
+	//获得userIndexer, key is userAddr
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
 	if err != nil {
-		fmt.Println("get Mapper Instance err:", err)
-		return InvalidAddr, uk, err
+		return ukaddr, nil, err
 	}
 
-	// 获得mapper中的合约
-	ukAddr, err := getLatestAddrFromMapper(localAddress, mapperInstance)
+	uks, err := GetAddrsFromMapper(localAddress, mapperInstance)
 	if err != nil {
-		return InvalidAddr, uk, err
+		return ukaddr, uk, err
 	}
-	//获得uk，暂时默认第一个是所需的uk合约地址
-	//TODO：优化从mapper中找出uk合约的方法
-	uk, err = upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
-	if err != nil {
-		fmt.Println("newUkErr:", err)
-		return InvalidAddr, uk, err
+
+	client := GetClient(EndPoint)
+
+	if key == "latest" {
+		ukaddr = uks[len(uks)-1]
+		uk, err := upKeeping.NewUpKeeping(ukaddr, client)
+		if err != nil {
+			log.Println("newUkErr:", err)
+			return ukaddr, uk, err
+		}
+		return ukaddr, uk, nil
 	}
-	return ukAddr.String(), uk, nil
+
+	for _, ukAddr := range uks {
+		ukaddr = ukAddr
+		retryCount := 0
+		for {
+			retryCount++
+			if retryCount > 10 {
+				log.Println("GetUpkeepingInfo:", err)
+				break
+			}
+
+			uk, err = upKeeping.NewUpKeeping(ukaddr, client)
+			if err != nil {
+				continue
+			}
+			queryAddr, _, _, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+				From: localAddress,
+			})
+			if err != nil {
+				time.Sleep(60 * time.Second)
+				continue
+			}
+
+			if queryAddr.String() == key {
+				return ukaddr, uk, nil
+			}
+			break
+		}
+	}
+
+	return ukaddr, uk, errors.New("No upkeeping")
 }
 
 // SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
-func SpaceTimePay(ukAddr, userAddress common.Address, providerAddr common.Address, hexKey string, money *big.Int) error {
+func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, money *big.Int) error {
 	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
 	if err != nil {
-		fmt.Println("newUkErr:", err)
+		log.Println("newUkErr:", err)
 		return err
 	}
 
-	//构建auth,用keeper的私钥
 	key, _ := crypto.HexToECDSA(hexKey)
 	retryCount := 0
 	for {
@@ -121,71 +167,21 @@ func SpaceTimePay(ukAddr, userAddress common.Address, providerAddr common.Addres
 		_, err := uk.SpaceTimePay(auth, providerAddr, money)
 		if err != nil {
 			if retryCount > 5 {
-				fmt.Println("spaceTimePayErr:", err)
+				log.Println("spaceTimePayErr:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
+		// need async check, how?
 		break
 	}
 	return nil
 }
 
-// GetUpkeepingInfo get Upkeeping-contract's params
-func GetUpkeepingInfo(localAddress common.Address, uk *upKeeping.UpKeeping) (
-	UpKeepingItem, error) {
-	var item UpKeepingItem
-
-	retryCount := 0
-	for {
-		retryCount++
-		_, keeperAddrs, providerAddrs, duration, capacity, price, startTime, err := uk.GetOrder(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("GetUpkeepingInfo:", err)
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		var keepers []string
-		var providers []string
-		for _, keeper := range keeperAddrs {
-			kid, err := address.GetIDFromAddress(keeper.String())
-			if err != nil {
-				return item, err
-			}
-			keepers = append(keepers, kid)
-		}
-		for _, provider := range providerAddrs {
-			pid, err := address.GetIDFromAddress(provider.String())
-			if err != nil {
-				return item, err
-			}
-			providers = append(providers, pid)
-		}
-		item = UpKeepingItem{
-			KeeperIDs:   keepers,
-			KeeperSLA:   int32(len(keeperAddrs)),
-			ProviderIDs: providers,
-			ProviderSLA: int32(len(providerAddrs)),
-			Duration:    duration.Int64(),
-			Capacity:    capacity.Int64(),
-			Price:       price.Int64(),
-			StartTime:   utils.UnixToTime(startTime.Int64()).Format(utils.SHOWTIME),
-		}
-		break
-	}
-
-	return item, nil
-}
-
 //AddProvider add a provider to upKeeping
-func AddProvider(hexKey string, userAddress common.Address, providerAddress []common.Address) error {
-	_, uk, err := GetUKFromResolver(userAddress)
+func AddProvider(hexKey string, localAddress, userAddress common.Address, providerAddress []common.Address, key string) error {
+	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -207,12 +203,13 @@ func AddProvider(hexKey string, userAddress common.Address, providerAddress []co
 		break
 	}
 
-	pid, _ := address.GetIDFromAddress(providerAddress[0].String())
 	retryCount = 0
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		upItem, err := GetUpkeepingInfo(userAddress, uk)
+		_, _, proAddr, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+			From: localAddress,
+		})
 		if err != nil {
 			if retryCount > 5 {
 				return err
@@ -221,8 +218,8 @@ func AddProvider(hexKey string, userAddress common.Address, providerAddress []co
 		}
 
 		found := false
-		for _, proID := range upItem.ProviderIDs {
-			if proID == pid {
+		for _, pro := range proAddr {
+			if pro.String() == providerAddress[0].String() {
 				found = true
 				break
 			}

@@ -1,75 +1,89 @@
 package provider
 
 import (
-	"log"
+	"context"
+	"errors"
 
-	cid "github.com/memoio/go-mefs/source/go-cid"
-	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
+	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-// HandlerV2 provider角色回调接口的实现，
-type HandlerV2 struct {
-	Role string
-}
-
 // HandleMetaMessage provider角色层metainfo的回调函数,传入对方节点发来的kv，和对方节点的peerid
 //没有返回值时，返回complete，或者返回规定信息
-func (provider *HandlerV2) HandleMetaMessage(metaKey, metaValue, from string) (string, error) {
+func (p *Info) HandleMetaMessage(optype int, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
 	km, err := metainfo.GetKeyMeta(metaKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	keytype := km.GetKeyType()
-	switch keytype {
-	case metainfo.Test:
-		go handleTest(km)
-	case metainfo.UserInitReq:
-		log.Println("keytype：UserInitReq, do not handle it")
-	case metainfo.UserDeployedContracts:
-		go handleUserDeployedContracts(km, metaKey, from)
+	dtype := km.GetDType()
+	switch dtype {
+	case metainfo.UserStart:
+		return p.handleUserStart(km, metaValue, from)
 	case metainfo.Challenge:
-		go handleChallengeBls12(km, metaValue, from)
-	case metainfo.Repair:
-		go handleRepair(km, metaValue, from)
-	case metainfo.DeleteBlock:
-		go handleDeleteBlock(km, from)
-	case metainfo.GetBlock:
-		res, err := handleGetBlock(km, from)
-		if err != nil {
-			log.Println("getBlcokError: ", err)
-		} else {
-			return res, nil
+		if optype == metainfo.Get {
+			go p.handleChallengeBls12(km, metaValue, from)
 		}
-	case metainfo.PutBlock:
-		err := handlePutBlock(km, metaValue, from)
-		if err != nil {
-			log.Println("put Blcok Error: ", err)
-			return metainfo.MetaPutBlockErr, nil
+	case metainfo.Repair:
+		if optype == metainfo.Get {
+			go p.handleRepair(km, metaValue, from)
+		}
+	case metainfo.Block:
+		switch optype {
+		case metainfo.Put:
+			err := p.handlePutBlock(km, metaValue, from)
+			if err != nil {
+				utils.MLogger.Error("put blcok error: ", err)
+				return nil, err
+			}
+		case metainfo.Get:
+			return p.handleGetBlock(km, metaValue, sig, from)
+		case metainfo.Append:
+			err := p.handleAppendBlock(km, metaValue, from)
+			if err != nil {
+				utils.MLogger.Info("append blcok error: ", err)
+				return nil, err
+			}
+		case metainfo.Delete:
+			go p.handleDeleteBlock(km, from)
 		}
 	default: //没有匹配的信息，报错
-		return "", metainfo.ErrWrongType
+		return nil, metainfo.ErrWrongType
 	}
-	return metainfo.MetaHandlerComplete, nil
+	return []byte(instance.MetaHandlerComplete), nil
 }
 
-// GetRole 获取这个节点的角色信息，返回错误说明provider还没有启动好
-func (provider *HandlerV2) GetRole() (string, error) {
-	return provider.Role, nil
-}
+func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from: ", from)
 
-func handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
-	blockID := km.GetMid()
-	bcid := cid.NewCidV2([]byte(blockID))
-	err := localNode.Blocks.DeleteBlock(bcid)
-	if err != nil && err != bs.ErrNotFound {
-		return err
+	gid := km.GetMid()
+	ops := km.GetOptions()
+	if len(ops) != 3 {
+		return nil, errors.New("wrong key")
 	}
-	return nil
-}
 
-func handleTest(km *metainfo.KeyMeta) {
-	log.Println("测试用回调函数")
-	log.Println("km.mid:", km.GetMid())
-	log.Println("km.options", km.GetOptions())
+	uid := ops[0]
+	_, ok := p.fsGroup.Load(gid)
+	if !ok {
+		gp := p.newGroupWithFS(uid, gid, string(metaValue), false)
+		if gp == nil {
+			return nil, errors.New("Not my user")
+		}
+	}
+
+	ui, ok := p.users.Load(uid)
+	if !ok {
+		ui := &uInfo{
+			userID: uid,
+		}
+		ui.setQuery(gid)
+		p.users.Store(uid, ui)
+	} else {
+		ui.(*uInfo).setQuery(groupID)
+	}
+
+	kmkps, _ := metainfo.NewKeyMeta(gid, metainfo.LogFS, uid)
+	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
+
+	return []byte("ok"), nil
 }

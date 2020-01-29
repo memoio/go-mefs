@@ -8,7 +8,7 @@ import (
 	"time"
 
 	repo "github.com/memoio/go-mefs/repo"
-	bserv "github.com/memoio/go-mefs/source/go-blockservice"
+	"github.com/memoio/go-mefs/source/data"
 	retry "github.com/memoio/go-mefs/source/go-datastore/retrystore"
 	bstore "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 
@@ -19,7 +19,6 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 	pstoremem "github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	record "github.com/libp2p/go-libp2p-record"
 )
 
 type BuildCfg struct {
@@ -91,12 +90,8 @@ func NewNode(ctx context.Context, cfg *BuildCfg, password, nKey string) (*MefsNo
 		Repo:      cfg.Repo,
 		ctx:       ctx,
 		Peerstore: pstoremem.NewPeerstore(),
-		Password:  password,
+		password:  password,
 		NetKey:    nKey,
-	}
-
-	n.RecordValidator = record.NamespacedValidator{
-		"pk": record.PublicKeyValidator{},
 	}
 
 	if cfg.Online {
@@ -139,32 +134,9 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 	// hash security
 	bs := bstore.NewBlockstore(rds)
 
-	opts := bstore.DefaultCacheOpts()
-
-	rcfg, err := n.Repo.Config()
-	if err != nil {
-		return err
-	}
-
-	opts.HasBloomFilterSize = rcfg.Datastore.BloomFilterSize
-	if !cfg.Permanent {
-		opts.HasBloomFilterSize = 0
-	}
-
-	if !cfg.NilRepo {
-		bs, err = bstore.CachedBlockstore(ctx, bs, opts)
-		if err != nil {
-			return err
-		}
-	}
-
-	bs = bstore.NewIdStore(bs)
+	bs.HashOnRead(false)
 
 	n.Blockstore = bs
-
-	if rcfg.Datastore.HashOnRead {
-		bs.HashOnRead(true)
-	}
 
 	hostOption := cfg.Host
 	if cfg.DisableEncryptedConnections {
@@ -176,6 +148,11 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 		You will not be able to connect to any nodes configured to use encrypted connections`)
 	}
 
+	rcfg, err := n.Repo.Config()
+	if err != nil {
+		return err
+	}
+
 	if cfg.Online {
 		do := setupDiscoveryOption(rcfg.Discovery)
 		if err := n.startOnlineServices(ctx, cfg.Routing, hostOption, do, cfg.getOpt("mplex")); err != nil {
@@ -183,7 +160,7 @@ func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
 		}
 	}
 
-	n.Blocks = bserv.New(n.Blockstore, n.Routing)
+	n.Data = data.New(n.Identity.Pretty(), n.Blockstore, n.Repo.Datastore(), n.PeerHost, n.Routing)
 
 	return nil
 }

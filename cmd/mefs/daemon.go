@@ -23,12 +23,11 @@ import (
 	"github.com/memoio/go-mefs/core/commands"
 	"github.com/memoio/go-mefs/core/corehttp"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/role/keeper"
 	"github.com/memoio/go-mefs/role/provider"
 	"github.com/memoio/go-mefs/role/user"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
@@ -57,15 +56,15 @@ const (
 	psKwd                     = "providerSla"
 	passwordKwd               = "password"
 	secretKeyKwd              = "secretKey"
-	reDeployOfferKwd          = "reDeployOffer"
+	reDeploy                  = "reDeployContract"
 	netKeyKwd                 = "netKey"
 	posKwd                    = "pos"
 	gcKwd                     = "cleanPos"
 )
 
 var (
-	errWrongInput = errors.New("The input option is wrong.")
-	errRepoExists = errors.New(`mefs configuration file already exists, reinitializing would overwrite your keys`)
+	errWrongInput = errors.New("The input option is wrong")
+	errRepoExists = errors.New("mefs configuration file already exists, reinitializing would overwrite your keys")
 )
 
 var daemonCmd = &cmds.Command{
@@ -140,10 +139,10 @@ environment variable:
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the privateKey").WithDefault(utils.DefaultPassword),
-		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
-		cmds.BoolOption(reDeployOfferKwd, "rdo", "used for provider reDeploy offer contract").WithDefault(false),
+		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(provider.DefaultCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(provider.DefaultDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
@@ -250,6 +249,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	contracts.EndPoint = cfg.Eth
 
+	// start logger
+	utils.StartLogger()
+
 	routingOption := cfg.Routing.Type
 	if routingOption == "" {
 		routingOption = routingOptionDHTKwd
@@ -280,32 +282,21 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	printSwarmAddrs(node)
 
-	//把每个角色的k v保存到本地leveldb中
 	nid := node.Identity.Pretty()
-	kmRole, err := metainfo.NewKeyMeta(nid, metainfo.Local, metainfo.SyncTypeRole)
-	if err != nil {
-		return err
-	}
-	keystring := kmRole.ToString() //角色信息的key
 
 	if !cfg.Test {
 		//从合约中获取账户角色
-		localAddress, err := address.GetAddressFromID(nid)
+		isKeeper, err := role.IsKeeper(nid)
 		if err != nil {
-			log.Error("error from get address from id: ", err)
-			return err
-		}
-		isKeeper, err := contracts.IsKeeper(localAddress)
-		if err != nil {
-			log.Error("error from IsKeeper: ", err)
+			utils.MLogger.Error("Got Keeper err: ", err)
 			return err
 		}
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 		} else {
-			isProvider, err := contracts.IsProvider(localAddress)
+			isProvider, err := role.IsProvider(nid)
 			if err != nil {
-				log.Error("error from IsProvider: ", err)
+				utils.MLogger.Error("Got Provider role: ", err)
 				return err
 			}
 			if isProvider {
@@ -315,48 +306,34 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}
 		}
 	}
-	value := cfg.Role //角色信息的value
-	err = node.Routing.(*dht.IpfsDHT).CmdPutTo(keystring, value, "local")
+
+	kmRole, err := metainfo.NewKeyMeta(nid, metainfo.Role)
 	if err != nil {
-		fmt.Println("node.Routing.CmdPut falied: ", err)
+		return err
+	}
+
+	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), "local")
+	if err != nil {
+		utils.MLogger.Error("Put role key falied: ", err)
 	}
 
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children
 		// that it will wait for before closing, such as the API server.
-		switch value {
-		case metainfo.RoleKeeper:
-			fmt.Println("Keeper-persisting before shut down")
-			err := keeper.PersistlocalPeerInfo()
-			if err != nil {
-				fmt.Println("Sorry, something wrong in persisting:", err)
-			} else {
-				fmt.Println("Persist completed")
-			}
-		case metainfo.RoleUser:
-			fmt.Println("User-persisting before shut down")
-			err = user.PersistBeforeExit()
-			if err != nil {
-				fmt.Println("Persist falied: ", err)
-			}
-			// 增加provider的persist，将channel的value值保存到本地
-		case metainfo.RoleProvider:
-			fmt.Println("Provider-persisting before shut down")
-			err = provider.PersistBeforeExit()
-			if err != nil {
-				fmt.Println("Persist falied: ", err)
-			}
-		default:
+
+		err = node.Inst.Stop()
+		if err != nil {
+			utils.MLogger.Error("Persist before exist falied: ", err)
 		}
 
 		err = node.Close()
 		if err != nil {
-			fmt.Println("node.Close falied: ", err)
+			utils.MLogger.Error("Mefs node close falied: ", err)
 		}
 
 		select {
 		case <-req.Context.Done():
-			log.Info("Gracefully shut down daemon")
+			utils.MLogger.Info("Gracefully shut down daemon")
 		default:
 		}
 	}()
@@ -366,11 +343,13 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	}
 
 	// construct api endpoint - every time
-	// metb的req的端口为0
 	apiErrc, err := serveHTTPApi(req, cctx)
 	if err != nil {
 		return err
 	}
+
+	// just for minio
+	core.LocalNode = node
 
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.MefsNodeCollector{Node: node})
@@ -379,10 +358,10 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	err = mcl.Init(mcl.BLS12_381)
 	if err != nil {
-		fmt.Println("Init BLS12_381 curve failed: ", err)
+		utils.MLogger.Error("Init BLS12_381 curve failed: ", err)
 		<-req.Context.Done()
 	} else {
-		fmt.Println("Init BLS12_381 curve success")
+		utils.MLogger.Info("Init BLS12_381 curve success")
 	}
 
 	capacity, ok := req.Options[capacityKwd].(int64)
@@ -401,66 +380,49 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
-	rdo, ok := req.Options[reDeployOfferKwd].(bool)
+	rdo, ok := req.Options[reDeploy].(bool)
 	if !ok {
 		fmt.Println("input wrong value for redeploy.")
 		return errRepoExists
 	}
 
-	switch value {
+	switch cfg.Role {
 	case metainfo.RoleKeeper:
-		fmt.Println("started as a keeper")
-		enableTendermint, _ := req.Options[enableTendermintKwd].(bool)
-		err = keeper.StartKeeperService(req.Context, node, enableTendermint)
+		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing)
 		if err != nil {
-			fmt.Println("Start keeperService failed:", err)
-			return err
+			fmt.Println("Start keeper service fails; please restart")
 		}
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&keeper.HandlerV2{Role: metainfo.RoleKeeper})
-		if err != nil {
-			return err
-		}
-	case metainfo.RoleUser:
-		fmt.Println("started as a user")
-		user.InitUserBook(node)
+		node.Inst = ins
 
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&user.HandlerV2{Role: metainfo.RoleUser})
+		fmt.Println("Keeper daemon is ready")
+
+	case metainfo.RoleUser:
+		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
-			return err
+			fmt.Println("Start user daemon fails; please restart")
 		}
+
+		node.Inst = ins
 
 		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
-		if cfg.Test {
-			go func() {
-				err = user.StartUser(node.Identity.Pretty(), cfg.IsInit, utils.DefaultPassword, user.DefaultCapacity, user.DefaultDuration, utils.STOREPRICEPEDOLLAR, user.KeeperSLA, user.ProviderSLA, rdo)
-				if err != nil {
-					fmt.Println("Start local user failed:", err)
-					err := user.KillUser(node.Identity.Pretty())
-					if err != nil {
-						fmt.Println("lfsuser.KillUser failed:", err)
-					}
-					return
-				}
-			}()
-		}
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("started as a provider")
-		err = provider.StartProviderService(req.Context, node, capacity, duration, price, rdo)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration, price, rdo)
 		if err != nil {
 			fmt.Println("Start providerService failed:", err)
 			return err
 		}
-		err = node.Routing.(*dht.IpfsDHT).AssignmetahandlerV2(&provider.HandlerV2{Role: metainfo.RoleProvider})
-		if err != nil {
-			return err
-		}
+
+		node.Inst = ins
+
+		fmt.Println("Provider daemon is ready")
 
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
 		if pos {
-			fmt.Println("Start pos Service")
-			go provider.PosService(req.Context, gc)
+			utils.MLogger.Info("Start pos Service")
+			go ins.(*provider.Info).PosService(req.Context, gc)
 		}
 	default:
 	}
@@ -524,6 +486,7 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 		corehttp.MutexFractionOption("/debug/pprof-mutex/"),
 		corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
 		corehttp.LogOption(),
+		corehttp.MLog(),
 	}
 
 	if len(cfg.Gateway.RootRedirect) > 0 {

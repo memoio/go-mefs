@@ -2,756 +2,937 @@ package user
 
 import (
 	"context"
-	"log"
+	"errors"
 	"math/big"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	inet "github.com/libp2p/go-libp2p-core/network"
+	"github.com/golang/protobuf/proto"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	mcl "github.com/memoio/go-mefs/bls12"
-	"github.com/memoio/go-mefs/contracts"
+	pb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-//keeperInfo 此结构体记录Keeper的信息，存储Tendermint地址，让user也能访问链上数据
+const (
+	starting     int8 = iota
+	collecting        // broadcast UserInit
+	collectDone       // notify keeper
+	deploying         // deploy contracts
+	depoyDone         // connect
+	groupStarted      // done
+)
+
 type keeperInfo struct {
-	isBFT     bool //标识Keeper组采取的同步方法
 	keeperID  string
+	sessionID uuid.UUID // for one write
 	connected bool
 }
 
 type providerInfo struct {
 	providerID string
 	connected  bool
-	chanItem   *contracts.ChannelItem
-	offerItem  *contracts.OfferItem
+	sessionID  uuid.UUID // for one write
+	chanItem   *role.ChannelItem
+	offerItem  *role.OfferItem
 }
 
-// groupService stores use's groupinfo
-type groupService struct {
-	userid        string
-	keepers       []*keeperInfo
-	providers     []*providerInfo
-	upKeepingItem *contracts.UpKeepingItem
-	queryItem     *contracts.QueryItem
-	keySet        *mcl.KeySet
-	initResMutex  sync.Mutex //目前同一时间只回复一个Keeper避免冲突
-	privateKey    []byte
-	storeDays     int64 //表示部署合约时的存储数据时间，单位是“天”
-	storeSize     int64 //表示部署合约时的存储数据大小，单位是“MB”
-	storePrice    int64 //表示部署合约时的存储价格大小，单位是“wei”
-	keeperSLA     int   //表示部署合约时的keeper参数，目前是keeper数量
-	providerSLA   int   //表示部署合约时的provider参数，目前是provider数量
-	reDeploy      bool  //是否重新部署offer
+// group stores use's groupinfo
+type groupInfo struct {
+	sync.Mutex
+	groupID string // id format of query address
+	userID  string // id format of user address
+	privKey string // EthString
+	state   int8   // atomic?
+	ds      data.Service
 
+	keepers   map[string]*keeperInfo
+	providers map[string]*providerInfo
+
+	storeDays     int64    //表示部署合约时的存储数据时间，单位是“天”
+	storeSize     int64    //表示部署合约时的存储数据大小，单位是“MB”
+	storePrice    int64    //表示部署合约时的存储价格大小，单位是“wei”
+	keeperSLA     int      //表示部署合约时的keeper参数，目前是keeper数量
+	providerSLA   int      //表示部署合约时的provider参数，目前是provider数量
+	reDeploy      bool     // 是否重新部署offer
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
+
+	upKeepingItem *role.UpKeepingItem
+	queryItem     *role.QueryItem
 }
 
-// constructGroupService Constructs groupService
-func constructGroupService(userid string, privKey []byte, duration int64, capacity int64, price int64, ks int, ps int, redeploy bool) *groupService {
-	if privKey == nil {
-		return nil
-	}
-	return &groupService{
-		userid:      userid,
-		privateKey:  privKey,
+func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redeploy bool, d data.Service) *groupInfo {
+	return &groupInfo{
+		userID:      uid,
+		privKey:     sk,
+		ds:          d,
+		state:       starting,
 		storeDays:   duration,
 		storeSize:   capacity,
 		storePrice:  price,
 		keeperSLA:   ks,
 		providerSLA: ps,
 		reDeploy:    redeploy,
+		keepers:     make(map[string]*keeperInfo, ks),
+		providers:   make(map[string]*providerInfo, ps),
 	}
 }
 
 // startGroupService starts group
-// step1: deploy query contract
-// step2: send init message(query address) to keeper
-// step3: handle init message from keeper
-// step4: sync send notify to keeper and hanle keeper's notify
-// step5: init userconfig, deploy upkeeping contract and channel contracts(need modify)
-func (gp *groupService) startGroupService(ctx context.Context, isInit bool) error {
-	if gp == nil {
-		return ErrCannotConnectNetwork
+// step1: broadcast init message(query address) to keeper
+// step2: handle init message from keeper
+// step3: sync send notify to keeper and handle keeper's notify
+// step4: deploy upkeeping contract and channel contracts(need modify)
+func (g *groupInfo) start(ctx context.Context) (bool, error) {
+	// getUK
+	if g.upKeepingItem != nil {
+		uItem := g.upKeepingItem
+		utils.MLogger.Info("start user: ", g.userID, " and its lfs: ", g.groupID)
+		g.keeperSLA = int(uItem.KeeperSLA)
+		g.providerSLA = int(uItem.ProviderSLA)
+		g.tempKeepers = uItem.KeeperIDs
+		g.tempProviders = uItem.ProviderIDs
+		g.state = depoyDone
+		err := g.connect(ctx)
+		if err != nil {
+			return true, err
+		}
+		return true, nil
 	}
-	// getbalance
-	uaddr, err := address.GetAddressFromID(gp.userid)
+
+	if g.userID == g.groupID {
+		kmUser, err := metainfo.NewKeyMeta(g.groupID, metainfo.LogFS, g.userID)
+		if err != nil {
+			return false, err
+		}
+
+		res, err := g.ds.GetKey(ctx, kmUser.ToString(), "local")
+		if err != nil {
+			return false, err
+		}
+
+		utils.MLogger.Info("Test user: ", g.userID, " has keepers and providers: ", string(res))
+
+		splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
+		if len(splitedMeta) == 2 {
+			count := 0
+			keepers := splitedMeta[0]
+			for i := 0; i < len(keepers)/utils.IDLength; i++ {
+				kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
+				_, err := peer.IDB58Decode(kid)
+				if err != nil {
+					continue
+				}
+
+				if !utils.CheckDup(g.tempKeepers, kid) {
+					continue
+				}
+
+				g.tempKeepers = append(g.tempKeepers, kid)
+				count++
+			}
+
+			g.keeperSLA = count
+
+			count = 0
+			providers := splitedMeta[1]
+			for i := 0; i < len(providers)/utils.IDLength; i++ {
+				pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
+
+				_, err := peer.IDB58Decode(pid)
+				if err != nil {
+					continue
+				}
+
+				if !utils.CheckDup(g.tempProviders, pid) {
+					continue
+				}
+
+				g.tempProviders = append(g.tempProviders, pid)
+				count++
+			}
+
+			g.providerSLA = count
+
+			utils.MLogger.Info("Start test user: ", g.userID, " and its lfs:", g.groupID)
+
+			g.state = depoyDone
+			err = g.connect(ctx)
+			if err != nil {
+				return true, err
+			}
+			return true, nil
+		}
+	}
+
+	utils.MLogger.Info("Initialize user:", g.userID, " and its lfs: ", g.groupID)
+	err := g.initGroup(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	return false, nil
+}
+
+func (g *groupInfo) connect(ctx context.Context) error {
+	if g.state != depoyDone {
+		return errors.New("Wrong state")
+	}
+
+	g.Lock()
+	defer g.Unlock()
+
+	utils.MLogger.Info("Connect keepers and providers for user: ", g.userID)
+	var wg sync.WaitGroup
+	for _, kid := range g.tempKeepers {
+		tempKeeper := &keeperInfo{
+			keeperID: kid,
+		}
+		g.keepers[kid] = tempKeeper
+		wg.Add(1)
+		go func(pid string) {
+			defer wg.Done()
+			g.ds.Connect(ctx, pid)
+		}(kid)
+	}
+
+	for _, pid := range g.tempProviders {
+		tempPro := &providerInfo{
+			providerID: pid,
+		}
+		g.providers[pid] = tempPro
+		wg.Add(1)
+		go func(pid string) {
+			defer wg.Done()
+			g.ds.Connect(ctx, pid)
+		}(pid)
+	}
+
+	wg.Wait()
+
+	connectTryCount := 5
+	failNum := 0
+	for i := 0; i < connectTryCount; i++ {
+		failNum = 0
+		for _, kinfo := range g.keepers {
+			if !g.ds.Connect(ctx, kinfo.keeperID) {
+				failNum++
+				kinfo.connected = false
+				if i == connectTryCount-1 {
+					utils.MLogger.Warn("Connect to keeper: ", kinfo.keeperID, " failed.")
+				}
+			} else {
+				kinfo.connected = true
+			}
+		}
+
+		if failNum > 0 {
+			time.Sleep(time.Minute)
+			continue
+		}
+		break
+	}
+
+	// all fails
+	if failNum == g.keeperSLA {
+		return ErrNoEnoughKeeper
+	}
+
+	failNum = 0
+	for i := 0; i < connectTryCount; i++ {
+		failNum = 0
+		for _, pinfo := range g.providers {
+			if !g.ds.Connect(ctx, pinfo.providerID) {
+				failNum++
+				pinfo.connected = false
+				if i == connectTryCount-1 {
+					utils.MLogger.Warn("Connect to provider: ", pinfo.providerID, " failed.")
+				}
+			} else {
+				pinfo.connected = true
+			}
+		}
+
+		if failNum > 0 {
+			time.Sleep(time.Minute)
+			continue
+		}
+		break
+	}
+
+	// all fails
+	if failNum == g.providerSLA {
+		return ErrNoEnoughProvider
+	}
+
+	// key: queryID/"UserStart"/userID/kc/pc
+	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		return err
 	}
 
-	balance, err := contracts.QueryBalance(uaddr.Hex())
-	if err != nil {
-		config, err := localNode.Repo.Config()
-		if err != nil {
-			return err
-		}
-		if config.Test {
-			balance = big.NewInt(0)
-		}
+	var res strings.Builder
+	for _, keeper := range g.keepers {
+		res.WriteString(keeper.keeperID)
 	}
-	log.Println(uaddr.String(), " has balance (wei): ", balance)
-	// 说明该user没钱，该user为testuser;否则为有金额的实际用户
-	if balance.Cmp(big.NewInt(0)) <= 0 {
-		// 判断是否为初始化启动
-		if isInit {
-			err := gp.findKeeperAndProviderInit(ctx, balance)
-			return err
-		}
-		// 尝试以inited方式启动
-		err = gp.findKeeperAndProviderNotInit(ctx)
-		if err != nil {
-			log.Println("Can't connect the user's keepers, so we think the user hasn't inited, begin to init user...", gp.userid)
-			err = gp.findKeeperAndProviderInit(ctx, balance)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		// getUK
-		_, uk, err := contracts.GetUKFromResolver(uaddr)
-		switch err {
-		case nil: //部署过
-			log.Println("begin to find keepers and providers to start user : ", gp.userid)
-			item, err := contracts.GetUpkeepingInfo(uaddr, uk)
-			if err != nil {
-				return err
-			}
-			// keeper数量、provider的数量应以合约约定为主
-			gp.keeperSLA = int(item.KeeperSLA)
-			gp.providerSLA = int(item.ProviderSLA)
-			gp.upKeepingItem = &item
-			err = gp.connectKeepersAndProviders(ctx, item.KeeperIDs, item.ProviderIDs)
-			if err != nil {
-				return err
-			}
-		case contracts.ErrNotDeployedMapper, contracts.ErrNotDeployedUk: //没有部署过
-			log.Println("begin to init user : ", gp.userid)
-			err := gp.findKeeperAndProviderInit(ctx, balance)
-			if err != nil {
-				return err
-			}
-		default:
-			return err
-		}
+
+	res.WriteString(metainfo.DELIMITER)
+
+	for _, provider := range g.providers {
+		res.WriteString(provider.providerID)
 	}
+
+	for _, kinfo := range g.keepers {
+		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, kinfo.keeperID)
+		if err != nil {
+			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
+			continue
+		}
+		uuidtmp, err := uuid.FromBytes(resp)
+		if err != nil {
+			continue
+		}
+		kinfo.sessionID = uuidtmp
+	}
+
+	for _, pinfo := range g.providers {
+		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, pinfo.providerID)
+		if err != nil {
+			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
+		}
+
+		uuidtmp, err := uuid.FromBytes(resp)
+		if err != nil {
+			continue
+		}
+		pinfo.sessionID = uuidtmp
+	}
+
+	utils.MLogger.Info("Group Service is ready for: ", g.userID)
+
+	g.loadContracts()
+	g.loadChannelValue()
+
+	g.state = groupStarted
 	return nil
 }
 
 // user init
-func (gp *groupService) findKeeperAndProviderInit(ctx context.Context, balance *big.Int) error {
-	addr, err := address.GetAddressFromID(gp.userid)
-	if err != nil {
-		return err
-	}
-	//deploy query first
-	config, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	var queryAddr common.Address
-	if !config.Test {
-		//判断账户余额能否部署query合约 + upKeeping + channel合约
-		var moneyPerDay = new(big.Int)
-		moneyPerDay = moneyPerDay.Mul(big.NewInt(gp.storePrice), big.NewInt(gp.storeSize))
-		var moneyAccount = new(big.Int)
-		moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(gp.storeDays))
-
-		deployPrice := big.NewInt(int64(740621000000000))
-		deployPrice.Add(big.NewInt(1128277), big.NewInt(int64(652346*gp.providerSLA)))
-		var leastMoney = new(big.Int)
-		leastMoney = leastMoney.Add(moneyAccount, deployPrice)
-		if balance.Cmp(leastMoney) < 0 { //余额不足
-			log.Println(ErrBalance, ", you need more balance ")
-			return ErrBalance
-		}
-
-		queryAddr, err = contracts.DeployQuery(addr, utils.EthSkByteToEthString(gp.privateKey), gp.storeSize, gp.storeDays, gp.storePrice, gp.keeperSLA, gp.providerSLA, gp.reDeploy)
-		if err != nil {
-			log.Println("fail to deploy query contract")
-			return err
-		}
-	} else {
-		log.Println("测试环境，将不部署query合约")
-	}
-
-	log.Println("Begin to find keepers for init...", "\nthe uid is: "+gp.userid+"\nthe addr is: "+addr.String())
-
-	err = testConnect()
-	if err != nil {
-		return err
-	}
-
+// key: queryID/"UserInit"/userID/keeperCount/providerCount
+// for test: queryID = userID
+func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
-	kmInit, err := metainfo.NewKeyMeta(gp.userid, metainfo.UserInitReq, strconv.Itoa(gp.keeperSLA), strconv.Itoa(gp.providerSLA), queryAddr.String())
-	if err != nil {
-		log.Println("findKeeperAndProviderInit()NewKeyMeta()error!")
-		return err
-	}
-	go broadcastMetaMessage(kmInit, "")
-	err = setUserState(gp.userid, collecting)
+	kmInit, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserInit, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		return err
 	}
+
+	kmes := kmInit.ToString()
+
+	g.state = collecting
+	go g.ds.BroadcastMessage(ctx, kmes)
+
 	// wait 20 minutes for collecting
 	timeOutCount := 0
-	tick := time.Tick(30 * time.Second)
+	tick := time.Tick(60 * time.Second)
 	for {
 		select {
-		case <-tick: //每过30s 检查是否收到了足够的KP信息，如果不足，继续发送初始化请求，足够的时候进行KP的选择和确认
-			if timeOutCount >= 40 {
+		case <-tick:
+			if timeOutCount >= 30 {
 				return ErrTimeOut
 			}
-			userState, err := getUserState(gp.userid)
-			if err != nil {
-				return err
-			}
-			switch userState {
+			switch g.state {
 			case collecting:
 				timeOutCount++
-				if len(gp.tempKeepers) >= gp.keeperSLA && len(gp.tempProviders) >= gp.providerSLA {
-					//收集到足够的keeper和Provider 进行挑选并给keeper发送确认信息，初始化阶段变为collectComplete
-					err := setUserState(gp.userid, collectCompleted)
-					if err != nil {
-						return err
-					}
-					gp.userInitNotif(kmInit)
-				} else {
-					log.Printf("Timeout, No enough keepers and Providers,Have k:%d p:%d,want k:%d p:%d, retrying...\n", len(gp.tempKeepers), len(gp.tempProviders), gp.keeperSLA, gp.providerSLA)
-					go broadcastMetaMessage(kmInit, "")
+				ok := g.collect(ctx)
+				if ok {
+					go g.ds.BroadcastMessage(ctx, kmes)
 				}
-			case collectCompleted:
-				timeOutCount++
-				//TODO：等待keeper的第四次握手超时怎么办，目前继续等待
-				log.Printf("Timeout, waiting keeper response\n")
-				for _, keeperInfo := range gp.keepers {
-					if !keeperInfo.connected {
-						log.Printf("Keeper %s not response, waiting...", keeperInfo.keeperID)
-					}
-				}
-			case onDeploy:
-				gp.handleRest()
+			case collectDone:
+				g.notify(ctx)
+			case deploying:
+				g.deployContract(ctx)
+			case depoyDone:
+				return g.connect(ctx)
 			default:
 				return nil
 			}
 		case <-ctx.Done():
-			return nil
+			return errors.New("cancel init")
 		}
 	}
 }
 
-//userInitNotIf 收集齐KP信息之后， 选择keeper和provider，构造确认信息发给keeper
-func (gp *groupService) userInitNotif(km *metainfo.KeyMeta) {
-	err := gp.chooseKeepersAndProviders()
-	if err != nil {
-		if err == ErrNoEnoughKeeper { //有keeper没有连接上，重新设置初始化状态为collecting
-			err := setUserState(gp.userid, collecting)
-			if err != nil {
-				log.Println("userInitNotif()setUserState()err:", err)
-			}
-		}
-		log.Println(err)
+// handleUserInit handle replys from keepers
+// key: queryID/"UserInit"/userID/keepercount/providercount,
+// value: kid1kid2..../pid1pid2
+func (g *groupInfo) handleUserInit(km *metainfo.KeyMeta, metaValue []byte, from string) {
+	g.Lock()
+	defer g.Unlock()
+
+	if g.state != collecting {
 		return
 	}
 
-	//构造本节点keeper信息和provider信息 放入硬盘 id1id2id3.......(无分隔符)
-	var assignedKeeper, assignedProvider string
-	for _, keeper := range gp.keepers {
-		assignedKeeper += keeper.keeperID
+	utils.MLogger.Info("Receive InitResponse，from：", from, ", value is：", string(metaValue))
+	splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splitedMeta) != 2 {
+		return
 	}
 
-	for _, provider := range gp.providers {
-		assignedProvider += provider.providerID
-	}
-	//构造发给keeper的初始化确认信息并发送给自己的所有keeper
-	assignedKP := assignedKeeper + metainfo.DELIMITER + assignedProvider
-	km.SetKeyType(metainfo.UserInitNotif)
-
-	var wg sync.WaitGroup
-	for _, keeper := range gp.keepers { //循环发消息
-		wg.Add(1)
-		log.Println("Notify keeper:", keeper.keeperID)
-		go func(keeper string) {
-			defer wg.Done()
-			retry := 0
-			// retry
-			for retry < 10 {
-				res, err := sendMetaRequest(km, assignedKP, keeper) //发送确认信息
-				if err != nil {
-					retry++
-					time.Sleep(30 * time.Second)
-				} else {
-					gp.handleUserInitNotifRes(res, keeper)
-					return
-				}
-			}
-
-		}(keeper.keeperID)
-
-	}
-	wg.Wait()
-
-	log.Println("Waiting for keepers' response")
-}
-
-//  AddKeepersAndProviders 把keeper和provider的id加入groupservice的备选中
-func (gp *groupService) addKeepersAndProviders(keepers, providers string) {
+	ctx := context.Background()
+	kcount := 0
+	pcount := 0
+	keepers := splitedMeta[0]
 	for i := 0; i < len(keepers)/utils.IDLength; i++ {
 		kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
 		_, err := peer.IDB58Decode(kid)
 		if err != nil {
 			continue
 		}
-		if !utils.CheckDup(gp.tempKeepers, kid) {
+		if !utils.CheckDup(g.tempKeepers, kid) {
 			continue
 		}
-		if sc.ConnectTo(context.Background(), localNode, kid) {
-			gp.tempKeepers = append(gp.tempKeepers, kid)
+
+		g.tempKeepers = append(g.tempKeepers, kid)
+		if g.ds.Connect(ctx, kid) {
+			kcount++
 		}
 	}
+
+	providers := splitedMeta[1]
 	for i := 0; i < len(providers)/utils.IDLength; i++ {
 		pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
-		_, err := peer.IDB58Decode(pid)
-		if err != nil {
+		if !utils.CheckDup(g.tempProviders, pid) {
 			continue
 		}
-		if !utils.CheckDup(gp.tempProviders, pid) {
-			continue
+
+		g.tempProviders = append(g.tempProviders, pid)
+		if g.ds.Connect(ctx, pid) {
+			pcount++
 		}
-		if sc.ConnectTo(context.Background(), localNode, pid) {
-			gp.tempProviders = append(gp.tempProviders, pid)
-		}
+	}
+
+	if kcount >= g.keeperSLA && pcount >= g.providerSLA {
+		g.state = collectDone
 	}
 }
 
-//chooseKeepersAndProviders 启动流程，收集到足够KP信息，从备选中 选出本节点的keeper和provider，选择keeper的时候，检查连接性
-func (gp *groupService) chooseKeepersAndProviders() error {
-	userState, err := getUserState(gp.userid)
+func (g *groupInfo) collect(ctx context.Context) bool {
+	g.Lock()
+	defer g.Unlock()
+
+	if g.state != collecting {
+		return false
+	}
+
+	kcount := 0
+	pcount := 0
+
+	for _, kid := range g.tempKeepers {
+		if g.ds.Connect(ctx, kid) {
+			kcount++
+		}
+	}
+
+	for _, kid := range g.tempProviders {
+		if g.ds.Connect(ctx, kid) {
+			pcount++
+		}
+	}
+
+	if kcount >= g.keeperSLA && pcount >= g.providerSLA {
+		g.state = collectDone
+		return false
+	} else {
+		utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...", kcount, pcount, g.keeperSLA, g.providerSLA)
+		return true
+	}
+}
+
+// key: queryID/"UserNotify"/userID/kc/pc
+func (g *groupInfo) notify(ctx context.Context) {
+	// in case other change temp
+	g.Lock()
+
+	if g.state != collectDone {
+		g.Unlock()
+		return
+	}
+
+	utils.MLogger.Info("Has enough Keeper and Providers, choosing...")
+	keepers := make([]string, 0, g.keeperSLA)
+	providers := make([]string, 0, g.providerSLA)
+	g.tempKeepers = utils.DisorderArray(g.tempKeepers)
+	i := 0
+	for _, kidStr := range g.tempKeepers {
+		if i >= g.keeperSLA {
+			break
+		}
+
+		if !g.ds.Connect(ctx, kidStr) {
+			continue
+		}
+		i++
+		keepers = append(keepers, kidStr)
+	}
+
+	if len(keepers) < g.keeperSLA {
+		g.state = collecting
+		g.Unlock()
+		utils.MLogger.Info("Keeper is not enough, collecting...")
+		return
+	}
+
+	g.tempProviders = utils.DisorderArray(g.tempProviders)
+	i = 0
+	for _, pidStr := range g.tempProviders {
+		if i >= g.providerSLA {
+			break
+		}
+
+		if !g.ds.Connect(ctx, pidStr) {
+			continue
+		}
+
+		i++
+		providers = append(providers, pidStr)
+	}
+
+	if len(providers) < g.providerSLA {
+		g.state = collecting
+		g.Unlock()
+		utils.MLogger.Info("Provider is not enough, collecting...")
+		return
+	}
+
+	g.tempKeepers = keepers
+	g.tempProviders = providers
+
+	utils.MLogger.Info("Choose completed")
+
+	var res strings.Builder
+	for _, kid := range g.tempKeepers {
+		res.WriteString(kid)
+	}
+
+	res.WriteString(metainfo.DELIMITER)
+
+	for _, pid := range g.tempProviders {
+		res.WriteString(pid)
+	}
+
+	g.Unlock()
+
+	kmNotify, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserNotify, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	if err != nil {
+		return
+	}
+
+	kmes := kmNotify.ToString()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		count := 0
+		for _, kid := range keepers { //循环发消息
+			wg.Add(1)
+			utils.MLogger.Info("Notify keeper: ", kid)
+			go func(kid string) {
+				defer wg.Done()
+				retry := 0
+				// retry
+				for retry < 10 {
+					res, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmes, []byte(res.String()), nil, kid)
+					if err != nil || string(res) != "ok" {
+						retry++
+						time.Sleep(30 * time.Second)
+					} else {
+						g.Lock()
+						count++
+						g.Unlock()
+						return
+					}
+				}
+
+			}(kid)
+
+		}
+		wg.Wait()
+
+		//all keepers are online
+		if count == g.keeperSLA {
+			utils.MLogger.Info("Receive all keepers' response")
+			g.Lock()
+			g.state = deploying
+			g.Unlock()
+			return
+		}
+	}
+
+	// re-collecting
+	g.Lock()
+	g.state = collecting
+	g.Unlock()
+}
+
+func (g *groupInfo) deployContract(ctx context.Context) error {
+	g.Lock()
+	defer g.Unlock()
+
+	if g.state != deploying {
+		return errors.New("State is wrong")
+	}
+
+	var res strings.Builder
+	for _, kid := range g.tempKeepers {
+		res.WriteString(kid)
+	}
+
+	res.WriteString(metainfo.DELIMITER)
+
+	for _, pid := range g.tempProviders {
+		res.WriteString(pid)
+	}
+
+	kmUser, err := metainfo.NewKeyMeta(g.groupID, metainfo.LogFS, g.userID)
 	if err != nil {
 		return err
 	}
-	if userState != collectCompleted {
-		return ErrWrongInitState
-	}
-	log.Println("Has enough Keeper and Providers, choosing...")
-	gp.keepers = make([]*keeperInfo, 0, gp.keeperSLA)
-	gp.providers = make([]*providerInfo, 0, gp.providerSLA)
-	//选择keeper
-	gp.tempKeepers = utils.DisorderArray(gp.tempKeepers)
-	for i := 0; i < len(gp.tempKeepers); {
-		if i >= gp.keeperSLA {
-			break
-		}
-		kidStr := gp.tempKeepers[i]
-		kidB58, _ := peer.IDB58Decode(kidStr)
-		//判断是否链接，如果连不上，则从备选中删除，看下一个
-		if localNode.PeerHost.Network().Connectedness(kidB58) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), localNode, kidStr) {
-				continue
-			}
-		}
-		tempK := &keeperInfo{
-			keeperID:  kidStr,
-			connected: false, // set true when receive notify response
-		}
-		i++
-		gp.keepers = append(gp.keepers, tempK)
-	}
-	if len(gp.keepers) < gp.keeperSLA {
-		return ErrNoEnoughKeeper
-	}
 
-	//选择provider
-	gp.tempProviders = utils.DisorderArray(gp.tempProviders)
-	for i := 0; i < len(gp.tempProviders); {
-		if i >= gp.providerSLA {
-			break
-		}
-		pidStr := gp.tempProviders[i]
-		pidB58, _ := peer.IDB58Decode(pidStr)
-		//判断是否链接，如果连不上，则从备选中删除，看下一个
-		if localNode.PeerHost.Network().Connectedness(pidB58) != inet.Connected {
-			if !sc.ConnectTo(context.Background(), localNode, pidStr) {
-				continue
-			}
-		}
-		i++
+	g.ds.PutKey(ctx, kmUser.ToString(), []byte(res.String()), "local")
 
-		tempP := &providerInfo{
-			providerID: pidStr,
-			connected:  true,
+	if g.userID != g.groupID {
+		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
+		if err != nil {
+			utils.MLogger.Error("Deploy UpKeeping failed: ", err)
 		}
 
-		gp.providers = append(gp.providers, tempP)
-	}
+		uItem, err := role.GetUpkeepingInfo(g.userID, ukID)
+		if err != nil {
+			utils.MLogger.Error("Get UpKeeping failed: ", err)
+		}
 
-	log.Println("Choose completed")
+		g.upKeepingItem = &uItem
+
+		var wg sync.WaitGroup
+		for _, proID := range g.tempProviders {
+			wg.Add(1)
+			go func(proID string) {
+				defer wg.Done()
+				_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+				if err != nil {
+					return
+				}
+				// need persist
+			}(proID)
+		}
+		wg.Wait()
+	}
+	g.state = depoyDone
 
 	return nil
 }
 
-// keeperConfirm 第四次握手 确认Keeper启动完毕
-// PeerID/"user_init_notif_res"/"bft","simple"或 IP:p2pport/IP:rpcport
-func (gp *groupService) keeperConfirm(keeper string, initRes string) error {
-	splitInitRes := strings.Split(initRes, metainfo.DELIMITER)
-	var ConnectedCount int
-	//将发来信息的keeper记录为连接成功
-	for _, kp := range gp.keepers {
-		if strings.Compare(kp.keeperID, keeper) == 0 && !kp.connected {
-			if len(splitInitRes) >= 2 {
-				kp.isBFT = true
-			}
-			kp.connected = true
-			log.Printf("Receive %s's response, waiting for other keepers\n", kp.keeperID)
-		}
-		if kp.connected {
-			ConnectedCount++
-		}
-	}
-	//与所有keeper都连接成功了
-	if ConnectedCount == len(gp.keepers) {
-		log.Println("Receive all keepers' response")
-		err := localNode.Repo.SetConfigKey("IsInit", false) //初始化过后，设置IsInit
-		if err != nil {
-			log.Println("gp.localNode.Repo.SetConfigKey failed :", err)
-		}
+func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
+	var pidstr string
+	var offset int
 
-		// 状态改为部署合约中
-		err = setUserState(gp.userid, onDeploy)
-		if err != nil {
-			log.Println("setUserState failed :", err)
-			return err
-		}
-
-	}
-	return nil
-}
-
-func (gp *groupService) handleRest() error {
-	err := gp.userBLS12ConfigInit()
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 	if err != nil {
+		return "", 0, err
+	}
+	blockMeta := kmBlock.ToString()
+	ctx := context.Background()
+	for _, kp := range g.tempKeepers {
+		pidAndOffset, err := g.ds.GetKey(ctx, blockMeta, kp)
+		if err != nil || pidAndOffset == nil {
+			continue
+		}
+		//成功收到
+		splitedValue := strings.Split(string(pidAndOffset), metainfo.DELIMITER)
+		if len(splitedValue) < 2 {
+			continue
+		}
+		pidstr = splitedValue[0]
+		offset, err = strconv.Atoi(splitedValue[1])
+		if err != nil {
+			continue
+		}
+
+		return pidstr, offset, nil
+	}
+	return "", 0, ErrNoProviders
+}
+
+func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
+	num := count
+	if count < 0 {
+		num = len(g.tempKeepers)
+	}
+
+	unconKeepers := make([]string, 0, num)
+	conKeepers := make([]string, 0, num)
+
+	ctx := context.Background()
+
+	i := 0
+	for _, kp := range g.tempKeepers {
+		if i >= num {
+			break
+		}
+
+		if !g.ds.Connect(ctx, kp) { //连接不上此keeper
+			unconKeepers = append(unconKeepers, kp)
+		} else {
+			conKeepers = append(conKeepers, kp)
+			i++
+		}
+	}
+
+	if len(conKeepers) < num && count > 0 {
+		return conKeepers, unconKeepers, ErrNoEnoughKeeper
+	}
+
+	return conKeepers, unconKeepers, nil
+}
+
+func (g *groupInfo) GetProviders(count int) ([]string, []string, error) {
+	num := count
+	if count < 0 {
+		num = len(g.tempProviders)
+	}
+
+	i := 0
+
+	unconPro := make([]string, 0, num)
+	conPro := make([]string, 0, num)
+	ctx := context.Background()
+	for _, pro := range g.tempProviders {
+		if i >= num {
+			break
+		}
+
+		if !g.ds.Connect(ctx, pro) { //连接不上此provider
+			unconPro = append(unconPro, pro)
+			continue
+		} else {
+			conPro = append(conPro, pro)
+			i++
+		}
+	}
+
+	if len(conPro) < num && count > 0 {
+		return conPro, unconPro, ErrNoEnoughProvider
+	}
+
+	return conPro, unconPro, nil
+}
+
+func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
+	if g.state < groupStarted {
+		return ErrLfsServiceNotReady
+	}
+	ctx := context.Background()
+	count := 0
+	for _, keeper := range g.tempKeepers {
+		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper)
+		if err != nil {
+			utils.MLogger.Info("Send meta message to: ", keeper, " error : ", err)
+			count++
+		}
+	}
+	if count == len(g.tempKeepers) {
+		return ErrNoKeepers
+	}
+	return nil
+}
+
+func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset int) error {
+	if g.state < groupStarted {
+		return ErrLfsServiceNotReady
+	}
+	kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+	if err != nil {
+		return err
+	}
+	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
+	return g.putDataToKeepers(kmBlock.ToString(), []byte(metaValue))
+}
+
+//删除块
+func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) error {
+	if g.state < groupStarted {
+		return ErrLfsServiceNotReady
+	}
+	provider, _, err := g.getBlockProviders(blockID)
+	if err == ErrNoProviders { //Noprovider说明此块还不存在，不用删除
+		utils.MLogger.Warnf("Get block: %s's location error, no exist or keepers lost it.", blockID)
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	if updateMeta { //这个需要等待返回
+		err := g.ds.DeleteBlock(ctx, km.ToString(), provider)
+		if err != nil {
+			return ErrCannotDeleteMetaBlock
+		}
+	} else {
+		go g.ds.DeleteBlock(ctx, km.ToString(), provider)
+	}
+
+	// or sent by provider?
+	km.SetDType(metainfo.BlockPos)
+	for _, kp := range g.tempKeepers {
+		go g.ds.DeleteKey(ctx, km.ToString(), kp)
+	}
+
+	return nil
+}
+
+func (g *groupInfo) loadContracts() error {
+	if g.groupID == g.userID {
 		return nil
 	}
 
-	gp.putUserConfig()
-
-	//部署合约
-	err = gp.deployUpKeepingAndChannel()
-	if err != nil {
-		log.Println("gp.deployUpKeepingAndChannel failed :", err)
-	}
-
-	saveContracts(gp.userid)
-
-	// 构造key告诉keeper和provider自己已经部署好合约
-	kmPid, err := metainfo.NewKeyMeta(gp.userid, metainfo.UserDeployedContracts)
-	if err != nil {
-		log.Println("Construct Deployed key error", err)
-		return err
-	}
-	for _, keeper := range gp.keepers {
-		_, err = sendMetaRequest(kmPid, gp.userid, keeper.keeperID)
+	if g.queryItem == nil {
+		qItem, err := role.GetQueryInfo(g.userID, g.groupID)
 		if err != nil {
-			log.Println("Send keeper", keeper.keeperID, " err:", err)
+			return err
 		}
+		g.queryItem = &qItem
 	}
-	for _, provider := range gp.providers {
-		_, err = sendMetaRequest(kmPid, gp.userid, provider.providerID)
+
+	if g.upKeepingItem == nil {
+		uItem, err := role.GetUpKeeping(g.userID, g.groupID)
 		if err != nil {
-			log.Println("Send provider", provider, " err:", err)
+			return err
 		}
-	}
-	log.Println(gp.userid + ":Group Service is ready")
-	err = setUserState(gp.userid, groupStarted)
-	if err != nil {
-		log.Println("setUserState failed :", err)
-		return err
-	}
-	return nil
-}
-
-func (gp *groupService) connectKeepersAndProviders(ctx context.Context, keepers, providers []string) error {
-	log.Println("Begin to connect user's keepers and providers:", gp.userid)
-	waitTime := 0
-	for {
-		if waitTime > 60 {
-			log.Println(ErrCannotConnectNetwork, "please restart and retry.")
-			return ErrCannotConnectNetwork
-		}
-		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 {
-			break
-		} else {
-			log.Println(ErrCannotConnectNetwork, "waiting...")
-			time.Sleep(10 * time.Second)
-		}
-		waitTime++
+		g.upKeepingItem = &uItem
 	}
 
-	connectTryCount := 5
-	for i := 0; i < connectTryCount; i++ {
-		var unsuccess []string
-		for _, kid := range keepers {
-			// 连接失败加入unsuccess
-			if !sc.ConnectTo(ctx, localNode, kid) {
-				unsuccess = append(unsuccess, kid)
-				log.Println("Connect to keeper", kid, "failed.")
+	for _, proInfo := range g.providers {
+		proID := proInfo.providerID
+
+		if proInfo.offerItem == nil {
+			oItem, err := role.GetLatestOffer(g.userID, proID)
+			if err != nil {
 				continue
 			}
-			tempKeeper := &keeperInfo{
-				keeperID:  kid,
-				connected: true,
-			}
-			kmKid, err := metainfo.NewKeyMeta(gp.userid, metainfo.Local, metainfo.SyncTypeKid)
+			proInfo.offerItem = &oItem
+		}
+	}
+
+	for _, proInfo := range g.providers {
+		proID := proInfo.providerID
+		if proInfo.chanItem == nil {
+			cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
 			if err != nil {
-				return err
+				continue
 			}
-			res, err := getKeyFrom(kmKid.ToString(), kid)
-			if err == nil && res != nil {
-				resStr := string(res)
-				splitRes := strings.Split(resStr, metainfo.DELIMITER)
-				if len(splitRes) > 3 {
-					if splitRes[1] == metainfo.SyncTypeBft {
-						tempKeeper.isBFT = true
-					}
+
+			if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+				_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+				if err != nil {
+					continue
 				}
-			}
-			// 检查该keeper是否已添加
-			exist := false
-			for _, kinfo := range gp.keepers {
-				if kid == kinfo.keeperID {
-					exist = true
-					break
-				}
-			}
-			if !exist {
-				gp.keepers = append(gp.keepers, tempKeeper)
-			}
-			if tempKeeper.isBFT {
-				log.Println("Connect to keeper", tempKeeper.keeperID, "use bft mode")
-			} else {
-				log.Println("Connect to keeper", tempKeeper.keeperID, "use simple mode")
-			}
-		}
 
-		if len(gp.keepers) == gp.keeperSLA {
-			break
-		}
-
-		keepers = unsuccess
-		// 每一个keeper连接后的判断，若连接数量足够后就立即进行而不是全部连接后再进行
-		if len(gp.keepers) < KeeperSLA {
-			time.Sleep(time.Minute)
-		}
-	}
-
-	if len(gp.keepers) <= 0 {
-		return ErrNoEnoughKeeper
-	}
-
-	for i := 0; i < connectTryCount; i++ {
-		if gp.keySet == nil {
-			err := gp.loadBLS12Config()
-			if err != nil {
-				log.Println("Load BLS12 Config error:", err)
-				return err
-			}
-		}
-		for _, pid := range providers {
-			if sc.ConnectTo(ctx, localNode, pid) {
-				log.Println("Connect to provider-", pid, "success.")
-			} else {
-				log.Println("Connect to provider-", pid, "failed.")
-			}
-
-			tempP := &providerInfo{
-				providerID: pid,
-			}
-
-			exist := false
-			for _, kinfo := range gp.providers {
-				if pid == kinfo.providerID {
-					exist = true
-					break
+				cItem, err = role.GetLatestChannel(g.userID, g.groupID, proID)
+				if err != nil {
+					continue
 				}
 			}
 
-			if !exist {
-				gp.providers = append(gp.providers, tempP)
-			}
-		}
-
-		if len(gp.providers) == gp.providerSLA {
-			break
-		}
-
-		if len(gp.providers) <= 0 {
-			time.Sleep(time.Minute)
-			continue
+			proInfo.chanItem = &cItem
 		}
 	}
 
-	if len(gp.providers) <= 0 {
-		return ErrNoEnoughProvider
-	}
-
-	// 构造key告诉keeper和provider自己已经启动
-	kmPid, err := metainfo.NewKeyMeta(gp.userid, metainfo.UserDeployedContracts)
-	if err != nil {
-		log.Println("Construct Deployed key error", err)
-		return err
-	}
-	for _, keeper := range gp.keepers {
-		_, err = sendMetaRequest(kmPid, gp.userid, keeper.keeperID)
-		if err != nil {
-			log.Println("Send keeper", keeper.keeperID, " err:", err)
-		}
-	}
-	for _, provider := range gp.providers {
-		_, err = sendMetaRequest(kmPid, gp.userid, provider.providerID)
-		if err != nil {
-			log.Println("Send provider", provider, " err:", err)
-		}
-	}
-	log.Println(gp.userid + ":Group Service is ready")
-
-	saveContracts(gp.userid)
-
-	err = setUserState(gp.userid, groupStarted)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (gp *groupService) findKeeperAndProviderNotInit(ctx context.Context) error {
-	log.Println("Begin to find Keeper for start user service:", gp.userid)
-	km, err := metainfo.NewKeyMeta(gp.userid, metainfo.Local, metainfo.SyncTypeKid)
-	if err != nil {
-		log.Println("findKeeperAndProviderNotInit()NewKeyMeta()error:", err)
-		return err
+func (g *groupInfo) loadChannelValue() error {
+	if g.groupID == g.userID {
+		return nil
 	}
 
-	// 判断是否联网
-	err = testConnect()
-	if err != nil {
-		return err
-	}
+	ctx := context.Background()
+	for _, proInfo := range g.providers {
+		if proInfo.chanItem != nil {
+			proID := proInfo.providerID
 
-	waitTime := 0
-	for {
-		if waitTime > 10 { //尝试多次依然连接不上？
-			log.Println(gp.userid, "Cannot find my keeper,please restart and try again.")
-			return ErrCannotConnectKeeper
-		}
-		if kids, err := getKeyFrom(km.ToString(), ""); kids != nil && err == nil { //先看本地有没有
-			if remain := len(kids) % utils.IDLength; remain != 0 {
-				kids = kids[:len(kids)-remain]
+			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelID, metainfo.Channel)
+			if err != nil {
+				continue
 			}
-			//有的keeper连接不上
-			tick := time.Tick(10 * time.Second)
-			tickCount := 0
-			for {
-				select {
-				case <-tick: //持续尝试连接已有的keeper节点
-					if tickCount > 10 { //尝试超过十分钟还连不上
-						log.Println("Cannot connect to some keeper, please restart...")
-						return ErrCannotConnectKeeper
-					}
-					tickCount++
-					for i := 0; i < len(kids)/utils.IDLength; i++ {
-						kid := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
-						if sc.ConnectTo(ctx, localNode, kid) {
-							tempKeeper := &keeperInfo{
-								keeperID: kid,
-							}
-							kmKid, err := metainfo.NewKeyMeta(gp.userid, metainfo.Local, metainfo.SyncTypeKid)
-							if err != nil {
-								return err
-							}
-							res, err := getKeyFrom(kmKid.ToString(), kid)
-							if err == nil && res != nil {
-								resStr := string(res)
-								splitRes := strings.Split(resStr, metainfo.DELIMITER)
-								if len(splitRes) > 3 {
-									if splitRes[1] == metainfo.SyncTypeBft {
-										tempKeeper.isBFT = true
-									}
-								}
-							}
-							var flag int
-							for flag = 0; flag < len(gp.keepers); flag++ {
-								if kid == gp.keepers[flag].keeperID {
-									break
-								}
-							}
-							if flag == len(gp.keepers) {
-								gp.keepers = append(gp.keepers, tempKeeper)
-							}
-							if tempKeeper.isBFT {
-								log.Println("Connect to keeper", tempKeeper.keeperID, "use bft mode")
-							} else {
-								log.Println("Connect to keeper", tempKeeper.keeperID, "use simple mode")
-							}
-						} else {
-							log.Println("Connect to keeper", kid, "failed.")
-						}
 
-						if len(gp.keepers) >= gp.keeperSLA {
-							if gp.keySet == nil {
-								err = gp.loadBLS12Config()
-								if err != nil {
-									log.Println("Load BLS12 Config error:", err)
-									return err
-								}
-							}
-							kmPid, err := metainfo.NewKeyMeta(gp.userid, metainfo.Local, metainfo.SyncTypePid)
-							if err != nil {
-								return err
-							}
-							if pids, err := getKeyFrom(kmPid.ToString(), ""); pids != nil && err == nil { //只尝试连接一次provider
-								if remain := len(pids) % utils.IDLength; remain != 0 {
-									pids = pids[:len(pids)-remain]
-								}
-								providers := string(pids)
-								for i := 0; i < len(providers)/utils.IDLength; i++ {
-									pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
-									if sc.ConnectTo(ctx, localNode, pid) {
-										log.Println("Connect to provider-", pid, "success.")
-									} else {
-										log.Println("Connect to provider-", pid, "failed.")
-									}
-									tmp := &providerInfo{
-										providerID: pid,
-									}
-									gp.providers = append(gp.providers, tmp)
-								}
-								log.Println(gp.userid + ":Group Service is ready")
-								err = setUserState(gp.userid, groupStarted)
-								if err != nil {
-									log.Println("setUserState failed :", err)
-								}
-							}
-							return nil
+			valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
+			if err == nil && len(valueByte) > 0 {
+				cSign := &pb.ChannelSign{}
+				err = proto.Unmarshal(valueByte, cSign)
+				if err == nil {
+					ok := role.VerifyChannelSign(cSign)
+					if ok {
+						value := new(big.Int).SetBytes(cSign.GetValue())
+						utils.MLogger.Info("channel value in local is:", value.String())
+						if value.Cmp(proInfo.chanItem.Value) > 0 {
+							proInfo.chanItem.Value = value
+							proInfo.chanItem.Sig = valueByte
 						}
 					}
-				case <-ctx.Done():
-					return nil
+				}
+
+				utils.MLogger.Info("try to get channel value from remote: ", proID)
+				valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
+				if err == nil {
+					err = proto.Unmarshal(valueRemote, cSign)
+					if err == nil {
+						ok := role.VerifyChannelSign(cSign)
+						if ok {
+							value := new(big.Int).SetBytes(cSign.GetValue())
+							utils.MLogger.Info("channel value from remote is:", value.String())
+							if value.Cmp(proInfo.chanItem.Value) > 0 {
+								proInfo.chanItem.Value = value
+								proInfo.chanItem.Sig = valueRemote
+							}
+						}
+					}
 				}
 			}
-		} else {
-			log.Println(gp.userid, "Cannot find my keeper, retrying...")
-			time.Sleep(10 * time.Second)
 		}
-		waitTime++
 	}
+
+	return nil
+}
+
+func (g *groupInfo) saveChannelValue() error {
+	if g.groupID == g.userID {
+		return nil
+	}
+
+	ctx := context.Background()
+	for _, proInfo := range g.providers {
+		if proInfo.chanItem != nil && proInfo.chanItem.Sig != nil && proInfo.chanItem.Dirty {
+			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelID, metainfo.Channel)
+			if err != nil {
+				continue
+			}
+
+			g.ds.PutKey(ctx, km.ToString(), proInfo.chanItem.Sig, "local")
+		}
+	}
+
+	return nil
 }

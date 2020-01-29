@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -10,13 +9,10 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
 )
 
-var repch chan string
-
-func checkLedger(ctx context.Context) {
-	log.Println("Check Ledger start!")
+func (k *Info) checkLedger(ctx context.Context) {
+	utils.MLogger.Info("Check Ledger start!")
 	time.Sleep(2 * CHALTIME)
 	ticker := time.NewTicker(CHECKTIME)
 	defer ticker.Stop()
@@ -25,84 +21,85 @@ func checkLedger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			doCheckLedgerForRepair()
-		}
-	}
-}
-
-func doCheckLedgerForRepair() {
-	log.Println("Repair starts!")
-	pus := getPUKeysFromukpInfo()
-	for _, pu := range pus {
-		// not repair pos blocks
-		if pu.uid == pos.GetPosId() {
-			continue
-		}
-
-		// only master repair
-		if !isMasterKeeper(pu.uid, pu.pid) {
-			continue
-		}
-
-		thisInfo, ok := ledgerInfo.Load(pu)
-		if !ok {
-			continue
-		}
-
-		thischalinfo := thisInfo.(*chalinfo)
-
-		thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-			thisinfo := value.(*cidInfo)
-			eclasped := utils.GetUnixNow() - thisinfo.availtime
-			switch thisinfo.repair {
-			case 0:
-				if EXPIRETIME < eclasped {
-					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-					log.Println("Need repair cid first time: ", cid)
-					thisinfo.repair++
-					repch <- cid
+			utils.MLogger.Info("Repair starts!")
+			pus := k.getQUKeys()
+			for _, pu := range pus {
+				// not repair pos blocks
+				if pu.uid == pos.GetPosId() {
+					continue
 				}
-			case 1:
-				if 4*EXPIRETIME < eclasped {
-					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-					log.Println("Need repair cid second time: ", cid)
-					thisinfo.repair++
-					repch <- cid
+
+				gp := k.getGroupInfo(pu.uid, pu.qid, false)
+				if gp == nil {
+					continue
 				}
-			case 2:
-				if 16*EXPIRETIME < eclasped {
-					cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-					log.Println("Need repair cid third time: ", cid)
-					thisinfo.repair++
-					repch <- cid
-				}
-			default:
-				// > 30 days; we donnot repair
-				if 480*EXPIRETIME >= eclasped {
-					// try every 32 hours
-					if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
-						cid := pu.uid + metainfo.BLOCK_DELIMITER + key.(string)
-						log.Println("Need repair cid tried: ", cid)
-						thisinfo.repair++
-						repch <- cid
+
+				for _, proID := range gp.providers {
+					// only master repair
+					if !gp.isMaster(proID) {
+						continue
 					}
+
+					thislinfo := gp.getLInfo(proID, false)
+					if thislinfo == nil {
+						continue
+					}
+
+					pre := pu.uid + metainfo.BLOCK_DELIMITER + pu.qid
+					thislinfo.blockMap.Range(func(key, value interface{}) bool {
+						thisinfo := value.(*blockInfo)
+						eclasped := utils.GetUnixNow() - thisinfo.availtime
+						switch thisinfo.repair {
+						case 0:
+							if EXPIRETIME < eclasped {
+								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+								utils.MLogger.Info("Need repair cid first time: ", cid)
+								thisinfo.repair++
+								k.repch <- cid
+							}
+						case 1:
+							if 4*EXPIRETIME < eclasped {
+								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+								utils.MLogger.Info("Need repair cid second time: ", cid)
+								thisinfo.repair++
+								k.repch <- cid
+							}
+						case 2:
+							if 16*EXPIRETIME < eclasped {
+								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+								utils.MLogger.Info("Need repair cid third time: ", cid)
+								thisinfo.repair++
+								k.repch <- cid
+							}
+						default:
+							// > 30 days; we donnot repair
+							if 480*EXPIRETIME >= eclasped {
+								// try every 32 hours
+								if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+									cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+									utils.MLogger.Info("Need repair cid tried: ", cid)
+									thisinfo.repair++
+									k.repch <- cid
+								}
+							}
+						}
+
+						return true
+					})
 				}
 			}
-
-			return true
-		})
+		}
 	}
 }
 
-func checkrepairlist(ctx context.Context) {
-	log.Println("Check repairlist start!")
-	repch = make(chan string, 1024)
+func (k *Info) repairRegular(ctx context.Context) {
+	utils.MLogger.Info("Check repairlist start!")
 	go func() {
 		for {
 			select {
-			case cid := <-repch:
-				log.Println("repairing cid: ", cid)
-				repairBlock(ctx, cid)
+			case cid := <-k.repch:
+				utils.MLogger.Info("repairing cid: ", cid)
+				k.repairBlock(ctx, cid)
 			case <-ctx.Done():
 				return
 			}
@@ -113,148 +110,144 @@ func checkrepairlist(ctx context.Context) {
 // repairBlock works in 3 steps:
 // 1.search a new provider,we do it in func SearchNewProvider
 // 2.put chunk to this provider
-// 3.change metainfo and sync
-func repairBlock(ctx context.Context, blockID string) {
-	var cpids, ugid []string
+// key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
+// value: chunkID1_pid1/chunkID2_pid2/...
+func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
+
 	var response string
-
-	// uid_bid_sid_bid
-	blkinfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
-	if len(blkinfo) < 4 {
+	// uid_qid_bid_sid_bid
+	blkinfo := strings.Split(rBlockID, metainfo.BLOCK_DELIMITER)
+	if len(blkinfo) < 5 {
 		return
 	}
 
-	userID := blkinfo[0]
+	blockID := strings.Join(blkinfo[1:], metainfo.BLOCK_DELIMITER)
 
-	thisbucket, ok := getBucketInfo(userID, blkinfo[1])
-	if !ok {
+	uid := blkinfo[0]
+	qid := blkinfo[1]
+
+	gp := k.getGroupInfo(uid, qid, false)
+	if gp == nil {
 		return
 	}
 
-	cidPrefix := strings.Join(blkinfo[1:3], metainfo.BLOCK_DELIMITER)
+	thisbucket := k.getBucketInfo(qid, qid, blkinfo[2], false)
+	if thisbucket == nil {
+		return
+	}
 
-	for i := 0; i < int(thisbucket.chunkNum); i++ {
-		blockid := cidPrefix + metainfo.BLOCK_DELIMITER + strconv.Itoa(i)
-		thisinfo, ok := thisbucket.stripes.Load(blockid)
+	count := int(thisbucket.chunkNum)
+
+	cpids := make([]string, count)
+	ugid := make([]string, count)
+
+	var res strings.Builder
+	for i := 0; i < count; i++ {
+		res.Reset()
+		res.WriteString(blkinfo[3])
+		res.WriteString(metainfo.BLOCK_DELIMITER)
+		res.WriteString(strconv.Itoa(i))
+		thisinfo, ok := thisbucket.stripes.Load(res.String())
 		if !ok {
 			continue
 		}
 
-		offset := thisinfo.(*cidInfo).offset
-		pid := thisinfo.(*cidInfo).storedOn
+		res.Reset()
+		res.WriteString(strconv.Itoa(i))
+		res.WriteString(metainfo.BLOCK_DELIMITER)
+
+		pid := thisinfo.(*blockInfo).storedOn
 
 		// recheck the status
-		if strconv.Itoa(i) == blkinfo[3] {
-			if thisinfo.(*cidInfo).repair == 0 {
+		if strconv.Itoa(i) == blkinfo[4] {
+			if thisinfo.(*blockInfo).repair == 0 {
 				return
 			}
 			response = pid
 		}
 
-		cpids = append(cpids, blockid+metainfo.REPAIR_DELIMETER+pid+metainfo.REPAIR_DELIMETER+strconv.Itoa(offset))
+		res.WriteString(pid)
+		cpids = append(cpids, res.String())
 		ugid = append(ugid, pid)
 	}
 
 	if len(ugid) == 0 {
-		log.Println("Repair: no enough informations")
+		utils.MLogger.Info("Repair: no enough informations")
 		return
 	}
 
 	if len(response) > 0 {
-		if !sc.ConnectTo(ctx, localNode, response) {
-			log.Println("Repair: need choose a new provider to replace old: ", response)
+		if !k.ds.Connect(ctx, response) {
+			utils.MLogger.Info("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
 	}
 
 	if len(response) == 0 || response == "" {
-		response = SearchNewProvider(ctx, userID, ugid)
+		response = k.searchNewProvider(ctx, qid, ugid)
 		if response == "" {
-			log.Println("Repair failed, no available provider")
+			utils.MLogger.Info("Repair failed, no available provider")
 			return
 		}
 	}
 
-	// cid1/pid1/offset1|cid1/pid1/offset1
+	// cid1_pid1/cid2_pid2
 	metaValue := strings.Join(cpids, metainfo.DELIMITER)
 
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair)
+	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair, uid)
 	if err != nil {
-		log.Println("construct repair KV error: ", err)
+		utils.MLogger.Info("construct repair KV error: ", err)
 		return
 	}
 
-	log.Println("cpids: ", cpids, " ,rpids: ", metaValue, ",repairs on: ", response)
-	_, err = sendMetaRequest(km, metaValue, response)
-	if err != nil {
-		log.Println("err: ", err)
-	}
+	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
+	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
 }
 
-func handleRepairResponse(km *metainfo.KeyMeta, metaValue, provider string) {
+// key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
+// value: "ok" or "fail"/pid/offset
+func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provider string) {
+	utils.MLogger.Info("handleRepairResult: ", km.ToString(), "From:", provider)
 	blockID := km.GetMid()
-	splitedValue := strings.Split(metaValue, metainfo.DELIMITER)
-	if len(splitedValue) != 4 {
-		log.Println("handleRepairResponse err: ", metainfo.ErrIllegalValue, metaValue)
+	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splitedValue) != 3 {
 		return
 	}
-	// old provider
-	oldPid := splitedValue[2]
-	offset, err := strconv.Atoi(splitedValue[3])
-	if err != nil {
-		log.Println("strconv.Atoi offset error: ", err)
-		return
-	}
+	splitedKey := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
+	qid := splitedKey[0]
+	bid := splitedKey[1]
 
-	uid := blockID[:utils.IDLength]
-	oldpu := puKey{
-		pid: oldPid,
-		uid: uid,
-	}
-
-	if strings.Compare(splitedValue[0], "RepairSuccess") == 0 {
-		log.Println("repair success, cid is: ", blockID)
-		newcidinfo := &cidInfo{
-			repair:    0,
-			availtime: utils.GetUnixNow(),
-			offset:    offset,
-			storedOn:  provider,
-		}
-
-		addCidinfotoMem(uid, provider, blockID, newcidinfo)
-		deleteBlockFromMem(oldpu.uid, oldpu.pid, blockID)
-
-		//更新block的meta信息
-		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Sync, metainfo.SyncTypeBlock)
+	if strings.Compare(splitedValue[0], "ok") == 0 {
+		utils.MLogger.Info("repair success, cid is: ", blockID)
+		newPid := splitedValue[1]
+		newOffset, err := strconv.Atoi(splitedValue[2])
 		if err != nil {
-			log.Println("construct Syncblock KV error :", err)
+			utils.MLogger.Info("strconv.Atoi offset error: ", err)
 			return
 		}
-		metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
-		metaSyncTo(kmBlock, metaValue)
-		kmBlock.SetKeyType(metainfo.Local) //将数据格式转换为local 保存在本地
-		err = putKeyTo(kmBlock.ToString(), metaValue, "local")
-		if err != nil {
-			log.Println("construct SyncPidsK error :", err)
+
+		splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
+		if len(splitedValue) != 3 {
 			return
 		}
+
+		k.deleteBlockMeta(qid, bid, true)
+		k.addBlockMeta(qid, bid, newPid, newOffset)
+
 		return
 	}
 
-	log.Println("repair failed, cid is: ", blockID)
+	utils.MLogger.Info("repair failed, block is: ", blockID)
 
 	return
 
 }
 
-//SearchNewProvider find a NEW provider for user
-//TODO:how to improve the search algorithm
-//TODO:is a Timer needed？
-func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
+//searchNewProvider find a NEW provider for user
+func (k *Info) searchNewProvider(ctx context.Context, gid string, ugid []string) string {
 	response := ""
-	gp, ok := getGroupsInfo(uid)
-	if !ok {
-		log.Println("SearchNewProvider getGroupsInfo() error")
+	gp := k.getGroupInfo(gid, gid, false)
+	if gp == nil {
 		return response
 	}
 
@@ -274,7 +267,7 @@ func SearchNewProvider(ctx context.Context, uid string, ugid []string) string {
 		}
 
 		if flag == len(ugid) {
-			if sc.ConnectTo(ctx, localNode, tmpPro) {
+			if k.ds.Connect(ctx, tmpPro) {
 				response = tmpPro
 				break
 			}

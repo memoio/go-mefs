@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"log"
+	"context"
 	"strconv"
 	"strings"
 
@@ -14,26 +14,33 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
-	ops := km.GetOptions()
+// key: qid/"Challenge"/uid/pid/kid/chaltime
+func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
+	utils.MLogger.Info("handle challenge: ", km.ToString(), " from: ", from)
 
-	if len(ops) < 1 {
+	ops := km.GetOptions()
+	if len(ops) < 4 {
 		return nil
 	}
 
-	userID := km.GetMid()
-	log.Println("receive", userID, " 's challenge from", from)
-	pubKey, err := getNewUserConfig(userID, from)
+	fsID := km.GetMid()
+	userID := ops[0]
+	utils.MLogger.Info("receive: ", fsID, " 's challenge from: ", from)
+	blskey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {
-		log.Println("get new user`s config from:", from, "failed, error :", err)
+		utils.MLogger.Warnf("get new user %s config from failed: %s ", fsID, err)
 		return err
 	}
 
+	if blskey == nil || blskey.Pk == nil {
+		utils.MLogger.Warn("get empty user`s config for: ", fsID)
+		return nil
+	}
+
 	hProto := &pb.Chalnum{}
-	hByte, _ := b58.Decode(metaValue)
-	err = proto.Unmarshal(hByte, hProto)
+	err = proto.Unmarshal(metaValue, hProto)
 	if err != nil {
-		log.Println("unmarshal h failed, err: ", err)
+		utils.MLogger.Error("unmarshal h failed: ", err)
 	}
 
 	var chal mcl.Challenge
@@ -61,24 +68,25 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 		} else {
 			electedOffset = 0
 		}
-		buf.WriteString(userID)
+		buf.WriteString(fsID)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(bid)
 		blockID := cid.NewCidV2([]byte(buf.String()))
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
-		tmpdata, tmptag, err := localNode.Blockstore.GetSegAndTag(blockID, uint64(electedOffset))
+		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
 		if err != nil {
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
 			faultBlocks = append(faultBlocks, index)
 		} else {
-			isTrue := mcl.VerifyTag(tmpdata, tmptag, electedIndex, pubKey)
+			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
 			if !isTrue {
-				log.Println("verify tag failed")
+				utils.MLogger.Warnf("verify %s data and tag failed", blockID)
 				//验证失败，则在本地删除此块
-				err := localNode.Blocks.DeleteBlock(blockID)
+				err := p.ds.DeleteBlock(context.Background(), blockID.String(), "local")
 				if err != nil {
-					log.Println("Delete block", blockID.String(), "error:", err)
+					utils.MLogger.Info("Delete block", blockID.String(), "error:", err)
 				}
 				faultBlocks = append(faultBlocks, index)
 			} else {
@@ -89,41 +97,46 @@ func handleChallengeBls12(km *metainfo.KeyMeta, metaValue, from string) error {
 		}
 	}
 
-	proof, err := mcl.GenProof(pubKey, chal, data, tag)
+	if len(chal.Indices) == 0 {
+		utils.MLogger.Errorf("GenProof for %s fails due to no available data", fsID)
+		return nil
+	}
+
+	proof, err := blskey.GenProof(chal, data, tag, 32)
 	if err != nil {
-		log.Println("GenProof err: ", err)
+		utils.MLogger.Error("GenProof err: ", err)
 		return err
 	}
 
 	// 在发送之前检查生成的proof
-	boo, err := mcl.VerifyProof(pubKey, chal, proof)
+	boo, err := blskey.VerifyProof(chal, proof)
 	if err != nil {
-		log.Println("verify proof failed, err is: ", err)
+		utils.MLogger.Error("verify proof failed, err is: ", err)
+		utils.MLogger.Error("gen proof for blocks: ", chal.Indices)
 		return err
 	}
 
 	if !boo {
-		log.Println("proof is false")
+		utils.MLogger.Warn("proof is false")
 		return mcl.ErrProofVerifyInProvider
 	}
 
-	log.Println("proof is right")
+	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
 
-	retKm, err := metainfo.NewKeyMeta(userID, metainfo.Proof, ops[0])
-	if err != nil {
-		return err
-	}
+	mustr := b58.Encode(proof.Mu)
+	nustr := b58.Encode(proof.Nu)
+	deltastr := b58.Encode(proof.Delta)
 
-	retValue := proof
+	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr
 
 	if len(faultBlocks) > 0 {
 		retValue = retValue + metainfo.DELIMITER + b58.Encode([]byte(strings.Join(faultBlocks, metainfo.DELIMITER)))
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = sendMetaRequest(retKm, retValue, from)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(retValue), nil, from)
 	if err != nil {
-		log.Println("send proof err: ", err)
+		utils.MLogger.Info("send proof err: ", err)
 	}
 	return nil
 }

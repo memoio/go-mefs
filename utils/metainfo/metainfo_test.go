@@ -9,11 +9,11 @@ import (
 //Test1 这个测试构造key和解析key的功能是否正确
 //主要是看输入参数的数量和keytype是否匹配
 func TestKeyMeta(t *testing.T) {
-	_, err := NewKeyMeta("testMainID", UserInitReq, "123")
+	_, err := NewKeyMeta("testMainID", UserInit, "123")
 	if err != nil {
 		fmt.Println("NewKeyMeta错误测试：", err)
 	}
-	km, _ := NewKeyMeta("testMainID", UserInitReq, "4", "6")
+	km, _ := NewKeyMeta("testMainID", UserStart, "4", "6")
 	strKM := km.ToString()
 	fmt.Println("NewKeyMeta正确测试:", strKM)
 	_, err = GetKeyMeta("testMainID" + DELIMITER + "2" + DELIMITER + "123")

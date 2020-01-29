@@ -7,7 +7,7 @@ Block定义（go/src/github.com/memoio/go-mefs/source/go-block-format/blocks.go�
 ```go
 type Block interface {
 	RawData() []byte
-	Cid() cid.Cid
+	Cid() string
 	String() string
 	Loggable() map[string]interface{}
 }
@@ -24,10 +24,9 @@ type Block interface {
 ```go
 import(
     b58 "github.com/mr-tron/base58/base58"
-    cid "github.com/memoio/go-mefs/source/go-cid"
 )
 
-var ncid cid.Cid //ncid表示返回的cid
+var ncid string //ncid表示返回的cid
 if len(cid) == 46 {  //长度=46,为普通cid
     pidb, _ := b58.Decode(p) //p为输入的string
 	ncid = cid.NewCidV0(pidb)
@@ -109,7 +108,7 @@ if len(cid) == 46 {  //长度=46,为普通cid
   ```
 
 
-+ `func (s *blockService) GetBlock(ncid cid.Cid)(blocks.Block, error)`
++ `func (s *blockService) GetBlock(ncid string)(blocks.Block, error)`
 
   此函数用于直接从本地获取Block，使用方法类似上面所说，首先获取当前的Node，再调用Node的blockservice即可调用到此函数。
 

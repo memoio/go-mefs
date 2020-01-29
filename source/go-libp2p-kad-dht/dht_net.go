@@ -16,6 +16,7 @@ import (
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/gogo/protobuf/proto"
 
 	"github.com/libp2p/go-msgio"
 	"go.opencensus.io/stats"
@@ -61,7 +62,7 @@ func (w *bufferedDelimitedWriter) Flush() error {
 }
 
 // handleNewStream implements the network.StreamHandler
-func (dht *IpfsDHT) handleNewStream(s network.Stream) {
+func (dht *KadDHT) handleNewStream(s network.Stream) {
 	defer s.Reset()
 	if dht.handleNewMessage(s) {
 		// Gracefully close the stream for writes.
@@ -70,7 +71,7 @@ func (dht *IpfsDHT) handleNewStream(s network.Stream) {
 }
 
 // Returns true on orderly completion of writes (so we can Close the stream).
-func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
+func (dht *KadDHT) handleNewMessage(s network.Stream) bool {
 	ctx := dht.ctx
 	r := msgio.NewVarintReaderSize(s, network.MessageSizeMax)
 
@@ -80,7 +81,7 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 	defer timer.Stop()
 
 	for {
-		var req pb.Message
+		req := new(pb.Message)
 		msgbytes, err := r.ReadMsg()
 		if err != nil {
 			defer r.ReleaseMsg(msgbytes)
@@ -99,7 +100,7 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 			)
 			return false
 		}
-		err = req.Unmarshal(msgbytes)
+		err = proto.Unmarshal(msgbytes, req)
 		r.ReleaseMsg(msgbytes)
 		if err != nil {
 			logger.Debugf("error unmarshalling message: %#v", err)
@@ -122,7 +123,7 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 		stats.Record(
 			ctx,
 			metrics.ReceivedMessages.M(1),
-			metrics.ReceivedBytes.M(int64(req.Size())),
+			metrics.ReceivedBytes.M(int64(req.XXX_Size())),
 		)
 
 		handler := dht.handlerForMsgType(req.GetType())
@@ -132,14 +133,14 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 			return false
 		}
 
-		resp, err := handler(ctx, mPeer, &req)
+		resp, err := handler(ctx, mPeer, req)
 		if err != nil {
 			stats.Record(ctx, metrics.ReceivedMessageErrors.M(1))
 			logger.Debugf("error handling message: %v", err)
 			return false
 		}
 
-		dht.updateFromMessage(ctx, mPeer, &req)
+		dht.updateFromMessage(ctx, mPeer, req)
 
 		if resp == nil {
 			continue
@@ -161,7 +162,7 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 
 // sendRequest sends out a request, but also makes sure to
 // measure the RTT for latency measurements.
-func (dht *IpfsDHT) sendRequest(ctx context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
+func (dht *KadDHT) sendRequest(ctx context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
 	ctx, _ = tag.New(ctx, metrics.UpsertMessageType(pmes))
 
 	ms, err := dht.messageSenderForPeer(ctx, p)
@@ -184,7 +185,7 @@ func (dht *IpfsDHT) sendRequest(ctx context.Context, p peer.ID, pmes *pb.Message
 	stats.Record(
 		ctx,
 		metrics.SentRequests.M(1),
-		metrics.SentBytes.M(int64(pmes.Size())),
+		metrics.SentBytes.M(int64(pmes.XXX_Size())),
 		metrics.OutboundRequestLatency.M(
 			float64(time.Since(start))/float64(time.Millisecond),
 		),
@@ -195,7 +196,7 @@ func (dht *IpfsDHT) sendRequest(ctx context.Context, p peer.ID, pmes *pb.Message
 }
 
 // sendMessage sends out a message
-func (dht *IpfsDHT) sendMessage(ctx context.Context, p peer.ID, pmes *pb.Message) error {
+func (dht *KadDHT) sendMessage(ctx context.Context, p peer.ID, pmes *pb.Message) error {
 	ctx, _ = tag.New(ctx, metrics.UpsertMessageType(pmes))
 
 	ms, err := dht.messageSenderForPeer(ctx, p)
@@ -212,13 +213,13 @@ func (dht *IpfsDHT) sendMessage(ctx context.Context, p peer.ID, pmes *pb.Message
 	stats.Record(
 		ctx,
 		metrics.SentMessages.M(1),
-		metrics.SentBytes.M(int64(pmes.Size())),
+		metrics.SentBytes.M(int64(pmes.XXX_Size())),
 	)
 	logger.Event(ctx, "dhtSentMessage", dht.self, p, pmes)
 	return nil
 }
 
-func (dht *IpfsDHT) updateFromMessage(ctx context.Context, p peer.ID, mes *pb.Message) error {
+func (dht *KadDHT) updateFromMessage(ctx context.Context, p peer.ID, mes *pb.Message) error {
 	// Make sure that this node is actually a DHT server, not just a client.
 	protos, err := dht.peerstore.SupportsProtocols(p, dht.protocolStrs()...)
 	if err == nil && len(protos) > 0 {
@@ -227,7 +228,7 @@ func (dht *IpfsDHT) updateFromMessage(ctx context.Context, p peer.ID, mes *pb.Me
 	return nil
 }
 
-func (dht *IpfsDHT) messageSenderForPeer(ctx context.Context, p peer.ID) (*messageSender, error) {
+func (dht *KadDHT) messageSenderForPeer(ctx context.Context, p peer.ID) (*messageSender, error) {
 	dht.smlk.Lock()
 	ms, ok := dht.strmap[p]
 	if ok {
@@ -264,7 +265,7 @@ type messageSender struct {
 	r   msgio.ReadCloser
 	lk  sync.Mutex
 	p   peer.ID
-	dht *IpfsDHT
+	dht *KadDHT
 
 	invalid   bool
 	singleMes int
@@ -412,7 +413,7 @@ func (ms *messageSender) ctxReadMsg(ctx context.Context, mes *pb.Message) error 
 			errc <- err
 			return
 		}
-		errc <- mes.Unmarshal(bytes)
+		errc <- proto.Unmarshal(bytes, mes)
 	}(ms.r)
 
 	t := time.NewTimer(dhtReadMessageTimeout)

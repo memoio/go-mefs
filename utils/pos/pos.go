@@ -27,6 +27,11 @@ func GetPosId() string {
 	return id
 }
 
+func GetPosGID() string {
+	id, _ := address.GetIDFromAddress(GetPosAddr())
+	return id
+}
+
 func GetPosPrice() int64 {
 	return utils.STOREPRICEPEDOLLAR / 10
 }

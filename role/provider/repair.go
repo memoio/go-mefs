@@ -1,85 +1,88 @@
 package provider
 
 import (
-	"log"
+	"context"
 	"strconv"
 	"strings"
-	"time"
 
 	rs "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/role/user"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
+func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
+	utils.MLogger.Info("handleRepair: ", km.ToString(), "from: ", keeper)
+
 	var nbid int
-	var cids []string
-	var ret string
 	sig, err := user.BuildSignMessage()
 	if err != nil {
 		return err
 	}
 
 	blockID := km.GetMid()
-	userID := blockID[:utils.IDLength]
+	ops := km.GetOptions()
+	if len(ops) < 1 {
+		return nil
+	}
+	blkInfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
+	if len(blkInfo) < 4 {
+		return nil
+	}
 
-	pubKey, err := getNewUserConfig(userID, keeper)
+	userID := ops[0]
+	fsID := blkInfo[0]
+	chunkID := blkInfo[3]
+
+	pubKey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {
-		log.Println("get new user`s config failed,error :", err)
+		utils.MLogger.Warn("get new user`s config failed,error :", err)
 		return err
 	}
 
-	cpids := strings.Split(rpids, metainfo.DELIMITER)
+	ctx := context.Background()
+
+	cpids := strings.Split(string(rpids), metainfo.DELIMITER)
 	stripe := make([][]byte, len(cpids)+1)
 	for _, cpid := range cpids {
 		if len(cpid) > 0 {
-			splitcpid := strings.Split(cpid, metainfo.REPAIR_DELIMETER)
-			blkid := userID + metainfo.BLOCK_DELIMITER + splitcpid[0]
-			cids = append(cids, blkid)
+			splitcpid := strings.Split(cpid, metainfo.BLOCK_DELIMITER)
+			if len(splitcpid) != 2 {
+				continue
+			}
+			blkInfo[3] = splitcpid[0]
+			blkid := strings.Join(blkInfo, metainfo.BLOCK_DELIMITER)
 			pid := splitcpid[1]
-			if blkid != blockID {
-				blk, err := localNode.Blocks.GetBlockFrom(localNode.Context(), pid, blkid, time.Minute, sig)
+			if splitcpid[0] != chunkID {
+				blk, err := p.ds.GetBlock(ctx, blkid, sig, pid)
 				if blk != nil && err == nil {
 					right := rs.VerifyBlock(blk.RawData(), blkid, pubKey)
 					if right {
-						blkMeta, err := metainfo.GetBlockMeta(blkid)
+						chNum, err := strconv.Atoi(splitcpid[0])
 						if err != nil {
-							log.Println("get block meta error :", err)
-							return err
-						}
-						i, err := strconv.Atoi(blkMeta.GetBid())
-						if err != nil {
-							log.Println("strconv.Atoi error :", err)
+							utils.MLogger.Info("strconv.Atoi error :", err)
 							return err
 						}
 
-						if i >= len(stripe) {
-							for j := len(stripe); j <= i; j++ {
+						if chNum >= len(stripe) {
+							for j := len(stripe); j <= chNum; j++ {
 								stripe = append(stripe, nil)
 							}
 						}
-						stripe[i] = make([]byte, len(blk.RawData()))
-						stripe[i] = blk.RawData()
+						stripe[chNum] = blk.RawData()
+						p.ds.DeleteBlock(ctx, blkid, "local")
 					} else {
-						log.Println("block rawdata verify failed, error :", err)
-						return err
+						utils.MLogger.Warn("block verify failed, error: ", err)
 					}
 				} else {
-					log.Println("GetBlock error :", err)
+					utils.MLogger.Warn("GetBlock error :", err)
 				}
 			} else {
-				cidMeta, err := metainfo.GetBlockMeta(blockID)
+				nbid, err = strconv.Atoi(chunkID)
 				if err != nil {
-					log.Println("get block meta error :", err)
-					return err
-				}
-				nbid, err = strconv.Atoi(cidMeta.GetBid())
-				if err != nil {
-					log.Println("strconv.Atoi error :", err)
+					utils.MLogger.Info("strconv.Atoi error :", err)
 					return err
 				}
 
@@ -88,68 +91,40 @@ func handleRepair(km *metainfo.KeyMeta, rpids, keeper string) error {
 						stripe = append(stripe, nil)
 					}
 				}
-
-				//ret = cid|pid|offset
-				ret = strings.Join(splitcpid[:2], metainfo.DELIMITER)
 			}
 		}
 	}
 
-	retKm, err := metainfo.NewKeyMeta(blockID, metainfo.RepairRes)
+	newstripe, off, err := rs.Repair(stripe)
 	if err != nil {
+		utils.MLogger.Info("repair ", blockID, " failed: ", err)
 		return err
 	}
-	newstripe, err := rs.Repair(stripe)
-	if err != nil {
-		log.Println("repair ", blockID, " failed, error: ", err)
-		retMetaValue := "RepairFailed" + metainfo.DELIMITER + ret
-		log.Println("repair response metavalue :", retMetaValue)
-		_, err = sendMetaRequest(retKm, retMetaValue, keeper)
-		if err != nil {
-			return err
-		}
-		//删除修复时get到的block；
-		for _, tmpCid := range cids {
-			if len(tmpCid) > 0 {
-				temcid := cid.NewCidV2([]byte(tmpCid))
-				err = localNode.Blocks.DeleteBlock(temcid)
-				if err != nil && err != bs.ErrNotFound {
-					log.Println("delete error :", err)
-					return err
-				}
-			}
-		}
+
+	right := rs.VerifyBlock(newstripe[nbid], blockID, pubKey)
+	if !right {
+		utils.MLogger.Warn("Block %s is not right", blockID)
 		return nil
 	}
+
 	ncid := cid.NewCidV2([]byte(blockID))
 	newblk, err := blocks.NewBlockWithCid(newstripe[nbid], ncid)
 	if err != nil {
-		log.Println("New block failed, error :", err)
+		utils.MLogger.Error("New block failed, error:", err)
 		return err
 	}
-	//删除修复时get到的block；
-	for _, tmpCid := range cids {
-		if len(tmpCid) > 0 {
-			temcid := cid.NewCidV2([]byte(tmpCid))
-			err = localNode.Blocks.DeleteBlock(temcid)
-			if err != nil && err != bs.ErrNotFound {
-				log.Println("delete error :", err)
-				return err
-			}
-		}
-	}
-	//把修复好的block放到本地；
-	err = localNode.Blocks.PutBlock(newblk)
+	err = p.ds.BlockStore().Put(newblk)
 	if err != nil {
-		log.Println("add block failed, error :", err)
+		utils.MLogger.Error("put block to local failed, error : ", err)
 		return err
 	}
-	retMetaValue := "RepairSuccess" + metainfo.DELIMITER + ret
-	log.Println("repair response metavalue :", retMetaValue)
-	log.Println("repair success：", blockID)
-	_, err = sendMetaRequest(retKm, retMetaValue, keeper)
+
+	utils.MLogger.Info("repair success: ", blockID)
+
+	retMetaValue := "RepairSuccess" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off-1)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
-		log.Println("repair response err :", err)
+		utils.MLogger.Error("repair response err :", err)
 		return err
 	}
 	return nil

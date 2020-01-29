@@ -1,24 +1,17 @@
 package user
 
 import (
-	"context"
 	"errors"
-	"log"
 	"math/big"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
-	inet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	"github.com/memoio/go-mefs/utils/metainfo"
-	sc "github.com/memoio/go-mefs/utils/swarmconnect"
+	pb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/utils"
 )
 
 //-------Group Type------
@@ -49,106 +42,40 @@ var (
 )
 
 var (
-	ErrPolicy                    = errors.New("the policy is error")
-	ErrBalance                   = errors.New("your account's balance is insufficient, we will not deploy contract")
-	ErrKeySetIsNil               = errors.New("user's Keyset is nil")
-	ErrUserNotExist              = errors.New("user not exist")
-	ErrUserBookIsNil             = errors.New("the User book is nil")
-	ErrCannotFindUserInUserBook  = errors.New("cannot find this user in userbook")
-	errGetContractItem           = errors.New("Can't get contract Item")
-	ErrContractServiceAlreadySet = errors.New("this contract Service already set")
-	ErrGroupServiceAlreadySet    = errors.New("this group Service already set")
-	ErrLfsServiceAlreadySet      = errors.New("this lfs Service already set")
-	ErrTimeOut                   = errors.New("Time out")
+	ErrPolicy                = errors.New("policy is error")
+	ErrBalance               = errors.New("balance is insufficient")
+	ErrKeySetIsNil           = errors.New("bls keyset is nil")
+	ErrUserNotExist          = errors.New("user does not exist")
+	ErrLfsServiceNotReady    = errors.New("lfs service is not ready")
+	ErrCannotStartLfsService = errors.New("cannot start lfs service")
+
+	errGetContractItem = errors.New("cannot get contract Item")
+	ErrTimeOut         = errors.New("Time out")
 
 	ErrNoProviders           = errors.New("there is no providers")
 	ErrNoKeepers             = errors.New("there is no keepers")
-	ErrCannotConnectKeeper   = errors.New("cannot connect Keeper")
-	ErrCannotConnectProvider = errors.New("cannot connect this provider")
-	ErrNoEnoughProvider      = errors.New("no Enough providers")
-	ErrNoEnoughKeeper        = errors.New("no Enough keepers")
-	ErrCannotConnectNetwork  = errors.New("cannot connect NetWork")
-	ErrCannotDeleteMetaBlock = errors.New("cannot delete metablock in provider,maybe it is not connected")
-	ErrGroupServiceNotReady  = errors.New("group service is not ready")
+	ErrNoEnoughProvider      = errors.New("no enough providers")
+	ErrNoEnoughKeeper        = errors.New("no enough keepers")
+	ErrCannotConnectNetwork  = errors.New("cannot connect")
+	ErrCannotDeleteMetaBlock = errors.New("cannot delete metablock in provider")
 
-	ErrCannotStartLfsService = errors.New("cannot start lfs service")
-	ErrLfsIsNotRunning       = errors.New("lfs is not running")
+	ErrBucketNotExist     = errors.New("bucket not exist")
+	ErrBucketAlreadyExist = errors.New("bucket already exists")
+	ErrBucketNotEmpty     = errors.New("bucket is not empty")
+	ErrBucketNameInvalid  = errors.New("bucket name is invalid")
 
-	ErrObjectNotExist     = errors.New("object is not exist")
-	ErrDirNotExist        = errors.New("directory is not exist")
-	ErrObjectAlreadyExist = errors.New("file already exist")
-
-	ErrBucketNotExist     = errors.New("bucket is not exist")
-	ErrBucketAlreadyExist = errors.New("bucket Already Exist")
-	ErrBucketNotEmpty     = errors.New("bucket is Not empty")
-	ErrBucketNameInvalid  = errors.New("bucket name invalid")
-
-	ErrObjectNameToolong    = errors.New("the object's name is too long")
-	ErrObjectNameInvalid    = errors.New("object name invalid")
-	ErrObjectOptionsInvalid = errors.New("object options invalid")
+	ErrObjectNotExist       = errors.New("object not exist")
+	ErrDirNotExist          = errors.New("directory not exist")
+	ErrObjectAlreadyExist   = errors.New("object already exist")
+	ErrObjectNameToolong    = errors.New("object name is too long")
+	ErrObjectNameInvalid    = errors.New("object name is invalid")
+	ErrObjectOptionsInvalid = errors.New("object option is invalid")
 
 	ErrCannotGetEnoughBlock = errors.New("cannot get enough Block")
-	ErrCannotLoadMetaBlock  = errors.New("cannot Load MetaBlock")
-	ErrCannotAddBlock       = errors.New("cannot Add this block")
+	ErrCannotLoadMetaBlock  = errors.New("cannot load MetaBlock")
+	ErrCannotAddBlock       = errors.New("cannot put this block")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
-	ErrWrongState           = errors.New("wrong userservice state")
-	ErrWrongInitState       = errors.New("wrong init state")
 )
-
-func putKeyTo(key, value, node string) error {
-	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
-}
-
-func getKeyFrom(key, node string) ([]byte, error) {
-	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
-}
-
-func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-
-	pid, err := peer.IDB58Decode(to)
-	if err != nil {
-		return err
-	}
-	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-		sc.ConnectTo(context.Background(), localNode, to)
-	}
-
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
-}
-
-func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	pid, err := peer.IDB58Decode(to)
-	if err != nil {
-		return "", err
-	}
-	if localNode.PeerHost.Network().Connectedness(pid) != inet.Connected {
-		sc.ConnectTo(context.Background(), localNode, to)
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
-}
-
-// broadcastMetaMessage 广播发送信息，现在只针对初始化流程写
-func broadcastMetaMessage(km *metainfo.KeyMeta, metavalue string) error {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	ctx = context.WithValue(ctx, "User_Init_Req", true)
-	/*pc, _, _, _ := runtime.Caller(2)
-	caller := runtime.FuncForPC(pc).Name()
-	ctx = context.WithValue(ctx, "caller", caller)*/
-	_, err := localNode.Routing.(*dht.IpfsDHT).GetValue(ctx, km.ToString())
-	return err
-}
 
 func DefaultBucketOptions() *pb.BucketOptions {
 	return &pb.BucketOptions{
@@ -221,34 +148,17 @@ func checkBucketNameCommon(bucketName string, strict bool) (err error) {
 	return err
 }
 
-func testConnect() error {
-	waitTime := 0 //进行网络连接
-	for {
-		if waitTime > 60 { //连不上网？
-			log.Println(ErrCannotConnectNetwork, "please restart and retry.")
-			return ErrCannotConnectNetwork
-		}
-		if connPeers := localNode.PeerHost.Network().Peers(); len(connPeers) != 0 { //刚启动还没连接节点，等等
-			break //连上网了，退出
-		} else {
-			log.Println(ErrCannotConnectNetwork, "waiting...")
-			time.Sleep(10 * time.Second) //没联网，等联网
-		}
-		waitTime++
-	}
-	return nil
-}
-
 // BuildSignMessage builds sign message for test or repair
 func BuildSignMessage() ([]byte, error) {
 	money := big.NewInt(123)
 	moneyByte := money.Bytes()
-	message := &pb.SignForChannel{
-		Money: moneyByte,
+	message := &pb.ChannelSign{
+		Value:     moneyByte,
+		ChannelID: "test",
 	}
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		log.Println("protoMarshal failed err: ", err)
+		utils.MLogger.Error("protoMarshal failed: ", err)
 		return nil, err
 	}
 	return mes, nil

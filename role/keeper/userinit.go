@@ -1,176 +1,209 @@
 package keeper
 
 import (
+	"context"
 	"errors"
-	"log"
+	"strconv"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
-//response: kid1kid2../pid1pid2..
-func initUser(userID string, keeperCount, providerCount int, price int64) (string, error) {
-	thisInfo, ok := ukpInfo.Load(userID)
-	if !ok {
-		return userNewInit(userID, keeperCount, providerCount, price)
+// handleUserInit collect keepers and providers for user
+// return kv, key: queryID/"UserInit"/userID/keepercount/providercount;
+// value: kid1kid2../pid1pid2..
+func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
+	utils.MLogger.Info("handleUserInit: ", km.ToString(), " from: ", from)
+	options := km.GetOptions()
+	if len(options) != 3 {
+		return
 	}
 
-	var responseExisted strings.Builder
-	thisGroupsInfo := thisInfo.(*groupsInfo)
-	// user has init
-	for _, pid := range thisGroupsInfo.keepers {
-		responseExisted.WriteString(pid)
+	kc, err := strconv.Atoi(options[1])
+	if err != nil {
+		utils.MLogger.Info("handleUserInitReq: ", err)
+		return
 	}
 
-	responseExisted.WriteString(metainfo.DELIMITER)
-
-	for _, pid := range thisGroupsInfo.providers {
-		responseExisted.WriteString(pid)
+	pc, err := strconv.Atoi(options[2])
+	if err != nil {
+		utils.MLogger.Info("handleUserInitReq: ", err)
+		return
 	}
-	return responseExisted.String(), nil
+
+	uid := options[0]
+	qid := km.GetMid()
+	price := int64(utils.STOREPRICEPEDOLLAR)
+	var response string
+	if qid != uid {
+		utils.MLogger.Infof("Get k/p numbers from query contract %s of user %s ", qid, uid)
+		item, err := role.GetQueryInfo(uid, qid)
+		if err != nil {
+			utils.MLogger.Error("get query: ", qid, " error: ", err)
+			return
+		}
+		kc = int(item.KeeperNums)
+		pc = int(item.ProviderNums)
+		price = item.Price
+	}
+
+	if pos.GetPosId() == uid {
+		price = int64(utils.STOREPRICEPEDOLLAR)
+	}
+
+	response, err = k.initUser(uid, qid, kc, pc, price)
+	if err != nil {
+		if err != nil {
+			utils.MLogger.Info("handleUserInitReq err: ", err)
+			return
+		}
+	}
+	utils.MLogger.Info("New fs: ", qid, " for user: ", uid, " keeperCount: ", kc, " providerCount: ", pc, " price: ", price)
+
+	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(response), nil, from)
 }
 
-func userNewInit(userID string, keeperCount, providerCount int, price int64) (string, error) {
-	localID := localNode.Identity.Pretty()
+//response: kid1kid2../pid1pid2..
+func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error) {
+	var newResponse strings.Builder
 
-	kmKid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeKid)
-	if err != nil {
-		return "", err
-	}
+	gp := k.getGroupInfo(uid, gid, false)
+	if gp == nil {
+		localID := k.localID
+		// fill self
+		newResponse.WriteString(localID)
+		kc--
+		//fill other keepers
+		k.keepers.Range(func(k, v interface{}) bool {
+			if kc == 0 {
+				return false
+			}
 
-	kmPid, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypePid)
-	if err != nil {
-		return "", err
-	}
+			key := k.(string)
+			if key == localID {
+				return true
+			}
 
-	var newResponse, pids strings.Builder
-	// fill self
-	newResponse.WriteString(localID)
-	pids.WriteString(localID)
-	keeperCount--
-	//fill other keepers
-	localPeerInfo.keepersInfo.Range(func(k, v interface{}) bool {
-		if keeperCount == 0 {
-			return false
-		}
-
-		key := k.(string)
-		if key == localID {
+			thisinfo := v.(*kInfo)
+			if thisinfo.online == true {
+				newResponse.WriteString(key)
+				kc--
+			}
 			return true
-		}
+		})
 
-		thisinfo := v.(*kInfo)
-		if thisinfo.online == true {
-			newResponse.WriteString(key)
-			pids.WriteString(key)
-			keeperCount--
-		}
-		return true
-	})
+		newResponse.WriteString(metainfo.DELIMITER)
 
-	putKeyTo(kmKid.ToString(), pids.String(), "local")
+		// fill providers
+		k.providers.Range(func(k, v interface{}) bool {
+			if pc == 0 {
+				return false
+			}
+			key := k.(string)
+			thisinfo := v.(*pInfo)
+			if thisinfo.online == true {
+				newResponse.WriteString(key)
+				pc--
+			}
+			return true
+		})
+
+		return newResponse.String(), nil
+	}
+
+	// user has init
+	for _, pid := range gp.keepers {
+		newResponse.WriteString(pid)
+	}
 
 	newResponse.WriteString(metainfo.DELIMITER)
-	pids.Reset()
-	// fill providers
-	localPeerInfo.providersInfo.Range(func(k, v interface{}) bool {
-		if providerCount == 0 {
-			return false
-		}
-		key := k.(string)
-		thisinfo := v.(*pInfo)
-		if thisinfo.online == true {
-			newResponse.WriteString(key)
-			pids.WriteString(key)
-			providerCount--
-		}
-		return true
-	})
 
-	putKeyTo(kmPid.ToString(), pids.String(), "local")
-
+	for _, pid := range gp.providers {
+		newResponse.WriteString(pid)
+	}
 	return newResponse.String(), nil
 }
 
-func fillUserInfo(groupid string, keepers, providers []string) (*groupsInfo, error) {
-	tempInfo := &groupsInfo{
-		keepers:      keepers,
-		providers:    providers,
-		userID:       groupid,
-		localKeeper:  groupid,
-		masterKeeper: groupid,
-	}
+// handleUserNotify return kv,
+// key: queryID/"UserNotify"/userID/keepercount/providercount;
+// value: kid1kid2../pid1pid2..
+func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleUserNotify: ", km.ToString(), "From:", from)
 
-	saveUpkeepingToGP(groupid, tempInfo)
-
-	localID := localNode.Identity.Pretty()
-	for _, keeperID := range tempInfo.keepers {
-		if localID == keeperID {
-			tempInfo.localKeeper = localID
-		}
-	}
-
-	// not my user
-	if tempInfo.localKeeper == groupid {
-		log.Println(groupid, "is not my user")
-		return nil, errors.New("Not my user")
-	}
-
-	ukpInfo.Store(groupid, tempInfo)
-
-	err := saveQuery(groupid, false)
-	if err != nil {
-		log.Println("Save ", groupid, "'s Query error: ", err)
-	}
-
-	_, err = getUserBLS12Config(groupid)
-	if err != nil {
-		log.Println("Save ", groupid, "'s BLS pubkey error: ", err)
-	}
-
-	return tempInfo, nil
-}
-
-func initUserInfo(groupid string, keepers, providers []string) (*groupsInfo, error) {
-	tempInfo := &groupsInfo{
-		keepers:      keepers,
-		providers:    providers,
-		userID:       groupid,
-		localKeeper:  groupid,
-		masterKeeper: groupid,
-	}
-
-	localID := localNode.Identity.Pretty()
-	for _, keeperID := range tempInfo.keepers {
-		if localID == keeperID {
-			tempInfo.localKeeper = localID
-		}
-	}
-
-	// not my user
-	if tempInfo.localKeeper == groupid {
-		log.Println(groupid, "is not my user")
-		return nil, errors.New("Not my user")
-	}
-
-	ukpInfo.Store(groupid, tempInfo)
-	return tempInfo, nil
-}
-
-// fillPinfo fill user's uInfo, groupsInfo in ukpMap
-// not get upkeeping contract
-func fillPinfo(groupid string, metaValue string, from string) {
-
-	var keepers []string
-	var providers []string
-	//将value切分，生成好对应的keepers和providers列表
-	splited := strings.Split(metaValue, metainfo.DELIMITER)
+	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
-		log.Println("handleNewUserNotif value is not correct: ", metaValue)
-		return
+		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
+		return []byte("no"), nil
 	}
+
+	kids := splited[0]
+	for i := 0; i < len(kids)/utils.IDLength; i++ {
+		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
+		if keeper == k.localID {
+			return []byte("ok"), nil
+		}
+	}
+
+	return []byte("ok"), nil
+}
+
+// key: queryID/"UserStart"/userID/keepercount/providercount;
+// value: kid1kid2../pid1pid2..
+func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from:", from)
+	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splited) < 2 {
+		utils.MLogger.Info("UserStart value is not correct: ", metaValue)
+		return nil, errors.New("value is not right")
+	}
+
+	ops := km.GetOptions()
+	if len(ops) != 3 {
+		return nil, errors.New("key is not right")
+	}
+
+	kc, err := strconv.Atoi(ops[1])
+	if err != nil {
+		utils.MLogger.Info("handleUserInitReq: ", err)
+		return nil, err
+	}
+
+	pc, err := strconv.Atoi(ops[2])
+	if err != nil {
+		utils.MLogger.Info("handleUserInitReq: ", err)
+		return nil, err
+	}
+
+	uid := ops[0]
+	qid := km.GetMid()
+
+	k.fillPinfo(uid, qid, pc, kc, metaValue, from)
+
+	gp := k.getGroupInfo(uid, qid, true)
+	if gp != nil {
+		return gp.sessionID.MarshalBinary()
+	}
+
+	return nil, errors.New("not my user")
+}
+
+// fillPinfo fill user's uInfo, groupInfo in ukpMap
+func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, from string) (*groupInfo, error) {
+	//将value切分，生成好对应的keepers和providers列表
+	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splited) < 2 {
+		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
+		return nil, errors.New("metavalue is not right")
+	}
+
+	keepers := make([]string, kc)
+	providers := make([]string, pc)
+
 	kids := splited[0]
 	for i := 0; i < len(kids)/utils.IDLength; i++ {
 		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
@@ -191,43 +224,21 @@ func fillPinfo(groupid string, metaValue string, from string) {
 		providers = append(providers, providerID)
 	}
 
-	tempInfo, err := initUserInfo(groupid, keepers, providers)
+	gp, err := k.createGroup(userID, groupID, keepers, providers)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	kmKid, err := metainfo.NewKeyMeta(groupid, metainfo.Local, metainfo.SyncTypeKid)
+	ui, _ := k.getUInfo(userID)
+	if ui != nil {
+		ui.setQuery(groupID)
+	}
+
+	kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
 	if err != nil {
-		log.Println("handleNewUserNotif err: ", err)
-		return
+		return nil, err
 	}
 
-	kmPid, err := metainfo.NewKeyMeta(groupid, metainfo.Local, metainfo.SyncTypePid)
-	if err != nil {
-		log.Println("handleNewUserNotif err: ", err)
-		return
-	}
-
-	var pidstrings strings.Builder
-	for _, keeperID := range tempInfo.keepers {
-		pidstrings.WriteString(keeperID)
-	}
-
-	putKeyTo(kmKid.ToString(), pidstrings.String(), "local")
-
-	pidstrings.Reset()
-	for _, proID := range tempInfo.providers {
-		pidstrings.WriteString(proID)
-		// replace ledgerinfo
-		thisPU := puKey{
-			uid: groupid,
-			pid: proID,
-		}
-		newChal := &chalinfo{}
-		ledgerInfo.Store(thisPU, newChal)
-	}
-
-	putKeyTo(kmPid.ToString(), pidstrings.String(), "local")
-
-	return
+	k.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
+	return gp, nil
 }

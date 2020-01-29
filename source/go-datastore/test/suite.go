@@ -13,7 +13,13 @@ import (
 var BasicSubtests = []func(t *testing.T, ds dstore.Datastore){
 	SubtestBasicPutGet,
 	SubtestNotFounds,
+	SubtestCombinations,
+	SubtestOrder,
+	SubtestLimit,
+	SubtestFilter,
 	SubtestManyKeysAndQuery,
+	SubtestReturnSizes,
+	SubtestBasicSync,
 }
 
 // BatchSubtests is a list of all basic batching datastore tests.

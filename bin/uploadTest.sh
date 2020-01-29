@@ -11,5 +11,4 @@ echo -e "\ndaemon is ready wait 1min to connect"
 time sleep 60
 
 echo -e "\nstep 3,run challenge test\n"
-cd $GOPATH/src/github.com/memoio/go-mefs/test/unit/uploadTest
-GO111MODULE=off go run uploadTest.go -count=$3 -eth=$1
+GO111MODULE=off go run  $GOPATH/src/github.com/memoio/go-mefs/test/unit/upload/test.go -count=$3 -eth=$1

@@ -1,242 +1,206 @@
 package provider
 
 import (
+	"context"
 	"errors"
-	"log"
 	"math/big"
-	"strconv"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
-	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/role/user/pb"
-	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
+	df "github.com/memoio/go-mefs/data-format"
+	pb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
+	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	b58 "github.com/mr-tron/base58/base58"
 )
 
-func handlePutBlock(km *metainfo.KeyMeta, value, from string) error {
-	// key is cid|ops|type|begin|end
+func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	utils.MLogger.Info("handlePutBlock: ", km.ToString(), "from: ", from)
+	// key is blockID/"block"
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
-	if len(splitedNcid) == 0 {
-		return errors.New("No value in km")
-	}
-	bmeta, err := metainfo.GetBlockMeta(splitedNcid[0])
-	if err != nil {
-		return nil
+	if len(splitedNcid) != 2 {
+		return errors.New("Wrong value for put block")
 	}
 
-	isMyuser := false
-	// 保存合约
-	upItem, err := getUpkeeping(bmeta.GetUid())
-	if err != nil {
-		go saveUpkeeping(bmeta.GetUid())
-	} else {
-		localID := localNode.Identity.Pretty()
-		for _, proID := range upItem.ProviderIDs {
-			if localID == proID {
-				isMyuser = true
-				offerItem, err := getOffer()
-				if err != nil {
-					return err
-				}
-				if upItem.Price < offerItem.Price {
-					return errors.New("price is lower now")
-				}
-				break
-			}
-		}
-	}
+	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	qid := bids[0]
 
-	if !isMyuser {
+	gp := p.getGroupInfo(qid, qid, true)
+	if gp == nil {
 		return errors.New("NotMyUser")
 	}
 
+	ctx := context.Background()
+
 	go func() {
-		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
-		if len(splitedNcid) < 5 {
-			Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
-			if err != nil {
-				log.Printf("Error create block %s: %s", bcid.String(), err)
-				return
-			}
-			err = localNode.Blockstore.Put(Nblk)
-			if err != nil {
-				log.Printf("Error writing block to datastore: %s", err)
-				return
-			}
-			return
-		}
-
-		typ := splitedNcid[2]
-
-		switch typ {
-		case "append":
-			if has, err := localNode.Blockstore.Has(bcid); !has || err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			beginOffset, err := strconv.Atoi(splitedNcid[3])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			endOffset, err := strconv.Atoi(splitedNcid[4])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			err = localNode.Blockstore.Append(bcid, []byte(value), beginOffset, endOffset)
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-		case "update":
-			_, err := strconv.Atoi(splitedNcid[3])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			_, err = strconv.Atoi(splitedNcid[4])
-			if err != nil {
-				log.Printf("Error append field to block %s: %s", bcid.String(), err)
-				return
-			}
-			if has, _ := localNode.Blockstore.Has(bcid); true == has {
-				err := localNode.Blockstore.DeleteBlock(bcid)
-				if err != nil {
-					log.Printf("Error delete block %s: %s", bcid.String(), err)
+		if Debug {
+			blskey, _ := p.getNewUserConfig(gp.userID, qid)
+			if blskey != nil && blskey.Pk != nil {
+				ok := df.VerifyBlock(value, splitedNcid[0], blskey)
+				if !ok {
+					utils.MLogger.Warnf("Verify data for %s fails", splitedNcid[0])
 				}
 			}
-			Nblk, err := blocks.NewBlockWithCid([]byte(value), bcid)
-			if err != nil {
-				log.Printf("Error create block %s: %s", bcid.String(), err)
-				return
-			}
-			err = localNode.Blockstore.Put(Nblk)
-			if err != nil {
-				log.Printf("Error writing block %s to datastore: %s", Nblk.String(), err)
-				return
-			}
-		default:
-			log.Printf("Wrong type in put block")
+
 		}
+		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
+		if err != nil {
+			utils.MLogger.Info("Error writing block to datastore: %s", err)
+			return
+		}
+		return
 	}()
 
 	return nil
 }
 
-func handleGetBlock(km *metainfo.KeyMeta, from string) (string, error) {
-	// key is cid|ops|sig
+func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+	utils.MLogger.Info("handleAppendBlock: ", km.ToString(), " from: ", from)
+	// key is blockID/"Block"/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
-	if len(splitedNcid) < 3 {
-		return "", errors.New("Key is too short")
+	if len(splitedNcid) != 4 {
+		return errors.New("Wrong value for put block")
 	}
 
-	sigByte, err := b58.Decode(splitedNcid[2])
-	if err != nil {
-		return "", errors.New("Signature format is wrong")
+	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	qid := bids[0]
+
+	gp := p.getGroupInfo(qid, qid, true)
+	if gp == nil {
+		return errors.New("NotMyUser")
 	}
 
-	res, userID, key, value, err := verify(sigByte)
-	if err != nil {
-		log.Printf("verify block %s failed, err is : %s", splitedNcid[0], err)
-		return "", err
-	}
-
-	if res {
-		// 验证通过
-		// 内存channel的value变化
-		// 然后持久化
-		bcid := cid.NewCidV2([]byte(splitedNcid[0]))
-		b, err := localNode.Blockstore.Get(bcid)
+	ctx := context.Background()
+	go func() {
+		err := p.ds.AppendBlock(ctx, km.ToString(), value, "local")
 		if err != nil {
-			return "", errors.New("Block is not found")
+			utils.MLogger.Errorf("append to block %s: %s", km.ToString(), err)
+			return
 		}
-		if key != "" {
-			channelItem, err := getChannel(userID)
-			if err != nil {
-				return "", errors.New("Find channelItem in channelBook error")
-			}
+	}()
+	return nil
+}
 
-			log.Println("Downlaod success，change channel.value and persist: ", value.String())
-			channelItem.Value = value
-			proContracts.channelBook.Store(userID, channelItem)
-			err = putKeyTo(key, value.String(), "local")
-			if err != nil {
-				log.Println("cmdPutErr:", err)
-			}
-		}
-		return string(b.RawData()), nil
+func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleGetBlock: ", km.ToString(), " from: ", from)
+
+	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
+	if len(splitedNcid) != 2 {
+		return nil, errors.New("Wrong value for get block")
 	}
 
-	log.Printf("verify is false %s", splitedNcid[0])
+	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	qid := bids[0]
 
-	return "", errors.New("Signature is wrong")
+	gp := p.getGroupInfo(qid, qid, true)
+	if gp == nil {
+		return nil, errors.New("NotMyUser")
+	}
+
+	ctx := context.Background()
+
+	if gp.userID != gp.groupID {
+		if gp.channel == nil {
+			utils.MLogger.Warn("channel is empty, reget it")
+			gp.loadContracts(p.localID)
+		}
+
+		if gp.channel != nil {
+			utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
+			chanID := gp.channel.ChannelID
+			value := gp.channel.Value
+
+			res, value, err := p.verify(chanID, value, sig)
+			if err != nil {
+				utils.MLogger.Errorf("verify block %s failed, err is : %s", splitedNcid[0], err)
+				return nil, err
+			}
+
+			if value != nil && value.Cmp(gp.channel.Money) > 0 {
+				utils.MLogger.Errorf("verify block %s failed, money is not enough", splitedNcid[0], err)
+				return nil, errors.New("money is not enough")
+			}
+
+			if res {
+				b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+				if err != nil {
+					utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
+					return nil, err
+				}
+
+				if value != nil {
+					gp.channel.Value = value
+					gp.channel.Sig = sig
+
+					key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
+					if err != nil {
+						return nil, err
+					}
+
+					p.ds.PutKey(ctx, key.ToString(), sig, "local")
+				}
+
+				return b.RawData(), nil
+			}
+			utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
+		}
+		utils.MLogger.Warn("channel is empty")
+	} else {
+		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
+		if err != nil {
+			return nil, errors.New("Block is not found")
+		}
+
+		return b.RawData(), nil
+	}
+	return nil, errors.New("Signature is wrong")
 }
 
 // verify verifies the transaction
-func verify(mes []byte) (bool, string, string, *big.Int, error) {
-	signForChannel := &pb.SignForChannel{}
-	err := proto.Unmarshal(mes, signForChannel)
+func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.Int, error) {
+	cSign := &pb.ChannelSign{}
+	err := proto.Unmarshal(mes, cSign)
 	if err != nil {
-		log.Println("proto.Unmarshal when provider verify err:", err)
-		return false, "", "", nil, err
+		utils.MLogger.Error("proto.Unmarshal when provider verify err:", err)
+		return false, nil, err
 	}
 
-	//解析传过来的参数
-	var money = new(big.Int)
-	money = money.SetBytes(signForChannel.GetMoney())
-	userAddr := common.HexToAddress(signForChannel.GetUserAddress())
-	providerAddr := common.HexToAddress(signForChannel.GetProviderAddress())
-	sig := signForChannel.GetSig() //传过来的签名信息如果是空，就表明是测试环境，直接返回true
-	log.Println("====测试sig是否为空====:", sig == nil, " money:", money, " userAddr:", signForChannel.GetUserAddress(), " providerAddr:", signForChannel.GetProviderAddress())
-	if sig == nil {
-		return true, "", "", nil, nil
+	if cSign.GetChannelID() == "test" && string(cSign.GetValue()) == "123" {
+		utils.MLogger.Debug("sign for test and repair")
+		return true, nil, nil
 	}
 
-	// 从内存获得value
-	userID, err := address.GetIDFromAddress(userAddr.String())
-	if err != nil {
-		return false, "", "", nil, err
+	// verify channel
+	if cSign.GetChannelID() != chanID {
+		utils.MLogger.Errorf("channelID save %s and got %s are not equal: ", chanID, cSign.GetChannelID())
+		return false, nil, nil
 	}
-	item, ok := proContracts.channelBook.Load(userID)
-	if !ok {
-		log.Println("Not find ", userID, "'s channelItem in channelBook.")
-		return false, "", "", nil, errors.New("Find channelItem in channelBook error")
+
+	// verify sign
+	res := role.VerifyChannelSign(cSign)
+	if !res {
+		utils.MLogger.Error("signature is wrong")
+		return false, nil, nil
 	}
-	channelItem, ok := item.(contracts.ChannelItem)
-	if !ok {
-		log.Println("Can't transfer item to channelItem.")
-		return false, "", "", nil, errors.New("Transfer item to channelItem error")
-	}
-	//在Value的基础上再加上此次下载需要支付的money，就是此次验证签名的value
+
+	//verify value;： value ?= oldValue + 100
+	value := new(big.Int).SetBytes(cSign.GetValue())
 	addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-	// 默认100 + Value
-	value := big.NewInt(0)
-	value = value.Add(channelItem.Value, big.NewInt(addValue))
-
-	if money.Cmp(value) < 0 { //比较对方传过来的value和此时的value值是否一样，不一样就返回false
-		log.Println("value is different from money,  value is: ", value.String())
-		//return false, "", "", nil, nil
+	oldValue = oldValue.Add(oldValue, big.NewInt(addValue))
+	if value.Cmp(oldValue) < 0 {
+		utils.MLogger.Warn(value.String, " received is less than calculated: ", oldValue.String())
+		return false, nil, nil
 	}
 
-	//判断签名是否正确
-	channelAddr, _, err := contracts.GetChannelAddr(providerAddr, providerAddr, userAddr)
-	if err != nil {
-		return false, "", "", nil, err
+	return res, value, nil
+}
+
+func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
+	utils.MLogger.Info("handleDeleteBlock: ", km.ToString(), "from: ", from)
+	err := p.ds.DeleteBlock(context.Background(), km.ToString(), "local")
+	if err != nil && err != bs.ErrNotFound {
+		return err
 	}
-	channelValueKeyMeta, err := metainfo.NewKeyMeta(channelAddr.String(), metainfo.Local, metainfo.SyncTypeChannelValue) // HexChannelAddress|13|channelValue
-	if err != nil {
-		return false, "", "", nil, err
-	}
-	res, err := contracts.VerifySig(signForChannel.GetUserPK(), sig, channelAddr, money)
-	if err != nil {
-		return false, "", "", nil, err
-	}
-	return res, userID, channelValueKeyMeta.ToString(), value, nil
+	return nil
 }

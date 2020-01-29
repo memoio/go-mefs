@@ -2,32 +2,26 @@ package role
 
 import (
 	"errors"
-	"log"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	pb "github.com/memoio/go-mefs/role/pb"
+	"github.com/memoio/go-mefs/utils"
 )
 
 func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 	pubkey := mkey.Pk
-	pubkeyBls := pubkey.BlsPK.Serialize()
-	pubkeyG := pubkey.G.Serialize()
-	pubkeyU := make([][]byte, mcl.N)
-	pubkeyW := make([][]byte, mcl.N)
+	pubkeyBls := pubkey.BlsPk.Serialize()
+	pubkeyG := pubkey.SignG2.Serialize()
+	pubkeyU := make([][]byte, mcl.PDPCount)
+	pubkeyW := make([][]byte, mcl.PDPCount)
 
-	for i, u := range pubkey.U {
-		if i >= mcl.N {
-			break
-		}
+	for i, u := range pubkey.ElemG1s {
 		pubkeyU[i] = u.Serialize()
 	}
 
-	for i, w := range pubkey.W {
-		if i >= mcl.N {
-			break
-		}
+	for i, w := range pubkey.ElemG2s {
 		pubkeyW[i] = w.Serialize()
 	}
 
@@ -35,12 +29,12 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 	c := btcec.S256()
 	_, pubk := btcec.PrivKeyFromBytes(c, privKey)
 	secrectKey := mkey.Sk
-	blsSK := secrectKey.BlsSK.Serialize()
+	blsSK := secrectKey.BlsSk.Serialize()
 	blsSKByte, err := btcec.Encrypt(pubk, blsSK)
 	if err != nil {
 		return nil, err
 	}
-	x := secrectKey.X.Serialize()
+	x := secrectKey.ElemSk.Serialize()
 	XByte, err := btcec.Encrypt(pubk, x)
 	if err != nil {
 		return nil, err
@@ -64,6 +58,10 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 }
 
 func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, error) {
+	if len(userBLS12config) == 0 {
+		return nil, errors.New("empty blskey byte")
+	}
+
 	mkey := new(mcl.KeySet)
 
 	userBLS12ConfigProto := new(pb.UserBLS12Config)
@@ -74,37 +72,31 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 
 	pk := new(mcl.PublicKey)
 
-	err = pk.BlsPK.Deserialize(userBLS12ConfigProto.PubkeyBls)
+	err = pk.BlsPk.Deserialize(userBLS12ConfigProto.PubkeyBls)
 	if err != nil {
 		return mkey, err
 	}
-	err = pk.G.Deserialize(userBLS12ConfigProto.PubkeyG)
+	err = pk.SignG2.Deserialize(userBLS12ConfigProto.PubkeyG)
 	if err != nil {
 		return mkey, err
 	}
-	pk.U = make([]mcl.G1, mcl.N)
+	pk.ElemG1s = make([]mcl.G1, mcl.PDPCount)
 	for i, u := range userBLS12ConfigProto.PubkeyU {
-		if i >= mcl.N {
-			break
-		}
 		var temp mcl.G1
 		err = temp.Deserialize(u)
 		if err != nil {
-			log.Println("temp.Deserialize(u) failed :", err)
+			utils.MLogger.Info("Deserialize failed: ", err)
 		}
-		pk.U[i] = temp
+		pk.ElemG1s[i] = temp
 	}
-	pk.W = make([]mcl.G2, mcl.N)
+	pk.ElemG2s = make([]mcl.G2, mcl.PDPCount)
 	for i, w := range userBLS12ConfigProto.PubkeyW {
-		if i >= mcl.N {
-			break
-		}
 		var temp mcl.G2
 		err = temp.Deserialize(w)
 		if err != nil {
-			log.Println("temp.Deserialize(u) failed :", err)
+			utils.MLogger.Info("Deserialize failed: ", err)
 		}
-		pk.W[i] = temp
+		pk.ElemG2s[i] = temp
 	}
 
 	mkey.Pk = pk
@@ -120,7 +112,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		if err != nil {
 			return mkey, err
 		}
-		err = sk.BlsSK.Deserialize(blsk)
+		err = sk.BlsSk.Deserialize(blsk)
 		if err != nil {
 			return mkey, err
 		}
@@ -129,12 +121,12 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		if err != nil {
 			return mkey, err
 		}
-		err = sk.X.Deserialize(x)
+		err = sk.ElemSk.Deserialize(x)
 		if err != nil {
 			return mkey, err
 		}
 
-		sk.XI = make([]mcl.Fr, mcl.N)
+		sk.ElemPowerSk = make([]mcl.Fr, mcl.PDPCount)
 		err = sk.CalculateXi()
 		if err != nil {
 			return mkey, err

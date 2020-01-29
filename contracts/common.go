@@ -3,16 +3,13 @@ package contracts
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"math/big"
-	"sync"
 	"time"
-
-	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -20,7 +17,6 @@ import (
 	"github.com/memoio/go-mefs/contracts/mapper"
 	"github.com/memoio/go-mefs/contracts/resolver"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 // EndPoint config中的ETH，在daemon中赋值
@@ -37,6 +33,9 @@ const (
 )
 
 var (
+	ErrEmpty              = errors.New("has not addr")
+	ErrMisType            = errors.New("mistype contract")
+	ErrNotDeployedIndexer = errors.New("has not deployed indexer")
 	//ErrNotDeployedMapper the user has not deployed mapper in the specified resolver
 	ErrNotDeployedMapper = errors.New("has not deployed mapper")
 	//ErrNotDeployedResolver the provider has not deployed resolver
@@ -55,67 +54,8 @@ var (
 	ErrNewContractInstance = errors.New("new contract Instace failed")
 	// ErrNotDeployedKPMap is
 	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
+	ErrTxFail           = errors.New("transaction fails")
 )
-
-// UpKeepingItem has upkeeping information
-type UpKeepingItem struct {
-	UserID        string // 部署upkeeping的userid
-	UpKeepingAddr string // 合约地址
-	KeeperIDs     []string
-	ProviderIDs   []string
-	KeeperSLA     int32
-	ProviderSLA   int32
-	Duration      int64
-	Capacity      int64
-	Price         int64  // 部署的价格
-	StartTime     string // 部署的时间
-}
-
-// ChannelItem has channel information
-type ChannelItem struct {
-	UserID      string // 部署Channel的userid
-	ProID       string
-	ChannelAddr string
-	Value       *big.Int
-	Money       *big.Int
-	StartTime   string // 部署的时间
-	Duration    int64  // timeout
-}
-
-// QueryItem has query information
-type QueryItem struct {
-	UserID       string // 部署Query的userid
-	QueryAddr    string
-	Capacity     int64
-	Duration     int64
-	Price        int64 // 合约给出的单价
-	KeeperNums   int32
-	ProviderNums int32
-	Completed    bool
-}
-
-// OfferItem has offer information
-type OfferItem struct {
-	ProviderID string // 部署Offer的providerid
-	OfferAddr  string
-	Capacity   int64
-	Duration   int64
-	Price      int64 // 合约给出的单价
-}
-
-// ProviderItem has provider's info
-type ProviderItem struct {
-	ProviderID string   // providerid
-	Capacity   int64    // MB
-	Money      *big.Int // pledge time
-	StartTime  string   // start time
-}
-
-type kpItem struct {
-	keeperIDs []string
-}
-
-var kpMap sync.Map
 
 func init() {
 	EndPoint = "http://212.64.28.207:8101"
@@ -125,7 +65,7 @@ func init() {
 func GetClient(endPoint string) *ethclient.Client {
 	client, err := rpc.Dial(endPoint)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	return ethclient.NewClient(client)
 }
@@ -135,263 +75,268 @@ func QueryBalance(account string) (balance *big.Int, err error) {
 	var result string
 	client, err := rpc.Dial(EndPoint)
 	if err != nil {
-		fmt.Println("rpc.dial err:", err)
+		log.Println("rpc.dial err:", err)
 		return balance, err
 	}
 	err = client.Call(&result, "eth_getBalance", account, "latest")
 	if err != nil {
-		fmt.Println("client.call err:", err)
+		log.Println("client.call err:", err)
 		return balance, err
 	}
 	balance = utils.HexToBigInt(result)
 	return balance, nil
 }
 
+// DeployIndexer deploy role's indexer and add it to admin indexer
 func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 	var indexerAddr common.Address
-	var indexerInstance *indexer.Indexer
 
 	client := GetClient(EndPoint)
-
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		log.Println("HexToECDSA err: ", err)
-		return indexerAddr, indexerInstance, err
-	}
-
-	retryCount := 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		indexerAddr, _, indexerInstance, err = indexer.DeployIndexer(auth, client)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("deploy Indexer Err:", err)
-				return indexerAddr, indexerInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		break
-	}
-	return indexerAddr, indexerInstance, nil
-}
-
-func GetResolverFromIndexer(localAddress common.Address, key string) (common.Address, *resolver.Resolver, error) {
-	var resolverAddr common.Address
-	var resolverInstance *resolver.Resolver
-
-	client := GetClient(EndPoint)
-	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, client)
-	if err != nil {
-		log.Println("new Indexer err: ", err)
-		return resolverAddr, resolverInstance, err
+		return indexerAddr, nil, err
 	}
 
 	retryCount := 0
 	for {
 		retryCount++
-		_, resolverAddr, err := indexer.Get(&bind.CallOpts{
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		indexerAddr, tx, indexerInstance, err := indexer.DeployIndexer(auth, client)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("deploy Indexer Err:", err)
+				return indexerAddr, indexerInstance, err
+			}
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			log.Println("deploy user indexer transaction fails:", err)
+			if retryCount > 20 {
+				return indexerAddr, indexerInstance, err
+			}
+			continue
+		}
+
+		return indexerAddr, indexerInstance, nil
+	}
+}
+
+// AddToIndexer adds
+func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, adminIndexer *indexer.Indexer) error {
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := adminIndexer.Add(auth, key, addAddr)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("add role indexer err:", err)
+				return err
+			}
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("add usroleer indexer transaction fails: ", err)
+				return err
+			}
+			continue
+		}
+
+		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+		if err != nil {
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		if addrGetted == addAddr {
+			return nil
+		}
+
+		if retryCount > 20 {
+			return ErrNotDeployedIndexer
+		}
+	}
+}
+
+// AlterAddrInIndexer alters
+func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string, adminIndexer *indexer.Indexer) error {
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := adminIndexer.AlterResolver(auth, key, addAddr)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("add role indexer err:", err)
+				return err
+			}
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("add usroleer indexer transaction fails: ", err)
+				return err
+			}
+			continue
+		}
+
+		if retryCount > 20 {
+			return ErrNotDeployedIndexer
+		}
+
+		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+		if err != nil {
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		if addrGetted == addAddr {
+			return nil
+		}
+	}
+}
+
+// GetAddrFromIndexer gets addr
+func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, common.Address, error) {
+	retryCount := 0
+	for {
+		retryCount++
+		ownAddr, indexerAddr, err := indexerInstance.Get(&bind.CallOpts{
 			From: localAddress,
 		}, key)
 		if err != nil {
-			if retryCount > 20 {
-				return resolverAddr, resolverInstance, err
+			if retryCount > 10 {
+				log.Println("get addr from indexer err: ", err)
+				return indexerAddr, ownAddr, err
 			}
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		if len(resolverAddr) == 0 || resolverAddr.String() == InvalidAddr {
-			return resolverAddr, resolverInstance, ErrNotDeployedResolver
+
+		if len(indexerAddr) == 0 || indexerAddr.String() == InvalidAddr {
+			log.Println("get empty addr from indexer")
+			return indexerAddr, ownAddr, ErrEmpty
 		}
-		resolverInstance, err = resolver.NewResolver(resolverAddr, client)
-		if err != nil {
-			return resolverAddr, resolverInstance, err
-		}
-		return resolverAddr, resolverInstance, nil
+
+		return indexerAddr, ownAddr, nil
 	}
 }
 
-func DeployResolver(localAddress common.Address, hexKey, key string) (common.Address, *resolver.Resolver, error) {
-	resolverAddr, resolverInstance, err := GetResolverFromIndexer(localAddress, key)
-	if err == nil {
-		return resolverAddr, resolverInstance, nil
-	}
-
-	client := GetClient(EndPoint)
-
-	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, client)
-	if err != nil {
-		log.Println("new Indexer err: ", err)
-		return resolverAddr, resolverInstance, err
-	}
-
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return resolverAddr, resolverInstance, err
-	}
-
-	retryCount := 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		resolverAddr, _, resolverInstance, err = resolver.DeployResolver(auth, client)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("deploy Resolver Err:", err)
-				return resolverAddr, resolverInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		break
-	}
-
-	//将resolver地址放进indexer中,关键字key可以理解为resolverAddress的索引
-	//resolver-for-channel的key为providerAddr.string()
-	retryCount = 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = indexer.Add(auth, key, resolverAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
-				return resolverAddr, resolverInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			_, resolverAddrGetted, err := indexer.Get(&bind.CallOpts{
-				From: localAddress,
-			}, key)
-			if err != nil {
-				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
-					return resolverAddr, resolverInstance, err
-				}
-				continue
-			}
-			if resolverAddrGetted == resolverAddr { //放进去了
-				break
-			}
-		}
-		break
-	}
-	return resolverAddr, resolverInstance, nil
-}
-
-func getResolverFromResolver(localAddress, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, *resolver.Resolver, error) {
-	retryCount := 0
-	for {
-		retryCount++
-		resolverAddr, err := resolverInstance.Get(&bind.CallOpts{
-			From: localAddress,
-		}, ownerAddress)
-		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("get resolve Addr err: ", err)
-				return resolverAddr, nil, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		if len(resolverAddr) == 0 || resolverAddr.String() == InvalidAddr {
-			return resolverAddr, nil, ErrNotDeployedResolver
-		}
-
-		secondInstance, err := resolver.NewResolver(resolverAddr, GetClient(EndPoint))
-		if err != nil {
-			return resolverAddr, nil, err
-		}
-		return resolverAddr, secondInstance, nil
-	}
-}
-
-func deployResolverToResolver(localAddress common.Address, resolverInstance *resolver.Resolver, hexKey string) (common.Address, *resolver.Resolver, error) {
-	resolverAddr, secondInstance, err := getResolverFromResolver(localAddress, localAddress, resolverInstance)
-	if err == nil {
-		return resolverAddr, secondInstance, nil
-	}
-
-	client := GetClient(EndPoint)
+// DeployResolver deploys
+func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
+	var resolverAddr common.Address
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		log.Println("HexToECDSA err: ", err)
 		return resolverAddr, nil, err
 	}
 
+	client := GetClient(EndPoint)
 	retryCount := 0
 	for {
+		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		resolverAddr, _, secondInstance, err = resolver.DeployResolver(auth, client)
+		resAddr, tx, resolverInstance, err := resolver.DeployResolver(auth, client)
 		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("deploy Resolver Err:", err)
-				return resolverAddr, secondInstance, err
+			if retryCount > 10 {
+				log.Println("deploy Resolver Err:", err)
+				return resolverAddr, resolverInstance, err
 			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		break
-	}
-
-	//将resolver地址放进indexer中,关键字key可以理解为resolverAddress的索引
-	//resolver-for-channel的key为providerAddr.string()
-	retryCount = 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = resolverInstance.Add(auth, resolverAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
-				return resolverAddr, secondInstance, err
-			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 			continue
 		}
 
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			resolverAddrGetted, err := resolverInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			}, localAddress)
-			if err != nil {
-				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
-					return resolverAddr, secondInstance, err
-				}
-				continue
+		err = CheckTx(tx)
+		if err != nil {
+			log.Println("deploy Resolver transaction fails:", err)
+			if retryCount > 20 {
+				return resolverAddr, resolverInstance, err
 			}
-			if resolverAddrGetted == resolverAddr { //放进去了
-				break
-			}
+			continue
 		}
-		break
+
+		return resAddr, resolverInstance, nil
 	}
-	return resolverAddr, secondInstance, nil
 }
 
-func GetMapperAddr(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, error) {
+// AddToResolver adds
+// ownerAddress is according to hexKey
+func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolverInstance *resolver.Resolver) error {
+	sk, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := resolverInstance.Add(auth, addAddr)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("add to resolver err:", err)
+				return err
+			}
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("add to resolver transaction fails: ", err)
+				return err
+			}
+			continue
+		}
+
+		addrGetted, err := GetAddrFromResolver(ownerAddress, ownerAddress, resolverInstance)
+		if err != nil {
+			time.Sleep(60 * time.Second)
+			continue
+		}
+
+		if addrGetted == addAddr {
+			return nil
+		}
+
+		if retryCount > 20 {
+			return ErrNotDeployedIndexer
+		}
+	}
+}
+
+// GetAddrFromResolver gets addr from resolver
+func GetAddrFromResolver(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, error) {
 	retryCount := 0
 	for {
 		retryCount++
@@ -400,43 +345,24 @@ func GetMapperAddr(localAddress common.Address, ownerAddress common.Address, res
 		}, ownerAddress)
 		if err != nil {
 			if retryCount > 20 {
-				fmt.Println("getMapperAddrErr:", err)
+				log.Println("getMapperAddrErr:", err)
 				return mapperAddr, err
 			}
 			time.Sleep(30 * time.Second)
 			continue
 		}
 		if len(mapperAddr) == 0 || mapperAddr.String() == InvalidAddr {
-			return mapperAddr, ErrNotDeployedMapper
+			log.Println("get empty addr from resolver")
+			return mapperAddr, ErrEmpty
 		}
 		return mapperAddr, nil
 	}
 }
 
-// getMapperInstance 返回已经部署的Mapper，若Mapper没部署则返回err
-// 特别地，当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
-// 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
-func getMapperInstance(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, *mapper.Mapper, error) {
-	mapperAddr, err := GetMapperAddr(localAddress, ownerAddress, resolverInstance)
-	if err != nil {
-		return mapperAddr, nil, err
-	}
-
-	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
-	if err != nil {
-		fmt.Println("newMapperErr:", err)
-		return mapperAddr, nil, err
-	}
-	return mapperAddr, mapperInstance, nil
-}
-
-// DeployMapper 部署Mapper合约，若Mapper已经部署过，则返回已部署好的Mapper
-func DeployMapper(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver, hexKey string) (common.Address, *mapper.Mapper, error) {
-	//试图从resolver中取出mapper地址：mapperAddr
-	mapperAddr, mapperInstance, err := getMapperInstance(localAddress, ownerAddress, resolverInstance)
-	if err == nil {
-		return mapperAddr, mapperInstance, nil
-	}
+// DeployMapper deploy a new mapper
+func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *mapper.Mapper, error) {
+	var mapperAddr common.Address
+	var mapperInstance *mapper.Mapper
 
 	client := GetClient(EndPoint)
 	sk, err := crypto.HexToECDSA(hexKey)
@@ -447,30 +373,13 @@ func DeployMapper(localAddress common.Address, ownerAddress common.Address, reso
 	// 部署Mapper
 	retryCount := 0
 	for {
+		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		mapperAddr, _, mapperInstance, err = mapper.DeployMapper(auth, client)
+		mapperAddr, tx, mapperInstance, err := mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("deployMapperErr:", err)
-				return mapperAddr, mapperInstance, err
-			}
-			retryCount++
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		break
-	}
-
-	//把mapper放进resolver
-	retryCount = 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := resolverInstance.Add(auth, mapperAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
+			if retryCount > 10 {
+				log.Println("deploy Mapper to indexer Err:", err)
 				return mapperAddr, mapperInstance, err
 			}
 			time.Sleep(30 * time.Second)
@@ -480,34 +389,357 @@ func DeployMapper(localAddress common.Address, ownerAddress common.Address, reso
 		//检查交易
 		err = CheckTx(tx)
 		if err != nil {
-			log.Println("addMapper transaction fails", err)
-			if retryCount > 20 {
+			log.Println("DeployMapper transaction fails:", err)
+			if retryCount > 10 {
 				return mapperAddr, mapperInstance, err
 			}
 			continue
 		}
 
-		retryCount = 0
-		for { //验证是否放进resolver
-			retryCount++
-			time.Sleep(30 * time.Second)
-			mapperGetted, err := resolverInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			}, ownerAddress)
-			if err != nil {
-				if retryCount > 20 {
-					return mapperAddr, mapperInstance, err
-				}
-				continue
+		return mapperAddr, mapperInstance, nil
+	}
+}
+
+func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstance *mapper.Mapper) error {
+	key, _ := crypto.HexToECDSA(hexKey)
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := mapperInstance.Add(auth, addr)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("add addr to Mapper Err:", err)
+				return err
 			}
-			if mapperGetted == mapperAddr {
-				break
-			}
+			time.Sleep(time.Minute)
+			continue
 		}
-		break
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("add to mapper fails", err)
+				return err
+			}
+			continue
+		}
+
+		if retryCount > 20 {
+			return errors.New("add address to mapper fail")
+		}
+
+		addrGetted, err := GetAddrsFromMapper(localAddress, mapperInstance)
+		if err != nil {
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		length := len(addrGetted)
+		if length != 0 && addrGetted[length-1] == addr {
+			return nil
+		}
+	}
+}
+
+// GetAddrsFromMapper gets
+func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) ([]common.Address, error) {
+	retryCount := 0
+	for {
+		retryCount++
+		channels, err := mapperInstance.Get(&bind.CallOpts{
+			From: localAddress,
+		})
+		if err != nil {
+			if retryCount > 20 {
+				log.Println("get addr from mapper:", err)
+				return nil, err
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
+			return channels, nil
+		}
+
+		log.Println("get empty addr from mapper")
+		return nil, ErrEmpty
+	}
+}
+
+func GetLatestFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) (common.Address, error) {
+	var addr common.Address
+	addrs, err := GetAddrsFromMapper(localAddress, mapperInstance)
+	if err != nil {
+		return addr, err
+	}
+	return addrs[len(addrs)-1], nil
+}
+
+// GetResolver gets role indexer
+func GetResolver(localAddress common.Address, key string) (common.Address, *resolver.Resolver, error) {
+	var resAddr common.Address
+
+	client := GetClient(EndPoint)
+	adminIndexerAddr := common.HexToAddress(indexerHex)
+	adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+	if err != nil {
+		log.Println("new admin Indexer err: ", err)
+		return resAddr, nil, err
+	}
+
+	resAddr, _, err = GetAddrFromIndexer(localAddress, key, adminIndexer)
+	if err != nil {
+		return resAddr, nil, err
+	}
+
+	resInstance, err := resolver.NewResolver(resAddr, client)
+	if err != nil {
+		return resAddr, nil, err
+	}
+
+	return resAddr, resInstance, nil
+}
+
+// GetRoleIndexer gets role indexer
+func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *indexer.Indexer, error) {
+	var indexerAddr common.Address
+	var indexerInstance *indexer.Indexer
+
+	client := GetClient(EndPoint)
+	adminIndexerAddr := common.HexToAddress(indexerHex)
+	adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+	if err != nil {
+		log.Println("new Indexer err: ", err)
+		return indexerAddr, indexerInstance, err
+	}
+
+	key := userAddress.String()
+
+	indexerAddr, ownAddr, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+	if err != nil {
+		return indexerAddr, indexerInstance, err
+	}
+
+	if ownAddr.String() != key {
+		log.Println("set owner is: ", key, ", but got owner is: ", ownAddr.String())
+		return indexerAddr, indexerInstance, ErrMisType
+	}
+
+	indexerInstance, err = indexer.NewIndexer(indexerAddr, client)
+	if err != nil {
+		return indexerAddr, indexerInstance, err
+	}
+
+	return indexerAddr, indexerInstance, nil
+}
+
+// getMapperFromResolver 返回已经部署的Mapper，若Mapper没部署则返回err
+// 特别地，当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
+// 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
+func GetMapperFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, *mapper.Mapper, error) {
+	mapperAddr, _, err := GetAddrFromIndexer(localAddress, key, indexerInstance)
+	if err != nil {
+		return mapperAddr, nil, err
+	}
+
+	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
+	if err != nil {
+		log.Println("newMapperErr:", err)
+		return mapperAddr, nil, err
 	}
 
 	return mapperAddr, mapperInstance, nil
+}
+
+func GetMapperFromResolver(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, *mapper.Mapper, error) {
+	mapperAddr, err := GetAddrFromResolver(localAddress, ownerAddress, resolverInstance)
+	if err != nil {
+		return mapperAddr, nil, err
+	}
+
+	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
+	if err != nil {
+		log.Println("newMapperErr:", err)
+		return mapperAddr, nil, err
+	}
+	return mapperAddr, mapperInstance, nil
+}
+
+// GetMapperFromAdmin get mapper
+// key is adminIndexer->resolver
+// userAddr is resolver->mapper
+// flag indicates set or not;
+// when set: userAddr depends on hexKey
+func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
+	var mapperAddr common.Address
+
+	if hexKey == "" {
+		flag = false
+	}
+
+	//获得userIndexer, key is userAddr.String()
+	_, resInstance, err := GetResolver(localAddr, key)
+	if err == ErrMisType {
+		return mapperAddr, nil, err
+	}
+
+	if err != nil {
+		if !flag {
+			return mapperAddr, nil, err
+		}
+		client := GetClient(EndPoint)
+		adminIndexerAddr := common.HexToAddress(indexerHex)
+		adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+		if err != nil {
+			log.Println("New Admin Indexer Err: ", err)
+			return mapperAddr, nil, err
+		}
+
+		resAddr, rInstance, err := DeployResolver(hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return mapperAddr, nil, err
+		}
+
+		log.Println("add resolver")
+		err = AddToIndexer(localAddr, resAddr, key, hexKey, adminIndexer)
+		if err != nil {
+			log.Println("add Role Indexer Err:", err)
+			return mapperAddr, nil, err
+		}
+
+		resInstance = rInstance
+	}
+
+	mapperAddr, mapperInstance, err := GetMapperFromResolver(localAddr, userAddr, resInstance)
+	if err != nil {
+		if !flag {
+			return mapperAddr, nil, err
+		}
+		mapperAddr, mInstance, err := DeployMapper(localAddr, hexKey)
+		if err != nil {
+			log.Println("deploy mapper err:", err)
+			return mapperAddr, nil, err
+		}
+
+		mapperInstance = mInstance
+
+		err = AddToResolver(userAddr, mapperAddr, hexKey, resInstance)
+		if err != nil {
+			log.Println("add mapper to resolver err:", err)
+			return mapperAddr, nil, err
+		}
+		return mapperAddr, mapperInstance, nil
+	}
+
+	return mapperAddr, mapperInstance, nil
+}
+
+// GetMapperFromAdminV1 get mapper
+// userAddr is adminIndexer->indexer
+// key is indexer->mapper
+// flag indicates set or not
+func GetMapperFromAdminV1(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
+	var mapperAddr common.Address
+
+	if hexKey == "" {
+		flag = false
+	}
+
+	//获得userIndexer, key is userAddr.String()
+	_, indexerInstance, err := GetRoleIndexer(localAddr, userAddr)
+	if err == ErrMisType {
+		return mapperAddr, nil, err
+	}
+
+	if err != nil {
+		if !flag {
+			return mapperAddr, nil, err
+		}
+		client := GetClient(EndPoint)
+		adminIndexerAddr := common.HexToAddress(indexerHex)
+		adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+		if err != nil {
+			log.Println("New Admin Indexer Err: ", err)
+			return mapperAddr, nil, err
+		}
+
+		indexerAddr, iInstance, err := DeployIndexer(hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return mapperAddr, nil, err
+		}
+
+		indexerInstance = iInstance
+
+		log.Println("add Role Indexer")
+		err = AddToIndexer(localAddr, indexerAddr, userAddr.String(), hexKey, adminIndexer)
+		if err != nil {
+			log.Println("add Role Indexer Err:", err)
+			return mapperAddr, nil, err
+		}
+	}
+
+	mapperAddr, mapperInstance, err := GetMapperFromIndexer(localAddr, key, indexerInstance)
+	if err != nil {
+		if !flag {
+			return mapperAddr, nil, err
+		}
+		mapperAddr, mInstance, err := DeployMapper(localAddr, hexKey)
+		if err != nil {
+			log.Println("deploy mapper err:", err)
+			return mapperAddr, nil, err
+		}
+
+		mapperInstance = mInstance
+
+		err = AddToIndexer(localAddr, mapperAddr, key, hexKey, indexerInstance)
+		if err != nil {
+			log.Println("add mapper to indexer err:", err)
+			return mapperAddr, nil, err
+		}
+		return mapperAddr, mapperInstance, nil
+	}
+
+	return mapperAddr, mapperInstance, nil
+}
+
+//CheckTx 通过交易详情检查交易是否触发了errorEvent
+func CheckTx(tx *types.Transaction) error {
+	log.Println("Check Tx hash:", tx.Hash().Hex())
+
+	var receipt *types.Receipt
+	for i := 0; i < 60; i++ {
+		receipt = GetTransactionReceipt(tx.Hash())
+		if receipt != nil {
+			//TxReceipt, _ := receipt.MarshalJSON()
+			//log.Println("TxReceipt:", string(TxReceipt))
+			break
+		}
+		time.Sleep(30 * time.Second)
+	}
+
+	if receipt == nil { //30分钟获取不到交易信息，判定交易失败
+		log.Println("transaction fails")
+		return ErrTxFail
+	}
+
+	if receipt.Logs == nil || len(receipt.Logs) == 0 {
+		log.Println("the transaction didn't trigger an event")
+		return nil
+	}
+	topics := receipt.Logs[0].Topics[0].Hex()
+	//log.Println("topics:", topics)
+
+	if topics == "0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa" {
+		str := string(receipt.Logs[0].Data)
+		log.Println("err in log is: ", str)
+		return errors.New(str)
+	}
+	return nil
 }
 
 //GetTransactionReceipt 通过交易hash获得交易详情
@@ -519,162 +751,4 @@ func GetTransactionReceipt(hash common.Hash) *types.Receipt {
 	}
 	receipt, err := client.TransactionReceipt(context.Background(), hash)
 	return receipt
-}
-
-//CheckTx 通过交易详情检查交易是否触发了errorEvent
-func CheckTx(tx *types.Transaction) error {
-	log.Println("Tx hash:", tx.Hash().Hex())
-
-	var receipt *types.Receipt
-	for i := 0; i < 60; i++ {
-		receipt = GetTransactionReceipt(tx.Hash())
-		if receipt != nil {
-			TxReceipt, _ := receipt.MarshalJSON()
-			fmt.Println("TxReceipt:", string(TxReceipt))
-			break
-		}
-		time.Sleep(30 * time.Second)
-	}
-	if receipt == nil { //30分钟获取不到交易信息，判定交易失败
-		log.Println("transaction fails")
-		return errors.New("transaction fails")
-	}
-
-	if receipt.Logs == nil || len(receipt.Logs) == 0 {
-		log.Println("the transaction didn't trigger an event")
-		return nil
-	}
-	topics := receipt.Logs[0].Topics[0].Hex()
-	fmt.Println("topics:", topics)
-
-	if topics == "0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa" {
-		str := string(receipt.Logs[0].Data)
-		fmt.Println(str)
-		return errors.New(str)
-	}
-	return nil
-}
-
-func addToMapper(localAddress common.Address, mapperInstance *mapper.Mapper, addr common.Address, hexKey string) error {
-	key, _ := crypto.HexToECDSA(hexKey)
-
-	retryCount := 0
-	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err := mapperInstance.Add(auth, addr)
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("add addr to Mapper Err:", err)
-				return err
-			}
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		retryCount = 0
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			addrGetted, err := mapperInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			})
-			if err != nil {
-				if retryCount > 20 {
-					fmt.Println("get addr from Mapper Err:", err)
-					return err
-				}
-				continue
-			}
-			length := len(addrGetted)
-			if length != 0 && addrGetted[length-1] == addr {
-				return nil
-			}
-			if retryCount > 20 {
-				break
-			}
-		}
-		break
-	}
-	return errors.New("add address to mapper fail")
-}
-
-func getAllAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) ([]common.Address, error) {
-	var addr []common.Address
-	retryCount := 0
-	for {
-		retryCount++
-		channels, err := mapperInstance.Get(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("get addr from mapper:", err)
-				return addr, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
-			return channels, nil
-		}
-		return addr, errors.New("get addr from mapper error")
-	}
-}
-
-func getLatestAddrFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) (common.Address, error) {
-	var addr common.Address
-	addrs, err := getAllAddrsFromMapper(localAddress, mapperInstance)
-	if err != nil {
-		return addr, err
-	}
-	return addrs[len(addrs)-1], nil
-}
-
-// SaveKpMap saves kpmap
-func SaveKpMap(peerID string) error {
-	localAddr, err := address.GetAddressFromID(peerID)
-	if err != nil {
-		log.Println("saveKpMap GetAddressFromID() error", err)
-		return err
-	}
-	kps, err := GetAllKeeperInKPMap(localAddr)
-	if err != nil {
-		log.Println("saveKpMap GetAllKeepers() error", err)
-		return err
-	}
-
-	for _, kpaddr := range kps {
-		pids, err := GetProviderInKPMap(localAddr, kpaddr)
-		if err != nil {
-			log.Println("get provider from kpmap err:", err)
-		}
-		if len(pids) > 0 {
-			keeperID, _ := address.GetIDFromAddress(kpaddr.String())
-			kidList := []string{keeperID}
-			for _, paddr := range pids {
-				pid, _ := address.GetIDFromAddress(paddr.String())
-				res, ok := kpMap.Load(pid)
-				if ok {
-					res.(*kpItem).keeperIDs = append(res.(*kpItem).keeperIDs, keeperID)
-				} else {
-					kidres := &kpItem{
-						keeperIDs: kidList,
-					}
-					kpMap.Store(keeperID, kidres)
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// GetKeepersOfPro get keepers of some provider
-func GetKeepersOfPro(peerID string) ([]string, bool) {
-	res, ok := kpMap.Load(peerID)
-	if !ok {
-		return nil, false
-	}
-	return res.(*kpItem).keeperIDs, true
 }

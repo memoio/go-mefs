@@ -14,11 +14,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/routing"
 
-	cid "github.com/ipfs/go-cid"
-	u "github.com/ipfs/go-ipfs-util"
 	logging "github.com/ipfs/go-log"
 	kb "github.com/libp2p/go-libp2p-kbucket"
-	record "github.com/libp2p/go-libp2p-record"
+	cid "github.com/ipfs/go-cid"
 
 	"github.com/memoio/go-mefs/config"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
@@ -30,13 +28,13 @@ import (
 // results will wait for the channel to drain.
 var asyncQueryBuffer = 10
 
-// This file implements the Routing interface for the IpfsDHT struct.
+// This file implements the Routing interface for the KadDHT struct.
 
 // Basic Put/Get
 
 // PutValue adds value corresponding to given Key.
 // This is the top level "Store" operation of the DHT
-func (dht *IpfsDHT) PutValue(ctx context.Context, key string, value []byte, opts ...routing.Option) (err error) {
+func (dht *KadDHT) PutValue(ctx context.Context, key string, value []byte, opts ...routing.Option) (err error) {
 	eip := logger.EventBegin(ctx, "PutValue")
 	defer func() {
 		eip.Append(loggableKey(key))
@@ -47,11 +45,6 @@ func (dht *IpfsDHT) PutValue(ctx context.Context, key string, value []byte, opts
 	}()
 	logger.Debugf("PutValue %s", key)
 
-	// don't even allow local users to put bad values.
-	if err := dht.Validator.Validate(key, value); err != nil {
-		return err
-	}
-
 	old, err := dht.getLocal(key)
 	if err != nil {
 		// Means something is wrong with the datastore.
@@ -61,17 +54,10 @@ func (dht *IpfsDHT) PutValue(ctx context.Context, key string, value []byte, opts
 	// Check if we have an old value that's not the same as the new one.
 	if old != nil && !bytes.Equal(old.GetValue(), value) {
 		// Check to see if the new one is better.
-		i, err := dht.Validator.Select(key, [][]byte{value, old.GetValue()})
-		if err != nil {
-			return err
-		}
-		if i != 0 {
-			return fmt.Errorf("can't replace a newer value with an older value")
-		}
+		// todo
 	}
 
-	rec := record.MakePutRecord(key, value)
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec := MakePutRecord(key, value)
 	err = dht.putLocal(key, rec)
 	if err != nil {
 		return err
@@ -111,7 +97,7 @@ type RecvdVal struct {
 }
 
 // GetValue searches for the value corresponding to given Key.
-func (dht *IpfsDHT) GetValue(ctx context.Context, key string, opts ...routing.Option) (_ []byte, err error) {
+func (dht *KadDHT) GetValue(ctx context.Context, key string, opts ...routing.Option) (_ []byte, err error) {
 	eip := logger.EventBegin(ctx, "GetValue")
 	defer func() {
 		eip.Append(loggableKey(key))
@@ -149,7 +135,7 @@ func (dht *IpfsDHT) GetValue(ctx context.Context, key string, opts ...routing.Op
 	return best, nil
 }
 
-func (dht *IpfsDHT) SearchValue(ctx context.Context, key string, opts ...routing.Option) (<-chan []byte, error) {
+func (dht *KadDHT) SearchValue(ctx context.Context, key string, opts ...routing.Option) (<-chan []byte, error) {
 	var cfg routing.Options
 	if err := cfg.Apply(opts...); err != nil {
 		return nil, err
@@ -184,7 +170,7 @@ func (dht *IpfsDHT) SearchValue(ctx context.Context, key string, opts ...routing
 			if len(vals) <= 1 || best == nil {
 				return
 			}
-			fixupRec := record.MakePutRecord(key, best.Val)
+			fixupRec := MakePutRecord(key, best.Val)
 			for _, v := range vals {
 				// if someone sent us a different 'less-valid' record, lets correct them
 				if !bytes.Equal(v.Val, best.Val) {
@@ -226,14 +212,6 @@ func (dht *IpfsDHT) SearchValue(ctx context.Context, key string, opts ...routing
 					if bytes.Equal(best.Val, v.Val) {
 						continue
 					}
-					sel, err := dht.Validator.Select(key, [][]byte{best.Val, v.Val})
-					if err != nil {
-						logger.Warning("Failed to select dht key: ", err)
-						continue
-					}
-					if sel != 1 {
-						continue
-					}
 				}
 				best = &v
 				select {
@@ -251,7 +229,7 @@ func (dht *IpfsDHT) SearchValue(ctx context.Context, key string, opts ...routing
 }
 
 // GetValues gets nvals values corresponding to the given key.
-func (dht *IpfsDHT) GetValues(ctx context.Context, key string, nvals int) (_ []RecvdVal, err error) {
+func (dht *KadDHT) GetValues(ctx context.Context, key string, nvals int) (_ []RecvdVal, err error) {
 	eip := logger.EventBegin(ctx, "GetValues")
 
 	eip.Append(loggableKey(key))
@@ -271,7 +249,7 @@ func (dht *IpfsDHT) GetValues(ctx context.Context, key string, nvals int) (_ []R
 	return out, ctx.Err()
 }
 
-func (dht *IpfsDHT) getValues(ctx context.Context, key string, nvals int) (<-chan RecvdVal, error) {
+func (dht *KadDHT) getValues(ctx context.Context, key string, nvals int) (<-chan RecvdVal, error) {
 	vals := make(chan RecvdVal, 1)
 
 	done := func(err error) (<-chan RecvdVal, error) {
@@ -396,7 +374,7 @@ func (dht *IpfsDHT) getValues(ctx context.Context, key string, nvals int) (<-cha
 // locations of the value, similarly to Coral and Mainline DHT.
 
 // Provide makes this node announce that it can provide a value for the given key
-func (dht *IpfsDHT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err error) {
+func (dht *KadDHT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err error) {
 	eip := logger.EventBegin(ctx, "Provide", key, logging.LoggableMap{"broadcast": brdcst})
 	defer func() {
 		if err != nil {
@@ -436,7 +414,7 @@ func (dht *IpfsDHT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err 
 	wg.Wait()
 	return nil
 }
-func (dht *IpfsDHT) makeProvRecord(skey cid.Cid) (*pb.Message, error) {
+func (dht *KadDHT) makeProvRecord(skey cid.Cid) (*pb.Message, error) {
 	pi := peer.AddrInfo{
 		ID:    dht.self,
 		Addrs: dht.host.Addrs(),
@@ -454,7 +432,7 @@ func (dht *IpfsDHT) makeProvRecord(skey cid.Cid) (*pb.Message, error) {
 }
 
 // FindProviders searches until the context expires.
-func (dht *IpfsDHT) FindProviders(ctx context.Context, c cid.Cid) ([]peer.AddrInfo, error) {
+func (dht *KadDHT) FindProviders(ctx context.Context, c cid.Cid) ([]peer.AddrInfo, error) {
 	var providers []peer.AddrInfo
 	for p := range dht.FindProvidersAsync(ctx, c, KValue) {
 		providers = append(providers, p)
@@ -465,14 +443,14 @@ func (dht *IpfsDHT) FindProviders(ctx context.Context, c cid.Cid) ([]peer.AddrIn
 // FindProvidersAsync is the same thing as FindProviders, but returns a channel.
 // Peers will be returned on the channel as soon as they are found, even before
 // the search query completes.
-func (dht *IpfsDHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) <-chan peer.AddrInfo {
+func (dht *KadDHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) <-chan peer.AddrInfo {
 	logger.Event(ctx, "findProviders", key)
 	peerOut := make(chan peer.AddrInfo, count)
 	go dht.findProvidersAsyncRoutine(ctx, key, count, peerOut)
 	return peerOut
 }
 
-func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key cid.Cid, count int, peerOut chan peer.AddrInfo) {
+func (dht *KadDHT) findProvidersAsyncRoutine(ctx context.Context, key cid.Cid, count int, peerOut chan peer.AddrInfo) {
 	defer logger.EventBegin(ctx, "findProvidersAsync", key).Done()
 	defer close(peerOut)
 
@@ -576,7 +554,7 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key cid.Cid, 
 }
 
 // FindPeer searches for a peer with given ID.
-func (dht *IpfsDHT) FindPeer(ctx context.Context, id peer.ID) (_ peer.AddrInfo, err error) {
+func (dht *KadDHT) FindPeer(ctx context.Context, id peer.ID) (_ peer.AddrInfo, err error) {
 	eip := logger.EventBegin(ctx, "FindPeer", id)
 	defer func() {
 		if err != nil {
@@ -671,7 +649,7 @@ func (dht *IpfsDHT) FindPeer(ctx context.Context, id peer.ID) (_ peer.AddrInfo, 
 }
 
 // FindPeersConnectedToPeer searches for peers directly connected to a given peer.
-func (dht *IpfsDHT) FindPeersConnectedToPeer(ctx context.Context, id peer.ID) (<-chan *peer.AddrInfo, error) {
+func (dht *KadDHT) FindPeersConnectedToPeer(ctx context.Context, id peer.ID) (<-chan *peer.AddrInfo, error) {
 
 	peerchan := make(chan *peer.AddrInfo, asyncQueryBuffer)
 	peersSeen := make(map[peer.ID]struct{})

@@ -10,7 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/role/user"
+
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/pkg/hash"
 )
@@ -24,10 +26,11 @@ var (
 )
 
 func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object string, options minio.ObjectOptions) (uploadID string, err error) {
-	lfs := user.GetLfsService(l.userID)
-	if lfs == nil {
-		return "", user.ErrLfsIsNotRunning
+	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
+	if lfs == nil || !lfs.Online() {
+		return "", errLfsServiceNotReady
 	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	_, err = lfs.HeadBucket(bucket)
 	if err != nil {
@@ -40,27 +43,24 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	if err != nil {
 		return "", err
 	}
-	uploadTask, err := lfs.ConstructUpload(object, "", bucket, upload.Stream)
+	obj, err := lfs.PutObject(bucket, object, upload.Stream)
 	if err != nil {
 		return "", err
 	}
-	go func() {
-		err := uploadTask.Start(ctx)
-		uploads.RemoveByID(upload.ID)
-		obj, _, err := lfs.HeadObject(bucket, object, false)
-		if err != nil {
-			upload.fail(err)
-		} else {
-			upload.complete(minio.ObjectInfo{
-				Bucket:      bucket,
-				Name:        object,
-				IsDir:       obj.Dir,
-				ETag:        obj.ETag,
-				ContentType: obj.ContentType,
-				Size:        obj.Size,
-			})
-		}
-	}()
+
+	uploads.RemoveByID(upload.ID)
+	if err != nil {
+		upload.fail(err)
+	} else {
+		upload.complete(minio.ObjectInfo{
+			Bucket:      bucket,
+			Name:        object,
+			IsDir:       obj.Dir,
+			ETag:        obj.ETag,
+			ContentType: obj.ContentType,
+			Size:        obj.Length,
+		})
+	}
 
 	return upload.ID, nil
 }

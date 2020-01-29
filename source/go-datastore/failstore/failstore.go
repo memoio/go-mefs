@@ -36,6 +36,16 @@ func (d *Failstore) Put(k ds.Key, val []byte) error {
 	return d.child.Put(k, val)
 }
 
+// Sync implements Datastore.Sync
+func (d *Failstore) Sync(prefix ds.Key) error {
+	err := d.errfunc("sync")
+	if err != nil {
+		return err
+	}
+
+	return d.child.Sync(prefix)
+}
+
 // Get retrieves a value from the datastore.
 func (d *Failstore) Get(k ds.Key) ([]byte, error) {
 	err := d.errfunc("get")
@@ -94,6 +104,11 @@ func (d *Failstore) DiskUsage() (uint64, error) {
 	return ds.DiskUsage(d.child)
 }
 
+//  Close implements the Datastore interface
+func (d *Failstore) Close() error {
+	return d.child.Close()
+}
+
 // FailBatch implements batching operations on the Failstore.
 type FailBatch struct {
 	cb     ds.Batch
@@ -126,12 +141,12 @@ func (b *FailBatch) Put(k ds.Key, val []byte) error {
 	return b.cb.Put(k, val)
 }
 
-func (b *FailBatch) Append(k ds.Key, val []byte, beginoffset, endoffset int) error {
+func (b *FailBatch) Append(k ds.Key, val []byte, begin, length int) error {
 	if err := b.dstore.errfunc("batch-append"); err != nil {
 		return err
 	}
 
-	return b.cb.Append(k, val, beginoffset, endoffset)
+	return b.cb.Append(k, val, begin, length)
 }
 
 // Delete does a batch delete.

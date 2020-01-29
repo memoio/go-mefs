@@ -6,11 +6,12 @@ package blocks
 import (
 	"errors"
 	"fmt"
+	"log"
 
-	cid "github.com/memoio/go-mefs/source/go-cid"
-
+	proto "github.com/gogo/protobuf/proto"
 	u "github.com/ipfs/go-ipfs-util"
-
+	pb "github.com/memoio/go-mefs/proto"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -85,4 +86,55 @@ func (b *BasicBlock) Loggable() map[string]interface{} {
 	return map[string]interface{}{
 		"block": b.Cid().String(),
 	}
+}
+
+func (b *BasicBlock) Prefix() (*pb.BucketOptions, int, error) {
+	return PrefixDecode(b.RawData())
+}
+
+func PrefixLen(data []byte) (int, int, error) {
+	len, n := proto.DecodeVarint(data[:10])
+	if n <= 0 {
+		return 0, 0, errors.New("wrong proto prefix message")
+	}
+
+	return int(len), n + int(len), nil
+}
+
+func PrefixDecode(data []byte) (*pb.BucketOptions, int, error) {
+	if len(data) < 10 {
+		log.Println("wrong proto prefix len")
+		return nil, 0, errors.New("wrong proto prefix length")
+	}
+	x, n := proto.DecodeVarint(data[:10])
+	if n <= 0 || x == 0 {
+		log.Println("wrong proto prefix message:", x, n)
+		return nil, 0, errors.New("wrong proto prefix message")
+	}
+
+	if n+int(x) > len(data) {
+		log.Println("short proto prefix message:", x, n)
+		return nil, 0, errors.New("short proto prefix message")
+	}
+
+	pre := new(pb.BucketOptions)
+	err := proto.Unmarshal(data[n:n+int(x)], pre)
+	if err != nil {
+		return nil, 0, err
+	}
+	return pre, n + int(x), nil
+}
+
+func PrefixEncode(pre *pb.BucketOptions) ([]byte, int, error) {
+	preData, err := proto.Marshal(pre)
+	if err != nil {
+		fmt.Println(err)
+		return nil, 0, err
+	}
+
+	buf := proto.EncodeVarint(uint64(len(preData)))
+
+	buf = append(buf, preData...)
+
+	return buf, len(buf), nil
 }

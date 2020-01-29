@@ -16,7 +16,7 @@ type cacheSize int
 // block Cids. This provides block access-time improvements, allowing
 // to short-cut many searches without query-ing the underlying datastore.
 type arccache struct {
-	arc        *lru.ARCCache
+	arc        *lru.TwoQueueCache
 	blockstore Blockstore
 
 	hits  metrics.Counter
@@ -24,7 +24,7 @@ type arccache struct {
 }
 
 func newARCCachedBS(ctx context.Context, bs Blockstore, lruSize int) (*arccache, error) {
-	arc, err := lru.NewARC(lruSize)
+	arc, err := lru.New2Q(lruSize)
 	if err != nil {
 		return nil, err
 	}
@@ -37,18 +37,15 @@ func newARCCachedBS(ctx context.Context, bs Blockstore, lruSize int) (*arccache,
 
 func (b *arccache) DeleteBlock(k cid.Cid) error {
 	if has, _, ok := b.hasCached(k); ok && !has {
-		return ErrNotFound
+		return nil
 	}
 
 	b.arc.Remove(k) // Invalidate cache before deleting.
 	err := b.blockstore.DeleteBlock(k)
-	switch err {
-	case nil, ErrNotFound:
+	if err == nil {
 		b.cacheHave(k, false)
-		return err
-	default:
-		return err
 	}
+	return err
 }
 
 // if ok == false has is inconclusive
@@ -89,10 +86,15 @@ func (b *arccache) Has(k cid.Cid) (bool, error) {
 
 func (b *arccache) GetSize(k cid.Cid) (int, error) {
 	if has, blockSize, ok := b.hasCached(k); ok {
-		if has {
+		if !has {
+			// don't have it, return
+			return -1, ErrNotFound
+		}
+		if blockSize >= 0 {
+			// have it and we know the size
 			return blockSize, nil
 		}
-		return -1, ErrNotFound
+		// we have it but don't know the size, ask the datastore.
 	}
 	blockSize, err := b.blockstore.GetSize(k)
 	if err == ErrNotFound {
@@ -141,9 +143,10 @@ func (b *arccache) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error
 }
 
 func (b *arccache) Put(bl blocks.Block) error {
-	/*if has, _, ok := b.hasCached(bl.Cid()); ok && has {
+	if has, _, ok := b.hasCached(bl.Cid()); ok && has {
 		return nil
-	}*/
+	}
+
 	err := b.blockstore.Put(bl)
 	if err == nil {
 		b.cacheSize(bl.Cid(), len(bl.RawData()))
@@ -151,12 +154,8 @@ func (b *arccache) Put(bl blocks.Block) error {
 	return err
 }
 
-func (b *arccache) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
-	err := b.blockstore.Append(c, field, beginoffset, endoffset)
-	if err == nil {
-		b.cacheSize(c, len(field))
-	}
-	return err
+func (b *arccache) Append(c cid.Cid, field []byte, begin, length int) error {
+	return b.blockstore.Append(c, field, begin, length)
 }
 
 func (b *arccache) PutMany(bs []blocks.Block) error {

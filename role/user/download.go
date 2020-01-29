@@ -5,19 +5,16 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"io"
-	"log"
 	"math/big"
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
+	pb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -47,157 +44,178 @@ type notif struct {
 
 //针对Bucket内stripe的下载，可复用
 type downloadJob struct {
-	bucket         *superBucket
-	decoder        *dataformat.DataDecoder //用于解码数据
-	lfs            *LfsService             //lfsservice
-	group          *groupService           //groupService
+	fsID           string
+	bucketID       int32
+	encrypt        bool
+	sKey           [32]byte
+	decoder        *dataformat.DataCoder //用于解码数据
+	group          *groupInfo            //groupInfo
 	buffer         [][]byte
 	blockCompleted int       //下载成功了几个块
 	writer         io.Writer //用于调度下载，以及返回是否出错
 }
 
-func newDownloadJob(bucket *superBucket, decoder *dataformat.DataDecoder, lfs *LfsService, group *groupService, writer io.Writer) (*downloadJob, error) {
+func newDownloadJob(uid string, bid int32, cry bool, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
 	return &downloadJob{
-		bucket:  bucket,
-		decoder: decoder,
-		lfs:     lfs,
-		group:   group,
-		writer:  writer,
-	}, nil
+		fsID:     uid,
+		bucketID: bid,
+		encrypt:  cry,
+		sKey:     sk,
+		decoder:  dec,
+		group:    group,
+		writer:   writer,
+	}
 }
 
 //下载一整个对象的下载任务
 type downloadTask struct {
-	superBucket  *superBucket
-	lService     *LfsService   //lfsService
-	group        *groupService //groupService
-	object       *objectInfo
-	decoder      *dataformat.DataDecoder //用于解码数据
-	State        TaskState
+	fsID         string
+	bucketID     int32
+	encrypt      bool
+	sKey         [32]byte
+	group        *groupInfo            //groupInfo
+	decoder      *dataformat.DataCoder //用于解码数据
+	state        TaskState
 	curStripe    int64 //当前已进行到哪个stripe
-	offsetStart  int64 //此次下载起始offset，表示在stripe中的起始segment
-	indexStart   int64 //此次下载起始index，表示在segment中的起始字节，用于后续指定范围下载
-	length       int64 //下载所需大小，用于后续指定范围下载
+	segOffset    int64 //此次下载起始offset，表示在stripe中的起始segment
+	dStart       int64 //数据其实起始
+	dLength      int64 //下载所需大小，用于后续指定范围下载
 	sizeReceived int   //可以统计下载进度
 	startTime    int64
 	writer       io.Writer
 	completeFunc []CompleteFunc //完成任务或出错的通知函数
 }
 
-// ConstructDownload constructs lfs download process
-func (lfs *LfsService) ConstructDownload(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, options *DownloadOptions) (Job, error) {
-	err := isStart(lfs.userid)
-	if err != nil {
-		return nil, err
-	}
-	if lfs.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
+// GetObject constructs lfs download process
+func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
+	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
+	if !l.online {
+		return ErrLfsServiceNotReady
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
+	if l.meta.bucketNameToID == nil {
+		return ErrBucketNotExist
 	}
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
+	if !ok {
+		return ErrBucketNotExist
+	}
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
-		return nil, ErrBucketNotExist
+		return ErrBucketNotExist
 	}
 
 	objectElement, ok := bucket.objects[objectName]
 	if !ok {
-		return nil, ErrObjectNotExist
+		return ErrObjectNotExist
 	}
 	object, ok := objectElement.Value.(*objectInfo)
 	if !ok || object == nil || object.Deletion {
-		return nil, ErrObjectNotExist
-	}
-	if options.Start+options.Length > object.Size {
-		return nil, ErrObjectOptionsInvalid
-	}
-	var curStripe int64
-	var offsetStart int64
-	var indexStart int64
-	var length = options.Length
-
-	if options.Length < 0 {
-		length = object.GetSize() - options.Start
+		return ErrObjectNotExist
 	}
 
-	dataCount := bucket.DataCount
-	stripeSize := int64(utils.BlockSize * dataCount)
-	stripeSegmentSize := int64(bucket.SegmentSize) * int64(dataCount)
+	length := opts.Length
+	if opts.Length < 0 {
+		length = object.GetLength() - opts.Start
+	}
+
+	if opts.Start+length > object.Length {
+		return ErrObjectOptionsInvalid
+	}
+
+	stripeSize := int64(utils.BlockSize * bucket.DataCount)
+	segStripeSize := int64(bucket.SegmentSize) * int64(bucket.DataCount)
 	//计算出下载的起始参数
-	extraDataSize := object.OffsetStart * int64(bucket.SegmentSize) * int64(dataCount) //在此object之前同一个stripe由其他object占据的空间
-	curStripe = (options.Start+extraDataSize)/stripeSize + object.StripeStart
-	offsetStart = ((options.Start + extraDataSize) % stripeSize) / stripeSegmentSize
-	indexStart = options.Start % stripeSegmentSize
+	segStart := object.Offset * segStripeSize //在此object之前同一个stripe由其他object占据的空间
+	// 下载的开始条带
+	stripePos := (opts.Start+segStart)/stripeSize + object.StripeStart
+	// 下载开始的segment
+	segPos := ((opts.Start + segStart) % stripeSize) / segStripeSize
+	// segment的偏移
+	offsetPos := opts.Start % segStripeSize
 
-	group := getGroupService(lfs.userid)
+	decoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), dataformat.CurrentVersion, int(bucket.ParityCount), int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
 
-	decoder, _ := dataformat.NewDataDecoder(bucket.Policy, bucket.DataCount, bucket.ParityCount)
-	return &downloadTask{
-		superBucket:  bucket,
-		lService:     lfs,
-		group:        group,
-		object:       object,
+	dl := &downloadTask{
+		fsID:         l.fsID,
+		bucketID:     bucket.BucketID,
+		group:        l.gInfo,
 		decoder:      decoder,
-		State:        Pending,
+		state:        Pending,
 		startTime:    time.Now().Unix(),
-		curStripe:    curStripe,
-		offsetStart:  offsetStart,
-		indexStart:   indexStart,
-		length:       length,
+		curStripe:    stripePos,
+		segOffset:    segPos,
+		dStart:       offsetPos,
+		dLength:      length,
 		writer:       writer,
 		completeFunc: completeFuncs,
-	}, nil
+	}
+
+	if bucket.Encryption {
+		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
+		tmpkey := l.privateKey
+		tmpkey = append(tmpkey, byte(bucket.BucketID))
+		dl.sKey = sha256.Sum256(tmpkey)
+		dl.encrypt = true
+	}
+
+	return dl.Start(context.Background())
 }
 
 func (do *downloadTask) Start(ctx context.Context) error {
-	stripeStart := do.curStripe
-	offsetStart := do.offsetStart
-	indexStart := do.indexStart
-	dataCount := do.superBucket.DataCount
-	stripeSize := int64(utils.BlockSize * dataCount)
+	curStripe := do.curStripe + 1
+	segStart := do.segOffset
+	dStart := do.dStart // 0
+	dc := do.decoder.Prefix.DataCount
+	segSize := do.decoder.Prefix.SegmentSize
+	stripeSize := int64(utils.BlockSize * dc)
 
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
-	extraData := do.offsetStart * int64(do.superBucket.SegmentSize) * int64(dataCount)
+	segPos := segStart * int64(segSize) * int64(dc)
 
-	job, _ := newDownloadJob(do.superBucket, do.decoder, do.lService, do.group, do.writer)
+	job := newDownloadJob(do.fsID, do.bucketID, do.encrypt, do.sKey, do.decoder, do.group, do.writer)
 	//构造任务并运行
+	var remain int64
+	//只有下载任务的第一个stripe才可能从非0的offset开始
+	if do.dLength <= stripeSize-segPos-do.dStart {
+		//第一种情况，处在某一个stripe的中间
+		remain = do.dLength
+	} else {
+		//第二种情况，此stripe填到末尾
+		remain = stripeSize - segPos - do.dStart
+	}
+
 	for {
-		var remain int64
-		//如果当前offset从0开始
-		if offsetStart == 0 {
-			if do.length >= (do.curStripe-stripeStart+1)*stripeSize-extraData-do.indexStart {
-				//填满一整个stripe
-				remain = stripeSize
-			} else {
-				//最后剩下一部分
-				remain = (do.length + extraData + do.indexStart) % (stripeSize)
-			}
-		} else {
-			//只有下载任务的第一个stripe才可能从非0的offset开始
-			if do.length <= stripeSize-extraData-do.indexStart {
-				//第一种情况，处在某一个stripe的中间
-				remain = do.length
-			} else {
-				//第二种情况，此stripe填到末尾
-				remain = stripeSize - extraData - do.indexStart
-			}
-		}
 		//重复读取stripe中所需内容
-		n, err := job.rangeRead(ctx, do.curStripe, offsetStart, indexStart, remain)
+		n, err := job.rangeRead(ctx, curStripe-1, segStart, dStart, remain)
 		if err != nil {
 			do.Complete(err)
 			return err
 		}
+
+		if n != remain {
+			utils.MLogger.Warn("length is not match, got: ", n, ", want: ", remain)
+		}
+
 		do.sizeReceived += int(n)
-		if int64(do.sizeReceived) >= do.length {
+
+		if int64(do.sizeReceived) >= do.dLength {
 			break
 		}
-		do.curStripe++
-		indexStart = 0
-		offsetStart = 0
+
+		curStripe++
+		dStart = 0
+		segStart = 0
+
+		if do.dLength <= (curStripe-do.curStripe)*stripeSize-segPos-do.dStart {
+			//最后剩下一部分
+			remain = (do.dLength + segPos + do.dStart) % (stripeSize)
+		} else {
+			//填满一整个stripe
+			remain = stripeSize
+
+		}
 	}
 	if w, ok := do.writer.(*bufio.Writer); ok {
 		w.Flush()
@@ -237,211 +255,174 @@ type (
 )
 
 //从一个stripe内指定范围读取数据写入到writer内
-func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, offsetStart, indexStart, remain int64) (int64, error) {
+func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset, remain int64) (int64, error) {
 	//首先设置一些本次stripe下载的基本参数
-	dataCount := ds.bucket.DataCount
-	parityCount := ds.bucket.ParityCount
+	dataCount := ds.decoder.Prefix.DataCount
+	parityCount := ds.decoder.Prefix.ParityCount
 	blockCount := dataCount + parityCount
-	bm, err := metainfo.NewBlockMeta(ds.lfs.userid, strconv.Itoa(int(ds.bucket.BucketID)), strconv.Itoa(int(stripeID)), "")
+	bm, err := metainfo.NewBlockMeta(ds.fsID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
-		log.Println("Download failed-", err)
-		return 0, err
-	}
-	// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-	tmpkey := ds.lfs.privateKey
-	tmpkey = append(tmpkey, byte(ds.bucket.BucketID))
-	skey := sha256.Sum256(tmpkey)
-
-	cfg, err := localNode.Repo.Config()
-	if err != nil {
-		log.Println("get config from Download failed, err: ", err)
+		utils.MLogger.Error("Download failed: ", err)
 		return 0, err
 	}
 
+	var count int32
+	needRepair := true //是否需要修复
 	datas := make([][]byte, blockCount)
-	var tempReceiveBlockCount int32
-	var needRepair = true //是否需要修复
-	var data []byte
-Loop:
+
 	for i := 0; i < int(blockCount); i++ {
-		select {
-		case <-ctx.Done(): //取消了本次下载
-			fmt.Println("Cancel download")
-			return 0, errors.New("Task canceled")
-		default:
-			if blockCount-int32(i)+tempReceiveBlockCount < dataCount {
-				log.Printf("Get Obeject failed, Err: %v\n", ErrCannotGetEnoughBlock)
-				return 0, ErrCannotGetEnoughBlock
-			}
-			bm.SetBid(strconv.Itoa(i))
-			ncid := bm.ToString()
-			provider, _, err := ds.group.getBlockProviders(ncid)
-			if err != nil || provider == ds.lfs.userid {
-				log.Printf("Get Block %s's provider from keeper failed, Err: %v\n", ncid, err)
-				continue Loop
-			}
-
-			//user给channel合约签名，发给provider
-			mes, money, err := ds.getMessage(ncid, provider)
-			if err != nil {
-				continue Loop
-			}
-
-			//获取数据块
-			b, err := localNode.Blocks.GetBlockFrom(ctx, provider, ncid, DefaultGetBlockDelay, mes)
-			if err != nil {
-				log.Printf("Get Block %s from %s failed, Err: %v\n", ncid, provider, err)
-				continue Loop
-			}
-			blkData := b.RawData()
-			//需要检查数据块的长度也没问题
-			ok, err := dataformat.VerifyBlockLength(blkData, int(offsetStart), int(ds.bucket.TagFlag), int(ds.bucket.SegmentSize), int(dataCount), int(parityCount), int(remain), ds.bucket.Policy)
-			if !ok {
-				log.Printf("Block %s from %s offset unmatched, Err: %v\n", ncid, provider, err)
-				continue Loop
-			}
-
-			if ok := dataformat.VerifyBlock(blkData, ncid, ds.group.getKeyset().Pk); !ok || err != nil {
-				log.Println("Verify Block failed.", ncid, "from:", provider)
-				continue Loop
-			}
-
-			if !cfg.Test {
-				//下载数据成功，将内存的channel的value更改
-				cItem, err := getChannelItem(ds.lfs.userid, provider)
-				if err == nil && cItem != nil {
-					log.Println("下载成功，更改内存中channel.value", cItem.ChannelAddr, money.String())
-					cItem.Value = money
-				}
-			}
-
-			if ds.bucket.Policy == dataformat.RsPolicy {
-				datas[i] = blkData
-			} else {
-				datas[0] = blkData
-			}
-			tempReceiveBlockCount++
-
-			if tempReceiveBlockCount >= dataCount {
-				if i == int(dataCount)-1 {
-					needRepair = false
-				}
-				break Loop
-			}
-		}
-	}
-	if tempReceiveBlockCount < dataCount {
-		log.Println("Download failed-", ErrCannotGetEnoughBlock)
-		return 0, ErrCannotGetEnoughBlock
-	}
-	data, err = ds.decoder.Decode(datas, int(offsetStart), needRepair)
-	if err != nil {
-		log.Println("Download failed-", err)
-		return 0, err
-	}
-	if int64(len(data)) > remain+indexStart {
-		if ds.bucket.Encryption {
-			padding := aes.BlockSize - ((remain-1)%aes.BlockSize + 1)
-			data = data[:remain+padding] //此处时因为获取的为整块，而文件所需只占里面一部分
-			// 先解密，再去padding
-			data, err = aes.AesDecrypt(data, skey[:])
-			if err != nil {
-				log.Println("Download failed-", err)
-				return 0, err
-			}
-			data = data[:len(data)-int(padding)]
-			if remain+indexStart > int64(len(data)) {
-				return 0, ErrCannotGetEnoughBlock
-			}
-		}
-
-		if remain+indexStart > int64(len(data)) {
+		// fails too many, no need to download
+		if blockCount-int32(i)+count < dataCount {
+			utils.MLogger.Error("Download Obeject failed: ", ErrCannotGetEnoughBlock)
 			return 0, ErrCannotGetEnoughBlock
 		}
 
-		_, err = ds.writer.Write(data[indexStart : indexStart+remain])
-		if err != nil {
-			return 0, err
+		bm.SetCid(strconv.Itoa(i))
+		ncid := bm.ToString()
+		provider, _, err := ds.group.getBlockProviders(ncid)
+		if err != nil || provider == ds.fsID {
+			utils.MLogger.Warnf("Get Block %s 's provider from keeper failed, Err: %s", ncid, err)
+			continue
 		}
-		return remain, nil
-	}
 
-	if remain+indexStart > int64(len(data)) {
+		//user给channel合约签名，发给provider
+		mes, money, err := ds.getChannelSign(ncid, provider)
+		if err != nil {
+			continue
+		}
+
+		//获取数据块
+		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
+		if err != nil {
+			utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
+			continue
+		}
+		blkData := b.RawData()
+		//需要检查数据块的长度也没问题f
+		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(remain))
+		if !ok || err != nil {
+			utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", ncid, provider, err)
+			continue
+		}
+
+		ok = ds.decoder.VerifyBlock(blkData, ncid)
+		if !ok {
+			utils.MLogger.Warn("Fail to verify block: ", ncid, " from:", provider)
+			continue
+		}
+
+		//下载数据成功，将内存的channel的value更改
+		pinfo, ok := ds.group.providers[provider]
+		if !ok {
+			continue
+		}
+		if pinfo.chanItem != nil {
+			pinfo.chanItem.Value = money
+			pinfo.chanItem.Sig = mes
+			pinfo.chanItem.Dirty = true
+			utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
+		}
+
+		if ds.decoder.Prefix.Policy == dataformat.RsPolicy {
+			datas[i] = blkData
+		} else {
+			datas[0] = blkData
+		}
+		count++
+
+		if count >= dataCount {
+			if i == int(dataCount)-1 {
+				needRepair = false
+			}
+			break
+		}
+	}
+	if count < dataCount {
+		utils.MLogger.Error("Download failed: ", ErrCannotGetEnoughBlock)
 		return 0, ErrCannotGetEnoughBlock
 	}
-	if ds.bucket.Encryption {
-		data, err = aes.AesDecrypt(data, skey[:])
+
+	ds.decoder.Repair = needRepair
+	// decode returns bytes of 16B
+	data, err := ds.decoder.Decode(datas, int(segStart), int(offset+remain))
+	if err != nil {
+		utils.MLogger.Errorf("Download failed due to decode err: ", err)
+		return 0, err
+	}
+
+	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, offset)
+
+	if ds.encrypt {
+		padding := aes.BlockSize - ((offset+remain-1)%aes.BlockSize + 1)
+		data = data[:offset+remain+padding]
+		data, err = aes.AesDecrypt(data, ds.sKey[:])
 		if err != nil {
-			log.Println("Download failed-", err)
+			utils.MLogger.Info("Download failed due to decrypt err: ", err)
 			return 0, err
 		}
+		data = data[:len(data)-int(padding)]
+		if remain+offset > int64(len(data)) {
+			return 0, ErrCannotGetEnoughBlock
+		}
 	}
-	//使用匿名函数调度
-	_, err = ds.writer.Write(data[indexStart : indexStart+remain])
+
+	if remain+offset > int64(len(data)) {
+		return 0, ErrCannotGetEnoughBlock
+	}
+
+	wl, err := ds.writer.Write(data[offset : offset+remain])
 	if err != nil {
 		return 0, err
 	}
+
+	if int64(wl) != remain {
+		utils.MLogger.Warn("write length is not equal")
+	}
+
 	return remain, nil
 }
 
-func (ds *downloadJob) getMessage(ncid string, provider string) ([]byte, *big.Int, error) {
+func (ds *downloadJob) getChannelSign(ncid string, provider string) ([]byte, *big.Int, error) {
+	// for test
 	money := big.NewInt(0)
-	//user给channel合约签名，发给provider
-	userID := ds.lfs.userid
-	privateKey := ds.lfs.privateKey
-	localAddress, providerAddress, hexSK, err := buildSignParams(userID, provider, privateKey)
+	hexSK := ds.group.privKey
+	channelID := ds.fsID
+
+	pinfo, ok := ds.group.providers[provider]
+	if !ok {
+		utils.MLogger.Warn(provider, " is not my provider")
+		return nil, nil, errors.New("No such provider")
+	}
+
+	if pinfo.chanItem != nil {
+		channelID = pinfo.chanItem.ChannelID
+		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
+		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
+	}
+
+	sig, err := role.SignForChannel(channelID, hexSK, money)
 	if err != nil {
-		log.Printf("buildSignParams about Block %s from %s failed.\n", ncid, provider)
+		utils.MLogger.Errorf("Signature about Block %s from %s failed.", ncid, provider)
 		return nil, nil, err
 	}
 
-	var channelAddr common.Address
-
-	//判断是不是测试user，如果是，就将channelAddress设为0
-	cfg, err := localNode.Repo.Config()
+	pubKey, err := utils.GetPkFromEthSk(hexSK)
 	if err != nil {
-		log.Println("get config from Download failed.")
-		return nil, nil, err
-	}
-	if cfg.Test {
-		channelAddress := contracts.InvalidAddr
-		channelAddr = common.HexToAddress(channelAddress)
-		//设置此次下载需要签名的金额，money此时不用变仍为0
-	} else {
-		cItem, err := getChannelItem(userID, provider)
-		if err == nil && cItem != nil {
-			channelAddr = common.HexToAddress(cItem.ChannelAddr)
-			// 此次下载需要签名的金额，在valueBase的基础上再加上此次下载需要支付的money，就是此次签名的value
-			addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-			money = money.Add(cItem.Value, big.NewInt(addValue)) //100 + valueBase
-		}
-	}
-	moneyByte := money.Bytes()
-
-	//签名
-	sig, err := contracts.SignForChannel(channelAddr, money, hexSK)
-	if err != nil {
-		log.Printf("signature about Block %s from %s failed.\n", ncid, provider)
-		return nil, nil, err
-	}
-	//将签名信息、user公钥、user地址、provider地址、签名金额一并发给provider
-	pubKey, err := utils.GetCompressedPkFromHexSk(hexSK)
-	if err != nil {
-		log.Println("get public key error.")
+		utils.MLogger.Error("Get public key fail: ", err)
 		return nil, nil, err
 	}
 
-	message := &pb.SignForChannel{
-		Sig:             sig,
-		UserPK:          pubKey,
-		UserAddress:     localAddress.String(),
-		ProviderAddress: providerAddress.String(),
-		Money:           moneyByte,
+	message := &pb.ChannelSign{
+		Sig:       sig,
+		PubKey:    pubKey,
+		Value:     money.Bytes(),
+		ChannelID: channelID,
 	}
+
 	mes, err := proto.Marshal(message)
 	if err != nil {
-		log.Println("protoMarshal about Block", ncid, "from", provider, "failed. err:", err)
 		return nil, nil, err
 	}
+
 	return mes, money, nil
 }

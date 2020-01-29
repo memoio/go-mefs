@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"io"
 	"sync"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -16,8 +15,8 @@ type MutexDatastore struct {
 	child ds.Datastore
 }
 
-// MutexWrap constructs a datastore with a coarse lock around
-// the entire datastore, for every single operation
+// MutexWrap constructs a datastore with a coarse lock around the entire
+// datastore, for every single operation.
 func MutexWrap(d ds.Datastore) *MutexDatastore {
 	return &MutexDatastore{child: d}
 }
@@ -27,9 +26,6 @@ func (d *MutexDatastore) Children() []ds.Datastore {
 	return []ds.Datastore{d.child}
 }
 
-// IsThreadSafe implements ThreadSafeDatastore
-func (d *MutexDatastore) IsThreadSafe() {}
-
 // Put implements Datastore.Put
 func (d *MutexDatastore) Put(key ds.Key, value []byte) (err error) {
 	d.Lock()
@@ -38,10 +34,17 @@ func (d *MutexDatastore) Put(key ds.Key, value []byte) (err error) {
 }
 
 // Append implements Datastore.Append
-func (d *MutexDatastore) Append(key ds.Key, value []byte, beginoffset, endoffset int) (err error) {
+func (d *MutexDatastore) Append(key ds.Key, value []byte, begin, length int) (err error) {
 	d.Lock()
 	defer d.Unlock()
-	return d.child.Append(key, value, beginoffset, endoffset)
+	return d.child.Append(key, value, begin, length)
+}
+
+// Sync implements Datastore.Sync
+func (d *MutexDatastore) Sync(prefix ds.Key) error {
+	d.Lock()
+	defer d.Unlock()
+	return d.child.Sync(prefix)
 }
 
 // Get implements Datastore.Get
@@ -83,7 +86,24 @@ func (d *MutexDatastore) Delete(key ds.Key) (err error) {
 func (d *MutexDatastore) Query(q dsq.Query) (dsq.Results, error) {
 	d.RLock()
 	defer d.RUnlock()
-	return d.child.Query(q)
+
+	// Apply the entire query while locked. Non-sync datastores may not
+	// allow concurrent queries.
+
+	results, err := d.child.Query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err1 := results.Rest()
+	err2 := results.Close()
+	switch {
+	case err1 != nil:
+		return nil, err1
+	case err2 != nil:
+		return nil, err2
+	}
+	return dsq.ResultsWithEntries(q, entries), nil
 }
 
 func (d *MutexDatastore) Batch() (ds.Batch, error) {
@@ -107,10 +127,7 @@ func (d *MutexDatastore) Batch() (ds.Batch, error) {
 func (d *MutexDatastore) Close() error {
 	d.RWMutex.Lock()
 	defer d.RWMutex.Unlock()
-	if c, ok := d.child.(io.Closer); ok {
-		return c.Close()
-	}
-	return nil
+	return d.child.Close()
 }
 
 // DiskUsage implements the PersistentDatastore interface.
@@ -131,10 +148,10 @@ func (b *syncBatch) Put(key ds.Key, val []byte) error {
 	return b.batch.Put(key, val)
 }
 
-func (b *syncBatch) Append(key ds.Key, val []byte, beginoffset, endoffset int) error {
+func (b *syncBatch) Append(key ds.Key, val []byte, begin, length int) error {
 	b.mds.Lock()
 	defer b.mds.Unlock()
-	return b.batch.Append(key, val, beginoffset, endoffset)
+	return b.batch.Append(key, val, begin, length)
 }
 
 func (b *syncBatch) Delete(key ds.Key) error {

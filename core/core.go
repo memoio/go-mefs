@@ -27,34 +27,36 @@ import (
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	ifconnmgr "github.com/libp2p/go-libp2p-core/connmgr"
-	ic "github.com/libp2p/go-libp2p-core/crypto"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	metrics "github.com/libp2p/go-libp2p-core/metrics"
 	smux "github.com/libp2p/go-libp2p-core/mux"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/routing"
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	pnet "github.com/libp2p/go-libp2p-pnet"
 	quic "github.com/libp2p/go-libp2p-quic-transport"
-	record "github.com/libp2p/go-libp2p-record"
-	routing "github.com/libp2p/go-libp2p-routing"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery"
-	p2pbhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	mafilter "github.com/libp2p/go-maddr-filter"
 
+	"github.com/btcsuite/btcd/btcec"
+	cy "github.com/libp2p/go-libp2p-core/crypto"
+	p2pbhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	version "github.com/memoio/go-mefs"
 	config "github.com/memoio/go-mefs/config"
 	p2p "github.com/memoio/go-mefs/p2p"
 	repo "github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/fsrepo"
-	bserv "github.com/memoio/go-mefs/source/go-blockservice"
+	"github.com/memoio/go-mefs/source/data"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	bstore "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	dhtopts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
+	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -76,33 +78,35 @@ func init() {
 	identify.ClientVersion = "go-mefs/" + version.CurrentVersionNumber + "/" + version.CurrentCommit
 }
 
+// LocalNode uses global var to pass
+var LocalNode *MefsNode
+
 // MefsNode is MEFS Core module. It represents an MEFS instance.
 type MefsNode struct {
 
 	// Self
 	Identity peer.ID // the local node's identity
-	Password string  // to decrypt the privateKey
+	password string  // to decrypt the PrivateKey
 
 	Repo repo.Repo
 
 	// Local node
-	PrivateKey      ic.PrivKey // the local node's private Key
-	PNetFingerprint []byte     // fingerprint of private network
+	PrivateKey      string // the local node's private Key(with format of eth, without prefix "0x")
+	PNetFingerprint []byte // fingerprint of private network
 	NetKey          string
 
 	// Services
-	Peerstore  pstore.Peerstore   // storage for other Peer instances
-	Blockstore bstore.Blockstore  // the raw blockstore, no filestore wrapping
-	Blocks     bserv.BlockService // the block service, get/add blocks.
+	Peerstore  pstore.Peerstore  // storage for other Peer instances
+	Blockstore bstore.Blockstore // the raw blockstore, no filestore wrapping
+	Data       data.Service      // the block service, get/add blocks.
 	Reporter   metrics.Reporter
 	Discovery  discovery.Service
 
 	// Online
-	PeerHost     p2phost.Host        // the network host (server+client)
-	Bootstrapper io.Closer           // the periodic bootstrapper
-	Routing      routing.IpfsRouting // the routing system. recommend ipfs-dht
-
-	RecordValidator record.Validator
+	PeerHost     p2phost.Host    // the network host (server+client)
+	Bootstrapper io.Closer       // the periodic bootstrapper
+	Routing      routing.Routing // the routing system. recommend ipfs-dht
+	Inst         instance.Service
 
 	P2P *p2p.P2P
 
@@ -376,7 +380,7 @@ func (n *MefsNode) HandlePeerFound(p peer.AddrInfo) {
 // initialized with the host and _before_ we start listening.
 func (n *MefsNode) startOnlineServicesWithHost(ctx context.Context, host p2phost.Host, routingOption RoutingOption) error {
 	// setup routing service
-	r, err := routingOption(ctx, host, n.Repo.Datastore(), n.RecordValidator)
+	r, err := routingOption(ctx, host, n.Repo.Datastore())
 	if err != nil {
 		return err
 	}
@@ -418,7 +422,7 @@ func (n *MefsNode) teardown() error {
 	// closed before that other object
 
 	if n.Routing != nil {
-		closers = append(closers, n.Routing.(*dht.IpfsDHT).Process())
+		closers = append(closers, n.Routing.(*dht.KadDHT).Process())
 	}
 
 	if n.Bootstrapper != nil {
@@ -522,33 +526,28 @@ func (n *MefsNode) loadID() error {
 	return nil
 }
 
-// GetKey will return a key from the Keystore with name `name`.
-func (n *MefsNode) GetKey(name string) (ic.PrivKey, error) {
-	if name == "self" {
-		return n.PrivateKey, nil
-	}
-	return nil, nil
-}
-
-//LoadPrivateKey load privatekey from keystore
+//LoadPrivateKey load privatekey from keystore to setup MefsNode
 func (n *MefsNode) LoadPrivateKey() error {
 	if n.Identity == "" || n.Peerstore == nil {
 		return errors.New("loaded private key out of order")
 	}
 
-	if n.PrivateKey != nil {
+	if n.PrivateKey != "" {
 		log.Warning("private key already loaded")
 		return nil
 	}
 
-	sk, err := fsrepo.GetPrivKeyFromKS(n.Identity, n.Password)
+	sk, err := fsrepo.GetPrivateKeyFromKeystore(n.Identity.Pretty(), n.password) //format of eth without prefix "0x"
 	if err != nil {
 		return err
 	}
 
 	n.PrivateKey = sk
-	n.Peerstore.AddPrivKey(n.Identity, n.PrivateKey)
-	n.Peerstore.AddPubKey(n.Identity, sk.GetPublic())
+
+	skEcdsa, err := utils.EthskToECDSAsk(sk)
+	prik := (*cy.Secp256k1PrivateKey)((*btcec.PrivateKey)(skEcdsa))
+	n.Peerstore.AddPrivKey(n.Identity, prik)
+	n.Peerstore.AddPubKey(n.Identity, prik.GetPublic())
 	return nil
 }
 
@@ -639,24 +638,22 @@ func startListening(host p2phost.Host, cfg *config.Config) error {
 	return nil
 }
 
-func constructDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching, validator record.Validator) (routing.IpfsRouting, error) {
+func constructDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching) (routing.Routing, error) {
 	return dht.New(
 		ctx, host,
 		dhtopts.Datastore(dstore),
-		dhtopts.Validator(validator),
 	)
 }
 
-func constructClientDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching, validator record.Validator) (routing.IpfsRouting, error) {
+func constructClientDHTRouting(ctx context.Context, host p2phost.Host, dstore ds.Batching) (routing.Routing, error) {
 	return dht.New(
 		ctx, host,
 		dhtopts.Client(true),
 		dhtopts.Datastore(dstore),
-		dhtopts.Validator(validator),
 	)
 }
 
-type RoutingOption func(context.Context, p2phost.Host, ds.Batching, record.Validator) (routing.IpfsRouting, error)
+type RoutingOption func(context.Context, p2phost.Host, ds.Batching) (routing.Routing, error)
 
 type DiscoveryOption func(context.Context, p2phost.Host) (discovery.Service, error)
 

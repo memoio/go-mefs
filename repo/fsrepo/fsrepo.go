@@ -2,7 +2,6 @@ package fsrepo
 
 import (
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -19,12 +18,12 @@ import (
 	logging "github.com/ipfs/go-log"
 	cy "github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	config "github.com/memoio/go-mefs/config"
+	serialize "github.com/memoio/go-mefs/config/serialize"
 	repo "github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/common"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	measure "github.com/memoio/go-mefs/source/go-ds-measure"
-	config "github.com/memoio/go-mefs/config"
-	serialize "github.com/memoio/go-mefs/config/serialize"
 	"github.com/memoio/go-mefs/utils"
 	ad "github.com/memoio/go-mefs/utils/address"
 	homedir "github.com/mitchellh/go-homedir"
@@ -281,14 +280,12 @@ func CreateAddressAndStoreInKeystore(repoPath string, password string) (string, 
 	if err != nil {
 		return "", "", err
 	}
-	skByteEth, err := utils.IPFSskToEthskByte(identity.PrivKey)
+
+	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
 	if err != nil {
 		return "", "", err
 	}
-	enc := make([]byte, len(skByteEth)*2)
-	//对私钥进行十六进制编码，得到以太坊格式的私钥，此处不加上"0x"前缀
-	hex.Encode(enc, skByteEth)
-	return addressHex, "0x" + string(enc), StoreEncryptedPrivateKey(dir, identity.PrivKey, identity.PeerID, password)
+	return addressHex, "0x" + sk, StoreEncryptedPrivateKey(dir, identity.PrivKey, identity.PeerID, password)
 }
 
 //GetAddressAndStoreInKeystore get address from privateKey and store in keystore
@@ -321,7 +318,7 @@ func GetAddressAndStoreInKeystore(repoPath string, privKey string, password stri
 		return addressHex, StoreEncryptedPrivateKey(dir, privKey, peerID, password)
 	}
 	//keystore中已经存过了
-	_, err = GetPrivateKeyFromKeystore(peerID, path, password)
+	_, err = getPrivateKeyFromKeystore(peerID, path, password)
 	if err != nil { //此password不是之前存入keystore时的password
 		err = os.Remove(path) //删除之前存入的privateKey
 		if err != nil {

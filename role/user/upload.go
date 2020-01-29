@@ -5,18 +5,16 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"io"
-	"log"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/user/pb"
-	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -27,133 +25,141 @@ type UploadOptions struct {
 	Length int64
 }
 
-// UploadTask has info for upload
-type UploadTask struct { //一个上传任务实例
-	lService    *LfsService
-	superBucket *superBucket
-	objectInfo  *objectInfo
-	BucketID    int32
-	Prefix      string
-	ObjectName  string
-	Reader      io.Reader
-	startTime   time.Time
-	encoder     *dataformat.DataEncoder
-	CurStripe   int64
-	OffsetStart int64
-	Length      int64
-	segmentSize int32
-	TagFlag     int32
-	keepers     []string
+// uploadTask has info for upload
+type uploadTask struct { //一个上传任务实例
+	fsID      string
+	encrypt   bool
+	sKey      [32]byte
+	bucketID  int32
+	curStripe int64
+	curOffset int64
+	length    int64
+	etag      string
+	gInfo     *groupInfo
+	reader    io.Reader
+	startTime time.Time
+	encoder   *dataformat.DataCoder
 }
 
-// ConstructUpload constructs upload process
-func (lfs *LfsService) ConstructUpload(objectName, prefix, bucketName string, reader io.Reader) (Job, error) {
-	err := isStart(lfs.userid)
-	if err != nil {
-		return nil, err
+// PutObject constructs upload process
+func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
+	if !l.online {
+		return nil, errors.New("user is not running")
 	}
-	if lfs.meta.bucketNameToID == nil {
+
+	if l.meta.bucketNameToID == nil {
 		return nil, ErrBucketNotExist
 	}
 
-	bucketID, ok := lfs.meta.bucketNameToID[bucketName]
+	if err := checkObjectName(objectName); err != nil {
+		return nil, err
+	}
+
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
 
-	bucket, ok := lfs.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	if err := checkObjectName(objectName); err != nil {
-		return nil, err
-	}
-	if objectElement, ok := bucket.objects[prefix+objectName]; ok || objectElement != nil {
+
+	bucket.Lock()
+	defer bucket.Unlock()
+
+	if objectElement, ok := bucket.objects[objectName]; ok || objectElement != nil {
 		return nil, ErrObjectAlreadyExist
 	}
-	gp := getGroupService(lfs.userid)
-	_, conkeepers, err := gp.getKeepers(gp.keeperSLA)
-	if err != nil {
-		return nil, err
-	}
-	objectName = prefix + objectName
+
 	if bucket.Policy != dataformat.RsPolicy && bucket.Policy != dataformat.MulPolicy {
 		return nil, ErrPolicy
 	}
+
+	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " begin")
 
 	object := &objectInfo{
 		ObjectInfo: pb.ObjectInfo{
 			Name:        objectName,
 			BucketID:    bucketID,
-			Ctime:       time.Now().Format(utils.BASETIME),
+			Ctime:       time.Now().Unix(),
 			StripeStart: bucket.CurStripe,
-			OffsetStart: bucket.NextOffset,
+			Offset:      bucket.NextOffset,
 			Deletion:    false,
 			Dir:         false,
 		},
 	}
 	objectElement := bucket.orderedObjects.PushBack(object)
 	bucket.objects[objectName] = objectElement
-	encoder := dataformat.NewDataEncoder(bucket.Policy, bucket.DataCount, bucket.ParityCount,
-		int32(bucket.TagFlag), bucket.SegmentSize, getGroupService(lfs.userid).getKeyset())
-	ul := &UploadTask{
-		lService:    lfs,
-		superBucket: bucket,
-		objectInfo:  object,
-		TagFlag:     int32(bucket.GetTagFlag()),
-		segmentSize: int32(bucket.GetSegmentSize()),
-		startTime:   time.Now(),
-		Prefix:      prefix,
-		Reader:      reader,
-		BucketID:    bucket.BucketID,
-		keepers:     conkeepers,
-		ObjectName:  objectName,
-		encoder:     encoder,
+
+	encoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), int(bucket.ParityCount), dataformat.CurrentVersion, int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
+
+	ul := &uploadTask{
+		fsID:      l.fsID,
+		startTime: time.Now(), // for queue?
+		reader:    reader,
+		gInfo:     l.gInfo,
+		bucketID:  bucketID,
+		curStripe: bucket.CurStripe,
+		curOffset: bucket.NextOffset,
+		encoder:   encoder,
 	}
-	return ul, nil
+
+	if bucket.Encryption {
+		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
+		tmpkey := l.privateKey
+		tmpkey = append(tmpkey, byte(bucket.BucketID))
+		ul.encrypt = true
+		ul.sKey = sha256.Sum256(tmpkey)
+	}
+
+	err := ul.Start(context.Background())
+	if err != nil {
+		if ul.length > 0 {
+			object.ETag = ul.etag
+			object.Length = ul.length
+			bucket.CurStripe = ul.curStripe
+			bucket.NextOffset = ul.curOffset
+			bucket.dirty = true //需要记录，可能上传一部分然后失败，空间已占用
+		} else { //没有占用任何空间，清除信息
+			objectElement := bucket.objects[objectName]
+			bucket.orderedObjects.Remove(objectElement)
+			delete(bucket.objects, objectName)
+		}
+		return &object.ObjectInfo, err
+	}
+
+	object.ETag = ul.etag
+	object.Length = ul.length
+	bucket.CurStripe = ul.curStripe
+	bucket.NextOffset = ul.curOffset
+	bucket.dirty = true
+
+	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end, length is: ", object.Length)
+	return &object.ObjectInfo, nil
 }
 
 // Stop is
-func (ul *UploadTask) Stop(context.Context) error {
+func (u *uploadTask) Stop(context.Context) error {
 	return nil
 }
 
 // Cancel is
-func (ul *UploadTask) Cancel(context.Context) error {
+func (u *uploadTask) Cancel(context.Context) error {
 	return nil
 }
 
 // Done is
-func (ul *UploadTask) Done() {
+func (u *uploadTask) Done() {
 	return
 }
 
 // Info gets
-func (ul *UploadTask) Info() (interface{}, error) {
-	if ul == nil || ul.objectInfo == nil {
+func (u *uploadTask) Info() (interface{}, error) {
+	if u == nil {
 		return nil, ErrObjectNotExist
 	}
-	return ul, nil
-}
-
-//Start 上传文件
-func (ul *UploadTask) Start(ctx context.Context) error {
-	if ul == nil {
-		return ErrLfsIsNotRunning
-	}
-	err := ul.putObject(ctx)
-	if err != nil {
-		if ul.objectInfo.Size > 0 {
-			ul.superBucket.dirty = true //需要记录，可能上传一部分然后失败，空间已占用
-		} else { //没有占用任何空间，清除信息
-			objectElement := ul.superBucket.objects[ul.ObjectName]
-			ul.superBucket.orderedObjects.Remove(objectElement)
-			delete(ul.superBucket.objects, ul.ObjectName)
-		}
-		return err
-	}
-	ul.superBucket.dirty = true
-	return nil
+	return u, nil
 }
 
 type blockMeta struct {
@@ -162,176 +168,200 @@ type blockMeta struct {
 	offset   int
 }
 
-// 具体实现
-func (ul *UploadTask) putObject(ctx context.Context) error {
-	ul.objectInfo.Lock()
-	defer ul.objectInfo.Unlock()
+//Start 上传文件
+func (u *uploadTask) Start(ctx context.Context) error {
+	enc := u.encoder
+	dc := enc.Prefix.DataCount
+	pc := enc.Prefix.ParityCount
+	bc := int(dc + pc)
+	least := int(dc + pc/2)
+	segSize := enc.Prefix.SegmentSize
+	readUnit := int(segSize) * int(dc) //每一次读取的数据，尽量读一个整的
+	readByte := utils.SegementCount * readUnit
 
-	encoder := ul.encoder
-	dataCount := encoder.DataCount
-	parityCount := encoder.ParityCount
-	blockCount := dataCount + parityCount
+	rdata := make([]byte, readByte)
+	extra := make([]byte, 0, readByte)
 
-	var readByte int32
-	//var err error
-	readByte = utils.SegementCount * ul.segmentSize * dataCount //每一次读取的数据，尽量读一个整的
-
-	var breakFlag = false
-
-	var curOffset int64
-	blockMetas := make([]blockMeta, blockCount)
-	//尽量复用内存
-	var data []byte
 	h := md5.New()
-Loop:
-	for { //循环上传每一个块
+	parllel := int32(0)
+	var wg sync.WaitGroup
+
+	breakFlag := false
+	for !breakFlag {
 		select {
 		case <-ctx.Done():
-			fmt.Println("上传取消")
+			utils.MLogger.Warn("upload cancel")
 			return nil
 		default:
-			curOffset = ul.superBucket.NextOffset
-			if curOffset == 0 { //不为零则为追加模式
-				if len(data) != int(readByte) {
-					data = make([]byte, readByte)
-				}
+			pros, _, _ := u.gInfo.GetProviders(bc)
+			if len(pros) >= least {
+				breakFlag = true
 			} else {
-				data = make([]byte, readByte-int32(curOffset)*int32(ul.segmentSize)*int32(dataCount))
+				utils.MLogger.Warn("cannot get enough providers")
+				time.Sleep(60 * time.Second)
+			}
+		}
+	}
+
+	breakFlag = false
+	for !breakFlag {
+		select {
+		case <-ctx.Done():
+			utils.MLogger.Warn("upload cancel")
+			return nil
+		default:
+			// clear itself
+			data := make([]byte, 0, readByte)
+			extraLen := len(extra)
+			readLen := readByte - int(u.curOffset)*readUnit - extraLen
+			if extraLen > 0 {
+				data = append(data, extra...)
+				extra = extra[:0]
 			}
 
-			//尽量一次性读一整个stripe所需数据
-			n, err := io.ReadAtLeast(ul.Reader, data, len(data))
+			n, err := io.ReadAtLeast(u.reader, rdata, readLen)
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				breakFlag = true
 			} else if err != nil {
 				return err
 			}
-			data = data[:n]
-			//在此记录下本次上传多少，等发送完毕再计入
-			tempSize := n
+
+			// need handle n > readLen
+			if n > readLen {
+				data = append(data, rdata[:readLen]...)
+				extra = append(extra, rdata[readLen:n]...)
+				n = readLen
+			} else {
+				data = append(data, rdata[:n]...)
+			}
+
+			// plus extra
+			n += extraLen
+
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
-			if ul.superBucket.Encryption {
-				// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-				tmpkey := ul.lService.privateKey
-				// ul.Lfs.Meta.node.PrivateKey.Bytes()
-				tmpkey = append(tmpkey, byte(ul.BucketID))
-				skey := sha256.Sum256(tmpkey)
 
-				if len(data)%aes.BlockSize != 0 {
-					data = aes.PKCS5Padding(data)
-				}
-				data, err = aes.AesEncrypt(data, skey[:])
-				if err != nil {
-					return err
-				}
+			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+
+			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, length: %d", u.curStripe, u.curOffset, n)
+
+			// handle it before
+			if endOffset >= int(u.encoder.Prefix.GetSegmentCount()) {
+				utils.MLogger.Error("Wrong offset, need to handle: ", endOffset)
+				return errors.New("Read length unexpected err")
 			}
 
-			//这里只输入BucketID和StripeID，blockID后面动态改变
-			bm, err := metainfo.NewBlockMeta(ul.lService.userid, strconv.Itoa(int(ul.BucketID)), strconv.Itoa(int(ul.superBucket.CurStripe)), "0")
-			if err != nil {
-				return err
-			}
+			u.length += int64(n)
 
-			//在这里先将数据编码
-			encodedData, offset, err := encoder.Encode(data, bm.ToString(3), int32(curOffset))
-			if err != nil {
-				log.Println("encodedData", err)
-				return err
-			}
-
-			//如果是新的一个stripe，则需要重新找provider
-			var providers []string
-			if curOffset == 0 {
-				providers, _ = getGroupService(ul.lService.userid).getProviders(int(blockCount))
-				if providers == nil || len(providers) < int(dataCount+parityCount/2) {
-					log.Println("putobject", ErrNoEnoughProvider)
-					return ErrNoEnoughProvider
+			for {
+				if atomic.LoadInt32(&parllel) < 32 {
+					break
 				}
-				if len(providers) > int(blockCount) {
-					providers = providers[:blockCount]
-				}
+				time.Sleep(time.Second)
 			}
+			atomic.AddInt32(&parllel, 1)
+			wg.Add(1)
 
-			//总共上传成功几个块
-			var count int
-			var provider string
-			for i := 0; i < int(blockCount); i++ {
-				bm.SetBid(strconv.Itoa(i))
-				ncid := bm.ToString()
-				var km *metainfo.KeyMeta
-
-				//如果是追加，则要找到上一个provider
-				if curOffset == 0 {
-					if i < len(providers) {
-						provider = providers[i]
-						km, _ = metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "update", "0", strconv.Itoa(offset))
-					} else {
-						blockMetas[i].cid = ncid
-						blockMetas[i].offset = offset
-						blockMetas[i].provider = ul.lService.userid
-						continue
+			go func(data []byte, stripeID, start int) {
+				defer wg.Done()
+				defer atomic.AddInt32(&parllel, -1)
+				// encrypt
+				if u.encrypt {
+					if len(data)%aes.BlockSize != 0 {
+						data = aes.PKCS5Padding(data)
 					}
-				} else {
-					provider, _, err = getGroupService(ul.lService.userid).getBlockProviders(ncid)
-					if err != nil || provider == ul.lService.userid {
-						log.Println("Append Block to", provider, "failed:", err)
-						if _, err := peer.IDB58Decode(provider); provider != "" && err == nil {
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = provider
-						} else {
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = ul.lService.userid
+					data, err = aes.AesEncrypt(data, u.sKey[:])
+					if err != nil {
+						return
+					}
+				}
+
+				bm, _ := metainfo.NewBlockMeta(u.fsID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
+
+				encodedData, offset, err := enc.Encode(data, bm.ToString(3), start)
+				if err != nil {
+					return
+				}
+
+				var count int
+				blockMetas := make([]blockMeta, bc)
+				for k := 0; k < 3; k++ {
+					count = 0
+					if start == 0 {
+						pros, _, _ := u.gInfo.GetProviders(bc)
+						if len(pros) < least {
+							return
 						}
-						continue
+
+						for i := 0; i < bc; i++ {
+							bm.SetCid(strconv.Itoa(i))
+							ncid := bm.ToString()
+							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+							blockMetas[i].cid = ncid
+							blockMetas[i].offset = offset
+							blockMetas[i].provider = u.fsID
+							if i > len(pros) {
+								continue
+							}
+							err := u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], pros[i])
+							if err != nil {
+								utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", pros[i], " failed: ", err)
+								continue
+							}
+							count++
+							blockMetas[i].provider = pros[i]
+						}
+					} else {
+						for i := 0; i < bc; i++ {
+							bm.SetCid(strconv.Itoa(i))
+							ncid := bm.ToString()
+							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
+							blockMetas[i].cid = ncid
+							blockMetas[i].offset = offset
+							blockMetas[i].provider = u.fsID
+
+							provider, _, err := u.gInfo.getBlockProviders(ncid)
+							if err != nil || provider == u.fsID {
+								continue
+							}
+
+							err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
+							if err != nil {
+								utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", provider, " failed: ", err)
+								continue
+							}
+							count++
+							blockMetas[i].provider = provider
+						}
 					}
-					km, _ = metainfo.NewKeyMeta(ncid, metainfo.PutBlock, "append", strconv.Itoa(int(curOffset)), strconv.Itoa(offset))
+
+					//没有达到最低安全标准，返回错误
+					if count >= least {
+						time.Sleep(60 * time.Second)
+						break
+					}
 				}
 
-				//开始上传这个块
-				Key := km.ToString()
-				bcid := cid.NewCidV2([]byte(Key))
-				b, err := blocks.NewBlockWithCid(encodedData[i], bcid)
-				if err != nil {
-					return err
+				for _, v := range blockMetas {
+					err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
+					if err != nil {
+						return
+					}
 				}
-				err = localNode.Blocks.PutBlockTo(b, provider)
-				if err != nil {
-					log.Println("Put Block", ncid, curOffset, offset, "to", provider, "failed:", err)
-					continue
-				}
-				count++
+			}(data, int(u.curStripe), int(u.curOffset))
 
-				blockMetas[i].cid = ncid
-				blockMetas[i].offset = offset
-				blockMetas[i].provider = provider
-			}
-			//没有达到最低安全标准，返回错误
-			if count < int(dataCount+parityCount/2) {
-				return ErrNoEnoughProvider
-			}
-
-			for _, v := range blockMetas {
-				err = getGroupService(ul.lService.userid).putDataMetaToKeepers(v.cid, v.provider, v.offset)
-				if err != nil {
-					log.Println("putobject", err)
-					return err
-				}
-			}
-			ul.objectInfo.Size += int64(tempSize)
-			if offset >= int(utils.SegementCount-1) { //如果写满了一个stripe
-				ul.superBucket.CurStripe++
-				ul.superBucket.NextOffset = 0
+			if endOffset == int(u.encoder.Prefix.GetSegmentCount())-1 { //如果写满了一个stripe
+				u.curStripe++
+				u.curOffset = 0
 			} else {
-				ul.superBucket.NextOffset = int64(offset + 1)
-			}
-			if breakFlag {
-				ul.objectInfo.ETag = hex.EncodeToString(h.Sum(nil))
-				break Loop
+				u.curOffset = int64(endOffset + 1)
 			}
 		}
 	}
+
+	u.etag = hex.EncodeToString(h.Sum(nil))
+
+	wg.Wait()
+
 	return nil
 }

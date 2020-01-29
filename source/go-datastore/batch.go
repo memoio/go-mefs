@@ -1,9 +1,9 @@
 package datastore
 
-type verb int
-
 type op struct {
 	delete bool
+	begin  int
+	length int
 	value  []byte
 }
 
@@ -27,8 +27,12 @@ func (bt *basicBatch) Put(key Key, val []byte) error {
 	return nil
 }
 
-func (bt *basicBatch) Append(key Key, val []byte, beginoffset, endoffset int) error {
-	bt.ops[key] = op{value: val}
+func (bt *basicBatch) Append(key Key, val []byte, begin, length int) error {
+	bt.ops[key] = op{
+		value:  val,
+		begin:  begin,
+		length: length,
+	}
 	return nil
 }
 
@@ -42,13 +46,13 @@ func (bt *basicBatch) Commit() error {
 	for k, op := range bt.ops {
 		if op.delete {
 			err = bt.target.Delete(k)
-			// We could try to do something smarter but I really
-			// don't care. Delete should be idempotent anyways.
-			if err == ErrNotFound {
-				err = nil
-			}
 		} else {
-			err = bt.target.Put(k, op.value)
+			if op.begin == 0 && op.length == 0 {
+				err = bt.target.Put(k, op.value)
+			} else {
+				err = bt.target.Append(k, op.value, op.begin, op.length)
+			}
+
 		}
 		if err != nil {
 			break

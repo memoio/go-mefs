@@ -285,7 +285,7 @@ func identityConfig(out io.Writer, nbits int) (Identity, error) {
 func identityConfigSK(out io.Writer, hexsk string) (Identity, error) {
 	ident := Identity{}
 
-	sk, err := utils.HexskToIPFSsk(hexsk)
+	sk, err := utils.EthskToIPFSsk(hexsk)
 	if err != nil {
 		return ident, err
 	}

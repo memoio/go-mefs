@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"context"
-	"log"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -16,8 +16,8 @@ import (
 	b58 "github.com/mr-tron/base58/base58"
 )
 
-func challengeRegular(ctx context.Context) {
-	log.Println("Challenge service start!")
+func (k *Info) challengeRegular(ctx context.Context) {
+	utils.MLogger.Info("Challenge service start!")
 	ticker := time.NewTicker(CHALTIME)
 	defer ticker.Stop()
 	for {
@@ -25,128 +25,110 @@ func challengeRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			challengeProviderBLS12()
-		}
-	}
-}
+			utils.MLogger.Info("Regular challenge start")
+			pus := k.getQUKeys()
+			for _, pu := range pus {
+				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
+				if thisGroup == nil {
+					continue
+				}
 
-func challengeProviderBLS12() {
-	log.Println("Challenge start at: ", utils.GetTimeNow())
+				for _, proID := range thisGroup.providers {
+					thisLinfo := thisGroup.getLInfo(proID, false)
+					if thisLinfo == nil {
+						continue
+					}
 
-	pus := getPUKeysFromukpInfo()
-	for _, pu := range pus {
-		thisInfo, ok := ledgerInfo.Load(pu)
-		if !ok {
-			continue
-		}
+					key, value, err := thisLinfo.genChallengeBLS(k.localID, pu.qid, proID, thisGroup.userID)
+					if err != nil {
+						continue
+					}
+					utils.MLogger.Debug("Challenge: ", key)
+					go k.ds.SendMetaRequest(ctx, int32(metainfo.Get), key, value, nil, proID)
+				}
 
-		thischalinfo := thisInfo.(*chalinfo)
-
-		// last chanllenge has not complete
-		if thischalinfo.inChallenge {
-			cleanLastChallenge(pu)
-		}
-
-		thischalinfo.inChallenge = true
-
-		// at most challenge 100 blocks
-		ret := make([]string, 0, 100)
-		psum := 0
-		chalnum := 0
-		thischalinfo.cidMap.Range(func(key, value interface{}) bool {
-			cInfo := value.(*cidInfo)
-			ret = append(ret, key.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(cInfo.offset))
-			psum += cInfo.offset + 1
-			chalnum++
-			if chalnum >= 100 {
-				return false
+				// in case povider cannot get it
+				go k.getUserBLS12Config(pu.uid, pu.qid)
 			}
-			return true
-		})
-
-		// no data
-		if len(ret) == 0 || psum == 0 {
-			thischalinfo.inChallenge = false
-			continue
 		}
-
-		challengetime := utils.GetUnixNow()
-		// timestamp as random source
-		// need more parameters to securely generate random source
-		chal := mcl.GenChallenge(challengetime, ret)
-
-		thischalresult := &chalresult{
-			kid:           localNode.Identity.Pretty(),
-			pid:           pu.pid,
-			uid:           pu.uid,
-			challengeTime: challengetime,
-			sum:           int64(psum) * df.DefaultSegmentSize,
-			totalSpace:    thischalinfo.maxlength,
-			h:             chal.C,
-		}
-
-		hProto := &pb.Chalnum{
-			PubC:    int64(chal.C),
-			Indices: chal.Indices,
-		}
-		hByte, err := proto.Marshal(hProto)
-		if err != nil {
-			log.Println("marshal h failed, err: ", err)
-			thischalinfo.inChallenge = false
-			continue
-		}
-
-		thischalinfo.chalMap.Store(challengetime, thischalresult)
-		thischalinfo.chalCid = ret
-		thischalinfo.lastChalTime = challengetime
-
-		go doChallengeBLS12(pu, hByte, challengetime)
 	}
 }
 
-func doChallengeBLS12(pu puKey, hByte []byte, chaltime int64) {
-	fail := false
-	// clean before return
-	defer func() {
-		if fail {
-			cleanLastChallenge(pu)
+func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []byte, error) {
+	// last chanllenge has not complete
+	if l.inChallenge {
+		l.cleanLastChallenge()
+	}
+
+	l.inChallenge = true
+
+	// at most challenge 100 blocks
+	ret := make([]string, 0, 100)
+	psum := 0
+	chalnum := 0
+	l.blockMap.Range(func(key, value interface{}) bool {
+		cInfo := value.(*blockInfo)
+		ret = append(ret, key.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(cInfo.offset))
+		psum += cInfo.offset + 1
+		chalnum++
+		if chalnum >= 100 {
+			return false
 		}
-	}()
+		return true
+	})
 
-	// get user config once; in case provider cannot get it
-	getUserBLS12Config(pu.uid)
+	// no data
+	if len(ret) == 0 || psum == 0 {
+		l.inChallenge = false
+		return "", nil, errors.New("no data")
+	}
 
-	km, err := metainfo.NewKeyMeta(pu.uid, metainfo.Challenge, utils.UnixToString(chaltime))
-	if err != nil {
-		log.Println("construct challenge KV error :", err)
-		fail = true
-		return
+	challengetime := utils.GetUnixNow()
+	// timestamp as random source
+	// need more parameters to securely generate random source
+	chal := mcl.GenChallenge(challengetime, ret)
+
+	thischalresult := &chalresult{
+		kid:        localID,
+		pid:        proID,
+		qid:        qid,
+		chalTime:   challengetime,
+		sum:        int64(psum) * df.DefaultSegmentSize,
+		totalSpace: l.maxlength,
+		h:          chal.C,
 	}
-	metaValue := b58.Encode(hByte)
-	_, err = sendMetaRequest(km, metaValue, pu.pid)
-	if err != nil {
-		log.Println("DoChallengeBLS12 error :", err)
-		fail = true
-		return
+
+	hProto := &pb.Chalnum{
+		PubC:    int64(chal.C),
+		Indices: chal.Indices,
 	}
-	return
+	hByte, err := proto.Marshal(hProto)
+	if err != nil {
+		l.inChallenge = false
+		return "", nil, err
+	}
+
+	l.chalMap.Store(challengetime, thischalresult)
+	l.chalCid = ret
+	l.lastChalTime = challengetime
+
+	// key: qid/"Challenge"/uid/pid/kid/chaltime
+	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, userID, proID, localID, utils.UnixToString(challengetime))
+	if err != nil {
+		return "", nil, err
+	}
+	return km.ToString(), hByte, nil
 }
 
-func cleanLastChallenge(pu puKey) {
-	thischalinfo, ok := getChalinfo(pu)
-	if !ok {
-		log.Println("getChalinfo error!pu: ", pu)
+func (l *lInfo) cleanLastChallenge() {
+
+	if !l.inChallenge {
 		return
 	}
 
-	if !thischalinfo.inChallenge {
-		return
-	}
-
-	failChallTime := thischalinfo.lastChalTime
-	thischalresult, ok := thischalinfo.chalMap.Load(failChallTime)
+	failChallTime := l.lastChalTime
+	thischalresult, ok := l.chalMap.Load(failChallTime)
 	if !ok {
-		log.Println("thischalinfo.chalMap.Load error!challengetime: ", failChallTime)
 		return
 	}
 
@@ -154,38 +136,45 @@ func cleanLastChallenge(pu puKey) {
 	chalResult.res = false
 	chalResult.length = 0
 
-	thischalinfo.inChallenge = false
+	l.inChallenge = false
 }
 
-//handleProofResultBls12 handles the challenge result from provider
-//key: uid/"proof"/chaltime,value: proof[/FaultBlocks]
-func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
+//handleProof handles the challenge result from provider
+//key: qid/"Challenge"/uid/pid/kid/chaltime,value: proof[/FaultBlocks]
+func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
+	utils.MLogger.Info("handleProof: ", km.ToString())
 	ops := km.GetOptions()
-	if len(ops) < 1 {
-		return
+	if len(ops) != 4 {
+		return false
 	}
 
-	chaltime := ops[0]
-	uid := km.GetMid()
+	qid := km.GetMid()
+	userID := ops[0]
+	proID := ops[1]
+	kid := ops[2]
+	chaltime := ops[3]
 
-	pu := puKey{
-		pid: pid,
-		uid: uid,
+	if kid != k.localID {
+		return false
+	}
+
+	thisGroup := k.getGroupInfo(userID, qid, false)
+	if thisGroup == nil {
+		return false
+	}
+
+	thisLinfo := thisGroup.getLInfo(proID, false)
+	if thisLinfo == nil {
+		return false
 	}
 
 	defer func() {
-		cleanLastChallenge(pu)
+		thisLinfo.inChallenge = false
 	}()
 
-	thischalinfo, ok := getChalinfo(pu)
-	if !ok {
-		log.Println("getChalinfo error!pu: ", pu)
-		return
-	}
-
-	spliteProof := strings.Split(proof, metainfo.DELIMITER)
+	spliteProof := strings.Split(string(value), metainfo.DELIMITER)
 	if len(spliteProof) < 3 {
-		return
+		return false
 	}
 
 	var splitedindex []string
@@ -195,14 +184,13 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	}
 
 	challengetime := utils.StringToUnix(chaltime)
-	if thischalinfo.lastChalTime != challengetime {
-		return
+	if thisLinfo.lastChalTime != challengetime {
+		return false
 	}
 
-	thischalresult, ok := thischalinfo.chalMap.Load(challengetime)
+	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
 	if !ok {
-		log.Println("thischalinfo.chalMap.Load error!challengetime:", challengetime)
-		return
+		return false
 	}
 
 	chalResult := thischalresult.(*chalresult)
@@ -219,8 +207,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 	// key: bucketid_stripeid_blockid
 	cset := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
-		log.Println("Fault or NotFound blocks :", uid, metainfo.BLOCK_DELIMITER, splitedindex)
-		reduceCredit(pid)
+		utils.MLogger.Debug(proID, " Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
 		for _, s := range splitedindex {
 			if len(s) == 0 {
 				continue
@@ -228,14 +215,13 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 			set[s] = struct{}{}
 			chcid, _, err := utils.SplitIndex(s)
 			if err != nil {
-				log.Println("SplitIndex err:", err)
 				continue
 			}
 			cset[chcid] = struct{}{}
 		}
 	}
 
-	for _, index := range thischalinfo.chalCid {
+	for _, index := range thisLinfo.chalCid {
 		_, ok := set[index]
 		if ok {
 			continue
@@ -243,7 +229,6 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 		buf.Reset()
 		chcid, off, err := utils.SplitIndex(index)
 		if err != nil {
-			log.Println("SplitIndex err:", err)
 			continue
 		}
 
@@ -255,7 +240,7 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 			continue
 		}
 
-		buf.WriteString(uid)
+		buf.WriteString(qid)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
 		buf.WriteString(chcid)
 		buf.WriteString(metainfo.BLOCK_DELIMITER)
@@ -269,51 +254,58 @@ func handleProofResultBls12(km *metainfo.KeyMeta, proof, pid string) {
 
 	// recheck the status again
 	if len(chal.Indices) == 0 {
-		return
+		return false
 	}
 
-	pubKey, err := getUserBLS12Config(uid)
+	muByte, err := b58.Decode(spliteProof[0])
 	if err != nil {
-		log.Println("getUserBLS12Config error! uid:", uid)
-		return
+		return false
+	}
+	nuByte, err := b58.Decode(spliteProof[1])
+	if err != nil {
+		return false
+	}
+	deltaByte, err := b58.Decode(spliteProof[2])
+	if err != nil {
+		return false
+	}
+	pf := &mcl.Proof{
+		Mu:    muByte,
+		Nu:    nuByte,
+		Delta: deltaByte,
 	}
 
-	blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
-
-	res, err := mcl.VerifyProof(pubKey, chal, blsProof)
+	res, err := thisGroup.blsKey.VerifyProof(chal, pf)
 	if err != nil {
-		log.Println("handle proof of ", uid, "from provider: ", pid, "verify err:", err)
-		return
+		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, "verify fails: ", err)
+		utils.MLogger.Warn("verify blocks: ", chal.Indices)
+		return false
 	}
 	if res {
-		log.Println("handle proof of ", uid, "from provider: ", pid, " verify success.")
+		utils.MLogger.Info("proof of ", qid, " from provider: ", proID, " verify success.")
 
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
-		thischalinfo.cidMap.Range(func(k, v interface{}) bool {
+		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
 			_, ok := cset[k.(string)]
 			if ok {
 				return true
 			}
-			cInfo := v.(*cidInfo)
+			cInfo := v.(*blockInfo)
 			cInfo.repair = 0
 			cInfo.availtime = challengetime
 			return true
 		})
 
 		//update thischalinfo.chalMap
+		blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
 		chalResult.proof = blsProof
 		chalResult.res = true
 		chalResult.length = int64((float64(slength) / float64(chalResult.sum)) * float64(chalResult.totalSpace))
-
-		// TODO: store in disk
-		addCredit(pid)
+		return true
 	} else {
-		log.Println("handle proof of ", uid, "from provider: ", pid, " verify fail.")
-		reduceCredit(pid)
+		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
 	}
 
-	thischalinfo.inChallenge = false
-
-	return
+	return false
 }

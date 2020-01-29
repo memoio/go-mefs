@@ -1,21 +1,19 @@
 package keeper
 
 import (
+	"context"
 	"errors"
-	"runtime"
-
-	"github.com/memoio/go-mefs/utils/metainfo"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/role"
-	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 var (
 	errKeeperServiceNotReady = errors.New("keeper service is not ready")
 	errUnmatchedPeerID       = errors.New("peer ID is not match")
 	errBlockNotExist         = errors.New("block does not exist")
-	errNoGroupsInfo          = errors.New("can not find groupsInfo")
+	errNoGroupsInfo          = errors.New("can not find groupInfo")
 	errParaseMetaFailed      = errors.New("no enough data in metainfo")
 	errNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
 	errPInfoTypeAssert       = errors.New("type asserts err in ukpInfo")
@@ -25,17 +23,17 @@ var (
 )
 
 //---config----
-func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
-	thisInfo, err := getUInfo(userID)
-	if err != nil {
-		return nil, err
+func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
+	thisGroup := k.getGroupInfo(userID, groupID, false)
+	if thisGroup == nil {
+		return nil, errors.New("No Bls Key")
 	}
 
-	if thisInfo.pubKey != nil {
-		return thisInfo.pubKey, nil
+	if thisGroup.blsKey != nil {
+		return thisGroup.blsKey, nil
 	}
 
-	userconfigbyte, err := getUserBLS12ConfigByte(userID)
+	userconfigbyte, err := k.getUserBLS12ConfigByte(userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,67 +43,38 @@ func getUserBLS12Config(userID string) (*mcl.PublicKey, error) {
 		return nil, err
 	}
 
-	thisInfo.pubKey = mkey.Pk
+	thisGroup.blsKey = mkey
 
-	return mkey.Pk, nil
+	return mkey, nil
 }
 
-func getUserBLS12ConfigByte(userID string) ([]byte, error) {
-	kmBls12, err := metainfo.NewKeyMeta(userID, metainfo.Local, metainfo.SyncTypeCfg, metainfo.CfgTypeBls12)
+func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
+	kmBls12, err := metainfo.NewKeyMeta(qid, metainfo.Config, uid)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := getKeyFrom(userconfigkey, "local")
-	if err == nil {
+	userconfigbyte, err := k.ds.GetKey(ctx, userconfigkey, "local")
+	if err == nil && userconfigbyte != nil {
 		return userconfigbyte, nil
 	}
-	gp, ok := getGroupsInfo(userID)
-	if !ok {
+	gp := k.getGroupInfo(uid, qid, false)
+	if gp == nil {
 		return nil, errors.New("no groupinfo")
 	}
 
 	for _, keeperID := range gp.keepers {
-		userconfigbyte, err = getKeyFrom(userconfigkey, keeperID)
-		if err == nil {
-			putKeyTo(userconfigkey, string(userconfigbyte), "local")
-			return userconfigbyte, nil
+		if keeperID != k.localID {
+			userconfigbyte, err = k.ds.GetKey(ctx, userconfigkey, keeperID)
+			if err == nil && userconfigbyte != nil {
+				return userconfigbyte, nil
+			}
 		}
 	}
 
 	return nil, errors.New("no user configkey")
-}
-
-//---network---
-func putKeyTo(key, value, node string) error {
-	return localNode.Routing.(*dht.IpfsDHT).CmdPutTo(key, value, node)
-}
-
-func getKeyFrom(key, node string) ([]byte, error) {
-	return localNode.Routing.(*dht.IpfsDHT).CmdGetFrom(key, node)
-}
-
-func deleteFrom(key, node string) error {
-	if node == "local" {
-		return localNode.Routing.(*dht.IpfsDHT).DeleteLocal(key)
-	}
-	return nil
-}
-
-func sendMetaMessage(km *metainfo.KeyMeta, metaValue, to string) error {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaMessage(km.ToString(), metaValue, to, caller)
-}
-
-func sendMetaRequest(km *metainfo.KeyMeta, metaValue, to string) (string, error) {
-	caller := ""
-	for _, i := range []int{0, 1, 2, 3, 4} {
-		pc, _, _, _ := runtime.Caller(i)
-		caller += string(i) + ":" + runtime.FuncForPC(pc).Name() + "\n"
-	}
-	return localNode.Routing.(*dht.IpfsDHT).SendMetaRequest(km.ToString(), metaValue, to, caller)
 }
