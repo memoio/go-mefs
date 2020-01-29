@@ -121,7 +121,7 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 
 	utils.MLogger.Info("repair success: ", blockID)
 
-	retMetaValue := "RepairSuccess" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off-1)
+	retMetaValue := "ok" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off-1)
 	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
 		utils.MLogger.Error("repair response err :", err)
