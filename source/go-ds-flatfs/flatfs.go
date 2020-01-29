@@ -563,7 +563,7 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length in
 	}
 
 	fieldSize := pre.SegmentSize + tagCount*int32(tagSize)
-	if len(fields)%int(fieldSize) != 0 {
+	if (len(fields)-preLen)%int(fieldSize) != 0 {
 		return dataformat.ErrWrongField
 	}
 
