@@ -14,7 +14,7 @@ import (
 )
 
 func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
-	utils.MLogger.Info("handleRepair: ", km.ToString(), "from: ", keeper)
+	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
 	var nbid int
 	sig, err := user.BuildSignMessage()

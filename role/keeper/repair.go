@@ -34,6 +34,8 @@ func (k *Info) checkLedger(ctx context.Context) {
 					continue
 				}
 
+				utils.MLogger.Info("check repair for user: ", pu.uid)
+
 				for _, proID := range gp.providers {
 					// only master repair
 					if !gp.isMaster(proID) {

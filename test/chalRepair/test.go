@@ -59,18 +59,25 @@ func ChallengeTest() error {
 		log.Fatal("address to id failed")
 		return err
 	}
-	transferTo(big.NewInt(moneyTo), addr)
 
-	time.Sleep(90 * time.Second)
+	test := true
+	for test {
+		transferTo(big.NewInt(moneyTo), addr)
 
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(addr)
-		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-			break
+		time.Sleep(90 * time.Second)
+
+		for {
+			time.Sleep(30 * time.Second)
+			balance := queryBalance(addr)
+			if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
+				break
+			}
+			log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 		}
-		log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+		test = false
+		break
 	}
+
 	err = sh.StartUser(addr)
 	if err != nil {
 		log.Fatal("Start user failed :", err)
@@ -153,22 +160,23 @@ func ChallengeTest() error {
 		return err
 	}
 	cid := bm.ToString()
-	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.Block)
+	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.BlockPos)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 	blockMeta := kmBlock.ToString()
-	log.Println("blockMeta : ", blockMeta)
+	log.Println("got blockMeta: ", blockMeta, " from: ", keeper)
 	var provider string
 	resPid, err := sh.GetFrom(blockMeta, keeper)
 	if err == nil {
-		provider = strings.Split(resPid.Extra, "|")[0]
+		provider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
 		log.Println("provider :", provider)
 	} else {
 		log.Println("get blockmeta error :", err)
 		return err
 	}
+
 	ret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if err != nil || ret == "" {
 		log.Println("get block from old provider error :", err)
@@ -189,7 +197,7 @@ func ChallengeTest() error {
 		return err
 	}
 
-	time.Sleep(2 * time.Minute)
+	time.Sleep(1 * time.Minute)
 	nret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if nret != "" && err == nil {
 		log.Println("get block from provider: ", provider, " expcted not")
@@ -198,7 +206,7 @@ func ChallengeTest() error {
 
 	log.Println("successfully delete block :", cid, " in provider", provider)
 
-	time.Sleep(1 * time.Minute)
+	// time.Sleep(1 * time.Minute)
 	// read whole file again
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
@@ -214,12 +222,12 @@ func ChallengeTest() error {
 
 	log.Println("successfully get object :", objectName, " in bucket:", bucketName)
 
-	time.Sleep(4 * time.Minute)
+	time.Sleep(10 * time.Minute)
 	//获取新的provider，从新的provider上获得块的MD5
 	var newProvider string
 	res, err := sh.GetFrom(blockMeta, keeper)
 	if err == nil {
-		newProvider = strings.Split(res.Extra, "|")[0]
+		newProvider = strings.Split(res.Extra, metainfo.DELIMITER)[0]
 		log.Println("newProvider :", newProvider)
 	} else {
 		log.Println("get newblockmeta error :", err)

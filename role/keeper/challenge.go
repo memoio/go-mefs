@@ -281,6 +281,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		utils.MLogger.Warn("verify blocks: ", chal.Indices)
 		return false
 	}
+
 	if res {
 		utils.MLogger.Info("proof of ", qid, " from provider: ", proID, " verify success.")
 
@@ -289,6 +290,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
 			_, ok := cset[k.(string)]
 			if ok {
+				utils.MLogger.Debugf("do not change %s availtime for %s", k.(string), qid)
 				return true
 			}
 			cInfo := v.(*blockInfo)
@@ -303,9 +305,9 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		chalResult.res = true
 		chalResult.length = int64((float64(slength) / float64(chalResult.sum)) * float64(chalResult.totalSpace))
 		return true
-	} else {
-		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
 	}
+
+	utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
 
 	return false
 }
