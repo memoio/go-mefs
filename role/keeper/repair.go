@@ -39,11 +39,13 @@ func (k *Info) checkLedger(ctx context.Context) {
 				for _, proID := range gp.providers {
 					// only master repair
 					if !gp.isMaster(proID) {
+						utils.MLogger.Debug(proID, " check repair is not msater for user: ", pu.uid)
 						continue
 					}
 
 					thislinfo := gp.getLInfo(proID, false)
 					if thislinfo == nil {
+						utils.MLogger.Debug(proID, "check repair has no legerinfo for user: ", pu.uid)
 						continue
 					}
 

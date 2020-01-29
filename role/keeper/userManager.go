@@ -82,6 +82,7 @@ func (g *groupInfo) isMaster(pid string) bool {
 			}
 		}
 		if len(mymaster) > 0 {
+			utils.MLogger.Debugf(pid, " has master keepers: ", mymaster)
 			return getMasterID(mymaster) == g.localKeeper
 		}
 	}

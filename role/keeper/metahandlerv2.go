@@ -67,7 +67,7 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 	blockID := km.GetMid()
 
 	sValue := strings.Split(string(metaValue), metainfo.DELIMITER)
-	if len(sValue) < 2 {
+	if len(sValue) != 2 {
 		utils.MLogger.Info("handleBlockPos err: ", metainfo.ErrIllegalValue)
 		return
 	}
