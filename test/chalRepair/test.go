@@ -133,7 +133,7 @@ func ChallengeTest() error {
 			log.Fatal("Challenge time not change")
 			return errors.New("ChallengeTest failed, Last challenge time not change")
 		}
-		time.Sleep(1 * time.Minute)
+		time.Sleep(2 * time.Minute)
 		getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr))
 		if err != nil {
 			log.Println("List Objects failed :", err)
@@ -206,7 +206,6 @@ func ChallengeTest() error {
 
 	log.Println("successfully delete block :", cid, " in provider", provider)
 
-	// time.Sleep(1 * time.Minute)
 	// read whole file again
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
@@ -222,7 +221,7 @@ func ChallengeTest() error {
 
 	log.Println("successfully get object :", objectName, " in bucket:", bucketName)
 
-	time.Sleep(10 * time.Minute)
+	time.Sleep(50 * time.Minute)
 	//获取新的provider，从新的provider上获得块的MD5
 	var newProvider string
 	res, err := sh.GetFrom(blockMeta, keeper)

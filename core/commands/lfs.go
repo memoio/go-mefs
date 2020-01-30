@@ -97,7 +97,7 @@ type Buckets struct {
 
 func (bk BucketStat) String() string {
 	return fmt.Sprintf(
-		"BucketName: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n--Encryption:%t\n",
+		"Name: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n--Encryption:%t\n",
 		ansi.Color(bk.Name, "green"),
 		bk.BucketID,
 		bk.Ctime,

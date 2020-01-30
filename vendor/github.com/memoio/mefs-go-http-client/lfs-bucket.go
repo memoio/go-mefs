@@ -7,12 +7,13 @@ import (
 )
 
 type BucketStat struct {
-	BucketName  string
+	Name        string
 	BucketID    int32
 	Ctime       string
 	Policy      int32
 	DataCount   int32
 	ParityCount int32
+	Encryption  bool
 }
 
 type Buckets struct {
@@ -22,8 +23,8 @@ type Buckets struct {
 
 func (bk BucketStat) String() string {
 	return fmt.Sprintf(
-		"BucketName: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n",
-		bk.BucketName,
+		"Name: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n",
+		bk.Name,
 		bk.BucketID,
 		bk.Ctime,
 		bk.Policy,

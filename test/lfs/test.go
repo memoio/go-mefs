@@ -60,15 +60,20 @@ func lfsTest() error {
 		return err
 	}
 
-	transferTo(big.NewInt(moneyTo), addr)
-	time.Sleep(90 * time.Second)
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(addr)
-		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-			break
+	test := true
+	for test {
+		transferTo(big.NewInt(moneyTo), addr)
+		time.Sleep(90 * time.Second)
+		for {
+			time.Sleep(30 * time.Second)
+			balance := queryBalance(addr)
+			if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
+				break
+			}
+			log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 		}
-		log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+		test = false
+		break
 	}
 
 	log.Println("2. test start lfs")
@@ -84,7 +89,7 @@ func lfsTest() error {
 
 	log.Println("3. test rs create bucket")
 
-	bucketName := strconv.FormatInt(time.Now().Unix(), 10)
+	bucketName := time.Now().Format("2006-01-02")
 	var opts []func(*shell.RequestBuilder) error
 	//set option of bucket
 	opts = append(opts, shell.SetAddress(addr))
@@ -93,7 +98,7 @@ func lfsTest() error {
 	opts = append(opts, shell.SetPolicy(df.RsPolicy))
 	_, err = sh.CreateBucket(bucketName, opts...)
 	if err != nil {
-		log.Println("create bucket err: ", err)
+		log.Fatal("create bucket err: ", err)
 	}
 
 	bk, err := sh.HeadBucket(bucketName, shell.SetAddress(addr))
@@ -103,8 +108,8 @@ func lfsTest() error {
 
 	fmt.Println(bk.Buckets)
 
-	if bk.Buckets[0].BucketName != bucketName {
-		log.Println("create bucket", bucketName, "fails, but got:", bk.Buckets[0].BucketName)
+	if bk.Buckets[0].Name != bucketName {
+		log.Println("create bucket", bucketName, "fails, but got:", bk.Buckets[0].Name)
 	}
 
 	if bk.Buckets[0].Policy != df.RsPolicy {
@@ -144,16 +149,16 @@ func lfsTest() error {
 
 	obj, err := sh.HeadObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("head file ", objectName, " err:", err)
+		log.Fatal("head file ", objectName, " err:", err)
 		return err
 	}
 
 	if obj.Objects[0].Name != objectName {
-		log.Println("head file ", objectName, "but got: ", obj.Objects[0].Name)
+		log.Fatal("head file ", objectName, "but got: ", obj.Objects[0].Name)
 	}
 
 	if int64(obj.Objects[0].Size) != r {
-		log.Println("head file siez: ", r, "but got: ", obj.Objects[0].Size)
+		log.Fatal("head file siez: ", r, "but got: ", obj.Objects[0].Size)
 	}
 
 	log.Println("5. test rs get object")
@@ -172,7 +177,7 @@ func lfsTest() error {
 
 	log.Println("6. test mul create bucket")
 
-	mbucketName := "mtest" + strconv.FormatInt(time.Now().Unix(), 10)
+	mbucketName := "mtest" + time.Now().Format("2006-01-02")
 	var mopts []func(*shell.RequestBuilder) error
 	mopts = append(mopts, shell.SetAddress(addr))
 	mopts = append(mopts, shell.SetDataCount(dataCount))
@@ -186,25 +191,25 @@ func lfsTest() error {
 
 	bk, err = sh.HeadBucket(mbucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("create mbucket err: ", err)
+		log.Fatal("create mbucket err: ", err)
 	}
 
 	fmt.Println(bk.Buckets)
 
-	if bk.Buckets[0].BucketName != mbucketName {
-		log.Println("create mbucket", mbucketName, "fails")
+	if bk.Buckets[0].Name != mbucketName {
+		log.Fatal("create mbucket", mbucketName, "fails")
 	}
 
 	if bk.Buckets[0].Policy != df.MulPolicy {
-		log.Println("create mbucket fails Policy")
+		log.Fatal("create mbucket fails Policy")
 	}
 
 	if bk.Buckets[0].DataCount != 1 {
-		log.Println("create mbucket fails datacount")
+		log.Fatal("create mbucket fails datacount")
 	}
 
 	if bk.Buckets[0].ParityCount != parityCount+dataCount-1 {
-		log.Println("create mbucket fails paritycount")
+		log.Fatal("create mbucket fails paritycount")
 	}
 
 	log.Println("7. test mul put object")
@@ -231,16 +236,16 @@ func lfsTest() error {
 
 	obj, err = sh.HeadObject(objectName, mbucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("head file ", objectName, " err:", err)
+		log.Fatal("head file ", objectName, " err:", err)
 		return err
 	}
 
 	if obj.Objects[0].Name != objectName {
-		log.Println("head file ", objectName, "but got: ", obj.Objects[0].Name)
+		log.Fatal("head file ", objectName, "but got: ", obj.Objects[0].Name)
 	}
 
 	if int64(obj.Objects[0].Size) != r1 {
-		log.Println("head file siez: ", r1, "but got: ", obj.Objects[0].Size)
+		log.Fatal("head file siez: ", r1, "but got: ", obj.Objects[0].Size)
 	}
 
 	log.Println("8. test mul get object")

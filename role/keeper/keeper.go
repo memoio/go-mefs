@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	EXPIRETIME       = int64(30*60) / 10 //超过这个时间，触发修复，单位：秒
-	CHALTIME         = 5 * time.Minute / 10
-	CHECKTIME        = 7 * time.Minute / 10
+	EXPIRETIME       = int64(30 * 60) //超过这个时间，触发修复，单位：秒
+	CHALTIME         = 5 * time.Minute
+	CHECKTIME        = 7 * time.Minute
 	PERSISTTIME      = 3 * time.Minute
 	SPACETIMEPAYTIME = 61 * time.Minute
 	CONPEERTIME      = 5 * time.Minute

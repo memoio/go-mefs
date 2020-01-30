@@ -77,7 +77,7 @@ func UploadTest(count int) error {
 		return err
 	}
 
-	bucketName := "Bucket0"
+	bucketName := time.Now().Format("2006-01-02")
 
 	for {
 		_, err := sh.ShowStorage(shell.SetAddress(addr))
