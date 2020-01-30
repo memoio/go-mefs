@@ -201,9 +201,7 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		return nil, errors.New("metavalue is not right")
 	}
 
-	keepers := make([]string, kc)
-	providers := make([]string, pc)
-
+	var keepers, providers []string
 	kids := splited[0]
 	for i := 0; i < len(kids)/utils.IDLength; i++ {
 		keeper := string(kids[i*utils.IDLength : (i+1)*utils.IDLength])
