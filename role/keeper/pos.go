@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -30,22 +29,14 @@ func (k *Info) handlePosAdd(km *metainfo.KeyMeta, metaValue []byte, from string)
 			continue
 		}
 
-		kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.Pos)
-		if err != nil {
-			return
-		}
-		pidAndOffset := from + metainfo.DELIMITER + strconv.Itoa(off)
-		err = k.ds.PutKey(context.Background(), kmBlock.ToString(), []byte(pidAndOffset), "local")
-		if err != nil {
-			return
-		}
-
 		//保存到内存
 		bm, err := metainfo.GetBlockMeta(blockID)
 		if err != nil {
 			return
 		}
-		err = k.addBlockMeta(bm.GetQid(), blockID, from, off)
+
+		// need modify
+		err = k.addBlockMeta(bm.GetQid(), blockID, from, off, true)
 		if err != nil {
 			return
 		}

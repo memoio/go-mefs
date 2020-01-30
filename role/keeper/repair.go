@@ -236,7 +236,7 @@ func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provid
 		}
 
 		k.deleteBlockMeta(qid, bid, true)
-		k.addBlockMeta(qid, bid, newPid, newOffset)
+		k.addBlockMeta(qid, bid, newPid, newOffset, true)
 
 		return
 	}

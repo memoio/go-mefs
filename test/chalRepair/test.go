@@ -239,7 +239,7 @@ func ChallengeTest() error {
 		return err
 	}
 
-	log.Println("md5 of repaired block`s rawdata :", newRet)
+	log.Println("md5 of repaired block rawdata :", newRet)
 	if ret == newRet {
 		log.Println("Repair success")
 	} else {

@@ -356,7 +356,7 @@ func (k *Info) loadUserBlock(qid string) error {
 			continue
 		}
 
-		k.addBlockMeta(qid, getID[1], pids[0], off)
+		k.addBlockMeta(qid, getID[1], pids[0], off, false)
 	}
 	return nil
 }
@@ -609,12 +609,29 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 	return gp.getBlockAvail(bid)
 }
 
-func (k *Info) addBlockMeta(qid, bid, pid string, offset int) error {
+func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 	utils.MLogger.Info("add block: ", bid, " and its offset: ", offset, " for query: ", qid, " and provider: ", pid)
 
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
 		return gp.addBlockMeta(bid, pid, offset)
+	}
+
+	if mode {
+		blockID := qid + metainfo.BLOCK_DELIMITER + bid
+
+		// notify provider, to delete block
+		km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+		if err != nil {
+			return err
+		}
+
+		pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
+
+		err = k.ds.PutKey(context.Background(), km.ToString(), []byte(pidAndOffset), "local")
+		if err != nil {
+			utils.MLogger.Info("Delete testUser block: ", blockID, " error:", err)
+		}
 	}
 
 	return errors.New("Not my user")
@@ -626,7 +643,6 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 
 	ctx := context.Background()
 
-	var pid string
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
 		pid, err := gp.getBlockPos(bid)
@@ -641,13 +657,13 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 		blockID := qid + metainfo.BLOCK_DELIMITER + bid
 
 		// notify provider, to delete block
-		km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
+		km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
 		if err != nil {
 			return
 		}
-		err = k.ds.DeleteBlock(ctx, km.ToString(), pid)
+		err = k.ds.DeleteKey(ctx, km.ToString(), "local")
 		if err != nil {
-			utils.MLogger.Info("Delete testUser block: ", blockID, " error:", err)
+			utils.MLogger.Warn("Delete testUser block: ", blockID, "  error:", err)
 		}
 	}
 

@@ -77,14 +77,8 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 		return
 	}
 
-	err = k.ds.PutKey(context.Background(), km.ToString(), metaValue, "local")
-	if err != nil {
-		utils.MLogger.Info("handleBlockPos err: ", err)
-		return
-	}
-
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
-	err = k.addBlockMeta(bids[0], bids[1], sValue[0], offset)
+	err = k.addBlockMeta(bids[0], bids[1], sValue[0], offset, true)
 	if err != nil {
 		utils.MLogger.Info("handleBlockPos err: ", err)
 	}
