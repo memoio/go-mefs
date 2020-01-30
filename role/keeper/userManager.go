@@ -65,6 +65,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 
 	tempInfo.masterKeeper = getMasterID(tempInfo.keepers)
 
+	utils.MLogger.Debugf("%s has masterID %s, and localID %s", qid, tempInfo.masterKeeper, tempInfo.localKeeper)
 	return tempInfo, nil
 }
 
