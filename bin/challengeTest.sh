@@ -1,5 +1,7 @@
 #!/bin/bash
 
+sh ./mcl.sh
+
 echo -e "mefs challenge test"
 
 echo -e "\nstep 1,mefs init\n"
