@@ -4,8 +4,7 @@ stages:
   - golangci-lint
   - compile
   - short-test
-  - challenge-test
-  - upload-test
+  - long-test
 
 variables:
   UPCOUNT: "50"
@@ -183,7 +182,7 @@ pos_test:
     - schedules
 
 lfs_test:
-  stage: short-test
+  stage: long-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
@@ -201,7 +200,7 @@ lfs_test:
     - schedules
 
 challenge_test:
-  stage: challenge-test
+  stage: long-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
@@ -221,7 +220,7 @@ challenge_test:
     - schedules
 
 upload_test:
-  stage: upload-test
+  stage: long-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
