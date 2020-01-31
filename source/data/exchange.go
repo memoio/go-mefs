@@ -374,14 +374,16 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 			break
 		}
 
-		if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
-			swrm.Backoff().Clear(pi.ID)
-		}
+		for j := 0; j < 3; j++ {
+			if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
+				swrm.Backoff().Clear(pi.ID)
+			}
 
-		for i := 0; i < 3; i++ {
 			err = n.ph.Connect(ctx, pi)
 			if err == nil {
-				return true
+				if n.ph.Network().Connectedness(id) == inet.Connected {
+					return true
+				}
 			}
 		}
 	}
@@ -440,11 +442,11 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 
 		utils.MLogger.Debug(to, "has extern ip: ", npi.String())
 
-		if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
-			swrm.Backoff().Clear(npi.ID)
-		}
-
 		for i := 0; i < 3; i++ {
+			if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
+				swrm.Backoff().Clear(npi.ID)
+			}
+
 			err = n.ph.Connect(ctx, npi)
 			if err == nil {
 				return true
