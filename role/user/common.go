@@ -2,16 +2,13 @@ package user
 
 import (
 	"errors"
-	"math/big"
 	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/golang/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
-	"github.com/memoio/go-mefs/utils"
 )
 
 //-------Group Type------
@@ -146,20 +143,4 @@ func checkBucketNameCommon(bucketName string, strict bool) (err error) {
 		err = errors.New("superBucket name contains invalid characters")
 	}
 	return err
-}
-
-// BuildSignMessage builds sign message for test or repair
-func BuildSignMessage() ([]byte, error) {
-	money := big.NewInt(123)
-	moneyByte := money.Bytes()
-	message := &pb.ChannelSign{
-		Value:     moneyByte,
-		ChannelID: "test",
-	}
-	mes, err := proto.Marshal(message)
-	if err != nil {
-		utils.MLogger.Error("protoMarshal failed: ", err)
-		return nil, err
-	}
-	return mes, nil
 }

@@ -144,6 +144,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 				return b.RawData(), nil
 			}
 			utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
+			return nil, errors.New("Signature is wrong")
 		}
 		utils.MLogger.Warn("channel is empty")
 	} else {
@@ -154,7 +155,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 		return b.RawData(), nil
 	}
-	return nil, errors.New("Signature is wrong")
+	return nil, errors.New("get block failed")
 }
 
 // verify verifies the transaction
@@ -173,7 +174,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 
 	// verify channel
 	if cSign.GetChannelID() != chanID {
-		utils.MLogger.Errorf("channelID save %s and got %s are not equal: ", chanID, cSign.GetChannelID())
+		utils.MLogger.Errorf("channelID save %s and got %s are not equal", chanID, cSign.GetChannelID())
 		return false, nil, nil
 	}
 
@@ -189,7 +190,7 @@ func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.
 	addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 	oldValue = oldValue.Add(oldValue, big.NewInt(addValue))
 	if value.Cmp(oldValue) < 0 {
-		utils.MLogger.Warn(value.String, " received is less than calculated: ", oldValue.String())
+		utils.MLogger.Warn(value.String(), " received is less than calculated: ", oldValue.String())
 		return false, nil, nil
 	}
 

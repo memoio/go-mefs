@@ -14,6 +14,7 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
@@ -495,7 +496,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		}
 	}
 
-	sig, err := BuildSignMessage()
+	sig, err := role.BuildSignMessage()
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +561,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 
 //lfs启动进行元数据的加载，对Log中的字段进行初始化 填充除superblock、Entries字段之外的字段
 func (l *LfsInfo) loadBucketInfo() error {
-	sig, err := BuildSignMessage()
+	sig, err := role.BuildSignMessage()
 	if err != nil {
 		return err
 	}
@@ -635,7 +636,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 //------------------------------Load Objectinfo---------------------------------------
 //填充Entries字段，传入参数为bucket,记录传入bucket的数据信息
 func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
-	sig, err := BuildSignMessage()
+	sig, err := role.BuildSignMessage()
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	rs "github.com/memoio/go-mefs/data-format"
-	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/role"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
@@ -17,7 +17,7 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
 	var nbid int
-	sig, err := user.BuildSignMessage()
+	sig, err := role.BuildSignMessage()
 	if err != nil {
 		return err
 	}

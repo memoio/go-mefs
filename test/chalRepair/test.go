@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	df "github.com/memoio/go-mefs/data-format"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -74,7 +75,6 @@ func ChallengeTest() error {
 			}
 			log.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 		}
-		test = false
 		break
 	}
 
@@ -152,13 +152,22 @@ func ChallengeTest() error {
 		log.Println("list keepers error :", err)
 		return err
 	}
-	keeper := keepers.Peers[0].PeerID
-	log.Println("keeper :", keepers.Peers[0].PeerID)
-	bm, err := metainfo.NewBlockMeta(uid, "1", "0", "0")
+
+	qid := uid
+	if test {
+		qItem, err := role.GetLatestQuery(uid)
+		if err != nil {
+			log.Fatal("got query fails: ", err)
+		}
+		qid = qItem.QueryID
+	}
+
+	bm, err := metainfo.NewBlockMeta(qid, "1", "0", "0")
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+
 	cid := bm.ToString()
 	kmBlock, err := metainfo.NewKeyMeta(cid, metainfo.BlockPos)
 	if err != nil {
@@ -166,20 +175,36 @@ func ChallengeTest() error {
 		return err
 	}
 	blockMeta := kmBlock.ToString()
+	keeper := keepers.Peers[0].PeerID
 	log.Println("got blockMeta: ", blockMeta, " from: ", keeper)
 	var provider string
-	resPid, err := sh.GetFrom(blockMeta, keeper)
-	if err == nil {
-		provider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
-		log.Println("provider :", provider)
-	} else {
-		log.Println("get blockmeta error :", err)
-		return err
+	retry := 0
+	for retry < 5 {
+		keeper = keepers.Peers[0].PeerID
+		resPid, err := sh.GetFrom(blockMeta, keeper)
+		if err == nil {
+			provider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
+			log.Println("provider is: ", provider)
+			break
+		} else {
+			keeper = keepers.Peers[1].PeerID
+			resPid, err := sh.GetFrom(blockMeta, keeper)
+			if err == nil {
+				provider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
+				log.Println("provider is: ", provider)
+				break
+			}
+		}
+		retry++
+	}
+
+	if len(provider) == 0 {
+		log.Fatal("cannot get block pos")
 	}
 
 	ret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if err != nil || ret == "" {
-		log.Println("get block from old provider error :", err)
+		log.Println("get block from old provider error: ", err)
 		return err
 	}
 	log.Println("md5 of block`s rawdata :", ret)
@@ -224,13 +249,28 @@ func ChallengeTest() error {
 	time.Sleep(50 * time.Minute)
 	//获取新的provider，从新的provider上获得块的MD5
 	var newProvider string
-	res, err := sh.GetFrom(blockMeta, keeper)
-	if err == nil {
-		newProvider = strings.Split(res.Extra, metainfo.DELIMITER)[0]
-		log.Println("newProvider :", newProvider)
-	} else {
-		log.Println("get newblockmeta error :", err)
-		return err
+	retry = 0
+	for retry < 5 {
+		keeper = keepers.Peers[0].PeerID
+		resPid, err := sh.GetFrom(blockMeta, keeper)
+		if err == nil {
+			newProvider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
+			log.Println("provider is: ", provider)
+			break
+		} else {
+			keeper = keepers.Peers[1].PeerID
+			resPid, err := sh.GetFrom(blockMeta, keeper)
+			if err == nil {
+				newProvider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
+				log.Println("provider is: ", provider)
+				break
+			}
+		}
+		retry++
+	}
+
+	if len(newProvider) == 0 {
+		log.Fatal("cannot get block pos")
 	}
 
 	newRet, err := getBlock(sh, cid, newProvider)

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"
@@ -871,4 +872,19 @@ func SaveKpMap(peerID string) error {
 		}
 	}
 	return nil
+}
+
+// BuildSignMessage builds sign message for test or repair
+func BuildSignMessage() ([]byte, error) {
+	message := &pb.ChannelSign{
+		Value:     []byte("123"),
+		ChannelID: "test",
+	}
+
+	mes, err := proto.Marshal(message)
+	if err != nil {
+		utils.MLogger.Error("protoMarshal failed: ", err)
+		return nil, err
+	}
+	return mes, nil
 }
