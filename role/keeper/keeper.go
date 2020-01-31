@@ -612,11 +612,6 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 	utils.MLogger.Info("add block: ", bid, " and its offset: ", offset, " for query: ", qid, " and provider: ", pid)
 
-	gp := k.getGroupInfo(qid, qid, false)
-	if gp != nil {
-		return gp.addBlockMeta(bid, pid, offset)
-	}
-
 	if mode {
 		blockID := qid + metainfo.BLOCK_DELIMITER + bid
 
@@ -632,6 +627,11 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 		if err != nil {
 			utils.MLogger.Info("Delete testUser block: ", blockID, " error:", err)
 		}
+	}
+
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp != nil {
+		return gp.addBlockMeta(bid, pid, offset)
 	}
 
 	return errors.New("Not my user")
