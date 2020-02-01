@@ -643,7 +643,7 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	//依次与各provider签署channel合约
 	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60)) //秒，存储时间
 	var moneyToChannel = new(big.Int)
-	moneyToChannel = moneyToChannel.Mul(big.NewInt(storeSize), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
+	moneyToChannel = moneyToChannel.Mul(big.NewInt(storeSize*1000), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
 
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
