@@ -2,6 +2,7 @@ package user
 
 import (
 	"container/list"
+	"context"
 	"strings"
 	"time"
 
@@ -11,17 +12,13 @@ import (
 )
 
 // CreateBucket create a bucket for a specified LFSservice
-func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
+func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
 	// TODO judge datacount + parity count <= providers
-	if !l.online {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
-	}
-
-	err := CheckValidBucketName(bucketName)
+	err := checkBucketName(bucketName)
 	if err != nil {
 		return nil, ErrBucketNameInvalid
 	}
@@ -79,13 +76,14 @@ func (l *LfsInfo) CreateBucket(bucketName string, options *pb.BucketOptions) (*p
 }
 
 // DeleteBucket deletes a bucket from a specified LFSservice
-func (l *LfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
-	if !l.online {
+func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return nil, ErrBucketNameInvalid
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -105,13 +103,14 @@ func (l *LfsInfo) DeleteBucket(bucketName string) (*pb.BucketInfo, error) {
 }
 
 // HeadBucket get a superBucket's metainfo
-func (l *LfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
-	if !l.online {
+func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return nil, ErrBucketNameInvalid
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -126,7 +125,7 @@ func (l *LfsInfo) HeadBucket(bucketName string) (*pb.BucketInfo, error) {
 }
 
 // ListBuckets lists all Buckets information
-func (l *LfsInfo) ListBuckets(prefix string) ([]*pb.BucketInfo, error) {
+func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketInfo, error) {
 	if !l.online {
 		return nil, ErrLfsServiceNotReady
 	}

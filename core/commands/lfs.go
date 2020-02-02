@@ -491,7 +491,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		object, err := lfs.HeadObject(req.Arguments[0], req.Arguments[1], user.ObjectOptions{})
+		object, err := lfs.HeadObject(req.Context, req.Arguments[0], req.Arguments[1], user.ObjectOptions{})
 		if err != nil {
 			return err
 		}
@@ -596,7 +596,7 @@ var lfsPutObjectCmd = &cmds.Command{
 		case files.File:
 			fileNext = fileType
 		}
-		object, err := lfs.PutObject(bucketName, objectName, fileNext)
+		object, err := lfs.PutObject(req.Context, bucketName, objectName, fileNext)
 		if err != nil {
 			return err
 		}
@@ -690,7 +690,7 @@ var lfsGetObjectCmd = &cmds.Command{
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
 		options := user.DefaultDownloadOptions()
-		go lfs.GetObject(req.Arguments[0], req.Arguments[1], bufw, complete, options)
+		go lfs.GetObject(req.Context, req.Arguments[0], req.Arguments[1], bufw, complete, options)
 
 		return res.Emit(piper)
 	},
@@ -808,7 +808,7 @@ var lfsListObjectsCmd = &cmds.Command{
 		}
 
 		bucketName := req.Arguments[0]
-		objects, err := lfs.ListObjects(bucketName, prefix, user.ObjectOptions{})
+		objects, err := lfs.ListObjects(req.Context, bucketName, prefix, user.ObjectOptions{})
 		if err != nil {
 			return err
 		}
@@ -898,7 +898,7 @@ var lfsDeleteObjectCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		object, err := lfs.DeleteObject(req.Arguments[0], req.Arguments[1])
+		object, err := lfs.DeleteObject(req.Context, req.Arguments[0], req.Arguments[1])
 		if err != nil {
 			return err
 		}
@@ -973,7 +973,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 		}
 
 		bucketName := req.Arguments[0]
-		bucket, err := lfs.HeadBucket(bucketName)
+		bucket, err := lfs.HeadBucket(req.Context, bucketName)
 		if err != nil {
 			return err
 		}
@@ -1078,7 +1078,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 		bucketOptions.DataCount = int32(dataCount)
 		bucketOptions.ParityCount = int32(parityCount)
 		bucketOptions.Encryption = encrytion
-		bucket, err := lfs.CreateBucket(req.Arguments[0], bucketOptions)
+		bucket, err := lfs.CreateBucket(req.Context, req.Arguments[0], bucketOptions)
 		if err != nil {
 			return err
 		}
@@ -1150,7 +1150,7 @@ It outputs the following to stdout:
 		}
 
 		prefix := req.Options[PrefixFilter].(string)
-		buckets, err := lfs.ListBuckets(prefix)
+		buckets, err := lfs.ListBuckets(req.Context, prefix)
 		if err != nil {
 			return err
 		}
@@ -1229,7 +1229,7 @@ It outputs the following to stdout:
 			return errLfsServiceNotReady
 		}
 
-		bucket, err := lfs.DeleteBucket(req.Arguments[0])
+		bucket, err := lfs.DeleteBucket(req.Context, req.Arguments[0])
 		if err != nil {
 			return err
 		}
@@ -1525,13 +1525,13 @@ mefs lfs show_storage show the storage space used(kb)
 			return errLfsServiceNotReady
 		}
 
-		buckets, err := lfs.ListBuckets(prefix)
+		buckets, err := lfs.ListBuckets(req.Context, prefix)
 		if err != nil {
 			return err
 		}
 		var storageSize uint64
 		for _, bucket := range buckets {
-			storageSpace, err := lfs.ShowBucketStorage(bucket.Name)
+			storageSpace, err := lfs.ShowBucketStorage(req.Context, bucket.Name)
 			if err != nil {
 				return err
 			}

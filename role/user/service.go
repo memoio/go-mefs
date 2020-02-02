@@ -14,20 +14,20 @@ type FileSyetem interface {
 	Fsync(bool) error
 	Online() bool
 
-	ListBuckets(prefix string) ([]*pb.BucketInfo, error)
-	CreateBucket(bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
-	HeadBucket(bucketName string) (*pb.BucketInfo, error)
-	DeleteBucket(bucketName string) (*pb.BucketInfo, error)
+	ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketInfo, error)
+	CreateBucket(ctx context.Context, bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error)
+	HeadBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error)
+	DeleteBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error)
 
-	ListObjects(bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error)
+	ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error)
 
-	PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error)
-	GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error
-	HeadObject(bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error)
-	DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error)
+	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error)
+	GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error
+	HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error)
+	DeleteObject(ctx context.Context, bucketName, objectName string) (*pb.ObjectInfo, error)
 
-	ShowStorage() (uint64, error)
-	ShowBucketStorage(bucketName string) (uint64, error)
+	ShowStorage(ctx context.Context) (uint64, error)
+	ShowBucketStorage(ctx context.Context, bucketName string) (uint64, error)
 }
 
 // service is user's service

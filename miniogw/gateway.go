@@ -125,7 +125,7 @@ func (l *lfsGateway) StorageInfo(ctx context.Context) (si minio.StorageInfo) {
 		return si
 	}
 
-	use, _ := lfs.ShowStorage()
+	use, _ := lfs.ShowStorage(ctx)
 	si.Used = []uint64{use}
 	return si
 }
@@ -143,8 +143,9 @@ func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options
 		log.Println("bucketOptions Unmarshal err", err)
 		bucketOptions = user.DefaultBucketOptions()
 	}
-	_, err = lfs.CreateBucket(bucket, bucketOptions)
-	return err
+	_, err = lfs.CreateBucket(ctx, bucket, bucketOptions)
+
+	return convertToMinioError(err, bucket, "")
 }
 
 // GetBucketInfo gets bucket metadata.
@@ -154,12 +155,12 @@ func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio
 		return bi, errLfsServiceNotReady
 	}
 
-	bucketInfo, err := lfs.HeadBucket(bucket)
+	bucketInfo, err := lfs.HeadBucket(ctx, bucket)
 	if err != nil {
-		return bi, err
+		return bi, convertToMinioError(err, bucket, "")
 	}
 	bi.Name = bucket
-	bi.Created = time.Unix(bucketInfo.Ctime, 0).In(time.Local)
+	bi.Created = time.Unix(bucketInfo.Ctime, 0).UTC()
 	return bi, nil
 }
 
@@ -169,14 +170,16 @@ func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 	if lfs == nil || !lfs.Online() {
 		return nil, user.ErrLfsServiceNotReady
 	}
-	bucketsInfo, err := lfs.ListBuckets("")
+
+	bucketsInfo, err := lfs.ListBuckets(ctx, "")
 	if err != nil {
-		return nil, err
+		return nil, convertToMinioError(err, "", "")
 	}
+
 	buckets = make([]minio.BucketInfo, len(bucketsInfo))
 	for i, v := range bucketsInfo {
 		buckets[i].Name = v.Name
-		buckets[i].Created = time.Unix(v.Ctime, 0).In(time.Local)
+		buckets[i].Created = time.Unix(v.Ctime, 0).UTC()
 	}
 	return buckets, nil
 }
@@ -188,9 +191,8 @@ func (l *lfsGateway) DeleteBucket(ctx context.Context, bucket string) error {
 		return errLfsServiceNotReady
 	}
 
-	_, err := lfs.DeleteBucket(bucket)
-
-	return err
+	_, err := lfs.DeleteBucket(ctx, bucket)
+	return convertToMinioError(err, bucket, "")
 }
 
 // ListObjects lists all blobs in LFS bucket filtered by prefix.
@@ -202,17 +204,18 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 
 	var ops user.ObjectOptions
 
-	objs, err := lfs.ListObjects(bucket, prefix, ops)
+	objs, err := lfs.ListObjects(ctx, bucket, prefix, ops)
 	if err != nil {
-		return loi, errLfsServiceNotReady
+		return loi, convertToMinioError(err, bucket, "")
 	}
+
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
 		loi.Objects[i].ETag = v.ETag
 		loi.Objects[i].Name = v.Name
 		loi.Objects[i].Size = v.Length
-		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).In(time.Local)
+		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).UTC()
 	}
 	return loi, nil
 }
@@ -228,9 +231,9 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 
 	var ops user.ObjectOptions
 
-	objs, err := lfs.ListObjects(bucket, prefix, ops)
+	objs, err := lfs.ListObjects(ctx, bucket, prefix, ops)
 	if err != nil {
-		return loi, errLfsServiceNotReady
+		return loi, convertToMinioError(err, bucket, "")
 	}
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
@@ -238,7 +241,7 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 		loi.Objects[i].ETag = v.ETag
 		loi.Objects[i].Name = v.Name
 		loi.Objects[i].Size = v.Length
-		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).In(time.Local)
+		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).UTC()
 	}
 	return loi, nil
 }
@@ -252,7 +255,7 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 
 	objInfo, err := l.GetObjectInfo(ctx, bucket, object, opts)
 	if err != nil {
-		return nil, err
+		return gr, convertToMinioError(err, bucket, object)
 	}
 
 	piper, pipew := io.Pipe()
@@ -267,7 +270,7 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	go lfs.GetObject(bucket, object, bufw, complete, user.DefaultDownloadOptions())
+	go lfs.GetObject(ctx, bucket, object, bufw, complete, user.DefaultDownloadOptions())
 
 	// Setup cleanup function to cause the above go-routine to
 	// exit in case of partial read
@@ -295,13 +298,13 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	err := lfs.GetObject(bucket, key, bufw, complete, &user.DownloadOptions{
+	err := lfs.GetObject(ctx, bucket, key, bufw, complete, &user.DownloadOptions{
 		Start:  startOffset,
 		Length: length,
 	})
 
 	if err != nil {
-		return err
+		return convertToMinioError(err, bucket, "")
 	}
 
 	return errRes
@@ -313,10 +316,11 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 	if lfs == nil || !lfs.Online() {
 		return minio.ObjectInfo{}, errLfsServiceNotReady
 	}
+
 	var ops user.ObjectOptions
-	obj, err := lfs.HeadObject(bucket, object, ops)
+	obj, err := lfs.HeadObject(ctx, bucket, object, ops)
 	if err != nil {
-		return minio.ObjectInfo{}, err
+		return minio.ObjectInfo{}, convertToMinioError(err, bucket, object)
 	}
 	objInfo = minio.ObjectInfo{
 		Bucket:      bucket,
@@ -338,9 +342,9 @@ func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *mi
 	}
 
 	reader := bufio.NewReaderSize(r.Reader, user.DefaultBufSize)
-	obj, err := lfs.PutObject(bucket, object, reader)
+	obj, err := lfs.PutObject(ctx, bucket, object, reader)
 	if err != nil {
-		return objInfo, err
+		return objInfo, convertToMinioError(err, bucket, object)
 	}
 
 	objInfo = minio.ObjectInfo{
@@ -367,9 +371,9 @@ func (l *lfsGateway) DeleteObject(ctx context.Context, bucket, object string) er
 		return errLfsServiceNotReady
 	}
 
-	_, err := lfs.DeleteObject(bucket, object)
+	_, err := lfs.DeleteObject(ctx, bucket, object)
 
-	return err
+	return convertToMinioError(err, bucket, object)
 }
 
 func (l *lfsGateway) DeleteObjects(ctx context.Context, bucket string, objects []string) ([]error, error) {
@@ -381,10 +385,10 @@ func (l *lfsGateway) DeleteObjects(ctx context.Context, bucket string, objects [
 	errFlag := 0
 	errs := make([]error, len(objects))
 	for i, object := range objects {
-		_, err := lfs.DeleteObject(bucket, object)
+		_, err := lfs.DeleteObject(ctx, bucket, object)
 		if err != nil {
 			errFlag = 1
-			errs[i] = err
+			errs[i] = convertToMinioError(err, bucket, object)
 		}
 	}
 
@@ -417,4 +421,21 @@ func (l *lfsGateway) DeleteBucketPolicy(ctx context.Context, bucket string) erro
 // IsCompressionSupported returns whether compression is applicable for this layer.
 func (l *lfsGateway) IsCompressionSupported() bool {
 	return false
+}
+
+func convertToMinioError(err error, bucket, object string) error {
+	switch err {
+	case user.ErrBucketNameInvalid:
+		return minio.BucketNameInvalid{Bucket: bucket}
+	case user.ErrBucketNotExist:
+		return minio.BucketNotFound{Bucket: bucket}
+	case user.ErrBucketAlreadyExist:
+		return minio.BucketExists{Bucket: bucket}
+	case user.ErrObjectNameInvalid:
+		return minio.ObjectNameInvalid{Bucket: bucket, Object: object}
+	case user.ErrObjectAlreadyExist:
+		return minio.ObjectAlreadyExists{Bucket: bucket, Object: object}
+	default:
+		return err
+	}
 }

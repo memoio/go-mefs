@@ -2,13 +2,11 @@ package user
 
 import (
 	"errors"
-	"regexp"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
+	"github.com/minio/minio-go/v6/pkg/s3utils"
 )
 
 //-------Group Type------
@@ -29,14 +27,6 @@ const (
 )
 
 const DefaultBufSize = 1024 * 1024 * 4
-
-// We support '.' with bucket names but we fallback to using path
-// style requests instead for such superBucket.
-var (
-	validBucketName       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9\.\-\_\:]{1,61}[A-Za-z0-9]$`)
-	validBucketNameStrict = regexp.MustCompile(`^[a-z0-9][a-z0-9\.\-]{1,61}[a-z0-9]$`)
-	ipAddress             = regexp.MustCompile(`^(\d+\.){3}\d+$`)
-)
 
 var (
 	ErrPolicy                = errors.New("policy is error")
@@ -85,62 +75,21 @@ func DefaultBucketOptions() *pb.BucketOptions {
 	}
 }
 
-//检查文件名合法性，文件名中不能含有"/"
+//检查文件名合法性
+func checkBucketName(bucketName string) error {
+	return s3utils.CheckValidBucketName(bucketName)
+}
+
 func checkObjectName(objectName string) error {
-	if strings.TrimSpace(objectName) == "" {
-		return errors.New("objectInfo name cannot be empty")
+	err := s3utils.CheckValidObjectName(objectName)
+	if err != nil {
+		return err
 	}
-	if len(objectName) > maxObjectNameLen {
-		return ErrObjectNameToolong
-	}
-	if !utf8.ValidString(objectName) {
-		return errors.New("objectInfo name with non UTF-8 strings are not supported")
-	}
+
 	for i := 0; i < len(objectName); i++ {
-		if objectName[i] == '/' || objectName[i] == '\\' || objectName[i] == '\n' {
+		if objectName[i] == '\\' || objectName[i] == '\n' {
 			return ErrObjectNameInvalid
 		}
 	}
 	return nil
-}
-
-// CheckValidBucketName - checks if we have a valid input bucket name.
-func CheckValidBucketName(bucketName string) (err error) {
-	return checkBucketNameCommon(bucketName, false)
-}
-
-// CheckValidBucketNameStrict - checks if we have a valid input bucket name.
-// This is a stricter version.
-// - http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html
-func CheckValidBucketNameStrict(bucketName string) (err error) {
-	return checkBucketNameCommon(bucketName, true)
-}
-
-// Common checker for both stricter and basic validation.
-func checkBucketNameCommon(bucketName string, strict bool) (err error) {
-	if strings.TrimSpace(bucketName) == "" {
-		return errors.New("superBucket name cannot be empty")
-	}
-	if len(bucketName) < 3 {
-		return errors.New("superBucket name cannot be smaller than 3 characters")
-	}
-	if len(bucketName) > 63 {
-		return errors.New("superBucket name cannot be greater than 63 characters")
-	}
-	if ipAddress.MatchString(bucketName) {
-		return errors.New("superBucket name cannot be an ip address")
-	}
-	if strings.Contains(bucketName, "..") || strings.Contains(bucketName, ".-") || strings.Contains(bucketName, "-.") {
-		return errors.New("superBucket name contains invalid characters")
-	}
-	if strict {
-		if !validBucketNameStrict.MatchString(bucketName) {
-			err = errors.New("superBucket name contains invalid characters")
-		}
-		return err
-	}
-	if !validBucketName.MatchString(bucketName) {
-		err = errors.New("superBucket name contains invalid characters")
-	}
-	return err
 }

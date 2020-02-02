@@ -17,13 +17,19 @@ type ObjectOptions struct {
 }
 
 // DeleteObject deletes a object in lfs
-func (l *LfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, error) {
-	if !l.online {
+func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName string) (*pb.ObjectInfo, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return nil, ErrBucketNameInvalid
+	}
+
+	err = checkObjectName(objectName)
+	if err != nil {
+		return nil, ErrObjectNameInvalid
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -59,13 +65,19 @@ func (l *LfsInfo) DeleteObject(bucketName, objectName string) (*pb.ObjectInfo, e
 }
 
 // HeadObject get the info of an object
-func (l *LfsInfo) HeadObject(bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error) {
-	if !l.online {
+func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return nil, ErrBucketNameInvalid
+	}
+
+	err = checkObjectName(objectName)
+	if err != nil {
+		return nil, ErrObjectNameInvalid
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -96,14 +108,16 @@ func (l *LfsInfo) HeadObject(bucketName, objectName string, opts ObjectOptions) 
 }
 
 // ListObjects lists all objects of a bucket
-func (l *LfsInfo) ListObjects(bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error) {
-	if !l.online {
+func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrObjectNotExist
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return nil, ErrBucketNameInvalid
 	}
+
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
 		return nil, ErrBucketNotExist
@@ -135,13 +149,9 @@ func (l *LfsInfo) ListObjects(bucketName, prefix string, opts ObjectOptions) ([]
 }
 
 // ShowStorage show lfs used space without appointed bucket
-func (l *LfsInfo) ShowStorage() (uint64, error) {
-	if !l.online {
+func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return 0, ErrLfsServiceNotReady
-	}
-
-	if l.meta.bucketNameToID == nil {
-		return 0, ErrBucketNotExist
 	}
 
 	var storageSpace uint64
@@ -165,13 +175,14 @@ func (l *LfsInfo) ShowStorage() (uint64, error) {
 }
 
 // ShowBucketStorage show lfs used spaceBucket
-func (l *LfsInfo) ShowBucketStorage(bucketName string) (uint64, error) {
-	if !l.online {
+func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uint64, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return 0, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return 0, ErrBucketNotExist
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return 0, ErrBucketNameInvalid
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]

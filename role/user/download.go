@@ -87,14 +87,10 @@ type downloadTask struct {
 }
 
 // GetObject constructs lfs download process
-func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
+func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
-	if !l.online {
+	if !l.online || l.meta.bucketNameToID == nil {
 		return ErrLfsServiceNotReady
-	}
-
-	if l.meta.bucketNameToID == nil {
-		return ErrBucketNotExist
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -160,7 +156,7 @@ func (l *LfsInfo) GetObject(bucketName, objectName string, writer io.Writer, com
 		dl.encrypt = true
 	}
 
-	return dl.Start(context.Background())
+	return dl.Start(ctx)
 }
 
 func (do *downloadTask) Start(ctx context.Context) error {
@@ -186,37 +182,44 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		remain = stripeSize - segPos - do.dStart
 	}
 
-	for {
-		//重复读取stripe中所需内容
-		n, err := job.rangeRead(ctx, curStripe-1, segStart, dStart, remain)
-		if err != nil {
-			do.Complete(err)
-			return err
-		}
+	breakFlag := false
+	for !breakFlag {
+		select {
+		case <-ctx.Done():
+			utils.MLogger.Warn("download cancel")
+			return nil
+		default:
+			n, err := job.rangeRead(ctx, curStripe-1, segStart, dStart, remain)
+			if err != nil {
+				do.Complete(err)
+				return err
+			}
 
-		if n != remain {
-			utils.MLogger.Warn("length is not match, got: ", n, ", want: ", remain)
-		}
+			if n != remain {
+				utils.MLogger.Warn("length is not match, got: ", n, ", want: ", remain)
+			}
 
-		do.sizeReceived += int(n)
+			do.sizeReceived += int(n)
 
-		if int64(do.sizeReceived) >= do.dLength {
-			break
-		}
+			if int64(do.sizeReceived) >= do.dLength {
+				breakFlag = true
+			} else {
+				curStripe++
+				dStart = 0
+				segStart = 0
 
-		curStripe++
-		dStart = 0
-		segStart = 0
+				if do.dLength <= (curStripe-do.curStripe)*stripeSize-segPos-do.dStart {
+					//最后剩下一部分
+					remain = (do.dLength + segPos + do.dStart) % (stripeSize)
+				} else {
+					//填满一整个stripe
+					remain = stripeSize
 
-		if do.dLength <= (curStripe-do.curStripe)*stripeSize-segPos-do.dStart {
-			//最后剩下一部分
-			remain = (do.dLength + segPos + do.dStart) % (stripeSize)
-		} else {
-			//填满一整个stripe
-			remain = stripeSize
-
+				}
+			}
 		}
 	}
+
 	if w, ok := do.writer.(*bufio.Writer); ok {
 		w.Flush()
 	}

@@ -31,8 +31,8 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 		return "", errLfsServiceNotReady
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	_, err = lfs.HeadBucket(bucket)
+	ctx, cancel := context.WithCancel(ctx)
+	_, err = lfs.HeadBucket(ctx, bucket)
 	if err != nil {
 		cancel()
 		return "", err
@@ -43,7 +43,7 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	if err != nil {
 		return "", err
 	}
-	obj, err := lfs.PutObject(bucket, object, upload.Stream)
+	obj, err := lfs.PutObject(ctx, bucket, object, upload.Stream)
 	if err != nil {
 		return "", err
 	}

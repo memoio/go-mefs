@@ -105,6 +105,7 @@ unit_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
+    - sh ./bin/mcl.sh
     - GO111MODULE=off make test
   tags:
     - "47.92.5.51"

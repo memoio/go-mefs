@@ -42,17 +42,14 @@ type uploadTask struct { //一个上传任务实例
 }
 
 // PutObject constructs upload process
-func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
-	if !l.online {
-		return nil, errors.New("user is not running")
+func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
+	if !l.online || l.meta.bucketNameToID == nil {
+		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketNameToID == nil {
-		return nil, ErrBucketNotExist
-	}
-
-	if err := checkObjectName(objectName); err != nil {
-		return nil, err
+	err := checkObjectName(objectName)
+	if err != nil {
+		return nil, ErrObjectNameInvalid
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
@@ -113,7 +110,7 @@ func (l *LfsInfo) PutObject(bucketName, objectName string, reader io.Reader) (*p
 		ul.sKey = sha256.Sum256(tmpkey)
 	}
 
-	err := ul.Start(context.Background())
+	err = ul.Start(ctx)
 	if err != nil {
 		if ul.length > 0 {
 			object.ETag = ul.etag
