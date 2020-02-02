@@ -163,7 +163,6 @@ func TestMclMain(t *testing.T) {
 	}
 }
 
-
 func BenchmarkSetHashOf(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
@@ -173,7 +172,7 @@ func BenchmarkSetHashOf(b *testing.B) {
 	var f Fr
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-	    if !f.SetHashOf([]byte("cbfa830f238a9a06d49f37508dc50092f45a99c8ed5afd024a78caaf1e8e021c" + "_" + strconv.Itoa(i) + "_" + strconv.Itoa(i))) {
+		if !f.SetHashOf([]byte("cbfa830f238a9a06d49f37508dc50092f45a99c8ed5afd024a78caaf1e8e021c" + "_" + strconv.Itoa(i) + "_" + strconv.Itoa(i))) {
 			b.Errorf("ErrSetHashOf")
 		}
 	}

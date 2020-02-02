@@ -112,7 +112,7 @@ func BenchmarkGenChallenge(b *testing.B) {
 	// generate the challenge for data possession validation
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = GenChallenge(int64(i), blocks)
+		//_ = GenChallenge(int64(i), blocks)
 	}
 }
 
@@ -155,7 +155,10 @@ func BenchmarkGenProof(b *testing.B) {
 
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
-	chal := GenChallenge(int64(0), blocks)
+	chal := Challenge{
+		Seed:    0,
+		Indices: blocks,
+	}
 
 	// ------------- the storage provider ---------------- //
 	// fetch the tag & challenge
@@ -215,7 +218,10 @@ func BenchmarkVerifyProof(b *testing.B) {
 
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
-	chal := GenChallenge(int64(0), blocks)
+	chal := Challenge{
+		Seed:    0,
+		Indices: blocks,
+	}
 
 	// ------------- the storage provider ---------------- //
 	// fetch the tag & challenge
@@ -235,7 +241,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 	// -------------- TPA --------------- //
 	// Verify the proof
 	h := Challenge{}
-	h.C = chal.C
+	h.Seed = chal.Seed
 	h.Indices = make([]string, SegNum)
 	for i := range chal.Indices {
 		bid := strconv.Itoa(i)

@@ -14,9 +14,7 @@ import (
 )
 
 const (
-	userAddr = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
-	userSk   = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	moneyTo  = 1000000000000000
+	moneyTo = 1000000000000000
 )
 
 var ethEndPoint, qethEndPoint string
@@ -28,14 +26,6 @@ func main() {
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
-
-	balance := test.QueryBalance(userAddr, ethEndPoint)
-	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
-		err := test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	if err := testCloseChannel(); err != nil {
 		log.Fatal(err)
@@ -49,6 +39,19 @@ func main() {
 func testChannelTimeout() (err error) {
 	log.Println("==========test channel timeout=========")
 	contracts.EndPoint = ethEndPoint
+
+	userAddr, userSk, err := test.CreateAddr()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	err = test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
 	proAddr, _, err := test.CreateAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
@@ -149,6 +152,19 @@ func testChannelTimeout() (err error) {
 func testCloseChannel() (err error) {
 	log.Println("test close channel")
 	contracts.EndPoint = ethEndPoint
+
+	userAddr, userSk, err := test.CreateAddr()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	err = test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
 	proAddr, proSk, err := test.CreateAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
