@@ -44,7 +44,7 @@ type groupInfo struct {
 	providers    []string
 	blsKey       *mcl.KeySet
 	upkeeping    *role.UpKeepingItem
-	channel      *role.ChannelItem
+	channel      sync.Map //key is channelID
 	query        *role.QueryItem
 }
 

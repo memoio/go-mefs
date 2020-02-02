@@ -101,52 +101,54 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 	ctx := context.Background()
 
 	if gp.userID != gp.groupID {
-		if gp.channel == nil {
-			utils.MLogger.Warn("channel is empty, reget it")
-			gp.loadContracts(p.localID)
+		res, chanGot, value, err := verifyChanSign(sig)
+		if err != nil {
+			utils.MLogger.Errorf("verify block %s failed, err is : %s", splitedNcid[0], err)
+			return nil, err
 		}
 
-		if gp.channel != nil {
-			utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
-			chanID := gp.channel.ChannelID
-			value := gp.channel.Value
+		cItem := gp.getChanItem(p.localID, chanGot)
+		if cItem == nil {
+			utils.MLogger.Warn("channel is empty, reget it for: ", chanGot)
+			return nil, errors.New("Channel is not valid")
+		}
 
-			res, value, err := p.verify(chanID, value, sig)
-			if err != nil {
-				utils.MLogger.Errorf("verify block %s failed, err is : %s", splitedNcid[0], err)
-				return nil, err
-			}
-
-			if value != nil && value.Cmp(gp.channel.Money) > 0 {
+		if value != nil {
+			if value.Cmp(cItem.Money) > 0 {
 				utils.MLogger.Errorf("verify block %s failed, money is not enough", splitedNcid[0], err)
 				return nil, errors.New("money is not enough")
 			}
 
-			if res {
-				b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+			ok := verifyChanValue(cItem.Value, value)
+			if !ok {
+				return nil, errors.New("money is not right")
+			}
+		}
+
+		if res {
+			utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
+			b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+			if err != nil {
+				utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
+				return nil, err
+			}
+
+			if value != nil {
+				cItem.Value = value
+				cItem.Sig = sig
+
+				key, err := metainfo.NewKeyMeta(cItem.ChannelID, metainfo.Channel)
 				if err != nil {
-					utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
 					return nil, err
 				}
 
-				if value != nil {
-					gp.channel.Value = value
-					gp.channel.Sig = sig
-
-					key, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
-					if err != nil {
-						return nil, err
-					}
-
-					p.ds.PutKey(ctx, key.ToString(), sig, "local")
-				}
-
-				return b.RawData(), nil
+				p.ds.PutKey(ctx, key.ToString(), sig, "local")
 			}
-			utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
-			return nil, errors.New("Signature is wrong")
+
+			return b.RawData(), nil
 		}
-		utils.MLogger.Warn("channel is empty")
+		utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
+		return nil, errors.New("Signature is wrong")
 	} else {
 		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
 		if err != nil {
@@ -159,42 +161,41 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 }
 
 // verify verifies the transaction
-func (p *Info) verify(chanID string, oldValue *big.Int, mes []byte) (bool, *big.Int, error) {
+func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
 	cSign := &pb.ChannelSign{}
 	err := proto.Unmarshal(mes, cSign)
 	if err != nil {
 		utils.MLogger.Error("proto.Unmarshal when provider verify err:", err)
-		return false, nil, err
+		return false, "", nil, err
 	}
 
 	if cSign.GetChannelID() == "test" && string(cSign.GetValue()) == "123" {
 		utils.MLogger.Debug("sign for test and repair")
-		return true, nil, nil
-	}
-
-	// verify channel
-	if cSign.GetChannelID() != chanID {
-		utils.MLogger.Errorf("channelID save %s and got %s are not equal", chanID, cSign.GetChannelID())
-		return false, nil, nil
+		return true, "", nil, nil
 	}
 
 	// verify sign
 	res := role.VerifyChannelSign(cSign)
 	if !res {
 		utils.MLogger.Error("signature is wrong")
-		return false, nil, nil
+		return false, "", nil, nil
 	}
 
+	chanGot := cSign.GetChannelID()
+	valueGot := new(big.Int).SetBytes(cSign.GetValue())
+
+	return res, chanGot, valueGot, nil
+}
+
+func verifyChanValue(oldValue, newValue *big.Int) bool {
 	//verify value;： value ?= oldValue + 100
-	value := new(big.Int).SetBytes(cSign.GetValue())
 	addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 	oldValue = oldValue.Add(oldValue, big.NewInt(addValue))
-	if value.Cmp(oldValue) < 0 {
-		utils.MLogger.Warn(value.String(), " received is less than calculated: ", oldValue.String())
-		return false, nil, nil
+	if newValue.Cmp(oldValue) < 0 {
+		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", oldValue.String())
+		return false
 	}
-
-	return res, value, nil
+	return true
 }
 
 func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {

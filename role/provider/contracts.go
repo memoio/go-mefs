@@ -63,14 +63,21 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 	}
 
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil && gp.userID != gp.groupID && gp.channel != nil && gp.channel.Sig != nil {
+	if gp != nil && gp.userID != gp.groupID {
 		ctx := context.Background()
-		km, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
-		if err != nil {
-			return err
-		}
 
-		p.ds.PutKey(ctx, km.ToString(), gp.channel.Sig, "local")
+		gp.channel.Range(func(key, value interface{}) bool {
+			cItem, ok := value.(*role.ChannelItem)
+			if !ok {
+				return true
+			}
+			km, err := metainfo.NewKeyMeta(cItem.ChannelID, metainfo.Channel)
+			if err != nil {
+				return true
+			}
+			p.ds.PutKey(ctx, km.ToString(), cItem.Sig, "local")
+			return true
+		})
 	}
 
 	return nil
@@ -81,51 +88,60 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 		return nil
 	}
 	gp := p.getGroupInfo(userID, groupID, false)
-	if gp != nil && gp.userID != gp.groupID && gp.channel != nil {
+	if gp != nil && gp.userID != gp.groupID {
 		ctx := context.Background()
-		km, err := metainfo.NewKeyMeta(gp.channel.ChannelID, metainfo.Channel)
-		if err != nil {
-			return err
-		}
+		gp.channel.Range(func(key, v interface{}) bool {
+			cItem, ok := v.(*role.ChannelItem)
+			if !ok {
+				return true
+			}
 
-		valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
-		if err != nil {
-			utils.MLogger.Error("get channel value from local fails: ", err)
-			return err
-		}
-
-		cSign := &pb.ChannelSign{}
-		err = proto.Unmarshal(valueByte, cSign)
-		if err != nil {
-			utils.MLogger.Error("proto.Unmarshal err:", err)
-			return err
-		}
-
-		value := new(big.Int).SetBytes(cSign.GetValue())
-		utils.MLogger.Info("channel value are:", value.String())
-		if value.Cmp(gp.channel.Value) > 0 {
-			gp.channel.Value = value
-			gp.channel.Sig = valueByte
-		}
-
-		if gp.channel.Value.Cmp(gp.channel.Money) >= 0 {
-			cSign := new(pb.ChannelSign)
-			err = proto.Unmarshal(gp.channel.Sig, cSign)
+			km, err := metainfo.NewKeyMeta(cItem.ChannelID, metainfo.Channel)
 			if err != nil {
-				return nil
+				return true
 			}
 
-			// need verify value again
-			retry := 3
-			for retry > 0 {
-				retry--
-				err = role.CloseChannel(gp.channel.ChannelID, p.sk, cSign.GetSig(), gp.channel.Value)
-				if err != nil {
-					continue
-				}
-				break
+			valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
+			if err != nil {
+				utils.MLogger.Error("get channel value from local fails: ", err)
+				return true
 			}
-		}
+
+			cSign := &pb.ChannelSign{}
+			err = proto.Unmarshal(valueByte, cSign)
+			if err != nil {
+				utils.MLogger.Error("proto.Unmarshal err:", err)
+				return true
+			}
+
+			value := new(big.Int).SetBytes(cSign.GetValue())
+			utils.MLogger.Info("channel value are:", value.String())
+			if value.Cmp(cItem.Value) > 0 {
+				cItem.Value = value
+				cItem.Sig = valueByte
+			}
+
+			if cItem.Value.Cmp(cItem.Money) >= 0 {
+				cSign := new(pb.ChannelSign)
+				err = proto.Unmarshal(cItem.Sig, cSign)
+				if err != nil {
+					return true
+				}
+
+				// need verify value again
+				retry := 3
+				for retry > 0 {
+					retry--
+					err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
+					if err != nil {
+						continue
+					}
+					break
+				}
+			}
+			return true
+		})
+
 	}
 
 	return nil
@@ -154,14 +170,29 @@ func (g *groupInfo) loadContracts(proID string) error {
 		g.providers = uItem.ProviderIDs
 	}
 
-	if g.channel == nil {
-		cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
-		if err != nil {
-			return err
-		}
-
-		g.channel = &cItem
+	cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
+	if err != nil {
+		return err
 	}
 
+	g.channel.Store(cItem.ChannelID, &cItem)
+
 	return nil
+}
+
+func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {
+	cv, ok := g.channel.Load(chanID)
+	if !ok {
+		utils.MLogger.Warn("channel is empty, reget it for: ", chanID)
+		cI, err := role.GetChannelInfo(localID, chanID)
+		if err != nil {
+			utils.MLogger.Errorf("channelID %s is not valid", chanID)
+			return nil
+		}
+
+		g.channel.Store(chanID, &cI)
+		return &cI
+	}
+
+	return cv.(*role.ChannelItem)
 }
