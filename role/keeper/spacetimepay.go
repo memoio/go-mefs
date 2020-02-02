@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -186,13 +187,15 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 
 	sort.Sort(tsl) //取出传入的时间区间内的时间数据，进行排序
 	for _, key := range tsl {
-		chalres, ok := l.chalMap.Load(key)
+		chalresI, ok := l.chalMap.Load(key)
 		if !ok {
 			utils.MLogger.Info("fetch challenge results err, time:", utils.UnixToTime(key))
 		}
+
+		chalres := chalresI.(*pb.ChalInfo)
+
 		timeList = append(timeList, key)
-		lengthtemp := chalres.(*chalresult).length
-		lenghList = append(lenghList, lengthtemp)
+		lenghList = append(lenghList, chalres.TotalLength)
 	}
 
 	if len(timeList) <= 1 || len(lenghList) <= 1 {

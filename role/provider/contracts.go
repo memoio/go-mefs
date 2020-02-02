@@ -184,14 +184,14 @@ func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {
 	cv, ok := g.channel.Load(chanID)
 	if !ok {
 		utils.MLogger.Warn("channel is empty, reget it for: ", chanID)
-		cI, err := role.GetChannelInfo(localID, chanID)
+		cItem, err := role.GetChannelInfo(localID, chanID)
 		if err != nil {
 			utils.MLogger.Errorf("channelID %s is not valid", chanID)
 			return nil
 		}
 
-		g.channel.Store(chanID, &cI)
-		return &cI
+		g.channel.Store(chanID, &cItem)
+		return &cItem
 	}
 
 	return cv.(*role.ChannelItem)

@@ -42,7 +42,6 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 					utils.MLogger.Warnf("Verify data for %s fails", splitedNcid[0])
 				}
 			}
-
 		}
 		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {

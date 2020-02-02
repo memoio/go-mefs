@@ -10,7 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/role/pb"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -84,25 +84,19 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	}
 
 	challengetime := utils.GetUnixNow()
-	// timestamp as random source
-	// need more parameters to securely generate random source
-	chal := mcl.GenChallenge(challengetime, ret)
 
-	thischalresult := &chalresult{
-		kid:        localID,
-		pid:        proID,
-		qid:        qid,
-		chalTime:   challengetime,
-		sum:        int64(psum) * df.DefaultSegmentSize,
-		totalSpace: l.maxlength,
-		h:          chal.C,
+	thischalresult := &pb.ChalInfo{
+		KeeperID:    localID,
+		ProviderID:  proID,
+		QueryID:     qid,
+		UserID:      userID,
+		ChalTime:    challengetime,
+		ChalLength:  int64(psum) * df.DefaultSegmentSize,
+		Blocks:      ret,
+		TotalLength: l.maxlength,
 	}
 
-	hProto := &pb.Chalnum{
-		PubC:    int64(chal.C),
-		Indices: chal.Indices,
-	}
-	hByte, err := proto.Marshal(hProto)
+	hByte, err := proto.Marshal(thischalresult)
 	if err != nil {
 		l.inChallenge = false
 		return "", nil, err
@@ -132,9 +126,8 @@ func (l *lInfo) cleanLastChallenge() {
 		return
 	}
 
-	chalResult := thischalresult.(*chalresult)
-	chalResult.res = false
-	chalResult.length = 0
+	chalResult := thischalresult.(*pb.ChalInfo)
+	chalResult.Res = false
 
 	l.inChallenge = false
 }
@@ -193,14 +186,12 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		return false
 	}
 
-	chalResult := thischalresult.(*chalresult)
+	chalResult := thischalresult.(*pb.ChalInfo)
 
 	var chal mcl.Challenge
 	var slength int64 //success length
 	var electedOffset int
 	var buf strings.Builder
-
-	chal.C = chalResult.h
 
 	// key: bucketid_stripeid_blockid_offset
 	set := make(map[string]struct{}, len(splitedindex))
@@ -233,7 +224,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		}
 
 		if off > 0 {
-			electedOffset = chal.C % off
+			electedOffset = chal.Seed % off
 		} else if off == 0 {
 			electedOffset = 0
 		} else {
@@ -301,9 +292,9 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 
 		//update thischalinfo.chalMap
 		blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
-		chalResult.proof = blsProof
-		chalResult.res = true
-		chalResult.length = int64((float64(slength) / float64(chalResult.sum)) * float64(chalResult.totalSpace))
+		chalResult.BlsProof = blsProof
+		chalResult.Res = true
+		chalResult.SuccessLength = int64((float64(slength) / float64(chalResult.ChalLength)) * float64(chalResult.TotalLength))
 		return true
 	}
 

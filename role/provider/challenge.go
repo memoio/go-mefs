@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/role/pb"
+	pb "github.com/memoio/go-mefs/proto"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -37,21 +37,21 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 		return nil
 	}
 
-	hProto := &pb.Chalnum{}
+	hProto := &pb.ChalInfo{}
 	err = proto.Unmarshal(metaValue, hProto)
 	if err != nil {
 		utils.MLogger.Error("unmarshal h failed: ", err)
 	}
 
 	var chal mcl.Challenge
-	chal.C = int(hProto.PubC)
+	chal.Seed = mcl.GenChallenge(hProto)
 
 	// 聚合
 	var data, tag [][]byte
 	var faultBlocks []string
 	var electedOffset int
 	var buf strings.Builder
-	for _, index := range hProto.Indices {
+	for _, index := range hProto.Blocks {
 		if len(index) == 0 {
 			continue
 		}
@@ -64,7 +64,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 			faultBlocks = append(faultBlocks, index)
 			continue
 		} else if off > 0 {
-			electedOffset = chal.C % off
+			electedOffset = chal.Seed % off
 		} else {
 			electedOffset = 0
 		}

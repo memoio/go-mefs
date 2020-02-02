@@ -284,21 +284,6 @@ type blockInfo struct {
 	storedOn  string // stored on which provider
 }
 
-//chalresult 挑战结果在内存中的结构
-//作为chalInfo的value 记录单次挑战的各项信息
-type chalresult struct {
-	kid        string //挑战发起者
-	pid        string //挑战对象
-	qid        string //挑战的数据所属对象
-	chalTime   int64  //挑战发起时间 使用unix时间戳
-	totalSpace int64  //the amount of this user's data on the provider
-	sum        int64  //挑战总空间
-	length     int64  //挑战成功空间
-	h          int    //挑战的随机数
-	res        bool   //挑战是否成功
-	proof      string //挑战结果的证据
-}
-
 //chalpay: for one pay informations
 type chalpay struct {
 	beginTime int64    // last end

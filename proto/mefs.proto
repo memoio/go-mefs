@@ -1,6 +1,15 @@
 syntax = "proto3";
 package proto;
 
+message UserBLS12Config{
+    bytes pubkeyBls = 2;
+    bytes pubkeyG = 3;
+    repeated bytes pubkeyU = 4;
+    repeated bytes pubkeyW = 5;
+    bytes prikeyBls = 6;
+    bytes X = 7;
+}
+
 message SuperBlockInfo {
   repeated uint64 BucketsSet = 1; // User现有的Buckets
   int32 MetaBackupCount = 2; //对于所有的元数据块，副本数
@@ -39,4 +48,53 @@ message ObjectInfo {
   bool Dir = 10;                    //是否为目录
   map<string, string> Metadata = 11; // User可以对文件自定义一些元信息
   string NextPart = 12;             //此项保存此对象追加的下一个part的Key，下一个Part同样以Object形式存在
+}
+
+message BucketOptions {
+	int32 Version = 1;
+	int32 Policy  = 2;
+	int32 DataCount = 3;
+	int32 ParityCount = 4;
+	int32 TagFlag = 5;
+	int32 SegmentSize = 6;
+	// number of segments
+	int32 SegmentCount = 7;
+	bool Encryption = 8; 
+	int32 Start = 11;
+}
+
+message ShareLink{
+    string UserID = 1;
+    string QueryID = 2;
+    string BucketName = 3;
+    string ObjectName = 4;
+    string Etag = 5;
+    BucketOptions BOptions = 6;
+    int32 BucketID = 7;
+    int64 Start = 8;
+    int64 Length = 9;
+    bool Encryption = 10;
+    bytes DecKey = 11;
+}
+
+message ChalInfo{
+    string QueryID = 1;
+    string KeeperID = 2;
+    string ProviderID = 3;
+    string UserID = 4;
+    int64 ChalTime = 5;
+    int64 ChalLength = 6;
+    int64 SuccessLength = 7;
+    int64 TotalLength = 8;
+    repeated string Blocks = 9;
+    repeated string FaultBlocks = 10;
+    string BlsProof = 11;
+    bool Res = 12;
+}
+
+message ChannelSign {
+  string ChannelID = 1;
+  bytes Value = 2;
+  bytes Sig = 3;    //user签名信息
+  bytes PubKey = 4; //user公钥
 }

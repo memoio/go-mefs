@@ -3,7 +3,13 @@ package mcl
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
+	"strconv"
+	"strings"
+
+	pb "github.com/memoio/go-mefs/proto"
+	"golang.org/x/crypto/blake2b"
 )
 
 // customized errors
@@ -58,7 +64,7 @@ type KeySet struct {
 
 // Challenge gives
 type Challenge struct {
-	C       int
+	Seed    int
 	Indices []string
 }
 
@@ -230,9 +236,23 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 }
 
 // GenChallenge 根据时间随机选取的待挑战segments由随机数c对各offset取模而得
-func GenChallenge(src int64, blocks []string) Challenge {
-	// 在[1, PDPCount - TagAtomNum]间随机选出一个整数C
-	rand.Seed(src)
+func GenChallenge(chal *pb.ChalInfo) int {
+	var nb strings.Builder
+	nb.WriteString(chal.QueryID)
+	nb.WriteString(chal.UserID)
+	nb.WriteString(chal.KeeperID)
+	nb.WriteString(chal.ProviderID)
+	nb.WriteString(strconv.FormatInt(chal.ChalTime, 10))
+	nb.WriteString(strconv.FormatInt(chal.TotalLength, 10))
+	nb.WriteString(strconv.FormatInt(chal.ChalLength, 10))
+
+	for i := 0; i < len(chal.Blocks); i++ {
+		nb.WriteString(chal.Blocks[i])
+	}
+
+	hashValue := blake2b.Sum256([]byte(nb.String()))
+	k := new(big.Int).SetBytes(hashValue[:])
+	rand.Seed(k.Int64())
 	var c int
 	for {
 		c = rand.Intn(PDPCount - TagAtomNum)
@@ -240,23 +260,7 @@ func GenChallenge(src int64, blocks []string) Challenge {
 			break
 		}
 	}
-
-	return Challenge{c, blocks}
-}
-
-// VerifyChalNum 确认challenge num的正确性
-func VerifyChalNum(src int64, chalNum int) bool {
-	// 在[1, PDPCount - TagAtomNum]间随机选出一个整数C
-	rand.Seed(src)
-	var c int
-	for {
-		c = rand.Intn(PDPCount - TagAtomNum)
-		if c != 0 {
-			break
-		}
-	}
-
-	return chalNum == c
+	return c
 }
 
 // VerifyTag check segment和tag是否对应
@@ -329,14 +333,14 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 		}
 	}
 
-	if len(k.Pk.ElemG2s) < TagAtomNum+chal.C || len(k.Pk.ElemG1s) < TagAtomNum {
+	if len(k.Pk.ElemG2s) < TagAtomNum+chal.Seed || len(k.Pk.ElemG1s) < TagAtomNum {
 		return nil, ErrNumOutOfRange
 	}
 	// 计算h_j = u_(c+j), j = 0, 1, ..., k-1
 	// 对于BLS12_381,h_j = w_(c+j)
 	h := make([]G2, TagAtomNum)
 	for j := 0; j < TagAtomNum; j++ {
-		h[j] = k.Pk.ElemG2s[chal.C+j]
+		h[j] = k.Pk.ElemG2s[chal.Seed+j]
 	}
 	// muProd = Prod(u_j^sums_j)
 	// nuProd = Prod(h_j^sums_j)
@@ -419,7 +423,7 @@ func (k *KeySet) VerifyProof(chal Challenge, pf *Proof) (bool, error) {
 
 	// 第二步：验证mu与nu是对应的
 	// lhs = e(mu, h0)
-	Pairing(&lhs2, &mu, &k.Pk.ElemG2s[chal.C])
+	Pairing(&lhs2, &mu, &k.Pk.ElemG2s[chal.Seed])
 	// rhs = e(u, nu)
 	Pairing(&rhs2, &k.Pk.ElemG1s[0], &nu)
 	// check
