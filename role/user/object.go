@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,6 +37,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
+
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
@@ -126,7 +128,7 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	var objects []*pb.ObjectInfo
+	var objects ObjectsInfo
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		if objectElement == nil {
 			continue
@@ -145,7 +147,20 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 			objects = append(objects, &object.ObjectInfo)
 		}
 	}
+	sort.Sort(objects)
 	return objects, nil
+}
+
+type ObjectsInfo []*pb.ObjectInfo
+
+func (o ObjectsInfo) Len() int { // 重写 Len() 方法
+	return len(o)
+}
+func (o ObjectsInfo) Swap(i, j int) { // 重写 Swap() 方法
+	o[i], o[j] = o[j], o[i]
+}
+func (o ObjectsInfo) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
+	return o[j].Name < o[i].Name
 }
 
 // ShowStorage show lfs used space without appointed bucket

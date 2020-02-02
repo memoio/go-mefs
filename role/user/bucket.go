@@ -3,6 +3,7 @@ package user
 import (
 	"container/list"
 	"context"
+	"sort"
 	"strings"
 	"time"
 
@@ -90,15 +91,21 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*pb.Buck
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
+
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	if bucket.CurStripe > 0 || bucket.NextOffset > 0 {
-		return nil, ErrBucketNotEmpty
-	}
+
+	l.meta.sb.Lock()
+	bucket.Lock()
 	bucket.Deletion = true
+	delete(l.meta.bucketNameToID, bucket.Name)
+	bucket.Name = bucket.Name + "/" + time.Now().Format(utils.BASETIME)
+	l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
 	bucket.dirty = true
+	bucket.Unlock()
+	defer l.meta.sb.Unlock()
 	return &bucket.BucketInfo, nil
 }
 
@@ -117,6 +124,7 @@ func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*pb.Bucket
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
+
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
@@ -133,7 +141,8 @@ func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketI
 	if l.meta.bucketByID == nil {
 		return nil, ErrBucketNotExist
 	}
-	var lsuperBucket []*pb.BucketInfo
+
+	var lsuperBucket BucketsInfo
 	for _, bs := range l.meta.bucketByID {
 		if bs.Deletion {
 			continue
@@ -142,5 +151,19 @@ func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketI
 			lsuperBucket = append(lsuperBucket, &bs.BucketInfo)
 		}
 	}
+
+	sort.Sort(lsuperBucket)
 	return lsuperBucket, nil
+}
+
+type BucketsInfo []*pb.BucketInfo
+
+func (b BucketsInfo) Len() int { // 重写 Len() 方法
+	return len(b)
+}
+func (b BucketsInfo) Swap(i, j int) { // 重写 Swap() 方法
+	b[i], b[j] = b[j], b[i]
+}
+func (b BucketsInfo) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
+	return b[j].Name < b[i].Name
 }

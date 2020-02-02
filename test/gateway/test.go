@@ -11,6 +11,8 @@ func main() {
 	// Use a secure connection.
 	ssl := false
 
+	bucketName := "mybucket"
+
 	// Initialize minio client object.
 	minioClient, err := minio.New("127.0.0.1:5080", "0x7aD8AA67aFEE05Fd539B938db69957050dDDA1c3", "123456789", ssl)
 	if err != nil {
@@ -20,19 +22,35 @@ func main() {
 
 	log.Println("Successfully link client.")
 
-	found, err := minioClient.BucketExists("mybucket")
+	found, err := minioClient.BucketExists(bucketName)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
 	if !found {
-		err = minioClient.MakeBucket("mybucket", "us-east-1")
+		err = minioClient.MakeBucket(bucketName, "us-east-1")
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		log.Println("Successfully created mybucket.")
+	}
+
+	err = minioClient.RemoveBucket(bucketName)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	found, err = minioClient.BucketExists(bucketName)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if found {
+		log.Println("remove fails")
 	}
 
 	file, err := os.Open("./test.go")

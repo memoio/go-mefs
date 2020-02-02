@@ -435,6 +435,8 @@ func convertToMinioError(err error, bucket, object string) error {
 		return minio.ObjectNameInvalid{Bucket: bucket, Object: object}
 	case user.ErrObjectAlreadyExist:
 		return minio.ObjectAlreadyExists{Bucket: bucket, Object: object}
+	case user.ErrObjectNotExist:
+		return minio.ObjectNotFound{Bucket: bucket, Object: object}
 	default:
 		return err
 	}
