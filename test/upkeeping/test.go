@@ -1,22 +1,14 @@
 package main
 
 import (
-	"context"
-	"crypto/ecdsa"
 	"flag"
 	"log"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -43,32 +35,19 @@ func main() {
 
 	contracts.EndPoint = ethEndPoint
 
-	userAddr, userSk, err := createAddr()
+	userAddr, userSk, err := test.CreateAddr()
 	if err != nil {
-		log.Fatal("create user fails")
+		log.Fatal("create user fails:", err)
 	}
 
-	balance := queryBalance(userAddr)
-	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
-		transferTo(big.NewInt(moneyTo), userAddr)
-	}
+	test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
 
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(userAddr)
-		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-			break
-		}
-
-		log.Println(userAddr, "'s Balance now:", balance.String(), ", waiting for transfer success")
-	}
-
-	if err := smartContractTest(kCount, pCount, amount, userAddr, userSk); err != nil {
+	if err := ukTest(kCount, pCount, amount, userAddr, userSk); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) error {
+func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) error {
 	log.Println(">>>>>>>>>>>>>>>>>>>>>SmartContractTest>>>>>>>>>>>>>>>>>>>>>")
 	defer log.Println("===================SmartContractTestEnd============================")
 
@@ -77,12 +56,12 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	mapProviderAddr := make(map[common.Address]*big.Int)
 	listKeeperAddr := []common.Address{localAddr}
 	listProviderAddr := []common.Address{}
-	mapKeeperAddr[localAddr] = queryBalance(localAddr.String())
+	mapKeeperAddr[localAddr] = test.QueryBalance(localAddr.String(), qethEndPoint)
 
 	i := 0
 	for _, serverKid := range serverKids { //得到keeper地址 并且查询初始余额
 		tempAddr, _ := address.GetAddressFromID(serverKid)
-		mapKeeperAddr[tempAddr] = queryBalance(tempAddr.String())
+		mapKeeperAddr[tempAddr] = test.QueryBalance(tempAddr.String(), qethEndPoint)
 		listKeeperAddr = append(listKeeperAddr, tempAddr)
 		if i++; i == kCount-1 {
 			break
@@ -91,7 +70,7 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	i = 0
 	for _, serverPid := range serverPids { //得到provider地址 并查询初始余额
 		tempAddr, _ := address.GetAddressFromID(serverPid)
-		mapProviderAddr[tempAddr] = queryBalance(tempAddr.String())
+		mapProviderAddr[tempAddr] = test.QueryBalance(tempAddr.String(), qethEndPoint)
 		listProviderAddr = append(listProviderAddr, tempAddr)
 		if i++; i == pCount {
 			break
@@ -123,14 +102,14 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr.String())
+		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
 		if amountUk.Cmp(big.NewInt(100)) > 0 {
 			log.Println("contract balance", amountUk)
 			if amountUk.Cmp(big.NewInt(234500)) != 0 {
 				log.Fatal("Contract balance is not equal to preset: 234500")
 			}
 
-			amountLocal := queryBalance(userAddr)
+			amountLocal := test.QueryBalance(userAddr, qethEndPoint)
 			amountCost := big.NewInt(0)
 			amountCost.Sub(amountLocal, mapKeeperAddr[localAddr])
 			log.Println("user balance change due to deploy：", amountCost)
@@ -159,11 +138,11 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		amountUk := queryBalance(ukaddr.String())
+		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
 		if amountUk.Cmp(big.NewInt(234500)) < 0 {
 			log.Println("keeper's balance change")
 			for kAddr, amount := range mapKeeperAddr {
-				amountNow := queryBalance(kAddr.String())
+				amountNow := test.QueryBalance(kAddr.String(), qethEndPoint)
 				amountCost := big.NewInt(0)
 				amountCost.Sub(amountNow, amount)
 				log.Println(kAddr.String(), ":", amountCost)
@@ -177,7 +156,7 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 
 			log.Println("provider's balance change")
 			for pAddr, amount := range mapProviderAddr {
-				amountNow := queryBalance(pAddr.String())
+				amountNow := test.QueryBalance(pAddr.String(), qethEndPoint)
 				amountCost := big.NewInt(0)
 				amountCost.Sub(amountNow, amount)
 				log.Println(pAddr.String(), ":", amountCost)
@@ -210,109 +189,4 @@ func smartContractTest(kCount int, pCount int, amount *big.Int, userAddr, userSk
 	log.Println("upkeeping's tests pass")
 
 	return nil
-}
-
-func transferTo(value *big.Int, addr string) {
-	client, err := ethclient.Dial(ethEndPoint)
-	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
-	}
-	log.Println("ethclient.Dial success")
-
-	privateKey, err := crypto.HexToECDSA("928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4")
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("crypto.HexToECDSA success")
-
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		log.Fatal("error casting public key to ECDSA")
-	}
-	log.Println("cast public key to ECDSA success")
-
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("client.PendingNonceAt success")
-	gasLimit := uint64(21000) // in units
-
-	gasPrice := big.NewInt(30000000000) // in wei (30 gwei)
-	gasPrice, err = client.SuggestGasPrice(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("client.SuggestGasPrice success")
-
-	toAddress := common.HexToAddress(addr[2:])
-	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
-
-	chainID, err := client.NetworkID(context.Background())
-	if err != nil {
-		log.Println("client.NetworkID error,use the default chainID")
-		chainID = big.NewInt(666)
-	}
-
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("types.SignTx success")
-
-	err = client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("transfer ", value.String(), "to", addr)
-	log.Printf("tx sent: %s\n", signedTx.Hash().Hex())
-}
-
-func queryBalance(addr string) *big.Int {
-	var result string
-	client, err := rpc.Dial(qethEndPoint)
-	if err != nil {
-		log.Fatal("rpc.dial err:", err)
-	}
-	err = client.Call(&result, "eth_getBalance", addr, "latest")
-	if err != nil {
-		log.Fatal("client.call err:", err)
-	}
-	return utils.HexToBigInt(result)
-}
-
-func createAddr() (string, string, error) {
-	identity, err := config.CreateID(os.Stdout, 2048)
-	if err != nil {
-		return "", "", err
-	}
-	address, err := address.GetAddressFromID(identity.PeerID)
-	if err != nil {
-		return "", "", err
-	}
-	addressHex := address.Hex()
-	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
-	if err != nil {
-		return "", "", err
-	}
-
-	balance := queryBalance(addressHex)
-	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
-		transferTo(big.NewInt(moneyTo), addressHex)
-	}
-
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(addressHex)
-		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-			break
-		}
-
-		log.Println(addressHex, "'s Balance now:", balance.String(), ", waiting for transfer success")
-	}
-
-	return addressHex, sk, nil
 }

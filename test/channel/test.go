@@ -1,23 +1,15 @@
 package main
 
 import (
-	"context"
-	"crypto/ecdsa"
 	"flag"
 	"log"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
-	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/role"
-	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -37,19 +29,12 @@ func main() {
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
 
-	balance := queryBalance(userAddr)
+	balance := test.QueryBalance(userAddr, ethEndPoint)
 	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
-		transferTo(big.NewInt(moneyTo), userAddr)
-	}
-
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(userAddr)
-		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-			break
+		err := test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
+		if err != nil {
+			log.Fatal(err)
 		}
-
-		log.Println(userAddr, "'s Balance now:", balance.String(), ", waiting for transfer success")
 	}
 
 	if err := testCloseChannel(); err != nil {
@@ -64,9 +49,15 @@ func main() {
 func testChannelTimeout() (err error) {
 	log.Println("==========test channel timeout=========")
 	contracts.EndPoint = ethEndPoint
-	proAddr, _, err := createAddr()
+	proAddr, _, err := test.CreateAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
+	}
+
+	err = test.TransferTo(big.NewInt(moneyTo), proAddr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println(err)
+		return err
 	}
 
 	providerAddr := common.HexToAddress(proAddr[2:])
@@ -85,11 +76,11 @@ func testChannelTimeout() (err error) {
 	log.Println("test query channel balance: ", channelAddr.String())
 	contracts.EndPoint = qethEndPoint
 	retryCount := 0
-	cbalance := queryBalance(channelAddr.String())
+	cbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		cbalance = queryBalance(channelAddr.String()) //查看部署的channel合约的账户余额
+		cbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if cbalance.Cmp(big.NewInt(0)) == 0 {
 			if retryCount > 20 {
 				log.Fatal("channel contract has no balance")
@@ -131,11 +122,11 @@ func testChannelTimeout() (err error) {
 	}
 
 	retryCount = 0
-	nbalance := queryBalance(channelAddr.String())
+	nbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		nbalance = queryBalance(channelAddr.String()) //查看部署的channel合约的账户余额
+		nbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if nbalance.Cmp(cbalance) == 0 {
 			if retryCount > 20 {
 				log.Fatal("call channel timeout failed")
@@ -158,9 +149,15 @@ func testChannelTimeout() (err error) {
 func testCloseChannel() (err error) {
 	log.Println("test close channel")
 	contracts.EndPoint = ethEndPoint
-	proAddr, proSk, err := createAddr()
+	proAddr, proSk, err := test.CreateAddr()
 	if err != nil {
 		log.Fatal("create provider fails")
+	}
+
+	err = test.TransferTo(big.NewInt(moneyTo), proAddr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println(err)
+		return err
 	}
 
 	providerAddr := common.HexToAddress(proAddr[2:])
@@ -177,11 +174,11 @@ func testCloseChannel() (err error) {
 
 	log.Println("test query channel balance: ", channelAddr.String())
 	retryCount := 0
-	cbalance := queryBalance(channelAddr.String())
+	cbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		cbalance = queryBalance(channelAddr.String()) //查看部署的channel合约的账户余额
+		cbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if cbalance.Cmp(big.NewInt(0)) == 0 {
 			if retryCount > 20 {
 				log.Fatal("channel contract has no balance")
@@ -207,7 +204,7 @@ func testCloseChannel() (err error) {
 	}
 
 	log.Println("test close channel contract")
-	balance := queryBalance(userAddr) //查看账户余额
+	balance := test.QueryBalance(userAddr, qethEndPoint) //查看账户余额
 	//签名
 	value := big.NewInt(11111)
 	contracts.EndPoint = ethEndPoint
@@ -226,11 +223,11 @@ func testCloseChannel() (err error) {
 	}
 
 	retryCount = 0
-	nbalance := queryBalance(channelAddr.String())
+	nbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		nbalance = queryBalance(channelAddr.String()) //查看部署的channel合约的账户余额
+		nbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if nbalance.Cmp(big.NewInt(0)) > 0 {
 			if retryCount > 20 {
 				log.Println("call close channel, balance has: ", nbalance.String())
@@ -244,11 +241,11 @@ func testCloseChannel() (err error) {
 	}
 
 	retryCount = 0
-	ubalance := queryBalance(userAddr)
+	ubalance := test.QueryBalance(userAddr, qethEndPoint)
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		ubalance = queryBalance(userAddr)
+		ubalance = test.QueryBalance(userAddr, qethEndPoint)
 		if ubalance.Cmp(balance) == 0 {
 			if retryCount > 20 {
 				log.Fatal("channel contract has balance")
@@ -267,109 +264,4 @@ func testCloseChannel() (err error) {
 		break
 	}
 	return nil
-}
-
-func createAddr() (string, string, error) {
-	identity, err := config.CreateID(os.Stdout, 2048)
-	if err != nil {
-		return "", "", err
-	}
-	address, err := address.GetAddressFromID(identity.PeerID)
-	if err != nil {
-		return "", "", err
-	}
-	addressHex := address.Hex()
-	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
-	if err != nil {
-		return "", "", err
-	}
-
-	balance := queryBalance(addressHex)
-	if balance.Cmp(big.NewInt(moneyTo)) <= 0 {
-		transferTo(big.NewInt(moneyTo), addressHex)
-	}
-
-	for {
-		time.Sleep(30 * time.Second)
-		balance := queryBalance(addressHex)
-		if balance.Cmp(big.NewInt(moneyTo)) >= 0 {
-			break
-		}
-
-		log.Println(addressHex, "'s Balance now:", balance.String(), ", waiting for transfer success")
-	}
-
-	return addressHex, sk, nil
-}
-
-func transferTo(value *big.Int, addr string) {
-	client, err := ethclient.Dial(ethEndPoint)
-	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
-	}
-	log.Println("ethclient.Dial success")
-
-	privateKey, err := crypto.HexToECDSA("928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4")
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("crypto.HexToECDSA success")
-
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		log.Fatal("error casting public key to ECDSA")
-	}
-	log.Println("cast public key to ECDSA success")
-
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("client.PendingNonceAt success")
-	gasLimit := uint64(21000) // in units
-
-	gasPrice := big.NewInt(30000000000) // in wei (30 gwei)
-	gasPrice, err = client.SuggestGasPrice(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("client.SuggestGasPrice success")
-
-	toAddress := common.HexToAddress(addr[2:])
-	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
-
-	chainID, err := client.NetworkID(context.Background())
-	if err != nil {
-		log.Println("client.NetworkID error,use the default chainID")
-		chainID = big.NewInt(666)
-	}
-
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("types.SignTx success")
-
-	err = client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("transfer ", value.String(), "to", addr)
-	log.Printf("tx sent: %s\n", signedTx.Hash().Hex())
-}
-
-func queryBalance(addr string) *big.Int {
-	var result string
-	client, err := rpc.Dial(qethEndPoint)
-	if err != nil {
-		log.Fatal("rpc.dial err:", err)
-	}
-	err = client.Call(&result, "eth_getBalance", addr, "latest")
-	if err != nil {
-		log.Fatal("client.call err:", err)
-	}
-	return utils.HexToBigInt(result)
 }
