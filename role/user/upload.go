@@ -77,6 +77,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	segStripeSize := int64(bo.SegmentSize)
 	stripeSize := int64(bo.SegmentCount*bo.DataCount) * segStripeSize
+
 	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
 
 	opart := &pb.ObjectPart{

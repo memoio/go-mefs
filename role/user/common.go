@@ -68,12 +68,14 @@ var (
 
 func DefaultBucketOptions() *pb.BucketOptions {
 	return &pb.BucketOptions{
-		Policy:      dataformat.RsPolicy,
-		DataCount:   3,
-		ParityCount: 2,
-		SegmentSize: dataformat.DefaultSegmentSize,
-		TagFlag:     dataformat.BLS12,
-		Encryption:  0,
+		Version:      1,
+		Policy:       dataformat.RsPolicy,
+		DataCount:    3,
+		ParityCount:  2,
+		SegmentSize:  dataformat.DefaultSegmentSize,
+		TagFlag:      dataformat.BLS12,
+		SegmentCount: dataformat.DefaultSegmentCount,
+		Encryption:   0,
 	}
 }
 
