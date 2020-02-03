@@ -106,17 +106,17 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	su.(*LfsInfo).privateKey = localKey
 
 	decoder := dataformat.NewDataCoderWithBopts(bo, su.(*LfsInfo).keySet)
+	segSize := int64(bo.GetSegmentSize())
 	stripeSize := int64(bo.SegmentCount * bo.SegmentSize * bo.GetDataCount())
-	segStripeSize := int64(bo.GetSegmentSize()) * int64(bo.GetDataCount())
 
 	for i := 0; i < len(sl.GetOParts()); i++ {
 		opart := sl.GetOParts()[i]
 		// 下载的开始条带
 		stripePos := opart.Start / stripeSize
 		// 下载开始的segment
-		segPos := (opart.Start % stripeSize) / segStripeSize
+		segPos := (opart.Start % stripeSize) / segSize
 		// segment的偏移
-		offsetPos := opart.Start % segStripeSize
+		offsetPos := opart.Start % segSize
 
 		dl := &downloadTask{
 			fsID:         sl.QueryID,

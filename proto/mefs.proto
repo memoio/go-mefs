@@ -16,6 +16,9 @@ message SuperBlockInfo {
   int32 NextBucketID = 3;
   int32 MagicNumber = 4;
   int32 Version = 5; //版本号
+  int64 CTime = 6;
+  int64 MTime = 7; // according to merkle root
+  bytes Root = 8;    // merkel root of bucket hash 
 }
 
 message BucketOptions {
@@ -36,9 +39,10 @@ message BucketInfo {
   BucketOptions BOpts = 4;
   int64 CurStripe = 5;      //当前写到哪一个Stripe
   int64 NextSeg = 6;        //当前写到哪一个Offset
-  int64 LastModified = 7;   //本Bucket内数据上次修改时间
+  int64 MTime = 7;   //本Bucket内数据上次修改时间
   int64 ObjectsBlockSize = 8; //本Bucket的ObjectsBlock序列化后占多少字节
   bool Deletion = 9;        //Bucket是否已删除
+  bytes Root = 10;
 }
 
 message ObjectInfo {
@@ -48,7 +52,8 @@ message ObjectInfo {
   bool Dir = 4;                     //是否为目录
   bool Deletion = 5;                //对象是否已删除
   map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
-  ObjectPart OPart = 7;
+  int64 ObjectID = 7;               // increase from 0
+  ObjectPart OPart = 8;             
 }
 
 message ObjectPart {
@@ -62,6 +67,8 @@ message ObjectPart {
 message BlockOptions {
   BucketOptions Bopts = 1;
   int32 Start = 2;
+  string UserID = 11; // for OSD
+  string QueryID = 12;
 }
 
 message ShareLink{

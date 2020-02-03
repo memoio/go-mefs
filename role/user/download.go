@@ -125,8 +125,8 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	bo := bucket.BOpts
 
-	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
-	stripeSize := int64(bo.SegmentCount) * segStripeSize
+	segStripeSize := int64(bo.SegmentSize)
+	stripeSize := int64(bo.SegmentCount*bo.DataCount) * segStripeSize
 
 	// 下载的开始条带
 	stripePos := start / stripeSize

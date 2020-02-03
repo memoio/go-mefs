@@ -75,8 +75,8 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " begin")
 
-	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
-	stripeSize := int64(bo.SegmentCount) * segStripeSize
+	segStripeSize := int64(bo.SegmentSize)
+	stripeSize := int64(bo.SegmentCount*bo.DataCount) * segStripeSize
 	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
 
 	opart := &pb.ObjectPart{
