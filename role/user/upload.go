@@ -3,8 +3,6 @@ package user
 import (
 	"context"
 	"crypto/md5"
-	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -113,7 +111,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	if bo.Encryption == 1 {
-		ul.sKey = getAesKey(l.privateKey, bucketID, start)
+		ul.sKey = CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, start)
 	}
 
 	err = ul.Start(ctx)
@@ -163,14 +161,6 @@ func (u *uploadTask) Info() (interface{}, error) {
 		return nil, ErrObjectNotExist
 	}
 	return u, nil
-}
-
-func getAesKey(privateKey []byte, bucketID int32, objectStart int64) [32]byte {
-	tmpkey := make([]byte, len(privateKey)+12)
-	copy(tmpkey, privateKey)
-	binary.LittleEndian.PutUint32(tmpkey[len(privateKey):], uint32(bucketID))
-	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+4:], uint64(objectStart))
-	return sha256.Sum256(tmpkey)
 }
 
 type blockMeta struct {

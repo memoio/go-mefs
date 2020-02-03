@@ -13,7 +13,7 @@ type BucketStat struct {
 	Policy      int32
 	DataCount   int32
 	ParityCount int32
-	Encryption  bool
+	Encryption  int32
 }
 
 type Buckets struct {

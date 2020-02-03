@@ -36,7 +36,7 @@ func (l *LfsInfo) putUserConfig() {
 		return
 	}
 
-	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet, l.privateKey)
+	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet, []byte(l.privateKey))
 	if err != nil {
 		return
 	}
@@ -90,7 +90,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	has := false
 	userBLS12config, err := l.ds.GetKey(ctx, blskey, "local")
 	if err == nil && len(userBLS12config) > 0 { //先从本地找，如果有就解析一下
-		mkey, err := parseBLS12ConfigMeta(l.privateKey, userBLS12config)
+		mkey, err := parseBLS12ConfigMeta([]byte(l.privateKey), userBLS12config)
 		if err == nil && mkey != nil {
 			l.keySet = mkey
 			has = true
@@ -101,7 +101,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	for _, kid := range l.gInfo.tempKeepers {
 		res, err := l.ds.GetKey(ctx, blskey, kid)
 		if err == nil && len(res) > 0 {
-			mkey, err := parseBLS12ConfigMeta(l.privateKey, res)
+			mkey, err := parseBLS12ConfigMeta([]byte(l.privateKey), res)
 			if err == nil && mkey != nil {
 				if l.keySet == nil {
 					userBLS12config = res

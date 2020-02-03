@@ -69,7 +69,7 @@ func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64
 		// check stats
 		fs := u.GetUser(userID)
 		if fs != nil && fs.Online() {
-			return fs.(*LfsInfo), errors.New("user exists")
+			return fs.(*LfsInfo), nil
 		}
 	}
 
@@ -81,6 +81,9 @@ func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64
 		if err == nil {
 			ginfo.queryItem = &qItem
 		} else {
+			if sk == "" {
+				return nil, errors.New("user has no private key")
+			}
 			qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
 			if err != nil {
 				return nil, err
@@ -120,7 +123,7 @@ func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64
 		fsID:       queryID,
 		context:    ctx,
 		cancelFunc: cancel,
-		privateKey: []byte(sk),
+		privateKey: sk,
 		gInfo:      ginfo,
 		ds:         u.ds,
 	}

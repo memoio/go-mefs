@@ -119,7 +119,8 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 
 		x, err := btcec.Decrypt(seck, userBLS12ConfigProto.X)
 		if err != nil {
-			return mkey, err
+			utils.MLogger.Info("decrypt private key err: ", err)
+			return mkey, nil
 		}
 		err = sk.ElemSk.Deserialize(x)
 		if err != nil {

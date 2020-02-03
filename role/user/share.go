@@ -65,7 +65,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	}
 
 	if bucket.BOpts.Encryption == 1 {
-		decKey := getAesKey(l.privateKey, bucket.BucketID, object.OPart.Start)
+		decKey := CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
 		sl.DecKey = decKey[:]
 	}
 
@@ -78,7 +78,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 }
 
 // GetShareObject constructs lfs download process
-func (l *LfsInfo) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, share []byte) error {
+func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, localKey string, share []byte) error {
 
 	sl := new(pb.ShareLink)
 
@@ -89,10 +89,24 @@ func (l *LfsInfo) GetShareObject(ctx context.Context, writer io.Writer, complete
 
 	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
 
+	su, err := u.NewFS(sl.UserID, sl.QueryID, "", 0, 0, 0, 0, 0, false)
+	if err != nil {
+		utils.MLogger.Errorf("create share user %s error: %s", sl.UserID, err)
+		return err
+	}
+
+	err = su.Start(ctx)
+	if err != nil {
+		utils.MLogger.Errorf("share user %s started error: %s", sl.UserID, err)
+		return err
+	}
+
 	bo := sl.BOpts
 
-	decoder := dataformat.NewDataCoderWithBopts(bo, l.keySet)
-	stripeSize := int64(utils.BlockSize * bo.GetDataCount())
+	su.(*LfsInfo).privateKey = localKey
+
+	decoder := dataformat.NewDataCoderWithBopts(bo, su.(*LfsInfo).keySet)
+	stripeSize := int64(bo.SegmentCount * bo.SegmentSize * bo.GetDataCount())
 	segStripeSize := int64(bo.GetSegmentSize()) * int64(bo.GetDataCount())
 
 	for i := 0; i < len(sl.GetOParts()); i++ {
@@ -107,7 +121,7 @@ func (l *LfsInfo) GetShareObject(ctx context.Context, writer io.Writer, complete
 		dl := &downloadTask{
 			fsID:         sl.QueryID,
 			bucketID:     sl.BucketID,
-			group:        l.gInfo,
+			group:        su.(*LfsInfo).gInfo,
 			decoder:      decoder,
 			state:        Pending,
 			startTime:    time.Now(),

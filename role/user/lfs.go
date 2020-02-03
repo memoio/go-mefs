@@ -25,7 +25,7 @@ import (
 type LfsInfo struct {
 	userID     string
 	fsID       string // use query addr as fsID
-	privateKey []byte
+	privateKey string // of userID
 	gInfo      *groupInfo
 	ds         data.Service
 	keySet     *mcl.KeySet
@@ -536,7 +536,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		}
 		pbSuperBlock := pb.SuperBlockInfo{}
 		SbBuffer := bytes.NewBuffer(data)
-		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*utils.BlockSize)
+		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*dataformat.BlockSize)
 		err = SbDelimitedReader.ReadMsg(&pbSuperBlock)
 		if err == io.EOF {
 		} else if err != nil {
@@ -615,7 +615,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 			}
 			bucket := pb.BucketInfo{}
 			BucketBuffer := bytes.NewBuffer(data)
-			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*utils.BlockSize)
+			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*dataformat.BlockSize)
 			err = BucketDelimitedReader.ReadMsg(&bucket)
 			if err != nil && err != io.EOF {
 				continue
@@ -704,7 +704,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		fullData = append(fullData, data...)
 
 		objectsBuffer := bytes.NewBuffer(fullData)
-		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*utils.BlockSize)
+		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*dataformat.BlockSize)
 		for {
 			object := pb.ObjectInfo{}
 			err := objectsDelimitedReader.ReadMsg(&object)

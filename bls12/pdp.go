@@ -255,7 +255,7 @@ func GenChallenge(chal *pb.ChalInfo) int {
 	rand.Seed(k.Int64())
 	var c int
 	for {
-		c = rand.Intn(PDPCount - TagAtomNum)
+		c = rand.Int()
 		if c != 0 {
 			break
 		}
@@ -338,9 +338,12 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	}
 	// 计算h_j = u_(c+j), j = 0, 1, ..., k-1
 	// 对于BLS12_381,h_j = w_(c+j)
+
+	c := chal.Seed % (PDPCount - TagAtomNum)
+
 	h := make([]G2, TagAtomNum)
 	for j := 0; j < TagAtomNum; j++ {
-		h[j] = k.Pk.ElemG2s[chal.Seed+j]
+		h[j] = k.Pk.ElemG2s[c+j]
 	}
 	// muProd = Prod(u_j^sums_j)
 	// nuProd = Prod(h_j^sums_j)
@@ -423,7 +426,8 @@ func (k *KeySet) VerifyProof(chal Challenge, pf *Proof) (bool, error) {
 
 	// 第二步：验证mu与nu是对应的
 	// lhs = e(mu, h0)
-	Pairing(&lhs2, &mu, &k.Pk.ElemG2s[chal.Seed])
+	c := chal.Seed % (PDPCount - TagAtomNum)
+	Pairing(&lhs2, &mu, &k.Pk.ElemG2s[c])
 	// rhs = e(u, nu)
 	Pairing(&rhs2, &k.Pk.ElemG1s[0], &nu)
 	// check

@@ -115,7 +115,6 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 }
 
 func (l *lInfo) cleanLastChallenge() {
-
 	if !l.inChallenge {
 		return
 	}
@@ -192,6 +191,8 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	var slength int64 //success length
 	var electedOffset int
 	var buf strings.Builder
+
+	chal.Seed = mcl.GenChallenge(chalResult)
 
 	// key: bucketid_stripeid_blockid_offset
 	set := make(map[string]struct{}, len(splitedindex))

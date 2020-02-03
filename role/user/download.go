@@ -155,7 +155,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	// default AES
 	if bo.Encryption == 1 {
 		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-		dl.sKey = getAesKey(l.privateKey, bucketID, stripePos)
+		dl.sKey = CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, stripePos)
 		dl.encrypt = 1
 	}
 
@@ -168,7 +168,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	dStart := do.dStart // 0
 	dc := do.decoder.Prefix.Bopts.DataCount
 	segSize := do.decoder.Prefix.Bopts.SegmentSize
-	stripeSize := int64(utils.BlockSize * dc)
+	stripeSize := int64(do.decoder.Prefix.Bopts.SegmentCount * segSize * dc)
 
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
 	segPos := segStart * int64(segSize) * int64(dc)
@@ -402,7 +402,7 @@ func (ds *downloadJob) getChannelSign(ncid string, provider string) ([]byte, *bi
 
 	if pinfo.chanItem != nil {
 		channelID = pinfo.chanItem.ChannelID
-		addValue := int64((utils.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
+		addValue := int64((dataformat.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
 		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 

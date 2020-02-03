@@ -17,6 +17,7 @@ const (
 	DefaultSegmentCount = 256
 	DefaultTagFlag      = BLS12
 	CurrentVersion      = 1
+	BlockSize           = 1024 * 1024
 )
 
 var (

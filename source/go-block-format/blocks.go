@@ -19,10 +19,6 @@ import (
 // according to the contents. It is currently used only when debugging.
 var ErrWrongHash = errors.New("data did not match given hash")
 
-//identify current block check method, default is 1(CRC32)
-const defaultFlag int32 = 1
-const checkSize = 4 * 1024 //(4k)
-
 // Block provides abstraction for blocks implementations.
 type Block interface {
 	RawData() []byte

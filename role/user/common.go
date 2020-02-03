@@ -1,7 +1,9 @@
 package user
 
 import (
+	"encoding/binary"
 	"errors"
+	"golang.org/x/crypto/blake2b"
 	"time"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
@@ -92,4 +94,14 @@ func checkObjectName(objectName string) error {
 		}
 	}
 	return nil
+}
+
+// CreateAesKey creates
+func CreateAesKey(privateKey, queryID []byte, bucketID int32, objectStart int64) [32]byte {
+	tmpkey := make([]byte, len(privateKey)+len(queryID)+12)
+	copy(tmpkey, privateKey)
+	copy(tmpkey[len(privateKey):], queryID)
+	binary.LittleEndian.PutUint32(tmpkey[len(privateKey)+len(queryID):], uint32(bucketID))
+	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID)+4:], uint64(objectStart))
+	return blake2b.Sum256(tmpkey)
 }
