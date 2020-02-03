@@ -11,6 +11,72 @@ import (
 	"github.com/memoio/go-mefs/utils"
 )
 
+// GenShareObject constructs sharelink
+func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
+	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
+	if !l.online || l.meta.bucketNameToID == nil {
+		return nil, ErrLfsServiceNotReady
+	}
+
+	bucketID, ok := l.meta.bucketNameToID[bucketName]
+	if !ok {
+		return nil, ErrBucketNotExist
+	}
+
+	bucket, ok := l.meta.bucketByID[bucketID]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, ErrBucketNotExist
+	}
+
+	objectElement, ok := bucket.objects[objectName]
+	if !ok {
+		return nil, ErrObjectNotExist
+	}
+
+	object, ok := objectElement.Value.(*objectInfo)
+	if !ok || object == nil || object.Deletion {
+		return nil, ErrObjectNotExist
+	}
+
+	sl := &pb.ShareLink{
+		UserID:     l.userID,
+		QueryID:    l.fsID,
+		BucketName: bucketName,
+		ObjectName: objectName,
+		BOpts:      bucket.BOpts,
+		BucketID:   bucket.BucketID,
+		OParts:     make([]*pb.ObjectPart, 1),
+	}
+
+	opart := object.GetOPart()
+	sl.OParts[0] = opart
+	for opart.GetNextPart() != "" {
+		objectElement, ok := bucket.objects[opart.GetNextPart()]
+		if !ok {
+			break
+		}
+
+		object, ok = objectElement.Value.(*objectInfo)
+		if !ok || object == nil || object.Deletion {
+			break
+		}
+		opart = object.GetOPart()
+		sl.OParts = append(sl.OParts, opart)
+	}
+
+	if bucket.BOpts.Encryption == 1 {
+		decKey := getAesKey(l.privateKey, bucket.BucketID, object.OPart.Start)
+		sl.DecKey = decKey[:]
+	}
+
+	sByte, err := proto.Marshal(sl)
+	if err != nil {
+		return nil, err
+	}
+
+	return sByte, nil
+}
+
 // GetShareObject constructs lfs download process
 func (l *LfsInfo) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, share []byte) error {
 
@@ -23,40 +89,46 @@ func (l *LfsInfo) GetShareObject(ctx context.Context, writer io.Writer, complete
 
 	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
 
-	bucket := sl.BOptions
+	bo := sl.BOpts
 
-	stripeSize := int64(utils.BlockSize * bucket.GetDataCount())
-	segStripeSize := int64(bucket.GetSegmentSize()) * int64(bucket.GetDataCount())
-	// 下载的开始条带
-	stripePos := sl.Start / stripeSize
-	// 下载开始的segment
-	segPos := (sl.Start % stripeSize) / segStripeSize
-	// segment的偏移
-	offsetPos := sl.Start % segStripeSize
+	decoder := dataformat.NewDataCoderWithBopts(bo, l.keySet)
+	stripeSize := int64(utils.BlockSize * bo.GetDataCount())
+	segStripeSize := int64(bo.GetSegmentSize()) * int64(bo.GetDataCount())
 
-	decoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), dataformat.CurrentVersion, int(bucket.ParityCount), int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
+	for i := 0; i < len(sl.GetOParts()); i++ {
+		opart := sl.GetOParts()[i]
+		// 下载的开始条带
+		stripePos := opart.Start / stripeSize
+		// 下载开始的segment
+		segPos := (opart.Start % stripeSize) / segStripeSize
+		// segment的偏移
+		offsetPos := opart.Start % segStripeSize
 
-	gi := &groupInfo{}
+		dl := &downloadTask{
+			fsID:         sl.QueryID,
+			bucketID:     sl.BucketID,
+			group:        l.gInfo,
+			decoder:      decoder,
+			state:        Pending,
+			startTime:    time.Now(),
+			curStripe:    stripePos,
+			segOffset:    segPos,
+			dStart:       offsetPos,
+			dLength:      opart.Length,
+			encrypt:      bo.Encryption,
+			writer:       writer,
+			completeFunc: completeFuncs,
+		}
 
-	dl := &downloadTask{
-		fsID:         sl.QueryID,
-		bucketID:     sl.BucketID,
-		group:        gi,
-		decoder:      decoder,
-		state:        Pending,
-		startTime:    time.Now().Unix(),
-		curStripe:    stripePos,
-		segOffset:    segPos,
-		dStart:       offsetPos,
-		dLength:      sl.Length,
-		encrypt:      sl.Encryption,
-		writer:       writer,
-		completeFunc: completeFuncs,
+		if bo.Encryption == 1 {
+			copy(dl.sKey[:], sl.DecKey[:32])
+		}
+
+		err := dl.Start(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
-	if sl.Encryption {
-		copy(dl.sKey[:32], sl.DecKey[:32])
-	}
-
-	return dl.Start(ctx)
+	return nil
 }

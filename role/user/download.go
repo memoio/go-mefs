@@ -3,7 +3,6 @@ package user
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"io"
 	"math/big"
@@ -46,7 +45,7 @@ type notif struct {
 type downloadJob struct {
 	fsID           string
 	bucketID       int32
-	encrypt        bool
+	encrypt        int32
 	sKey           [32]byte
 	decoder        *dataformat.DataCoder //用于解码数据
 	group          *groupInfo            //groupInfo
@@ -55,7 +54,7 @@ type downloadJob struct {
 	writer         io.Writer //用于调度下载，以及返回是否出错
 }
 
-func newDownloadJob(uid string, bid int32, cry bool, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
+func newDownloadJob(uid string, bid, cry int32, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
 	return &downloadJob{
 		fsID:     uid,
 		bucketID: bid,
@@ -71,17 +70,17 @@ func newDownloadJob(uid string, bid int32, cry bool, sk [32]byte, dec *dataforma
 type downloadTask struct {
 	fsID         string
 	bucketID     int32
-	encrypt      bool
+	encrypt      int32
 	sKey         [32]byte
 	group        *groupInfo            //groupInfo
 	decoder      *dataformat.DataCoder //用于解码数据
 	state        TaskState
 	curStripe    int64 //当前已进行到哪个stripe
 	segOffset    int64 //此次下载起始offset，表示在stripe中的起始segment
-	dStart       int64 //数据其实起始
+	dStart       int64 // startPos
 	dLength      int64 //下载所需大小，用于后续指定范围下载
 	sizeReceived int   //可以统计下载进度
-	startTime    int64
+	startTime    time.Time
 	writer       io.Writer
 	completeFunc []CompleteFunc //完成任务或出错的通知函数
 }
@@ -97,6 +96,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	if !ok {
 		return ErrBucketNotExist
 	}
+
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return ErrBucketNotExist
@@ -106,6 +106,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	if !ok {
 		return ErrObjectNotExist
 	}
+
 	object, ok := objectElement.Value.(*objectInfo)
 	if !ok || object == nil || object.Deletion {
 		return ErrObjectNotExist
@@ -113,25 +114,28 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	length := opts.Length
 	if opts.Length < 0 {
-		length = object.GetLength() - opts.Start
+		length = object.OPart.GetLength() - opts.Start
 	}
 
-	if opts.Start+length > object.Length {
+	if opts.Start+length > object.OPart.GetLength() {
 		return ErrObjectOptionsInvalid
 	}
 
-	stripeSize := int64(utils.BlockSize * bucket.DataCount)
-	segStripeSize := int64(bucket.SegmentSize) * int64(bucket.DataCount)
-	//计算出下载的起始参数
-	segStart := object.Offset * segStripeSize //在此object之前同一个stripe由其他object占据的空间
-	// 下载的开始条带
-	stripePos := (opts.Start+segStart)/stripeSize + object.StripeStart
-	// 下载开始的segment
-	segPos := ((opts.Start + segStart) % stripeSize) / segStripeSize
-	// segment的偏移
-	offsetPos := opts.Start % segStripeSize
+	start := opts.Start + object.OPart.GetStart()
 
-	decoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), dataformat.CurrentVersion, int(bucket.ParityCount), int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
+	bo := bucket.BOpts
+
+	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
+	stripeSize := int64(bo.SegmentCount) * segStripeSize
+
+	// 下载的开始条带
+	stripePos := start / stripeSize
+	// 下载开始的segment
+	segPos := (start % stripeSize) / segStripeSize
+	// segment的偏移
+	dPos := start % segStripeSize
+
+	decoder := dataformat.NewDataCoderWithBopts(bo, l.keySet)
 
 	dl := &downloadTask{
 		fsID:         l.fsID,
@@ -139,21 +143,20 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		group:        l.gInfo,
 		decoder:      decoder,
 		state:        Pending,
-		startTime:    time.Now().Unix(),
+		startTime:    time.Now(),
 		curStripe:    stripePos,
 		segOffset:    segPos,
-		dStart:       offsetPos,
+		dStart:       dPos,
 		dLength:      length,
 		writer:       writer,
 		completeFunc: completeFuncs,
 	}
 
-	if bucket.Encryption {
+	// default AES
+	if bo.Encryption == 1 {
 		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-		tmpkey := l.privateKey
-		tmpkey = append(tmpkey, byte(bucket.BucketID))
-		dl.sKey = sha256.Sum256(tmpkey)
-		dl.encrypt = true
+		dl.sKey = getAesKey(l.privateKey, bucketID, stripePos)
+		dl.encrypt = 1
 	}
 
 	return dl.Start(ctx)
@@ -163,8 +166,8 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	curStripe := do.curStripe + 1
 	segStart := do.segOffset
 	dStart := do.dStart // 0
-	dc := do.decoder.Prefix.DataCount
-	segSize := do.decoder.Prefix.SegmentSize
+	dc := do.decoder.Prefix.Bopts.DataCount
+	segSize := do.decoder.Prefix.Bopts.SegmentSize
 	stripeSize := int64(utils.BlockSize * dc)
 
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
@@ -260,8 +263,8 @@ type (
 //从一个stripe内指定范围读取数据写入到writer内
 func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset, remain int64) (int64, error) {
 	//首先设置一些本次stripe下载的基本参数
-	dataCount := ds.decoder.Prefix.DataCount
-	parityCount := ds.decoder.Prefix.ParityCount
+	dataCount := ds.decoder.Prefix.Bopts.DataCount
+	parityCount := ds.decoder.Prefix.Bopts.ParityCount
 	blockCount := dataCount + parityCount
 	bm, err := metainfo.NewBlockMeta(ds.fsID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
@@ -326,7 +329,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
 		}
 
-		if ds.decoder.Prefix.Policy == dataformat.RsPolicy {
+		if ds.decoder.Prefix.Bopts.Policy == dataformat.RsPolicy {
 			datas[i] = blkData
 		} else {
 			datas[0] = blkData
@@ -355,7 +358,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 
 	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, offset)
 
-	if ds.encrypt {
+	if ds.encrypt == 1 {
 		padding := aes.BlockSize - ((offset+remain-1)%aes.BlockSize + 1)
 		data = data[:offset+remain+padding]
 		data, err = aes.AesDecrypt(data, ds.sKey[:])

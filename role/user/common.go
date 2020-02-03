@@ -71,7 +71,7 @@ func DefaultBucketOptions() *pb.BucketOptions {
 		ParityCount: 2,
 		SegmentSize: dataformat.DefaultSegmentSize,
 		TagFlag:     dataformat.BLS12,
-		Encryption:  true,
+		Encryption:  0,
 	}
 }
 

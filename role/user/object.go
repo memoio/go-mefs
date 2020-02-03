@@ -60,8 +60,8 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	delete(bucket.objects, objectName)
 	object.Deletion = true
 	// move deletions to special name
-	object.Name = objectName + "/" + time.Now().Format(utils.BASETIME)
-	bucket.objects[object.Name] = objectElement
+	object.OPart.Name = objectName + "/" + time.Now().Format(utils.BASETIME)
+	bucket.objects[object.OPart.Name] = objectElement
 	bucket.dirty = true
 	return &object.ObjectInfo, nil
 }
@@ -143,7 +143,7 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 		//		availTime, _ := l.GetObjectAvailTime(object)
 		//		availTimes = append(availTimes, availTime)
 		//	}
-		if strings.HasPrefix(object.Name, prefix) {
+		if strings.HasPrefix(object.OPart.Name, prefix) {
 			objects = append(objects, &object.ObjectInfo)
 		}
 	}
@@ -160,7 +160,7 @@ func (o ObjectsInfo) Swap(i, j int) { // 重写 Swap() 方法
 	o[i], o[j] = o[j], o[i]
 }
 func (o ObjectsInfo) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
-	return o[j].Name < o[i].Name
+	return o[j].OPart.Name < o[i].OPart.Name
 }
 
 // ShowStorage show lfs used space without appointed bucket
@@ -182,7 +182,7 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 				continue
 			}
 
-			storageSpace += uint64(object.GetLength())
+			storageSpace += uint64(object.OPart.GetLength())
 		}
 	}
 
@@ -217,7 +217,7 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 		if !ok || object.Deletion {
 			continue
 		}
-		storageSpace += uint64(object.GetLength())
+		storageSpace += uint64(object.OPart.GetLength())
 	}
 	return storageSpace, nil
 }
@@ -258,8 +258,13 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := l.meta.bucketByID[object.BucketID]
-	blockCount := bucket.DataCount + bucket.ParityCount
-	bm, err := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(object.StripeStart)), "")
+	blockCount := bucket.BOpts.DataCount + bucket.BOpts.ParityCount
+
+	bo := bucket.BOpts
+
+	stripeID := object.OPart.Start / int64(bo.SegmentCount*bo.SegmentSize*bo.DataCount)
+
+	bm, err := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
 		return "", err
 	}

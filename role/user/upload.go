@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -69,27 +70,36 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		return nil, ErrObjectAlreadyExist
 	}
 
-	if bucket.Policy != dataformat.RsPolicy && bucket.Policy != dataformat.MulPolicy {
+	bo := bucket.BOpts
+	if bo.Policy != dataformat.RsPolicy && bo.Policy != dataformat.MulPolicy {
 		return nil, ErrPolicy
 	}
 
 	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " begin")
 
+	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
+	stripeSize := int64(bo.SegmentCount) * segStripeSize
+	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
+
+	opart := &pb.ObjectPart{
+		Name:  objectName,
+		Start: start,
+	}
+
 	object := &objectInfo{
 		ObjectInfo: pb.ObjectInfo{
-			Name:        objectName,
-			BucketID:    bucketID,
-			Ctime:       time.Now().Unix(),
-			StripeStart: bucket.CurStripe,
-			Offset:      bucket.NextOffset,
-			Deletion:    false,
-			Dir:         false,
+			OPart:    opart,
+			BucketID: bucketID,
+			Ctime:    time.Now().Unix(),
+			Deletion: false,
+			Dir:      false,
 		},
 	}
+
 	objectElement := bucket.orderedObjects.PushBack(object)
 	bucket.objects[objectName] = objectElement
 
-	encoder := dataformat.NewDataCoder(int(bucket.Policy), int(bucket.DataCount), int(bucket.ParityCount), dataformat.CurrentVersion, int(bucket.TagFlag), int(bucket.SegmentSize), dataformat.DefaultSegmentCount, l.keySet)
+	encoder := dataformat.NewDataCoderWithBopts(bucket.BOpts, l.keySet)
 
 	ul := &uploadTask{
 		fsID:      l.fsID,
@@ -98,25 +108,21 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		gInfo:     l.gInfo,
 		bucketID:  bucketID,
 		curStripe: bucket.CurStripe,
-		curOffset: bucket.NextOffset,
+		curOffset: bucket.NextSeg,
 		encoder:   encoder,
 	}
 
-	if bucket.Encryption {
-		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-		tmpkey := l.privateKey
-		tmpkey = append(tmpkey, byte(bucket.BucketID))
-		ul.encrypt = true
-		ul.sKey = sha256.Sum256(tmpkey)
+	if bo.Encryption == 1 {
+		ul.sKey = getAesKey(l.privateKey, bucketID, start)
 	}
 
 	err = ul.Start(ctx)
 	if err != nil {
 		if ul.length > 0 {
-			object.ETag = ul.etag
-			object.Length = ul.length
+			object.OPart.ETag = ul.etag
+			object.OPart.Length = ul.length
 			bucket.CurStripe = ul.curStripe
-			bucket.NextOffset = ul.curOffset
+			bucket.NextSeg = ul.curOffset
 			bucket.dirty = true //需要记录，可能上传一部分然后失败，空间已占用
 		} else { //没有占用任何空间，清除信息
 			objectElement := bucket.objects[objectName]
@@ -126,13 +132,13 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		return &object.ObjectInfo, err
 	}
 
-	object.ETag = ul.etag
-	object.Length = ul.length
+	object.OPart.ETag = ul.etag
+	object.OPart.Length = ul.length
 	bucket.CurStripe = ul.curStripe
-	bucket.NextOffset = ul.curOffset
+	bucket.NextSeg = ul.curOffset
 	bucket.dirty = true
 
-	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end, length is: ", object.Length)
+	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end, length is: ", object.OPart.Length)
 	return &object.ObjectInfo, nil
 }
 
@@ -159,6 +165,14 @@ func (u *uploadTask) Info() (interface{}, error) {
 	return u, nil
 }
 
+func getAesKey(privateKey []byte, bucketID int32, objectStart int64) [32]byte {
+	tmpkey := make([]byte, len(privateKey)+12)
+	copy(tmpkey, privateKey)
+	binary.LittleEndian.PutUint32(tmpkey[len(privateKey):], uint32(bucketID))
+	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+4:], uint64(objectStart))
+	return sha256.Sum256(tmpkey)
+}
+
 type blockMeta struct {
 	cid      string
 	provider string
@@ -168,13 +182,13 @@ type blockMeta struct {
 //Start 上传文件
 func (u *uploadTask) Start(ctx context.Context) error {
 	enc := u.encoder
-	dc := enc.Prefix.DataCount
-	pc := enc.Prefix.ParityCount
+	dc := enc.Prefix.Bopts.DataCount
+	pc := enc.Prefix.Bopts.ParityCount
 	bc := int(dc + pc)
 	least := int(dc + pc/2)
-	segSize := enc.Prefix.SegmentSize
+	segSize := enc.Prefix.Bopts.SegmentSize
 	readUnit := int(segSize) * int(dc) //每一次读取的数据，尽量读一个整的
-	readByte := utils.SegementCount * readUnit
+	readByte := int(enc.Prefix.Bopts.SegmentCount) * readUnit
 
 	rdata := make([]byte, readByte)
 	extra := make([]byte, 0, readByte)
@@ -238,12 +252,12 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.SegmentSize*u.encoder.Prefix.DataCount)
+			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.Bopts.SegmentSize*u.encoder.Prefix.Bopts.DataCount)
 
 			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, length: %d", u.curStripe, u.curOffset, n)
 
 			// handle it before
-			if endOffset >= int(u.encoder.Prefix.GetSegmentCount()) {
+			if endOffset >= int(u.encoder.Prefix.Bopts.GetSegmentCount()) {
 				utils.MLogger.Error("Wrong offset, need to handle: ", endOffset)
 				return errors.New("Read length unexpected err")
 			}
@@ -347,7 +361,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				}
 			}(data, int(u.curStripe), int(u.curOffset))
 
-			if endOffset == int(u.encoder.Prefix.GetSegmentCount())-1 { //如果写满了一个stripe
+			if endOffset == int(u.encoder.Prefix.Bopts.GetSegmentCount())-1 { //如果写满了一个stripe
 				u.curStripe++
 				u.curOffset = 0
 			} else {

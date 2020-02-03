@@ -714,14 +714,14 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				return err
 			}
 
-			if object.Length == 0 {
+			if object.OPart.Length == 0 {
 				continue
 			}
 
 			objectElement := bucket.orderedObjects.PushBack(&objectInfo{
 				ObjectInfo: object,
 			})
-			bucket.objects[object.Name] = objectElement
+			bucket.objects[object.OPart.Name] = objectElement
 		}
 	}
 	return nil

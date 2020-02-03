@@ -88,7 +88,7 @@ func (b *BasicBlock) Loggable() map[string]interface{} {
 	}
 }
 
-func (b *BasicBlock) Prefix() (*pb.BucketOptions, int, error) {
+func (b *BasicBlock) Prefix() (*pb.BlockOptions, int, error) {
 	return PrefixDecode(b.RawData())
 }
 
@@ -101,7 +101,7 @@ func PrefixLen(data []byte) (int, int, error) {
 	return int(len), n + int(len), nil
 }
 
-func PrefixDecode(data []byte) (*pb.BucketOptions, int, error) {
+func PrefixDecode(data []byte) (*pb.BlockOptions, int, error) {
 	if len(data) < 10 {
 		log.Println("wrong proto prefix len")
 		return nil, 0, errors.New("wrong proto prefix length")
@@ -117,7 +117,7 @@ func PrefixDecode(data []byte) (*pb.BucketOptions, int, error) {
 		return nil, 0, errors.New("short proto prefix message")
 	}
 
-	pre := new(pb.BucketOptions)
+	pre := new(pb.BlockOptions)
 	err := proto.Unmarshal(data[n:n+int(x)], pre)
 	if err != nil {
 		return nil, 0, err
@@ -125,7 +125,7 @@ func PrefixDecode(data []byte) (*pb.BucketOptions, int, error) {
 	return pre, n + int(x), nil
 }
 
-func PrefixEncode(pre *pb.BucketOptions) ([]byte, int, error) {
+func PrefixEncode(pre *pb.BlockOptions) ([]byte, int, error) {
 	preData, err := proto.Marshal(pre)
 	if err != nil {
 		fmt.Println(err)

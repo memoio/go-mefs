@@ -18,38 +18,6 @@ message SuperBlockInfo {
   int32 Version = 5; //版本号
 }
 
-message BucketInfo {
-  string Name = 1;
-  int32 BucketID = 2;
-  int32 Policy = 3;    //存储策略-纠删(1)or多备份(2)
-  int32 DataCount = 4; 
-  int32 ParityCount = 5; 
-  int64 CurStripe = 6;       //当前写到哪一个Stripe
-  int64 NextOffset = 7;      //当前写到哪一个Offset
-  int64 ObjectsBlockSize = 8; //本Bucket的ObjectsBlock序列化后占多少字节
-  int32 SegmentSize = 9;    //本Bucket的segment size
-  int32 TagFlag = 10;       //本Bucket的TagFLag
-  int64 Ctime = 11;          //本Bucket的创建时间
-  int64 LastModified = 12;   //本Bucket内数据上次修改时间
-  bool Deletion = 13;        //Bucket是否已删除
-  bool Encryption = 14;      //Bucket是否采取加密
-}
-
-message ObjectInfo {
-  string Name = 1;                  //对象名称
-  int32 BucketID = 2;               //本对象所属的Bucket
-  int64 Length = 3;                 //对象长度
-  int64 StripeStart = 4;            //本对象的起始Stripe
-  int64 Offset = 5;                 //本对象在起始Stripe的起始offset
-  int64 Ctime = 6;                 //对象创建时间
-  string ContentType = 7;           //对象的类型，如文本、图片
-  string ETag = 8;                  //MD5
-  bool Deletion = 9;               //对象是否已删除
-  bool Dir = 10;                    //是否为目录
-  map<string, string> Metadata = 11; // User可以对文件自定义一些元信息
-  string NextPart = 12;             //此项保存此对象追加的下一个part的Key，下一个Part同样以Object形式存在
-}
-
 message BucketOptions {
 	int32 Version = 1;
 	int32 Policy  = 2;
@@ -57,10 +25,43 @@ message BucketOptions {
 	int32 ParityCount = 4;
 	int32 TagFlag = 5;
 	int32 SegmentSize = 6;
-	// number of segments
-	int32 SegmentCount = 7;
-	bool Encryption = 8; 
-	int32 Start = 11;
+	int32 SegmentCount = 7; // number of segments
+	int32 Encryption = 8;  // Encryption type, default is AES
+}
+
+message BucketInfo {
+  string Name = 1;
+  int32 BucketID = 2;
+  int64 Ctime = 3;          //本Bucket的创建时间
+  BucketOptions BOpts = 4;
+  int64 CurStripe = 5;      //当前写到哪一个Stripe
+  int64 NextSeg = 6;        //当前写到哪一个Offset
+  int64 LastModified = 7;   //本Bucket内数据上次修改时间
+  int64 ObjectsBlockSize = 8; //本Bucket的ObjectsBlock序列化后占多少字节
+  bool Deletion = 9;        //Bucket是否已删除
+}
+
+message ObjectInfo {
+  int32 BucketID = 1;               //本对象所属的Bucket
+  int64 Ctime = 2;                  //对象创建时间
+  string ContentType = 3;           //对象的类型，如文本、图片
+  bool Dir = 4;                     //是否为目录
+  bool Deletion = 5;                //对象是否已删除
+  map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
+  ObjectPart OPart = 7;
+}
+
+message ObjectPart {
+  string Name = 1;                  //对象名称
+  int64 Start = 2;                  //本对象的起始
+  int64 Length = 3;                 //对象长度
+  string ETag = 4;                  //MD5
+  string NextPart = 5;              //userd for append
+}
+
+message BlockOptions {
+  BucketOptions Bopts = 1;
+  int32 Start = 2;
 }
 
 message ShareLink{
@@ -68,13 +69,10 @@ message ShareLink{
     string QueryID = 2;
     string BucketName = 3;
     string ObjectName = 4;
-    string Etag = 5;
-    BucketOptions BOptions = 6;
-    int32 BucketID = 7;
-    int64 Start = 8;
-    int64 Length = 9;
-    bool Encryption = 10;
-    bytes DecKey = 11;
+    int32 BucketID = 5;
+    BucketOptions BOpts = 6;
+    repeated ObjectPart OParts = 7;
+    bytes DecKey = 8;
 }
 
 message ChalInfo{

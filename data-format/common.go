@@ -37,21 +37,21 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 		return false, ErrDataTooShort
 	}
 	pre, preLen, err := bf.PrefixDecode(data)
-	if err != nil || pre.GetVersion() == 0 || pre.GetDataCount() == 0 {
+	if err != nil || pre.GetBopts().GetVersion() == 0 || pre.GetBopts().GetDataCount() == 0 {
 		return false, err
 	}
 
 	dataLen := len(data) - preLen
 
-	s, ok := TagMap[int(pre.TagFlag)]
+	s, ok := TagMap[int(pre.GetBopts().GetTagFlag())]
 	if !ok {
 		s = 48
 	}
 
-	fieldSize := int(pre.SegmentSize) + s*int(2+(pre.ParityCount-1)/pre.DataCount)
+	fieldSize := int(pre.GetBopts().GetSegmentSize()) + s*int(2+(pre.GetBopts().ParityCount-1)/pre.GetBopts().DataCount)
 
-	if dataLen < start*fieldSize+(1+(length-1)/int(pre.DataCount*pre.SegmentSize))*fieldSize {
-		utils.MLogger.Error("VerifyBlockLength has: ", dataLen, ", need: ", start*fieldSize+1+(length-1)/int(pre.DataCount))
+	if dataLen < start*fieldSize+(1+(length-1)/int(pre.GetBopts().DataCount*pre.GetBopts().SegmentSize))*fieldSize {
+		utils.MLogger.Error("VerifyBlockLength has: ", dataLen, ", need: ", start*fieldSize+1+(length-1)/int(pre.GetBopts().DataCount))
 		return false, nil
 	}
 
@@ -66,7 +66,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) bool {
 	}
 
 	pre, preLen, err := bf.PrefixDecode(data)
-	if err != nil || pre.GetVersion() == 0 || pre.GetDataCount() == 0 {
+	if err != nil || pre.GetBopts().GetVersion() == 0 || pre.GetBopts().GetDataCount() == 0 {
 		utils.MLogger.Error("prefix is not good: ", pre)
 		return false
 	}

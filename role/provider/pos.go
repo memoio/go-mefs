@@ -47,7 +47,9 @@ var pre = &pb.BucketOptions{
 }
 
 var opt = &df.DataCoder{
-	Prefix: pre,
+	Prefix: &pb.BlockOptions{
+		Bopts: pre,
+	},
 }
 
 // PosService starts pos

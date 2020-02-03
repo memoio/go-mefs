@@ -21,7 +21,7 @@ var TagMap = map[int]int{
 
 //根据指定段大小生成标签，index是生成BLS-tag的需要
 func (d *DataCoder) GenTagForSegment(index, data []byte) ([]byte, error) {
-	switch d.Prefix.TagFlag {
+	switch d.Prefix.GetBopts().TagFlag {
 	case CRC32:
 		return uint32ToBytes(crc32.ChecksumIEEE(data)), nil
 	case BLS:

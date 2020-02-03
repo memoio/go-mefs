@@ -16,7 +16,7 @@ import (
 )
 
 type DataCoder struct {
-	Prefix     *pb.BucketOptions
+	Prefix     *pb.BlockOptions
 	BlsKey     *mcl.KeySet
 	Repair     bool
 	RLength    int // recover how long
@@ -48,7 +48,7 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 		return nil
 	}
 
-	pre := &pb.BucketOptions{
+	bo := &pb.BucketOptions{
 		Version:      int32(version),
 		Policy:       int32(policy),
 		DataCount:    int32(dataCount),
@@ -58,11 +58,21 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 		SegmentCount: int32(segCount),
 	}
 
+	return NewDataCoderWithBopts(bo, keyset)
+}
+
+// NewDataCoderWithBopts contructs a new datacoder with bucketops
+func NewDataCoderWithBopts(bo *pb.BucketOptions, keyset *mcl.KeySet) *DataCoder {
+
+	pre := &pb.BlockOptions{
+		Bopts: bo,
+	}
+
 	return NewDataCoderWithPrefix(pre, keyset)
 }
 
 // NewDataCoderWithPrefix creates a new datacoder with prefix
-func NewDataCoderWithPrefix(p *pb.BucketOptions, k *mcl.KeySet) *DataCoder {
+func NewDataCoderWithPrefix(p *pb.BlockOptions, k *mcl.KeySet) *DataCoder {
 	d := &DataCoder{
 		Prefix: p,
 		BlsKey: k,
@@ -74,18 +84,18 @@ func NewDataCoderWithPrefix(p *pb.BucketOptions, k *mcl.KeySet) *DataCoder {
 func (d *DataCoder) PreCompute() {
 	preLen := proto.Size(d.Prefix)
 	d.prefixSize = preLen + proto.SizeVarint(uint64(preLen))
-	dc := int(d.Prefix.DataCount)
-	pc := int(d.Prefix.ParityCount)
+	dc := int(d.Prefix.Bopts.DataCount)
+	pc := int(d.Prefix.Bopts.ParityCount)
 	d.blockCount = dc + pc
 	d.tagCount = 2 + (pc-1)/dc
 
-	s, ok := TagMap[int(d.Prefix.TagFlag)]
+	s, ok := TagMap[int(d.Prefix.Bopts.TagFlag)]
 	if !ok {
 		s = 48
 	}
 
 	d.tagSize = int(s)
-	d.segSize = int(d.Prefix.SegmentSize)
+	d.segSize = int(d.Prefix.Bopts.SegmentSize)
 	d.fieldSize = d.segSize + d.tagSize*d.tagCount
 }
 
@@ -94,8 +104,8 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 		return nil, 0, ErrDataTooShort
 	}
 
-	dc := int(d.Prefix.DataCount)
-	pc := int(d.Prefix.ParityCount)
+	dc := int(d.Prefix.Bopts.DataCount)
+	pc := int(d.Prefix.Bopts.ParityCount)
 
 	endSegment := 1 + (len(data)-1)/(d.segSize*dc)
 
@@ -142,7 +152,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			}
 		}
 
-		switch d.Prefix.Policy {
+		switch d.Prefix.Bopts.Policy {
 		case MulPolicy:
 			for j := dc; j < d.blockCount; j++ {
 				res := copy(dataGroup[j], dataGroup[0])
@@ -206,7 +216,7 @@ func (d *DataCoder) Decode(stripe [][]byte, start, length int) ([]byte, error) {
 		return nil, err
 	}
 
-	switch d.Prefix.Policy {
+	switch d.Prefix.Bopts.Policy {
 	case RsPolicy:
 		if d.Repair {
 			d.RLength = minLen
@@ -224,16 +234,16 @@ func (d *DataCoder) Decode(stripe [][]byte, start, length int) ([]byte, error) {
 	}
 
 	segStart := start
-	segLength := 1 + (length-1)/(int(d.Prefix.DataCount)*d.segSize)
+	segLength := 1 + (length-1)/(int(d.Prefix.Bopts.DataCount)*d.segSize)
 
 	if length == -1 {
 		segLength = 1 + (minLen-d.prefixSize-1)/d.fieldSize - segStart
 	}
 
-	res := make([]byte, 0, segLength*int(d.Prefix.DataCount)*d.segSize)
+	res := make([]byte, 0, segLength*int(d.Prefix.Bopts.DataCount)*d.segSize)
 	// 根据offset从每个块中提取Field的data
 	for i := segStart; i < segStart+segLength; i++ {
-		for j := 0; j < int(d.Prefix.DataCount); j++ {
+		for j := 0; j < int(d.Prefix.Bopts.DataCount); j++ {
 			res = append(res, data[j][d.prefixSize+i*d.fieldSize:d.prefixSize+i*d.fieldSize+d.segSize]...)
 		}
 	}
@@ -312,7 +322,7 @@ func (d *DataCoder) recoverField(stripe [][]byte) ([][]byte, error) {
 		}
 	}
 
-	datas, err := d.recoverData(tmpData, int(d.Prefix.DataCount), int(d.Prefix.ParityCount))
+	datas, err := d.recoverData(tmpData, int(d.Prefix.Bopts.DataCount), int(d.Prefix.Bopts.ParityCount))
 	if err != nil {
 		return nil, err
 	}
@@ -434,8 +444,8 @@ func createFields(stripe, dataGroup, tagGroup [][]byte) [][]byte {
 }
 
 // decode stripe returns prefix, min len
-func decodeStripe(data [][]byte) (*pb.BucketOptions, int, int, error) {
-	var prefix *pb.BucketOptions
+func decodeStripe(data [][]byte) (*pb.BlockOptions, int, int, error) {
+	var prefix *pb.BlockOptions
 	var avaNum, preLen int
 	lengths := make([]int, len(data))
 	for i := 0; i < len(data); i++ {
@@ -457,17 +467,17 @@ func decodeStripe(data [][]byte) (*pb.BucketOptions, int, int, error) {
 		return nil, 0, 0, errors.New("no available block")
 	}
 
-	if prefix != nil && (int(prefix.DataCount) > avaNum || int(prefix.DataCount) > len(lengths)) {
-		utils.MLogger.Error("repair crash, need data count: ", prefix.DataCount, ", but got avaNum: ", avaNum)
+	if prefix != nil && (int(prefix.Bopts.DataCount) > avaNum || int(prefix.Bopts.DataCount) > len(lengths)) {
+		utils.MLogger.Error("repair crash, need data count: ", prefix.Bopts.DataCount, ", but got avaNum: ", avaNum)
 		return nil, 0, 0, ErrRepairCrash
 	}
 
 	sort.Sort(sort.Reverse(sort.IntSlice(lengths)))
 
-	if lengths[prefix.DataCount-1] <= 0 {
-		utils.MLogger.Error("repair crash after sort: need count: ", prefix.DataCount, ", but got avaNum again: ", avaNum)
+	if lengths[prefix.Bopts.DataCount-1] <= 0 {
+		utils.MLogger.Error("repair crash after sort: need count: ", prefix.Bopts.DataCount, ", but got avaNum again: ", avaNum)
 		return nil, 0, 0, ErrRepairCrash
 	}
 
-	return prefix, preLen, lengths[prefix.DataCount-1], nil
+	return prefix, preLen, lengths[prefix.Bopts.DataCount-1], nil
 }

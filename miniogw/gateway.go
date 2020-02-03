@@ -212,9 +212,9 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.ETag
-		loi.Objects[i].Name = v.Name
-		loi.Objects[i].Size = v.Length
+		loi.Objects[i].ETag = v.OPart.ETag
+		loi.Objects[i].Name = v.OPart.Name
+		loi.Objects[i].Size = v.OPart.Length
 		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).UTC()
 	}
 	return loi, nil
@@ -238,9 +238,9 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.ETag
-		loi.Objects[i].Name = v.Name
-		loi.Objects[i].Size = v.Length
+		loi.Objects[i].ETag = v.OPart.ETag
+		loi.Objects[i].Name = v.OPart.Name
+		loi.Objects[i].Size = v.OPart.Length
 		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).UTC()
 	}
 	return loi, nil
@@ -326,9 +326,9 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 		Bucket:      bucket,
 		Name:        object,
 		IsDir:       obj.Dir,
-		ETag:        obj.ETag,
+		ETag:        obj.OPart.ETag,
 		ContentType: obj.ContentType,
-		Size:        obj.Length,
+		Size:        obj.OPart.Length,
 	}
 
 	return objInfo, nil
@@ -351,9 +351,9 @@ func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *mi
 		Bucket:      bucket,
 		Name:        object,
 		IsDir:       obj.Dir,
-		ETag:        obj.ETag,
+		ETag:        obj.OPart.ETag,
 		ContentType: obj.ContentType,
-		Size:        obj.Length,
+		Size:        obj.OPart.Length,
 	}
 
 	return objInfo, err

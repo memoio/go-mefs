@@ -87,7 +87,7 @@ type BucketStat struct {
 	Policy      int32
 	DataCount   int32
 	ParityCount int32
-	Encryption  bool
+	Encryption  int32
 }
 
 type Buckets struct {
@@ -97,7 +97,7 @@ type Buckets struct {
 
 func (bk BucketStat) String() string {
 	return fmt.Sprintf(
-		"Name: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n--Encryption:%t\n",
+		"Name: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n--Encryption:%d\n",
 		ansi.Color(bk.Name, "green"),
 		bk.BucketID,
 		bk.Ctime,
@@ -507,9 +507,9 @@ var lfsHeadObjectCmd = &cmds.Command{
 		}
 		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:           object.GetName(),
-			Size:           object.GetLength(),
-			MD5:            object.GetETag(),
+			Name:           object.OPart.GetName(),
+			Size:           object.OPart.GetLength(),
+			MD5:            object.OPart.GetETag(),
 			Ctime:          ctime.Format(utils.SHOWTIME),
 			Dir:            false,
 			LatestChalTime: availTim.Format(utils.SHOWTIME),
@@ -603,9 +603,9 @@ var lfsPutObjectCmd = &cmds.Command{
 
 		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:  object.GetName(),
-			Size:  object.GetLength(),
-			MD5:   object.GetETag(),
+			Name:  object.OPart.GetName(),
+			Size:  object.OPart.GetLength(),
+			MD5:   object.OPart.GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}
@@ -830,9 +830,9 @@ var lfsListObjectsCmd = &cmds.Command{
 				}
 			}
 			tempObState := ObjectStat{
-				Name:           object.GetName(),
-				Size:           object.GetLength(),
-				MD5:            object.GetETag(),
+				Name:           object.OPart.GetName(),
+				Size:           object.OPart.GetLength(),
+				MD5:            object.OPart.GetETag(),
 				Ctime:          ctime.Format(utils.SHOWTIME),
 				Dir:            false,
 				LatestChalTime: avaTime,
@@ -905,9 +905,9 @@ var lfsDeleteObjectCmd = &cmds.Command{
 
 		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:  object.GetName(),
-			Size:  object.GetLength(),
-			MD5:   object.GetETag(),
+			Name:  object.OPart.GetName(),
+			Size:  object.OPart.GetLength(),
+			MD5:   object.OPart.GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}
@@ -982,9 +982,9 @@ var lfsHeadBucketCmd = &cmds.Command{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
 			Ctime:       ctime.Format(utils.SHOWTIME),
-			Policy:      bucket.Policy,
-			DataCount:   bucket.DataCount,
-			ParityCount: bucket.ParityCount,
+			Policy:      bucket.BOpts.Policy,
+			DataCount:   bucket.BOpts.DataCount,
+			ParityCount: bucket.BOpts.ParityCount,
 		}
 		return cmds.EmitOnce(res, &Buckets{
 			Method:  "Head Bucket",
@@ -1077,7 +1077,10 @@ var lfsCreateBucketCmd = &cmds.Command{
 		bucketOptions.Policy = int32(policy)
 		bucketOptions.DataCount = int32(dataCount)
 		bucketOptions.ParityCount = int32(parityCount)
-		bucketOptions.Encryption = encrytion
+		if encrytion {
+			bucketOptions.Encryption = 1
+		}
+
 		bucket, err := lfs.CreateBucket(req.Context, req.Arguments[0], bucketOptions)
 		if err != nil {
 			return err
@@ -1088,10 +1091,10 @@ var lfsCreateBucketCmd = &cmds.Command{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
 			Ctime:       ctime.Format(utils.SHOWTIME),
-			Policy:      bucket.Policy,
-			DataCount:   bucket.DataCount,
-			ParityCount: bucket.ParityCount,
-			Encryption:  bucket.Encryption,
+			Policy:      bucket.BOpts.Policy,
+			DataCount:   bucket.BOpts.DataCount,
+			ParityCount: bucket.BOpts.ParityCount,
+			Encryption:  bucket.BOpts.Encryption,
 		}
 		return cmds.EmitOnce(res, &Buckets{
 			Method:  "Create Bucket",
@@ -1163,9 +1166,9 @@ It outputs the following to stdout:
 				Name:        bucket.Name,
 				BucketID:    bucket.BucketID,
 				Ctime:       ctime.Format(utils.SHOWTIME),
-				Policy:      bucket.Policy,
-				DataCount:   bucket.DataCount,
-				ParityCount: bucket.ParityCount,
+				Policy:      bucket.BOpts.Policy,
+				DataCount:   bucket.BOpts.DataCount,
+				ParityCount: bucket.BOpts.ParityCount,
 			}
 			bucketStats.Buckets = append(bucketStats.Buckets, bucketStat)
 		}
@@ -1239,9 +1242,9 @@ It outputs the following to stdout:
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
 			Ctime:       ctime.Format(utils.SHOWTIME),
-			Policy:      bucket.Policy,
-			DataCount:   bucket.DataCount,
-			ParityCount: bucket.ParityCount,
+			Policy:      bucket.BOpts.Policy,
+			DataCount:   bucket.BOpts.DataCount,
+			ParityCount: bucket.BOpts.ParityCount,
 		}
 		return cmds.EmitOnce(res, &Buckets{
 			Method:  "Delete Bucket",

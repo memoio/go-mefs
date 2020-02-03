@@ -555,14 +555,14 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length in
 	if err != nil {
 		return err
 	}
-	tagCount := 2 + (pre.ParityCount-1)/pre.DataCount
+	tagCount := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
 
-	tagSize, ok := dataformat.TagMap[int(pre.TagFlag)]
+	tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
 	if !ok {
 		return dataformat.ErrWrongTagFlag
 	}
 
-	fieldSize := pre.SegmentSize + tagCount*int32(tagSize)
+	fieldSize := pre.Bopts.SegmentSize + tagCount*int32(tagSize)
 	if (len(fields)-preLen)%int(fieldSize) != 0 {
 		return dataformat.ErrWrongField
 	}
@@ -766,27 +766,27 @@ func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) ([]byte, []b
 		return nil, nil, err
 	}
 
-	tagSize, ok := dataformat.TagMap[int(pre.TagFlag)]
+	tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
 	if !ok {
 		return nil, nil, dataformat.ErrWrongTagFlag
 	}
 
-	tagNum := 2 + (pre.ParityCount-1)/pre.DataCount
-	fieldSize := uint64(pre.SegmentSize + tagNum*int32(tagSize))
+	tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
+	fieldSize := uint64(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
 
 	start := uint64(preLen) + offset*fieldSize
 	if uint64(fileSize) < offset+fieldSize {
 		return nil, nil, dataformat.ErrDataTooShort
 	}
 
-	segment := make([]byte, pre.SegmentSize)
+	segment := make([]byte, pre.Bopts.SegmentSize)
 	tag := make([]byte, tagSize)
 	//-------
 	n, err := f.ReadAt(segment, int64(start))
 	if err != nil {
 		return nil, nil, err
 	}
-	if n != int(pre.SegmentSize) {
+	if n != int(pre.Bopts.SegmentSize) {
 		return nil, nil, dataformat.ErrCannotGetSegment
 	}
 	start += uint64(n)

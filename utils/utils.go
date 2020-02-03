@@ -33,7 +33,7 @@ const (
 	//BlockSize 暂定一个块中纯data的大小，1k
 	BlockSize = 1024 * 1024
 
-	SegementCount = 256
+	DefaultSegementCount = 256
 
 	DefaultPassword = "123456789"
 )
