@@ -333,13 +333,13 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 		}
 	}
 
-	if len(k.Pk.ElemG2s) < TagAtomNum+chal.Seed || len(k.Pk.ElemG1s) < TagAtomNum {
+	c := chal.Seed % (PDPCount - TagAtomNum)
+
+	if len(k.Pk.ElemG2s) < TagAtomNum+c || len(k.Pk.ElemG1s) < TagAtomNum {
 		return nil, ErrNumOutOfRange
 	}
 	// 计算h_j = u_(c+j), j = 0, 1, ..., k-1
 	// 对于BLS12_381,h_j = w_(c+j)
-
-	c := chal.Seed % (PDPCount - TagAtomNum)
 
 	h := make([]G2, TagAtomNum)
 	for j := 0; j < TagAtomNum; j++ {
