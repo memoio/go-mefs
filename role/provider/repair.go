@@ -103,7 +103,7 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 
 	right := rs.VerifyBlock(newstripe[nbid], blockID, pubKey)
 	if !right {
-		utils.MLogger.Warn("Block %s is not right", blockID)
+		utils.MLogger.Warnf("Block %s is not right", blockID)
 		return nil
 	}
 
