@@ -838,26 +838,30 @@ func (g *groupInfo) loadContracts() error {
 		}
 	}
 
+	var wg sync.WaitGroup
 	for _, proInfo := range g.providers {
-		proID := proInfo.providerID
-		if proInfo.chanItem == nil {
-			cItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
-			if err != nil || cItem.Money.Cmp(big.NewInt(0)) == 0 {
-				_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
-				if err != nil {
-					continue
-				}
+		wg.Add(1)
+		go func(proInfo *providerInfo) {
+			defer wg.Done()
+			if proInfo.chanItem == nil {
+				proID := proInfo.providerID
+				cItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
+				if err != nil || cItem.Money.Cmp(big.NewInt(0)) == 0 {
+					_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+					if err != nil {
+						return
+					}
 
-				cItem, err = role.GetLatestChannel(g.shareToID, g.groupID, proID)
-				if err != nil {
-					continue
+					cItem, err = role.GetLatestChannel(g.shareToID, g.groupID, proID)
+					if err != nil {
+						return
+					}
 				}
+				proInfo.chanItem = &cItem
 			}
-
-			proInfo.chanItem = &cItem
-		}
+		}(proInfo)
 	}
-
+	wg.Wait()
 	return nil
 }
 
