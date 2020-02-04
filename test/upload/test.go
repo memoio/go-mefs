@@ -173,7 +173,15 @@ func uploadTest(count int) error {
 	log.Println("download ", fileDownloadSuccessNum, " files,")
 
 	log.Println("upload: ", fileNum, "; success:", fileUploadSuccessNum, " rate is", 100*fileUploadSuccessNum/count)
-	log.Println("downlaod: ", fileNum, "; success:", fileDownloadSuccessNum, " rate is", 100*fileDownloadSuccessNum/fileUploadSuccessNum)
+	log.Println("downlaod: ", fileNum, "; success:", fileDownloadSuccessNum, " rate is", 100*fileDownloadSuccessNum/count)
+	if 100*fileUploadSuccessNum/count < 90 {
+		log.Fatal("upload rate is too low")
+	}
+
+	if 100*fileDownloadSuccessNum/count < 90 {
+		log.Fatal("download rate is too low")
+	}
+
 	return nil
 }
 

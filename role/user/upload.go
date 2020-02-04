@@ -87,6 +87,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	object := &objectInfo{
 		ObjectInfo: pb.ObjectInfo{
+			ObjectID: bucket.NextObjectID,
 			OPart:    opart,
 			BucketID: bucketID,
 			Ctime:    time.Now().Unix(),
@@ -120,6 +121,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		if ul.length > 0 {
 			object.OPart.ETag = ul.etag
 			object.OPart.Length = ul.length
+			bucket.NextObjectID++
 			bucket.CurStripe = ul.curStripe
 			bucket.NextSeg = ul.curOffset
 			bucket.dirty = true //需要记录，可能上传一部分然后失败，空间已占用
@@ -133,6 +135,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	object.OPart.ETag = ul.etag
 	object.OPart.Length = ul.length
+	bucket.NextObjectID++
 	bucket.CurStripe = ul.curStripe
 	bucket.NextSeg = ul.curOffset
 	bucket.dirty = true

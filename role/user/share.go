@@ -9,33 +9,34 @@ import (
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
+	b58 "github.com/mr-tron/base58/base58"
 )
 
 // GenShareObject constructs sharelink
-func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
+func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) (string, error) {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.bucketNameToID == nil {
-		return nil, ErrLfsServiceNotReady
+		return "", ErrLfsServiceNotReady
 	}
 
 	bucketID, ok := l.meta.bucketNameToID[bucketName]
 	if !ok {
-		return nil, ErrBucketNotExist
+		return "", ErrBucketNotExist
 	}
 
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
-		return nil, ErrBucketNotExist
+		return "", ErrBucketNotExist
 	}
 
 	objectElement, ok := bucket.objects[objectName]
 	if !ok {
-		return nil, ErrObjectNotExist
+		return "", ErrObjectNotExist
 	}
 
 	object, ok := objectElement.Value.(*objectInfo)
 	if !ok || object == nil || object.Deletion {
-		return nil, ErrObjectNotExist
+		return "", ErrObjectNotExist
 	}
 
 	sl := &pb.ShareLink{
@@ -71,25 +72,29 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 
 	sByte, err := proto.Marshal(sl)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return sByte, nil
+	return b58.Encode(sByte), nil
 }
 
 // GetShareObject constructs lfs download process
-func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, localKey string, share []byte) error {
+func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localKey string, share string) error {
+
+	shareByte, err := b58.Decode(share)
+	if err != nil {
+		return nil
+	}
 
 	sl := new(pb.ShareLink)
-
-	err := proto.Unmarshal(share, sl)
+	err = proto.Unmarshal(shareByte, sl)
 	if err != nil {
 		return err
 	}
 
 	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
 
-	su, err := u.NewFS(sl.UserID, sl.QueryID, "", 0, 0, 0, 0, 0, false)
+	su, err := u.NewFS(sl.UserID, uid, sl.QueryID, "", 0, 0, 0, 0, 0, false)
 	if err != nil {
 		utils.MLogger.Errorf("create share user %s error: %s", sl.UserID, err)
 		return err

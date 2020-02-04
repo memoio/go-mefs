@@ -49,13 +49,14 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	objects := make(map[string]*list.Element)
 	bucket := &superBucket{
 		BucketInfo: pb.BucketInfo{
-			Name:      bucketName,
-			BucketID:  bucketID,
-			BOpts:     options,
-			CurStripe: 0,
-			NextSeg:   0,
-			Ctime:     time.Now().Unix(),
-			Deletion:  false,
+			Name:         bucketName,
+			BucketID:     bucketID,
+			BOpts:        options,
+			CurStripe:    0,
+			NextSeg:      0,
+			Ctime:        time.Now().Unix(),
+			Deletion:     false,
+			NextObjectID: 0,
 		},
 		dirty:          true,
 		objects:        objects,

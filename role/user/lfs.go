@@ -31,7 +31,6 @@ type LfsInfo struct {
 	keySet     *mcl.KeySet
 	meta       *lfsMeta //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
 	online     bool
-	inProcess  int //atomic
 	context    context.Context
 	cancelFunc context.CancelFunc
 }

@@ -45,11 +45,12 @@ type providerInfo struct {
 // group stores use's groupinfo
 type groupInfo struct {
 	sync.Mutex
-	groupID string // id format of query address
-	userID  string // id format of user address
-	privKey string // EthString
-	state   int8   // atomic?
-	ds      data.Service
+	groupID   string // id format of query address
+	userID    string // id format of user address
+	shareToID string // shareToID = userID when not share
+	privKey   string // EthString of shareTo
+	state     int8   // atomic?
+	ds        data.Service
 
 	keepers   map[string]*keeperInfo
 	providers map[string]*providerInfo
@@ -67,9 +68,10 @@ type groupInfo struct {
 	queryItem     *role.QueryItem
 }
 
-func newGroup(uid, sk string, duration, capacity, price int64, ks, ps int, redeploy bool, d data.Service) *groupInfo {
+func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps int, redeploy bool, d data.Service) *groupInfo {
 	return &groupInfo{
 		userID:      uid,
+		shareToID:   shareTo,
 		privKey:     sk,
 		ds:          d,
 		state:       starting,
@@ -839,18 +841,14 @@ func (g *groupInfo) loadContracts() error {
 	for _, proInfo := range g.providers {
 		proID := proInfo.providerID
 		if proInfo.chanItem == nil {
-			cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)
-			if err != nil {
-				continue
-			}
-
-			if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+			cItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
+			if err != nil || cItem.Money.Cmp(big.NewInt(0)) == 0 {
 				_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
 				if err != nil {
 					continue
 				}
 
-				cItem, err = role.GetLatestChannel(g.userID, g.groupID, proID)
+				cItem, err = role.GetLatestChannel(g.shareToID, g.groupID, proID)
 				if err != nil {
 					continue
 				}

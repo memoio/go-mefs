@@ -193,6 +193,8 @@ var LfsCmd = &cmds.Command{
 		"start":          lfsStartUserCmd,
 		"kill":           lfsKillUserCmd,
 		"show_storage":   lfsShowStorageCmd,
+		"get_share":      lfsGetShareCmd,
+		"gen_share":      lfsGenShareCmd,
 	},
 }
 
@@ -401,7 +403,7 @@ var lfsStartUserCmd = &cmds.Command{
 			}
 		}
 
-		lfs, err := node.Inst.(*user.Info).NewFS(uid, qid, hexSk, capacity, duration, price, ks, ps, rdo)
+		lfs, err := node.Inst.(*user.Info).NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo)
 		if err != nil {
 			node.Inst.(*user.Info).KillUser(uid)
 			return err
@@ -1552,5 +1554,182 @@ mefs lfs show_storage show the storage space used(kb)
 			OutStorage = fmt.Sprintf("%.2f", FloatStorage/1073741824) + "GB"
 		}
 		return cmds.EmitOnce(res, OutStorage)
+	},
+}
+
+var lfsGetShareCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "Get a share object to specified outputpath or current work directory",
+		ShortDescription: `
+'mefs lfs get_share' is a plumbing command for download a file or dir from lfs
+ It outputs the following to stdout:
+
+ 	"GetShareObject success，Size: objectSize" or "error"
+
+`,
+	},
+
+	Arguments: []cmds.Argument{
+		cmds.StringArg("ShareLink", true, false, "The share link"),
+		cmds.StringArg("ObjectName", true, false, "The file you want to save."),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(OutputPath, "o", "The path where the output should be stored."),
+	},
+	PreRun: func(req *cmds.Request, env cmds.Environment) error {
+		outPath := getOutPath(req)
+		fpath := filepath.Join(outPath, req.Arguments[1])
+		_, err := os.Stat(fpath)
+		if !os.IsNotExist(err) {
+			return errors.New("The outpath already has file: " + req.Arguments[1])
+		}
+		return nil
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		var userid string
+		addressid, found := req.Options[AddressID].(string)
+		if addressid == "" || !found {
+			userid = node.Identity.Pretty()
+		} else {
+			userid, err = address.GetIDFromAddress(addressid)
+			if err != nil {
+				return err
+			}
+		}
+
+		pwd := req.Options[PassWord].(string)
+		sk, err := fsrepo.GetPrivateKeyFromKeystore(userid, pwd)
+		if err != nil {
+			return err
+		}
+
+		us := node.Inst.(*user.Info)
+
+		piper, pipew := io.Pipe()
+		bufw := bufio.NewWriterSize(pipew, user.DefaultBufSize)
+		checkErrAndClosePipe := func(err error) error {
+			if err != nil {
+				err = pipew.CloseWithError(err)
+				return err
+			}
+			err = pipew.Close()
+			return err
+		}
+		var complete []user.CompleteFunc
+		complete = append(complete, checkErrAndClosePipe)
+		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[1])
+
+		return res.Emit(piper)
+	},
+	PostRun: cmds.PostRunMap{
+		cmds.CLI: func(res cmds.Response, re cmds.ResponseEmitter) error {
+			req := res.Request()
+			v, err := res.Next()
+			if err != nil {
+				return err
+			}
+
+			outReader, ok := v.(io.Reader)
+			if !ok {
+				return e.New(e.TypeErr(outReader, v))
+			}
+			outPath := getOutPath(req)
+			rootExists := true
+			rootIsDir := false
+			var fpath string
+			if stat, err := os.Stat(outPath); err != nil && os.IsNotExist(err) {
+				rootExists = false
+			} else if err != nil {
+				return err
+			} else if stat.IsDir() {
+				rootIsDir = true
+			}
+			if rootIsDir {
+				fpath = path.Join(outPath, req.Arguments[1])
+			} else if !rootExists {
+				fpath = outPath
+			} else {
+				return errors.New("The outpath already has file: " + req.Arguments[1])
+			}
+			var file *os.File
+			if _, err := os.Stat(fpath); err != nil && os.IsNotExist(err) {
+				file, err = os.Create(fpath)
+				if err != nil {
+					return err
+				}
+			} else {
+				return errors.New("The outpath already has file: " + req.Arguments[1])
+			}
+			//close这里不会报错么？
+			defer file.Close()
+			n, err := io.Copy(file, outReader)
+			if err != nil {
+				fmt.Println("Download failed - ", err)
+				return err
+			}
+			fmt.Printf("GetObject to %s success，Size: %d\n", fpath, n)
+			return nil
+		},
+	},
+}
+
+var lfsGenShareCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "Gennerate share link of a lfs object.",
+		ShortDescription: `
+'mefs lfs gen_share' is a plumbing command to print information of a lfs file.
+ It outputs the following to stdout:
+
+	ShareLink   The ShareLink info of a 
+`,
+	},
+
+	Arguments: []cmds.Argument{
+		cmds.StringArg("BucketName", true, false, "The Bucket's name that object in."),
+		cmds.StringArg("ObjectName", true, false, "The Object's Name"),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		var userid string
+		addressid, found := req.Options[AddressID].(string)
+		if addressid == "" || !found {
+			userid = node.Identity.Pretty()
+		} else {
+			userid, err = address.GetIDFromAddress(addressid)
+			if err != nil {
+				return err
+			}
+		}
+		lfs := node.Inst.(*user.Info).GetUser(userid)
+		if lfs == nil || !lfs.Online() {
+			return errLfsServiceNotReady
+		}
+
+		slink, err := lfs.(*user.LfsInfo).GenShareObject(req.Context, req.Arguments[0], req.Arguments[1])
+		if err != nil {
+			return err
+		}
+
+		return cmds.EmitOnce(res, slink)
 	},
 }

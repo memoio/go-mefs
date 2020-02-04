@@ -43,6 +43,7 @@ message BucketInfo {
   int64 ObjectsBlockSize = 8; //本Bucket的ObjectsBlock序列化后占多少字节
   bool Deletion = 9;        //Bucket是否已删除
   bytes Root = 10;
+  int64 NextObjectID = 11;
 }
 
 message ObjectInfo {

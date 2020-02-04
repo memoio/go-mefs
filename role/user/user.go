@@ -63,7 +63,7 @@ func New(nid string, d data.Service, rt routing.Routing) (instance.Service, erro
 }
 
 // NewFS add a new user
-func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
+func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo bool) (FileSyetem, error) {
 	utils.MLogger.Infof("create lfs service: %s for user %s", queryID, userID)
 	if !rdo {
 		// check stats
@@ -73,7 +73,7 @@ func (u *Info) NewFS(userID, queryID, sk string, capacity, duration, price int64
 		}
 	}
 
-	ginfo := newGroup(userID, sk, capacity, duration, price, ks, ps, rdo, u.ds)
+	ginfo := newGroup(userID, shareTo, sk, capacity, duration, price, ks, ps, rdo, u.ds)
 
 	// queryID == userID indicats this is a testuser
 	if queryID != userID {
