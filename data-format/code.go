@@ -63,7 +63,6 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 
 // NewDataCoderWithBopts contructs a new datacoder with bucketops
 func NewDataCoderWithBopts(bo *pb.BucketOptions, keyset *mcl.KeySet) *DataCoder {
-
 	pre := &pb.BlockOptions{
 		Bopts: bo,
 	}

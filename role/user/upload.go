@@ -73,7 +73,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		return nil, ErrPolicy
 	}
 
-	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " begin")
+	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
 
 	segStripeSize := int64(bo.SegmentSize)
 	stripeSize := int64(bo.SegmentCount*bo.DataCount) * segStripeSize
@@ -117,19 +117,10 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	err = ul.Start(ctx)
-	if err != nil {
-		if ul.length > 0 {
-			object.OPart.ETag = ul.etag
-			object.OPart.Length = ul.length
-			bucket.NextObjectID++
-			bucket.CurStripe = ul.curStripe
-			bucket.NextSeg = ul.curOffset
-			bucket.dirty = true //需要记录，可能上传一部分然后失败，空间已占用
-		} else { //没有占用任何空间，清除信息
-			objectElement := bucket.objects[objectName]
-			bucket.orderedObjects.Remove(objectElement)
-			delete(bucket.objects, objectName)
-		}
+	if err != nil && ul.length == 0 {
+		objectElement := bucket.objects[objectName]
+		bucket.orderedObjects.Remove(objectElement)
+		delete(bucket.objects, objectName)
 		return &object.ObjectInfo, err
 	}
 
@@ -138,10 +129,15 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	bucket.NextObjectID++
 	bucket.CurStripe = ul.curStripe
 	bucket.NextSeg = ul.curOffset
-	bucket.dirty = true
 
-	utils.MLogger.Info("Upload object: ", objectName, " to bucket: ", bucketName, " end, length is: ", object.OPart.Length)
-	return &object.ObjectInfo, nil
+	// left is objectname; right is md5
+	bucket.mtree.Push([]byte(bucketName))
+	bucket.mtree.Push([]byte(ul.etag))
+	bucket.Root = bucket.mtree.Root()
+
+	bucket.dirty = true
+	utils.MLogger.Infof("Upload object: %s to bucket: %s end, length is: %d", objectName, bucketName, object.OPart.Length)
+	return &object.ObjectInfo, err
 }
 
 // Stop is

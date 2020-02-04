@@ -67,6 +67,7 @@ require (
 	github.com/libp2p/go-msgio v0.0.4
 	github.com/memoio/mefs-go-http-client v0.0.0-20190807085537-81d338e169a3
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
+	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/minio/cli v1.22.0
 	github.com/minio/minio v0.0.0-20191105222037-26e760ee6283
 	github.com/minio/minio-go/v6 v6.0.39
@@ -101,10 +102,11 @@ require (
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7
 	github.com/whyrusleeping/stump v0.0.0-20160611222256-206f8f13aae1
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208 // indirect
+	gitlab.com/NebulousLabs/merkletree v0.0.0-20200118113624-07fbf710afc4
 	go.opencensus.io v0.22.2
 	go.uber.org/zap v1.12.0
 	go4.org v0.0.0-20190313082347-94abd6928b1d // indirect
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/crypto v0.0.0-20200109152110-61a87790db17
 	golang.org/x/sys v0.0.0-20191010194322-b09406accb47
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127

@@ -3,6 +3,7 @@ package user
 import (
 	"container/list"
 	"context"
+	"crypto/sha256"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
+	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
 // CreateBucket create a bucket for a specified LFSservice
@@ -61,7 +63,13 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		dirty:          true,
 		objects:        objects,
 		orderedObjects: list.New(),
+		mtree:          mt.New(sha256.New()),
 	}
+
+	bucket.mtree.SetIndex(0)
+	bucket.mtree.Push([]byte(bucketName))
+	bucket.mtree.Push([]byte(bucketName))
+
 	//将此Bucket信息添加到LFS中
 	l.meta.sb.NextBucketID++
 	l.meta.sb.bitsetInfo.Set(uint(bucketID))

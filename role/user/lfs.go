@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"io"
 	"strconv"
@@ -19,6 +21,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
 // LfsInfo has lfs info
@@ -59,6 +62,7 @@ type superBucket struct {
 	dirty          bool
 	sync.RWMutex
 	state int
+	mtree *mt.Tree
 }
 
 // objectInfo stores an object meta info
@@ -154,17 +158,14 @@ func initLfs() (*lfsMeta, error) {
 
 func initLogs() (*lfsMeta, error) {
 	sb := newSuperBlock()
-	bucketByID := make(map[int32]*superBucket)
-	bucketNameToID := make(map[string]int32)
 	return &lfsMeta{
 		sb:             sb,
-		bucketByID:     bucketByID,
-		bucketNameToID: bucketNameToID,
+		bucketByID:     make(map[int32]*superBucket),
+		bucketNameToID: make(map[string]int32),
 	}, nil
 }
 
 func newSuperBlock() *superBlock {
-	bitset := bitset.New(256)
 	return &superBlock{
 		SuperBlockInfo: pb.SuperBlockInfo{
 			BucketsSet:      nil,
@@ -172,7 +173,7 @@ func newSuperBlock() *superBlock {
 			NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
 			MagicNumber:     0xfb,
 			Version:         1},
-		bitsetInfo: bitset,
+		bitsetInfo: bitset.New(256),
 		dirty:      true,
 	}
 }
@@ -195,6 +196,70 @@ func (l *LfsInfo) GetGroup() *groupInfo {
 }
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
+func (l *LfsInfo) persistRoot(ctx context.Context) error {
+	utils.MLogger.Infof("Persist Lfs root %s is ready for: %s", l.fsID, l.userID)
+	tick := time.NewTicker(30 * time.Minute)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			if l.online { //LFS没启动不刷新
+				l.genRoot()
+			}
+		case <-ctx.Done():
+			l.genRoot()
+			return nil
+		}
+	}
+}
+
+func (l *LfsInfo) genRoot() {
+	l.meta.sb.RLock()
+	bucketNum := l.meta.sb.GetNextBucketID()
+
+	lr := new(pb.LfsRoot)
+
+	lr.BRoots = make([]*pb.BucketRoot, bucketNum)
+
+	for i, bucket := range l.meta.bucketByID {
+		if i < bucketNum || i == 0 {
+			continue
+		}
+		bucket.RLock()
+		lr.BRoots[i-1].BucketID = bucket.BucketID
+		lr.BRoots[i-1].Root = bucket.Root
+		lr.BRoots[i-1].Length = bucket.NextObjectID
+		bucket.Unlock()
+	}
+	l.meta.sb.RUnlock()
+
+	mtree := mt.New(sha256.New())
+	mtree.SetIndex(0)
+	ctime := time.Now().Unix()
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, uint64(ctime))
+
+	mtree.Push([]byte(l.fsID))
+	mtree.Push(buf)
+
+	for i := 0; i < int(bucketNum); i++ {
+		binary.LittleEndian.PutUint64(buf, uint64(lr.BRoots[i].Length))
+		mtree.Push(buf)
+		mtree.Push(lr.BRoots[i].Root)
+	}
+
+	lr.Root = mtree.Root()
+	lr.CTime = ctime
+
+	// add root to contract
+
+	l.meta.sb.Lock()
+	l.meta.sb.LRoot = append(l.meta.sb.LRoot, lr)
+	l.meta.sb.dirty = true
+	l.meta.sb.Unlock()
+}
+
+//每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 	utils.MLogger.Infof("Persist Lfs %s is ready for: %s", l.fsID, l.userID)
 	tick := time.NewTicker(30 * time.Second)
@@ -210,7 +275,7 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			if l.online { //LFS没启动不刷新
-				err := l.Fsync(false)
+				err := l.Fsync(true)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
 				}
@@ -226,19 +291,10 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 		return ErrLfsServiceNotReady
 	}
 
-	l.meta.sb.RLock()
-	if l.meta.sb.dirty || isForce { //将超级块信息保存在本地
-		err := l.flushSuperBlock()
-		if err != nil {
-			l.meta.sb.RUnlock()
-			return err
-		}
+	err := l.flushSuperBlock(isForce)
+	if err != nil {
+		return err
 	}
-	l.meta.sb.RUnlock()
-
-	l.meta.sb.Lock()
-	l.meta.sb.dirty = false
-	l.meta.sb.Unlock()
 
 	for _, bucket := range l.meta.bucketByID {
 		err := l.flushBucketAndObjects(bucket, isForce)
@@ -247,13 +303,22 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 		}
 	}
 
-	l.gInfo.saveChannelValue()
+	if isForce {
+		l.gInfo.saveChannelValue()
+	}
 
 	return nil
 }
 
 //----------------------Flush superBlock---------------------------
-func (l *LfsInfo) flushSuperBlock() error {
+func (l *LfsInfo) flushSuperBlock(isForce bool) error {
+	l.meta.sb.RLock()
+	defer l.meta.sb.RUnlock()
+
+	if !isForce && !l.meta.sb.dirty {
+		return nil
+	}
+
 	sb := l.meta.sb
 	sb.BucketsSet = sb.bitsetInfo.Bytes()
 	sbBuffer := bytes.NewBuffer(nil)
@@ -318,6 +383,7 @@ func (l *LfsInfo) flushSuperBlock() error {
 	}
 
 	utils.MLogger.Infof("user %s lfs %s superblock persist. ", l.userID, l.fsID)
+	l.meta.sb.dirty = false
 	return nil
 }
 
