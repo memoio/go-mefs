@@ -57,10 +57,10 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 		return nil, ErrObjectNotExist
 	}
 
-	delete(bucket.objects, objectName)
 	object.Deletion = true
+	delete(bucket.objects, objectName)
 	// move deletions to special name
-	object.OPart.Name = objectName + "/" + time.Now().Format(utils.BASETIME)
+	object.OPart.Name = objectName + "/" + strconv.Itoa(int(object.ObjectID))
 	bucket.objects[object.OPart.Name] = objectElement
 	bucket.dirty = true
 	return &object.ObjectInfo, nil

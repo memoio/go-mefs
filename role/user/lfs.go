@@ -34,6 +34,7 @@ type LfsInfo struct {
 	keySet     *mcl.KeySet
 	meta       *lfsMeta //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
 	online     bool
+	writable   bool // only one user can write
 	context    context.Context
 	cancelFunc context.CancelFunc
 }
@@ -51,7 +52,6 @@ type superBlock struct {
 	bitsetInfo *bitset.BitSet
 	sync.RWMutex
 	dirty bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
-	state int
 }
 
 // superBucket has lfs objects info
@@ -61,7 +61,6 @@ type superBucket struct {
 	orderedObjects *list.List               //用过map和list结合，构造一个有序Map
 	dirty          bool
 	sync.RWMutex
-	state int
 	mtree *mt.Tree
 }
 
@@ -69,7 +68,6 @@ type superBucket struct {
 type objectInfo struct {
 	pb.ObjectInfo
 	sync.RWMutex
-	state int
 }
 
 // Start starts user's info

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,7 +106,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*pb.Buck
 	bucket.Lock()
 	bucket.Deletion = true
 	delete(l.meta.bucketNameToID, bucket.Name)
-	bucket.Name = bucket.Name + "/" + time.Now().Format(utils.BASETIME)
+	bucket.Name = bucket.Name + "/" + strconv.Itoa(int(bucket.BucketID))
 	l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
 	bucket.dirty = true
 	bucket.Unlock()

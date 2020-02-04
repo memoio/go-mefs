@@ -55,6 +55,7 @@ const (
 	UserInit
 	UserNotify
 	UserStart
+	UserStop
 	Query
 	Offer
 	UpKeeping

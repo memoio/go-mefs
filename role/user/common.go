@@ -38,6 +38,7 @@ var (
 	ErrLfsServiceNotReady    = errors.New("lfs service is not ready")
 	ErrCannotStartLfsService = errors.New("cannot start lfs service")
 
+	ErrReadOnly        = errors.New("lfs is read only")
 	errGetContractItem = errors.New("cannot get contract Item")
 	ErrTimeOut         = errors.New("Time out")
 
@@ -75,7 +76,7 @@ func DefaultBucketOptions() *pb.BucketOptions {
 		SegmentSize:  dataformat.DefaultSegmentSize,
 		TagFlag:      dataformat.BLS12,
 		SegmentCount: dataformat.DefaultSegmentCount,
-		Encryption:   0,
+		Encryption:   1,
 	}
 }
 
