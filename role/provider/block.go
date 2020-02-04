@@ -106,10 +106,13 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 			return nil, err
 		}
 
-		cItem := gp.getChanItem(p.localID, chanGot)
-		if cItem == nil {
-			utils.MLogger.Warn("channel is empty, reget it for: ", chanGot)
-			return nil, errors.New("Channel is not valid")
+		var cItem *role.ChannelItem
+		if chanGot != "" {
+			cItem = gp.getChanItem(p.localID, chanGot)
+			if cItem == nil {
+				utils.MLogger.Warn("channel is empty, reget it for: ", chanGot)
+				return nil, errors.New("Channel is not valid")
+			}
 		}
 
 		if value != nil {
@@ -148,15 +151,16 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 		}
 		utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
 		return nil, errors.New("Signature is wrong")
-	} else {
-		b, err := p.ds.GetBlock(context.Background(), splitedNcid[0], nil, "local")
-		if err != nil {
-			return nil, errors.New("Block is not found")
-		}
-
-		return b.RawData(), nil
 	}
-	return nil, errors.New("get block failed")
+
+	utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
+	b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+	if err != nil {
+		utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
+		return nil, err
+	}
+
+	return b.RawData(), nil
 }
 
 // verify verifies the transaction
