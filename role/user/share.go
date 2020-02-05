@@ -9,6 +9,7 @@ import (
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
 
@@ -70,6 +71,19 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		sl.DecKey = decKey[:]
 	}
 
+	if l.fsID == l.userID {
+		kmUser, err := metainfo.NewKeyMeta(l.fsID, metainfo.LogFS, l.userID)
+		if err != nil {
+			return "", err
+		}
+
+		res, err := l.ds.GetKey(ctx, kmUser.ToString(), "local")
+		if err != nil {
+			return "", err
+		}
+		sl.KPs = string(res)
+	}
+
 	sByte, err := proto.Marshal(sl)
 	if err != nil {
 		return "", err
@@ -79,7 +93,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 }
 
 // GetShareObject constructs lfs download process
-func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localKey string, share string) error {
+func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string) error {
 	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {
@@ -96,7 +110,19 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 
 	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
 
-	su, err := u.NewFS(sl.UserID, uid, sl.QueryID, "", 0, 0, 0, 0, 0, false)
+	if sl.UserID == sl.QueryID {
+		kmUser, err := metainfo.NewKeyMeta(sl.QueryID, metainfo.LogFS, sl.UserID)
+		if err != nil {
+			return err
+		}
+
+		err = u.ds.PutKey(ctx, kmUser.ToString(), []byte(sl.KPs), "local")
+		if err != nil {
+			return err
+		}
+	}
+
+	su, err := u.NewFS(sl.UserID, uid, sl.QueryID, localSk, 0, 0, 0, 0, 0, false)
 	if err != nil {
 		utils.MLogger.Errorf("create share user %s error: %s", sl.UserID, err)
 		return err
@@ -110,7 +136,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 
 	sul := su.(*LfsInfo)
 	sul.writable = false
-	sul.privateKey = localKey
+	sul.privateKey = localSk
 
 	bo := sl.BOpts
 	decoder := dataformat.NewDataCoderWithBopts(bo, sul.keySet)

@@ -92,6 +92,7 @@ message ShareLink{
     BucketOptions BOpts = 6;
     repeated ObjectPart OParts = 7;
     bytes DecKey = 8;
+    string KPs = 11;// keepers/providers
 }
 
 message ChalInfo{
