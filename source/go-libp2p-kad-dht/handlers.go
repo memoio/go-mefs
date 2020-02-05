@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	proto "github.com/gogo/protobuf/proto"
@@ -145,6 +146,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 	if rec.GetSignature() != nil {
 		keys := strings.Split(string(rec.GetKey()), metainfo.DELIMITER)
 		if len(keys) < 3 {
+			log.Println("key is wrong for: ", string(rec.GetKey()))
 			return nil, errors.New("key is wrong")
 		}
 
@@ -164,6 +166,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 		ok := utils.VerifySig(pubrec.GetValue(), gotID, string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
 		if !ok {
+			log.Println("key signature is wrong for: ", string(rec.GetKey()))
 			return nil, errors.New("key signature is wrong")
 		}
 	}
