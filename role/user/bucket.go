@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"sort"
 	"strconv"
 	"strings"
@@ -69,7 +70,9 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 	bucket.mtree.SetIndex(0)
 	bucket.mtree.Push([]byte(bucketName))
-	bucket.mtree.Push([]byte(bucketName))
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, uint64(bucket.Ctime))
+	bucket.mtree.Push(buf)
 
 	//将此Bucket信息添加到LFS中
 	l.meta.sb.NextBucketID++

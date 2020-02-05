@@ -170,7 +170,7 @@ func uploadTest(count int) error {
 	})
 
 	log.Println("download test complete")
-	log.Println("download ", fileDownloadSuccessNum, " files,")
+	log.Println("download ", fileDownloadSuccessNum, " files")
 
 	log.Println("upload: ", fileNum, "; success:", fileUploadSuccessNum, " rate is", 100*fileUploadSuccessNum/count)
 	log.Println("downlaod: ", fileNum, "; success:", fileDownloadSuccessNum, " rate is", 100*fileDownloadSuccessNum/count)

@@ -26,6 +26,7 @@ func main() {
 	ethEndPoint = *eth
 	toAddr := *addr
 	contracts.EndPoint = ethEndPoint
+	qethEndPoint = ethEndPoint
 
 	num := test.QueryBalance("0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6", ethEndPoint)
 	fmt.Println("用于转账的账号余额:", num)
