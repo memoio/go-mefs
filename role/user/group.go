@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -607,7 +608,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		return err
 	}
 
-	g.ds.PutKey(ctx, kmUser.ToString(), []byte(res.String()), "local")
+	g.ds.PutKey(ctx, kmUser.ToString(), []byte(res.String()), nil, "local")
 
 	if g.userID != g.groupID {
 		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
@@ -736,22 +737,88 @@ func (g *groupInfo) GetProviders(count int) ([]string, []string, error) {
 	return conPro, unconPro, nil
 }
 
+func (g *groupInfo) putToAll(ctx context.Context, key string, value, sig []byte) {
+	g.ds.PutKey(ctx, key, value, nil, "local")
+
+	var wg sync.WaitGroup
+	//put config to
+	for _, kid := range g.tempKeepers {
+		wg.Add(1)
+		go func(pid string) {
+			defer wg.Done()
+			retry := 0
+			for retry < 10 {
+				err := g.ds.PutKey(ctx, key, value, nil, pid)
+				if err != nil {
+					retry++
+					if retry >= 10 {
+						utils.MLogger.Warn("Put bls config to: ", pid, " failed: ", err)
+					}
+					time.Sleep(60 * time.Second)
+				}
+				break
+			}
+		}(kid)
+	}
+
+	for _, kid := range g.tempProviders {
+		wg.Add(1)
+		go func(pid string) {
+			defer wg.Done()
+			retry := 0
+			for retry < 10 {
+				err := g.ds.PutKey(ctx, key, value, nil, pid)
+				if err != nil {
+					retry++
+					if retry >= 10 {
+						utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
+					}
+					time.Sleep(60 * time.Second)
+				}
+				break
+			}
+		}(kid)
+	}
+	wg.Done()
+	return
+}
+
 func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
+
+	var wg sync.WaitGroup
+
 	ctx := context.Background()
-	count := 0
+	count := int32(0)
 	for _, keeper := range g.tempKeepers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper)
-		if err != nil {
-			utils.MLogger.Error("Send meta message to: ", keeper, " error : ", err)
-			count++
-		}
+		wg.Add(1)
+		go func(pid string) {
+			defer wg.Done()
+			i := 0
+			for {
+				_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper)
+				if err != nil {
+					i++
+					if i == 5 {
+						utils.MLogger.Error("Send meta message to: ", keeper, " error : ", err)
+						atomic.AddInt32(&count, 1)
+						return
+					}
+					time.Sleep(30 * time.Second)
+				}
+				break
+			}
+		}(keeper)
 	}
-	if count == len(g.tempKeepers) {
+
+	wg.Wait()
+
+	if int(count) == len(g.tempKeepers) {
 		return ErrNoKeepers
 	}
+
 	return nil
 }
 
@@ -932,7 +999,7 @@ func (g *groupInfo) saveChannelValue() error {
 				continue
 			}
 
-			g.ds.PutKey(ctx, km.ToString(), proInfo.chanItem.Sig, "local")
+			g.ds.PutKey(ctx, km.ToString(), proInfo.chanItem.Sig, nil, "local")
 		}
 	}
 

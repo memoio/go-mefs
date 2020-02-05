@@ -55,7 +55,7 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 				return nil, err
 			}
 
-			p.ds.PutKey(ctx, userconfigkey, userconfigbyte, "local")
+			p.ds.PutKey(ctx, userconfigkey, userconfigbyte, nil, "local")
 
 			gp.blsKey = mkey
 			return mkey, nil
@@ -103,7 +103,7 @@ func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error)
 			return nil, err
 		}
 
-		p.ds.PutKey(ctx, userconfigkey, userconfigbyte, "local")
+		p.ds.PutKey(ctx, userconfigkey, userconfigbyte, nil, "local")
 
 		return mkey.Sk, nil
 	}

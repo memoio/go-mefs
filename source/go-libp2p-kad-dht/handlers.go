@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/ipfs/go-cid"
@@ -14,6 +15,7 @@ import (
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -139,6 +141,32 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 	}
 
 	// Make sure the record is valid (not expired, valid signature etc)
+
+	if rec.GetSignature() != nil {
+		keys := strings.Split(string(rec.GetKey()), metainfo.DELIMITER)
+		if len(keys) < 3 {
+			return nil, errors.New("key is wrong")
+		}
+
+		gotID := keys[2]
+
+		km, _ := metainfo.NewKeyMeta(gotID, metainfo.PublicKey)
+		pubRecByte, err := dht.datastore.Get(ds.NewKey(km.ToString()))
+		if err != nil {
+			return nil, err
+		}
+
+		pubrec := new(pb.Record)
+		err = proto.Unmarshal(pubRecByte, pubrec)
+		if err != nil {
+			return nil, err
+		}
+
+		ok := utils.VerifySig(pubrec.GetValue(), gotID, string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
+		if !ok {
+			return nil, errors.New("key signature is wrong")
+		}
+	}
 
 	dskey := convertToDsKey(rec.GetKey())
 

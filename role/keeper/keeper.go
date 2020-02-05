@@ -135,7 +135,7 @@ func (k *Info) save(ctx context.Context) error {
 	})
 
 	if pids.Len() > 0 {
-		err = k.ds.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), "local")
+		err = k.ds.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func (k *Info) save(ctx context.Context) error {
 	})
 
 	if pids.Len() > 0 {
-		err = k.ds.PutKey(ctx, kmPID.ToString(), []byte(pids.String()), "local")
+		err = k.ds.PutKey(ctx, kmPID.ToString(), []byte(pids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ func (k *Info) save(ctx context.Context) error {
 
 		// persist queryID of one user
 		if res.Len() > 0 {
-			err = k.ds.PutKey(ctx, kmfs.ToString(), []byte(res.String()), "local")
+			err = k.ds.PutKey(ctx, kmfs.ToString(), []byte(res.String()), nil, "local")
 			if err != nil {
 				return true
 			}
@@ -194,7 +194,7 @@ func (k *Info) save(ctx context.Context) error {
 
 	// persist all users
 	if pids.Len() > 0 {
-		err = k.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), "local")
+		err = k.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
@@ -232,7 +232,7 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(ctx, kmLast.ToString(), []byte(valueLast), "local")
+		k.ds.PutKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local")
 
 		//key: `qid/"chalpay"/pid/beginTime/endTime`
 		//value: `spacetime/signature/proof`
@@ -242,7 +242,7 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(ctx, km.ToString(), []byte(metaValue), "local")
+		k.ds.PutKey(ctx, km.ToString(), []byte(metaValue), nil, "local")
 	}
 	return nil
 }
@@ -623,7 +623,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 
 		pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
 
-		err = k.ds.PutKey(context.Background(), km.ToString(), []byte(pidAndOffset), "local")
+		err = k.ds.PutKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("Delete testUser block: ", blockID, " error:", err)
 		}

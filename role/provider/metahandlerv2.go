@@ -83,7 +83,7 @@ func (p *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	}
 
 	kmkps, _ := metainfo.NewKeyMeta(gid, metainfo.LogFS, uid)
-	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, "local")
+	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, nil, "local")
 
 	return []byte("ok"), nil
 }

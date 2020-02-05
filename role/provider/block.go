@@ -144,7 +144,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 					return nil, err
 				}
 
-				p.ds.PutKey(ctx, key.ToString(), sig, "local")
+				p.ds.PutKey(ctx, key.ToString(), sig, nil, "local")
 			}
 
 			return b.RawData(), nil

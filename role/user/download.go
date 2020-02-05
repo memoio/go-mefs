@@ -9,10 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -405,27 +403,9 @@ func (ds *downloadJob) getChannelSign(ncid string, provider string) ([]byte, *bi
 		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 
-	sig, err := role.SignForChannel(channelID, hexSK, money)
+	mes, err := role.SignForChannel(channelID, hexSK, money)
 	if err != nil {
 		utils.MLogger.Errorf("Signature about Block %s from %s failed.", ncid, provider)
-		return nil, nil, err
-	}
-
-	pubKey, err := utils.GetPkFromEthSk(hexSK)
-	if err != nil {
-		utils.MLogger.Error("Get public key fail: ", err)
-		return nil, nil, err
-	}
-
-	message := &pb.ChannelSign{
-		Sig:       sig,
-		PubKey:    pubKey,
-		Value:     money.Bytes(),
-		ChannelID: channelID,
-	}
-
-	mes, err := proto.Marshal(message)
-	if err != nil {
 		return nil, nil, err
 	}
 

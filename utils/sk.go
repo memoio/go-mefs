@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -10,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	cy "github.com/libp2p/go-libp2p-core/crypto"
+	b58 "github.com/mr-tron/base58/base58"
+	mh "github.com/multiformats/go-multihash"
 )
 
 //EthSkLength implements the length of privatekey in Ethereum format with prefix "0x"
@@ -121,4 +124,68 @@ func GetPkFromEthSk(sk string) (pk []byte, err error) {
 
 	pk = crypto.CompressPubkey(ecdsaPk)
 	return pk, nil
+}
+
+//GetCompressedPkFromHexSk get compressed pubKey from hex private key
+func getPkFromECDSASk(sk *ecdsa.PrivateKey) (pk []byte, err error) {
+	ecdsaPk := (sk.Public()).(*ecdsa.PublicKey)
+	// btcecPk := (*btcec.PublicKey)(secp256k1Pk)
+	// ecdsaPk := (*ecdsa.PublicKey)(btcecPk)
+
+	pk = crypto.CompressPubkey(ecdsaPk)
+	return pk, nil
+}
+
+func IDFromPublicKey(pubKey []byte) (string, error) {
+	pk, err := crypto.DecompressPubkey(pubKey)
+	if err != nil {
+		return "", err
+	}
+
+	if pk == nil || pk.X == nil || pk.Y == nil {
+		return "", errors.New("invalid publickey")
+	}
+	b := elliptic.Marshal(btcec.S256(), pk.X, pk.Y)
+
+	var alg uint64 = mh.KECCAK_160
+	hash, _ := mh.Sum(b[1:], alg, -1)
+	return b58.Encode(hash), nil
+}
+
+//SignForKey user sends a private key signature to the provider
+func SignForKey(hexKey string, key string, value []byte) (sig []byte, err error) {
+	skECDSA, err := EthskToECDSAsk(hexKey)
+	if err != nil {
+		return sig, err
+	}
+
+	hash := crypto.Keccak256([]byte(key), value)
+
+	//私钥对上述哈希值签名
+	sig, err = crypto.Sign(hash, skECDSA)
+	if err != nil {
+		return sig, err
+	}
+
+	_, err = GetPkFromEthSk(hexKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return sig, nil
+}
+
+// VerifySig verifies
+func VerifySig(pubKey []byte, ownerID, key string, value, sig []byte) bool {
+	gotID, err := IDFromPublicKey(pubKey)
+	if err != nil {
+		return false
+	}
+
+	if gotID != ownerID {
+		return false
+	}
+
+	hash := crypto.Keccak256([]byte(key), value)
+	return crypto.VerifySignature(pubKey, hash, sig)
 }

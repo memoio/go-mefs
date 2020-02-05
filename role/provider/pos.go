@@ -291,7 +291,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		// 本地更新
 		posValue := posCidPrefix
 		utils.MLogger.Info("posKM :", posKM.ToString(), ", posValue :", posValue)
-		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
+		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
@@ -348,7 +348,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		utils.MLogger.Info("after delete ,Gid :", curGid, ", sid :", curSid, ", cid prefix :", posCidPrefix)
 
 		posValue := posCidPrefix
-		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), "local")
+		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posValue), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue

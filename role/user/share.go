@@ -116,7 +116,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 			return err
 		}
 
-		err = u.ds.PutKey(ctx, kmUser.ToString(), []byte(sl.KPs), "local")
+		err = u.ds.PutKey(ctx, kmUser.ToString(), []byte(sl.KPs), nil, "local")
 		if err != nil {
 			return err
 		}

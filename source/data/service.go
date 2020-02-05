@@ -14,7 +14,7 @@ import (
 type Service interface {
 	GetNetAddr() string
 	GetKey(ctx context.Context, key, to string) ([]byte, error)
-	PutKey(ctx context.Context, key string, data []byte, to string) error
+	PutKey(ctx context.Context, key string, data, sig []byte, to string) error
 	// AppendKey key is dtype/id/op1/op2
 	AppendKey(ctx context.Context, key string, data []byte, to string) error
 	DeleteKey(ctx context.Context, key, to string) error

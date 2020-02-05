@@ -109,7 +109,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 	return res, nil
 }
 
-func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) error {
+func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
 		return errNoRouting
 	}
@@ -120,7 +120,7 @@ func (n *impl) PutKey(ctx context.Context, key string, data []byte, to string) e
 		n.Connect(ctx, to)
 	}
 
-	return n.rt.(*dht.KadDHT).PutTo(ctx, key, data, to)
+	return n.rt.(*dht.KadDHT).PutTo(ctx, key, data, sig, to)
 }
 
 // to modify

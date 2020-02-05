@@ -75,7 +75,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 			if err != nil {
 				return true
 			}
-			p.ds.PutKey(ctx, km.ToString(), cItem.Sig, "local")
+			p.ds.PutKey(ctx, km.ToString(), cItem.Sig, nil, "local")
 			return true
 		})
 	}

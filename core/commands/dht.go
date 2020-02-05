@@ -611,7 +611,7 @@ var putValuetoDhtCmd = &cmds.Command{
 
 		go func() {
 			defer cancel()
-			err := nd.Routing.(*dht.KadDHT).PutTo(ctx, key, []byte(data), id)
+			err := nd.Routing.(*dht.KadDHT).PutTo(ctx, key, []byte(data), nil, id)
 			if err != nil {
 				notif.PublishQueryEvent(ctx, &notif.QueryEvent{
 					Type:  notif.QueryError,

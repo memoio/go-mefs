@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/role"
@@ -30,7 +29,7 @@ func parseBLS12ConfigMeta(privKey, userBLS12config []byte) (*mcl.KeySet, error) 
 	return mkey, nil
 }
 
-func (l *LfsInfo) putUserConfig() {
+func (l *LfsInfo) putUserConfig(ctx context.Context) {
 	kmBls, err := metainfo.NewKeyMeta(l.fsID, metainfo.Config, l.userID)
 	if err != nil {
 		return
@@ -42,40 +41,13 @@ func (l *LfsInfo) putUserConfig() {
 	}
 
 	blskey := kmBls.ToString()
-	ctx := context.Background()
-	// put to local first
-	l.ds.PutKey(ctx, blskey, userBLS12Config, "local")
 
-	//put config to
-	for _, kid := range l.gInfo.tempKeepers {
-		retry := 0
-		for retry < 10 {
-			err := l.ds.PutKey(ctx, blskey, userBLS12Config, kid)
-			if err != nil {
-				retry++
-				if retry >= 10 {
-					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
-				}
-				time.Sleep(60 * time.Second)
-			}
-			break
-		}
+	sig, err := utils.SignForKey(l.privateKey, blskey, userBLS12Config)
+	if err != nil {
+		return
 	}
 
-	for _, kid := range l.gInfo.tempProviders {
-		retry := 0
-		for retry < 10 {
-			err := l.ds.PutKey(ctx, blskey, userBLS12Config, kid)
-			if err != nil {
-				retry++
-				if retry >= 10 {
-					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
-				}
-				time.Sleep(60 * time.Second)
-			}
-			break
-		}
-	}
+	l.gInfo.putToAll(ctx, blskey, userBLS12Config, sig)
 }
 
 func (l *LfsInfo) loadBLS12Config() error {
@@ -111,7 +83,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 			}
 			// send to keeper
 			if len(userBLS12config) > 0 {
-				err = l.ds.PutKey(ctx, blskey, userBLS12config, kid)
+				err = l.ds.PutKey(ctx, blskey, userBLS12config, nil, kid)
 				if err != nil {
 					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
 				}
@@ -123,7 +95,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	// remote has no config; resend
 	if !has && len(userBLS12config) > 0 {
 		// store local
-		err = l.ds.PutKey(ctx, blskey, userBLS12config, "local")
+		err = l.ds.PutKey(ctx, blskey, userBLS12config, nil, "local")
 		if err != nil {
 			utils.MLogger.Warn("Put bls config to local failed: ", err)
 		}

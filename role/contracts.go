@@ -801,7 +801,26 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	if err != nil {
 		return sig, err
 	}
-	return sig, nil
+
+	pubKey, err := utils.GetPkFromEthSk(hexKey)
+	if err != nil {
+		utils.MLogger.Error("Get public key fail: ", err)
+		return nil, err
+	}
+
+	message := &pb.ChannelSign{
+		Sig:       sig,
+		PubKey:    pubKey,
+		Value:     value.Bytes(),
+		ChannelID: channelID,
+	}
+
+	mes, err := proto.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return mes, nil
 }
 
 //VerifyChannelSig provider used to verify user's signature for channel-contract

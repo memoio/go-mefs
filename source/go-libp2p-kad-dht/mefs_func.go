@@ -124,11 +124,12 @@ func (dht *KadDHT) SendMessage(ctx context.Context, typ int32, metaKey string, m
 //============dht层的直接调用函数==============
 
 //PutTo 将kv对发送到指定节点，id为local时，保存在本地
-func (dht *KadDHT) PutTo(ctx context.Context, key string, value []byte, id string) error {
+func (dht *KadDHT) PutTo(ctx context.Context, key string, value, sig []byte, id string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	rec := MakePutRecord(key, value)
+	rec.Signature = sig
 
 	if id == "local" {
 		return dht.putLocal(key, rec)

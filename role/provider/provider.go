@@ -368,7 +368,7 @@ func (p *Info) save(ctx context.Context) error {
 	})
 
 	if pids.Len() > 0 {
-		err = p.ds.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), "local")
+		err = p.ds.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
@@ -386,7 +386,7 @@ func (p *Info) save(ctx context.Context) error {
 	})
 
 	if pids.Len() > 0 {
-		err = p.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), "local")
+		err = p.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
@@ -408,7 +408,7 @@ func (p *Info) save(ctx context.Context) error {
 			}
 
 			if pids.Len() > 0 {
-				err = p.ds.PutKey(ctx, kmQID.ToString(), []byte(pids.String()), "local")
+				err = p.ds.PutKey(ctx, kmQID.ToString(), []byte(pids.String()), nil, "local")
 				if err != nil {
 					return true
 				}

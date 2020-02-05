@@ -86,6 +86,19 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return err
 	}
 
+	pubKey, err := utils.GetPkFromEthSk(l.privateKey)
+	if err != nil {
+		utils.MLogger.Error("Get publickey for: ", l.userID, " fail: ", err)
+		return err
+	}
+
+	km, err := metainfo.NewKeyMeta(l.userID, metainfo.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	l.gInfo.putToAll(l.context, km.ToString(), pubKey, nil)
+
 	if has {
 		// init or send bls config
 		err = l.loadBLS12Config()
@@ -102,7 +115,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		}
 
 		l.keySet = mkey
-		go l.putUserConfig()
+		l.putUserConfig(l.context)
 	}
 
 	// in case persist is cancel

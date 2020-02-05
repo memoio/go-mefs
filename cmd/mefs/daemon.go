@@ -312,7 +312,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
-	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), "local")
+	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), nil, "local")
 	if err != nil {
 		utils.MLogger.Error("Put role key falied: ", err)
 	}
