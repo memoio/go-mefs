@@ -453,10 +453,9 @@ func (g *groupInfo) collect(ctx context.Context) bool {
 	if kcount >= g.keeperSLA && pcount >= g.providerSLA {
 		g.state = collectDone
 		return false
-	} else {
-		utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...", kcount, pcount, g.keeperSLA, g.providerSLA)
-		return true
 	}
+	utils.MLogger.Infof("No enough keepers and providers, have k:%d p:%d, want k:%d p:%d, collecting...", kcount, pcount, g.keeperSLA, g.providerSLA)
+	return true
 }
 
 // key: queryID/"UserNotify"/userID/kc/pc
@@ -771,7 +770,7 @@ func (g *groupInfo) putToAll(ctx context.Context, key string, value, sig []byte)
 				if err != nil {
 					retry++
 					if retry >= 10 {
-						utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
+						utils.MLogger.Warn("Put bls config to: ", pid, " failed: ", err)
 					}
 					time.Sleep(60 * time.Second)
 				}
@@ -798,11 +797,11 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 			defer wg.Done()
 			i := 0
 			for {
-				_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper)
+				_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, pid)
 				if err != nil {
 					i++
 					if i == 5 {
-						utils.MLogger.Error("Send meta message to: ", keeper, " error : ", err)
+						utils.MLogger.Error("Send meta message to: ", pid, " error : ", err)
 						atomic.AddInt32(&count, 1)
 						return
 					}

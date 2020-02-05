@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"golang.org/x/crypto/blake2b"
-	"time"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
@@ -19,16 +18,11 @@ const (
 	DefaultCapacity int64 = 1000 //单位：MB
 	DefaultDuration int64 = 100  //单位：天
 
-	//LFS
-	maxObjectNameLen = 4096 //设定文件名和路径可占用的最长字节数
-
-	DefaultGetBlockDelay = 30 * time.Second
-
 	defaultMetaBackupCount int32 = 3
 	flushLocalBackup             = 1
-)
 
-const DefaultBufSize = 1024 * 1024 * 4
+	DefaultBufSize = 1024 * 1024 * 4
+)
 
 var (
 	ErrPolicy                = errors.New("policy is error")
