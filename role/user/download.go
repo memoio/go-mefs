@@ -155,7 +155,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	// default AES
 	if bo.Encryption == 1 {
 		// 构建user的privatekey+bucketid的key，对key进行sha256后作为加密的key
-		dl.sKey = CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, stripePos)
+		dl.sKey = CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, object.OPart.Start)
 		dl.encrypt = 1
 	}
 

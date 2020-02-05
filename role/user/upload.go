@@ -284,69 +284,88 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					return
 				}
 
-				var count int
+				count := int32(0)
 				blockMetas := make([]blockMeta, bc)
-				for k := 0; k < 3; k++ {
-					count = 0
-					if start == 0 {
-						pros, _, _ := u.gInfo.GetProviders(bc)
-						if len(pros) < least {
-							return
-						}
+				var pwg sync.WaitGroup
 
-						for i := 0; i < bc; i++ {
-							bm.SetCid(strconv.Itoa(i))
-							ncid := bm.ToString()
-							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = u.fsID
-							if i > len(pros) {
-								continue
-							}
-							err := u.gInfo.ds.PutBlock(ctx, km.ToString(), encodedData[i], pros[i])
-							if err != nil {
-								utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", pros[i], " failed: ", err)
-								continue
-							}
-							count++
-							blockMetas[i].provider = pros[i]
-						}
-					} else {
-						for i := 0; i < bc; i++ {
-							bm.SetCid(strconv.Itoa(i))
-							ncid := bm.ToString()
-							km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = u.fsID
-
-							provider, _, err := u.gInfo.getBlockProviders(ncid)
-							if err != nil || provider == u.fsID {
-								continue
-							}
-
-							err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), encodedData[i], provider)
-							if err != nil {
-								utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", provider, " failed: ", err)
-								continue
-							}
-							count++
-							blockMetas[i].provider = provider
-						}
+				count = 0
+				if start == 0 {
+					pros, _, _ := u.gInfo.GetProviders(bc)
+					if len(pros) < least {
+						return
 					}
 
-					//没有达到最低安全标准，返回错误
-					if count >= least {
-						time.Sleep(60 * time.Second)
-						break
+					for i := 0; i < bc; i++ {
+						bm.SetCid(strconv.Itoa(i))
+						ncid := bm.ToString()
+						km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+						blockMetas[i].cid = ncid
+						blockMetas[i].offset = offset
+						blockMetas[i].provider = u.fsID
+						if i >= len(pros) {
+							continue
+						}
+
+						blockMetas[i].provider = pros[i]
+						pwg.Add(1)
+						go func(edata []byte, proID string) {
+							defer pwg.Done()
+							for k := 0; k < 3; k++ {
+								err := u.gInfo.ds.PutBlock(ctx, km.ToString(), edata, proID)
+								if err != nil {
+									utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", proID, " failed: ", err)
+									time.Sleep(30 * time.Second)
+									continue
+								} else {
+									atomic.AddInt32(&count, 1)
+									break
+								}
+							}
+
+						}(encodedData[i], pros[i])
 					}
+					pwg.Wait()
+				} else {
+					for i := 0; i < bc; i++ {
+						bm.SetCid(strconv.Itoa(i))
+						ncid := bm.ToString()
+						km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
+						blockMetas[i].cid = ncid
+						blockMetas[i].offset = offset
+						blockMetas[i].provider = u.fsID
+
+						provider, _, err := u.gInfo.getBlockProviders(ncid)
+						if err != nil || provider == u.fsID {
+							continue
+						}
+						blockMetas[i].provider = provider
+
+						pwg.Add(1)
+						go func(edata []byte, proID string) {
+							defer pwg.Done()
+							for k := 0; k < 3; k++ {
+								err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), edata, proID)
+								if err != nil {
+									utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", proID, " failed: ", err)
+									time.Sleep(30 * time.Second)
+									continue
+								} else {
+									atomic.AddInt32(&count, 1)
+									break
+								}
+							}
+						}(encodedData[i], provider)
+					}
+					pwg.Wait()
 				}
 
-				for _, v := range blockMetas {
-					err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
-					if err != nil {
-						return
+				//没有达到最低安全标准，返回错误
+				if count >= dc {
+					for _, v := range blockMetas {
+						err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
+						if err != nil {
+							utils.MLogger.Errorf("put metablock: %s to keepers failed", v.cid)
+						}
 					}
 				}
 			}(data, int(u.curStripe), int(u.curOffset))

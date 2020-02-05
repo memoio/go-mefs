@@ -777,6 +777,11 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				return err
 			}
 
+			if object.GetOPart() == nil {
+				utils.MLogger.Warnf("got bucket %s objectinfo fails", bucket.Name)
+				continue
+			}
+
 			if object.OPart.Length == 0 {
 				continue
 			}

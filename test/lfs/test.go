@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -60,7 +62,6 @@ func lfsTest() error {
 			log.Println("trnasfer fails: ", err)
 			return err
 		}
-
 	}
 
 	log.Println("2. test start lfs")
@@ -162,7 +163,12 @@ func lfsTest() error {
 	obuf := new(bytes.Buffer)
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].Size) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].Size)
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].Size)
+	}
+
+	gotTag := md5.Sum(obuf.Bytes())
+	if hex.EncodeToString(gotTag[:]) != obj.Objects[0].MD5 {
+		log.Fatal("download file ", objectName, "failed, got md5: ", hex.EncodeToString(gotTag[:]), "expected: ", obj.Objects[0].MD5)
 	}
 
 	log.Println("6. test mul create bucket")
@@ -250,6 +256,11 @@ func lfsTest() error {
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(obj.Objects[0].Size) {
 		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].Size)
+	}
+
+	gotTag = md5.Sum(obuf.Bytes())
+	if hex.EncodeToString(gotTag[:]) != obj.Objects[0].MD5 {
+		log.Fatal("download mul file ", objectName, "failed, got md5: ", hex.EncodeToString(gotTag[:]), "expected: ", obj.Objects[0].MD5)
 	}
 
 	log.Println("9. test showstorage")
