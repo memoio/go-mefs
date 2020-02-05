@@ -78,6 +78,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 	}
 
 	l.online = false
+	l.writable = false
 
 	has, err := l.gInfo.start(ctx)
 	if err != nil {
@@ -111,6 +112,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return err
 	}
 	l.online = true
+	l.writable = true // need to modify
 	return nil
 }
 
@@ -201,11 +203,13 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if l.online { //LFS没启动不刷新
+			if l.online && l.writable {
 				l.genRoot()
 			}
 		case <-ctx.Done():
-			l.genRoot()
+			if l.online && l.writable {
+				l.genRoot()
+			}
 			return nil
 		}
 	}
@@ -265,14 +269,14 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if l.online { //LFS没启动不刷新
+			if l.online && l.writable { //LFS没启动不刷新
 				err := l.Fsync(false)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
 				}
 			}
 		case <-ctx.Done():
-			if l.online { //LFS没启动不刷新
+			if l.online && l.writable { //LFS没启动不刷新
 				err := l.Fsync(true)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
@@ -287,6 +291,10 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 func (l *LfsInfo) Fsync(isForce bool) error {
 	if !l.online {
 		return ErrLfsServiceNotReady
+	}
+
+	if !l.writable {
+		return nil
 	}
 
 	err := l.flushSuperBlock(isForce)

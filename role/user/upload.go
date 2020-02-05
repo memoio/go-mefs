@@ -46,6 +46,10 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		return nil, ErrLfsServiceNotReady
 	}
 
+	if !l.writable {
+		return nil, ErrReadOnly
+	}
+
 	err := checkObjectName(objectName)
 	if err != nil {
 		return nil, ErrObjectNameInvalid

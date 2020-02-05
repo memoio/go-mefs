@@ -80,7 +80,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 
 // GetShareObject constructs lfs download process
 func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localKey string, share string) error {
-
+	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {
 		return nil
@@ -106,11 +106,12 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 		return err
 	}
 
+	sul := su.(*LfsInfo)
+	sul.writable = false
+	sul.privateKey = localKey
+
 	bo := sl.BOpts
-
-	su.(*LfsInfo).privateKey = localKey
-
-	decoder := dataformat.NewDataCoderWithBopts(bo, su.(*LfsInfo).keySet)
+	decoder := dataformat.NewDataCoderWithBopts(bo, sul.keySet)
 	segSize := int64(bo.GetSegmentSize())
 	stripeSize := int64(bo.SegmentCount * bo.SegmentSize * bo.GetDataCount())
 

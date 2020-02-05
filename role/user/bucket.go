@@ -23,6 +23,10 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		return nil, ErrLfsServiceNotReady
 	}
 
+	if !l.writable {
+		return nil, ErrReadOnly
+	}
+
 	err := checkBucketName(bucketName)
 	if err != nil {
 		return nil, ErrBucketNameInvalid
@@ -88,6 +92,10 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
+	}
+
+	if !l.writable {
+		return nil, ErrReadOnly
 	}
 
 	err := checkBucketName(bucketName)

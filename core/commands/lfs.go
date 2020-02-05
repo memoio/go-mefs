@@ -1571,7 +1571,7 @@ var lfsGetShareCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{
 		cmds.StringArg("ShareLink", true, false, "The share link"),
-		cmds.StringArg("ObjectName", true, false, "The file you want to save."),
+		cmds.StringArg("OutputName", true, false, "The file name you want to save."),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),

@@ -23,6 +23,10 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 		return nil, ErrLfsServiceNotReady
 	}
 
+	if !l.writable {
+		return nil, ErrReadOnly
+	}
+
 	err := checkBucketName(bucketName)
 	if err != nil {
 		return nil, ErrBucketNameInvalid
