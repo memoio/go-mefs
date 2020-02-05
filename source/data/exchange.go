@@ -433,7 +433,11 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 			continue
 		}
 
-		pai := ma.Cast(res)
+		pai, err := ma.NewMultiaddrBytes(res)
+		if err != nil {
+			utils.MLogger.Errorf("multiaddr %s failed to parse: %s", string(res), err)
+			continue
+		}
 
 		npi = peer.AddrInfo{
 			ID:    to,
