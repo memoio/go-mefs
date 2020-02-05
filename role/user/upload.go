@@ -27,7 +27,7 @@ type UploadOptions struct {
 // uploadTask has info for upload
 type uploadTask struct { //一个上传任务实例
 	fsID      string
-	encrypt   bool
+	encrypt   int32
 	sKey      [32]byte
 	bucketID  int32
 	curStripe int64
@@ -110,6 +110,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		curStripe: bucket.CurStripe,
 		curOffset: bucket.NextSeg,
 		encoder:   encoder,
+		encrypt:   bo.Encryption,
 	}
 
 	if bo.Encryption == 1 {
@@ -267,7 +268,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				defer wg.Done()
 				defer atomic.AddInt32(&parllel, -1)
 				// encrypt
-				if u.encrypt {
+				if u.encrypt == 1 {
 					if len(data)%aes.BlockSize != 0 {
 						data = aes.PKCS5Padding(data)
 					}
