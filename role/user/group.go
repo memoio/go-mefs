@@ -779,7 +779,7 @@ func (g *groupInfo) putToAll(ctx context.Context, key string, value, sig []byte)
 			}
 		}(kid)
 	}
-	wg.Done()
+	wg.Wait()
 	return
 }
 
