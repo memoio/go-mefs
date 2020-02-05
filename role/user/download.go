@@ -153,7 +153,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	// default AES
 	if bo.Encryption == 1 {
-		dl.sKey = CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, object.OPart.Start)
+		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, object.OPart.Start)
 	}
 
 	return dl.Start(ctx)

@@ -348,7 +348,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 		select {
 		case <-tick:
 			if timeOutCount >= 30 {
-				return ErrTimeOut
+				return errTimeOut
 			}
 			switch g.state {
 			case collecting:

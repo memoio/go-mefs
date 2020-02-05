@@ -1,6 +1,10 @@
 package aes
 
-import "errors"
+import (
+	"encoding/binary"
+	"errors"
+	"golang.org/x/crypto/blake2b"
+)
 
 const (
 	KeySize   = 32 // 256bit，32B
@@ -12,3 +16,13 @@ var (
 	ErrKeySize   = errors.New("Keysize error")
 	ErrBlockSize = errors.New("Blocksize error,the blocksize must be an integer which can be divisible by 128")
 )
+
+// CreateAesKey creates
+func CreateAesKey(privateKey, queryID []byte, bucketID int32, objectStart int64) [32]byte {
+	tmpkey := make([]byte, len(privateKey)+len(queryID)+12)
+	copy(tmpkey, privateKey)
+	copy(tmpkey[len(privateKey):], queryID)
+	binary.LittleEndian.PutUint32(tmpkey[len(privateKey)+len(queryID):], uint32(bucketID))
+	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID)+4:], uint64(objectStart))
+	return blake2b.Sum256(tmpkey)
+}

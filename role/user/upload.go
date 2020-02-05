@@ -118,7 +118,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	if bo.Encryption == 1 {
-		ul.sKey = CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, start)
+		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, start)
 	}
 
 	err = ul.Start(ctx)

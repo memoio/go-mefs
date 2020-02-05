@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
@@ -67,7 +68,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	}
 
 	if bucket.BOpts.Encryption == 1 {
-		decKey := CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
+		decKey := aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
 		sl.DecKey = decKey[:]
 	}
 

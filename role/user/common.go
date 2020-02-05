@@ -1,9 +1,7 @@
 package user
 
 import (
-	"encoding/binary"
 	"errors"
-	"golang.org/x/crypto/blake2b"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
@@ -13,14 +11,19 @@ import (
 //-------Group Type------
 
 const (
-	KeeperSLA             = 2 //暂定
-	ProviderSLA           = 6
+	// KeeperSLA is keeper needed
+	KeeperSLA = 2
+	// ProviderSLA is provider needed
+	ProviderSLA = 6
+	// DefaultCapacity is default store capacity
 	DefaultCapacity int64 = 1000 //单位：MB
-	DefaultDuration int64 = 100  //单位：天
+	// DefaultDuration is default store days
+	DefaultDuration int64 = 100 //单位：天
 
 	defaultMetaBackupCount int32 = 3
 	flushLocalBackup             = 1
 
+	// DefaultBufSize used for read
 	DefaultBufSize = 1024 * 1024 * 4
 )
 
@@ -31,10 +34,10 @@ var (
 	ErrUserNotExist          = errors.New("user does not exist")
 	ErrLfsServiceNotReady    = errors.New("lfs service is not ready")
 	ErrCannotStartLfsService = errors.New("cannot start lfs service")
+	ErrReadOnly              = errors.New("lfs is read only")
 
-	ErrReadOnly        = errors.New("lfs is read only")
 	errGetContractItem = errors.New("cannot get contract Item")
-	ErrTimeOut         = errors.New("Time out")
+	errTimeOut         = errors.New("Time out")
 
 	ErrNoProviders           = errors.New("there is no providers")
 	ErrNoKeepers             = errors.New("there is no keepers")
@@ -49,7 +52,6 @@ var (
 	ErrBucketNameInvalid  = errors.New("bucket name is invalid")
 
 	ErrObjectNotExist       = errors.New("object not exist")
-	ErrDirNotExist          = errors.New("directory not exist")
 	ErrObjectAlreadyExist   = errors.New("object already exist")
 	ErrObjectNameToolong    = errors.New("object name is too long")
 	ErrObjectNameInvalid    = errors.New("object name is invalid")
@@ -61,6 +63,7 @@ var (
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
 )
 
+// DefaultBucketOptions is default bucket option
 func DefaultBucketOptions() *pb.BucketOptions {
 	return &pb.BucketOptions{
 		Version:      1,
@@ -91,14 +94,4 @@ func checkObjectName(objectName string) error {
 		}
 	}
 	return nil
-}
-
-// CreateAesKey creates
-func CreateAesKey(privateKey, queryID []byte, bucketID int32, objectStart int64) [32]byte {
-	tmpkey := make([]byte, len(privateKey)+len(queryID)+12)
-	copy(tmpkey, privateKey)
-	copy(tmpkey[len(privateKey):], queryID)
-	binary.LittleEndian.PutUint32(tmpkey[len(privateKey)+len(queryID):], uint32(bucketID))
-	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID)+4:], uint64(objectStart))
-	return blake2b.Sum256(tmpkey)
 }

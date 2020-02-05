@@ -155,7 +155,7 @@ func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketI
 		return nil, ErrBucketNotExist
 	}
 
-	var lsuperBucket BucketsInfo
+	var lsuperBucket []*pb.BucketInfo
 	for _, bs := range l.meta.bucketByID {
 		if bs.Deletion {
 			continue
@@ -165,18 +165,8 @@ func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketI
 		}
 	}
 
-	sort.Sort(lsuperBucket)
+	sort.Slice(lsuperBucket, func(i, j int) bool {
+		return lsuperBucket[i].Name < lsuperBucket[j].Name
+	})
 	return lsuperBucket, nil
-}
-
-type BucketsInfo []*pb.BucketInfo
-
-func (b BucketsInfo) Len() int { // 重写 Len() 方法
-	return len(b)
-}
-func (b BucketsInfo) Swap(i, j int) { // 重写 Swap() 方法
-	b[i], b[j] = b[j], b[i]
-}
-func (b BucketsInfo) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
-	return b[j].Name < b[i].Name
 }
