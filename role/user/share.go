@@ -83,7 +83,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	sl := new(pb.ShareLink)
