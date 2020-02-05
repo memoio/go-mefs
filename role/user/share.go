@@ -83,12 +83,14 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {
+		utils.MLogger.Warn("Download Share Object B58 decode failed: ", err)
 		return err
 	}
 
 	sl := new(pb.ShareLink)
 	err = proto.Unmarshal(shareByte, sl)
 	if err != nil {
+		utils.MLogger.Warn("Download Share Object Unmarshal failed: ", err)
 		return err
 	}
 
