@@ -1627,7 +1627,7 @@ var lfsGetShareCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[1])
+		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0])
 
 		return res.Emit(piper)
 	},
