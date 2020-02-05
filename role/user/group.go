@@ -745,7 +745,7 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 	for _, keeper := range g.tempKeepers {
 		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), key, value, nil, keeper)
 		if err != nil {
-			utils.MLogger.Info("Send meta message to: ", keeper, " error : ", err)
+			utils.MLogger.Error("Send meta message to: ", keeper, " error : ", err)
 			count++
 		}
 	}
