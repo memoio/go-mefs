@@ -1,29 +1,3 @@
-/*
-Copyright (C) 2016 Thomas Adam
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is furnished
-to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
-// This file is modified by the dragonboat project
-// exported names have been updated from gorocksdb_* to dragonboat_*
-// so user applications can use the gorocksdb package as well.
-
 package gorocksdb
 
 // #include "rocksdb/c.h"
@@ -46,6 +20,8 @@ const (
 	Bz2Compression    = CompressionType(C.rocksdb_bz2_compression)
 	LZ4Compression    = CompressionType(C.rocksdb_lz4_compression)
 	LZ4HCCompression  = CompressionType(C.rocksdb_lz4hc_compression)
+	XpressCompression = CompressionType(C.rocksdb_xpress_compression)
+	ZSTDCompression   = CompressionType(C.rocksdb_zstd_compression)
 )
 
 // CompactionStyle specifies the compaction style.
@@ -117,7 +93,7 @@ func (opts *Options) SetCompactionFilter(value CompactionFilter) {
 		opts.ccf = nc.c
 	} else {
 		idx := registerCompactionFilter(value)
-		opts.ccf = C.dragonboat_compactionfilter_create(C.uintptr_t(idx))
+		opts.ccf = C.gorocksdb_compactionfilter_create(C.uintptr_t(idx))
 	}
 	C.rocksdb_options_set_compaction_filter(opts.c, opts.ccf)
 }
@@ -129,7 +105,7 @@ func (opts *Options) SetComparator(value Comparator) {
 		opts.ccmp = nc.c
 	} else {
 		idx := registerComperator(value)
-		opts.ccmp = C.dragonboat_comparator_create(C.uintptr_t(idx))
+		opts.ccmp = C.gorocksdb_comparator_create(C.uintptr_t(idx))
 	}
 	C.rocksdb_options_set_comparator(opts.c, opts.ccmp)
 }
@@ -142,7 +118,7 @@ func (opts *Options) SetMergeOperator(value MergeOperator) {
 		opts.cmo = nmo.c
 	} else {
 		idx := registerMergeOperator(value)
-		opts.cmo = C.dragonboat_mergeoperator_create(C.uintptr_t(idx))
+		opts.cmo = C.gorocksdb_mergeoperator_create(C.uintptr_t(idx))
 	}
 	C.rocksdb_options_set_merge_operator(opts.c, opts.cmo)
 }
@@ -214,6 +190,42 @@ func (opts *Options) SetParanoidChecks(value bool) {
 	C.rocksdb_options_set_paranoid_checks(opts.c, boolToChar(value))
 }
 
+// SetDBPaths sets the DBPaths of the options.
+//
+// A list of paths where SST files can be put into, with its target size.
+// Newer data is placed into paths specified earlier in the vector while
+// older data gradually moves to paths specified later in the vector.
+//
+// For example, you have a flash device with 10GB allocated for the DB,
+// as well as a hard drive of 2TB, you should config it to be:
+//   [{"/flash_path", 10GB}, {"/hard_drive", 2TB}]
+//
+// The system will try to guarantee data under each path is close to but
+// not larger than the target size. But current and future file sizes used
+// by determining where to place a file are based on best-effort estimation,
+// which means there is a chance that the actual size under the directory
+// is slightly more than target size under some workloads. User should give
+// some buffer room for those cases.
+//
+// If none of the paths has sufficient room to place a file, the file will
+// be placed to the last path anyway, despite to the target size.
+//
+// Placing newer data to earlier paths is also best-efforts. User should
+// expect user files to be placed in higher levels in some extreme cases.
+//
+// If left empty, only one path will be used, which is db_name passed when
+// opening the DB.
+// Default: empty
+func (opts *Options) SetDBPaths(dbpaths []*DBPath) {
+	l := len(dbpaths)
+	cDbpaths := make([]*C.rocksdb_dbpath_t, l)
+	for i, v := range dbpaths {
+		cDbpaths[i] = v.c
+	}
+
+	C.rocksdb_options_set_db_paths(opts.c, &cDbpaths[0], C.size_t(l))
+}
+
 // SetEnv sets the specified object to interact with the environment,
 // e.g. to read/write files, schedule background work, etc.
 // Default: DefaultEnv
@@ -236,8 +248,8 @@ func (opts *Options) SetInfoLogLevel(value InfoLogLevel) {
 // `total_threads` is used. Good value for `total_threads` is the number of
 // cores. You almost definitely want to call this function if your system is
 // bottlenecked by RocksDB.
-func (opts *Options) IncreaseParallelism(total int) {
-	C.rocksdb_options_increase_parallelism(opts.c, C.int(total))
+func (opts *Options) IncreaseParallelism(total_threads int) {
+	C.rocksdb_options_increase_parallelism(opts.c, C.int(total_threads))
 }
 
 // OptimizeForPointLookup optimize the DB for point lookups.
@@ -247,14 +259,14 @@ func (opts *Options) IncreaseParallelism(total int) {
 //
 // If you use this with rocksdb >= 5.0.2, you must call `SetAllowConcurrentMemtableWrites(false)`
 // to avoid an assertion error immediately on opening the db.
-func (opts *Options) OptimizeForPointLookup(sz uint64) {
-	C.rocksdb_options_optimize_for_point_lookup(opts.c, C.uint64_t(sz))
+func (opts *Options) OptimizeForPointLookup(block_cache_size_mb uint64) {
+	C.rocksdb_options_optimize_for_point_lookup(opts.c, C.uint64_t(block_cache_size_mb))
 }
 
-// SetAllowConcurrentMemtableWrites set whether to allow concurrent memtable writes.
-// Conccurent writes are not supported by all memtable factories (currently only
-// SkipList memtables). As of rocksdb 5.0.2 you must call
-// `SetAllowConcurrentMemtableWrites(false)` if you use `OptimizeForPointLookup`.
+// Set whether to allow concurrent memtable writes. Conccurent writes are
+// not supported by all memtable factories (currently only SkipList memtables).
+// As of rocksdb 5.0.2 you must call `SetAllowConcurrentMemtableWrites(false)`
+// if you use `OptimizeForPointLookup`.
 func (opts *Options) SetAllowConcurrentMemtableWrites(allow bool) {
 	C.rocksdb_options_set_allow_concurrent_memtable_write(opts.c, boolToChar(allow))
 }
@@ -275,14 +287,14 @@ func (opts *Options) SetAllowConcurrentMemtableWrites(allow bool) {
 // biggest performance gains.
 // Note: we might use more memory than memtable_memory_budget during high
 // write rate period
-func (opts *Options) OptimizeLevelStyleCompaction(budget uint64) {
-	C.rocksdb_options_optimize_level_style_compaction(opts.c, C.uint64_t(budget))
+func (opts *Options) OptimizeLevelStyleCompaction(memtable_memory_budget uint64) {
+	C.rocksdb_options_optimize_level_style_compaction(opts.c, C.uint64_t(memtable_memory_budget))
 }
 
 // OptimizeUniversalStyleCompaction optimize the DB for universal compaction.
 // See note on OptimizeLevelStyleCompaction.
-func (opts *Options) OptimizeUniversalStyleCompaction(budget uint64) {
-	C.rocksdb_options_optimize_universal_style_compaction(opts.c, C.uint64_t(budget))
+func (opts *Options) OptimizeUniversalStyleCompaction(memtable_memory_budget uint64) {
+	C.rocksdb_options_optimize_universal_style_compaction(opts.c, C.uint64_t(memtable_memory_budget))
 }
 
 // SetWriteBufferSize sets the amount of data to build up in memory
@@ -329,6 +341,25 @@ func (opts *Options) SetMinWriteBufferNumberToMerge(value int) {
 // Default: 1000
 func (opts *Options) SetMaxOpenFiles(value int) {
 	C.rocksdb_options_set_max_open_files(opts.c, C.int(value))
+}
+
+// SetMaxFileOpeningThreads sets the maximum number of file opening threads.
+// If max_open_files is -1, DB will open all files on DB::Open(). You can
+// use this option to increase the number of threads used to open the files.
+// Default: 16
+func (opts *Options) SetMaxFileOpeningThreads(value int) {
+	C.rocksdb_options_set_max_file_opening_threads(opts.c, C.int(value))
+}
+
+// SetMaxTotalWalSize sets the maximum total wal size in bytes.
+// Once write-ahead logs exceed this size, we will start forcing the flush of
+// column families whose memtables are backed by the oldest live WAL file
+// (i.e. the ones that are causing all the space amplification). If set to 0
+// (default), we will dynamically choose the WAL size limit to be
+// [sum of all write_buffer_size * max_write_buffer_number] * 4
+// Default: 0
+func (opts *Options) SetMaxTotalWalSize(value uint64) {
+	C.rocksdb_options_set_max_total_wal_size(opts.c, C.uint64_t(value))
 }
 
 // SetCompression sets the compression algorithm.
@@ -380,7 +411,7 @@ func (opts *Options) SetPrefixExtractor(value SliceTransform) {
 		opts.cst = nst.c
 	} else {
 		idx := registerSliceTransform(value)
-		opts.cst = C.dragonboat_slicetransform_create(C.uintptr_t(idx))
+		opts.cst = C.gorocksdb_slicetransform_create(C.uintptr_t(idx))
 	}
 	C.rocksdb_options_set_prefix_extractor(opts.c, opts.cst)
 }
@@ -473,6 +504,94 @@ func (opts *Options) SetMaxBytesForLevelMultiplier(value float64) {
 	C.rocksdb_options_set_max_bytes_for_level_multiplier(opts.c, C.double(value))
 }
 
+// SetLevelCompactiondynamiclevelbytes specifies whether to pick
+// target size of each level dynamically.
+//
+// We will pick a base level b >= 1. L0 will be directly merged into level b,
+// instead of always into level 1. Level 1 to b-1 need to be empty.
+// We try to pick b and its target size so that
+// 1. target size is in the range of
+//   (max_bytes_for_level_base / max_bytes_for_level_multiplier,
+//    max_bytes_for_level_base]
+// 2. target size of the last level (level num_levels-1) equals to extra size
+//    of the level.
+// At the same time max_bytes_for_level_multiplier and
+// max_bytes_for_level_multiplier_additional are still satisfied.
+//
+// With this option on, from an empty DB, we make last level the base level,
+// which means merging L0 data into the last level, until it exceeds
+// max_bytes_for_level_base. And then we make the second last level to be
+// base level, to start to merge L0 data to second last level, with its
+// target size to be 1/max_bytes_for_level_multiplier of the last level's
+// extra size. After the data accumulates more so that we need to move the
+// base level to the third last one, and so on.
+//
+// For example, assume max_bytes_for_level_multiplier=10, num_levels=6,
+// and max_bytes_for_level_base=10MB.
+// Target sizes of level 1 to 5 starts with:
+// [- - - - 10MB]
+// with base level is level. Target sizes of level 1 to 4 are not applicable
+// because they will not be used.
+// Until the size of Level 5 grows to more than 10MB, say 11MB, we make
+// base target to level 4 and now the targets looks like:
+// [- - - 1.1MB 11MB]
+// While data are accumulated, size targets are tuned based on actual data
+// of level 5. When level 5 has 50MB of data, the target is like:
+// [- - - 5MB 50MB]
+// Until level 5's actual size is more than 100MB, say 101MB. Now if we keep
+// level 4 to be the base level, its target size needs to be 10.1MB, which
+// doesn't satisfy the target size range. So now we make level 3 the target
+// size and the target sizes of the levels look like:
+// [- - 1.01MB 10.1MB 101MB]
+// In the same way, while level 5 further grows, all levels' targets grow,
+// like
+// [- - 5MB 50MB 500MB]
+// Until level 5 exceeds 1000MB and becomes 1001MB, we make level 2 the
+// base level and make levels' target sizes like this:
+// [- 1.001MB 10.01MB 100.1MB 1001MB]
+// and go on...
+//
+// By doing it, we give max_bytes_for_level_multiplier a priority against
+// max_bytes_for_level_base, for a more predictable LSM tree shape. It is
+// useful to limit worse case space amplification.
+//
+// max_bytes_for_level_multiplier_additional is ignored with this flag on.
+//
+// Turning this feature on or off for an existing DB can cause unexpected
+// LSM tree structure so it's not recommended.
+//
+// Default: false
+func (opts *Options) SetLevelCompactionDynamicLevelBytes(value bool) {
+	C.rocksdb_options_set_level_compaction_dynamic_level_bytes(opts.c, boolToChar(value))
+}
+
+// SetMaxCompactionBytes sets the maximum number of bytes in all compacted files.
+// We try to limit number of bytes in one compaction to be lower than this
+// threshold. But it's not guaranteed.
+// Value 0 will be sanitized.
+// Default: result.target_file_size_base * 25
+func (opts *Options) SetMaxCompactionBytes(value uint64) {
+	C.rocksdb_options_set_max_compaction_bytes(opts.c, C.uint64_t(value))
+}
+
+// SetSoftPendingCompactionBytesLimit sets the threshold at which
+// all writes will be slowed down to at least delayed_write_rate if estimated
+// bytes needed to be compaction exceed this threshold.
+//
+// Default: 64GB
+func (opts *Options) SetSoftPendingCompactionBytesLimit(value uint64) {
+	C.rocksdb_options_set_soft_pending_compaction_bytes_limit(opts.c, C.size_t(value))
+}
+
+// SetHardPendingCompactionBytesLimit sets the bytes threshold at which
+// all writes are stopped if estimated bytes needed to be compaction exceed
+// this threshold.
+//
+// Default: 256GB
+func (opts *Options) SetHardPendingCompactionBytesLimit(value uint64) {
+	C.rocksdb_options_set_hard_pending_compaction_bytes_limit(opts.c, C.size_t(value))
+}
+
 // SetMaxBytesForLevelMultiplierAdditional sets different max-size multipliers
 // for different levels.
 //
@@ -486,12 +605,6 @@ func (opts *Options) SetMaxBytesForLevelMultiplierAdditional(value []int) {
 	}
 
 	C.rocksdb_options_set_max_bytes_for_level_multiplier_additional(opts.c, &cLevels[0], C.size_t(len(value)))
-}
-
-// SetLevelCompactionDynamicLevelBytes enables/disables the
-// level_compaction_dynamic_level_bytes option field.
-func (opts *Options) SetLevelCompactionDynamicLevelBytes(value bool) {
-	C.rocksdb_options_set_level_compaction_dynamic_level_bytes(opts.c, boolToChar(value))
 }
 
 // SetUseFsync enable/disable fsync.
@@ -714,7 +827,7 @@ func (opts *Options) SetAllowMmapReads(value bool) {
 }
 
 // SetAllowMmapWrites enable/disable mmap writes for writing sst tables.
-// Default: true
+// Default: false
 func (opts *Options) SetAllowMmapWrites(value bool) {
 	C.rocksdb_options_set_allow_mmap_writes(opts.c, boolToChar(value))
 }
@@ -759,6 +872,20 @@ func (opts *Options) SetStatsDumpPeriodSec(value uint) {
 // Default: true
 func (opts *Options) SetAdviseRandomOnOpen(value bool) {
 	C.rocksdb_options_set_advise_random_on_open(opts.c, boolToChar(value))
+}
+
+// SetDbWriteBufferSize sets the amount of data to build up
+// in memtables across all column families before writing to disk.
+//
+// This is distinct from write_buffer_size, which enforces a limit
+// for a single memtable.
+//
+// This feature is disabled by default. Specify a non-zero value
+// to enable it.
+//
+// Default: 0 (disabled)
+func (opts *Options) SetDbWriteBufferSize(value int) {
+	C.rocksdb_options_set_db_write_buffer_size(opts.c, C.size_t(value))
 }
 
 // SetAccessHintOnCompactionStart specifies the file access pattern
@@ -844,6 +971,21 @@ func (opts *Options) SetInplaceUpdateSupport(value bool) {
 // Default: 10000, if inplace_update_support = true, else 0.
 func (opts *Options) SetInplaceUpdateNumLocks(value int) {
 	C.rocksdb_options_set_inplace_update_num_locks(opts.c, C.size_t(value))
+}
+
+// SetMemtableHugePageSize sets the page size for huge page for
+// arena used by the memtable.
+// If <=0, it won't allocate from huge page but from malloc.
+// Users are responsible to reserve huge pages for it to be allocated. For
+// example:
+//      sysctl -w vm.nr_hugepages=20
+// See linux doc Documentation/vm/hugetlbpage.txt
+// If there isn't enough free huge page available, it will fall back to
+// malloc.
+//
+// Dynamically changeable through SetOptions() API
+func (opts *Options) SetMemtableHugePageSize(value int) {
+	C.rocksdb_options_set_memtable_huge_page_size(opts.c, C.size_t(value))
 }
 
 // SetBloomLocality sets the bloom locality.
@@ -951,9 +1093,19 @@ func (opts *Options) SetBlockBasedTableFactory(value *BlockBasedTableOptions) {
 	C.rocksdb_options_set_block_based_table_factory(opts.c, value.c)
 }
 
-// SetRecycleLogFileNum sets the recycle_log_file_num option field.
-func (opts *Options) SetRecycleLogFileNum(value int) {
-	C.rocksdb_options_set_recycle_log_file_num(opts.c, C.size_t(value))
+// SetAllowIngestBehind sets allow_ingest_behind
+// Set this option to true during creation of database if you want
+// to be able to ingest behind (call IngestExternalFile() skipping keys
+// that already exist, rather than overwriting matching keys).
+// Setting this option to true will affect 2 things:
+// 1) Disable some internal optimizations around SST file compression
+// 2) Reserve bottom-most level for ingested files only.
+// 3) Note that num_levels should be >= 3 if this option is turned on.
+//
+// DEFAULT: false
+// Immutable.
+func (opts *Options) SetAllowIngestBehind(value bool) {
+	C.rocksdb_options_set_allow_ingest_behind(opts.c, boolToChar(value))
 }
 
 // Destroy deallocates the Options object.

@@ -71,7 +71,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	}
 
 	rootpath, _ := fsrepo.BestKnownPath()
-	localPeerInfo.dnh = raft.StartRaftHost(rootpath)
+	m.dnh = raft.StartRaftHost(rootpath)
 
 	//tendermint启动相关
 	m.enableBft = false

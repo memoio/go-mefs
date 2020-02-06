@@ -1,29 +1,3 @@
-/*
-Copyright (C) 2016 Thomas Adam
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is furnished
-to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
-// This file is modified by the dragonboat project
-// exported names have been updated from gorocksdb_* to dragonboat_*
-// so user applications can use the gorocksdb package as well.
-
 package gorocksdb
 
 // #include "rocksdb/c.h"
@@ -64,36 +38,40 @@ func (st nativeSliceTransform) InRange(src []byte) bool     { return false }
 func (st nativeSliceTransform) Name() string                { return "" }
 
 // Hold references to slice transforms.
-var sliceTransforms []SliceTransform
+var sliceTransforms = NewCOWList()
 
-func registerSliceTransform(st SliceTransform) int {
-	sliceTransforms = append(sliceTransforms, st)
-	return len(sliceTransforms) - 1
+type sliceTransformWrapper struct {
+	name           *C.char
+	sliceTransform SliceTransform
 }
 
-//export dragonboat_slicetransform_transform
-func dragonboat_slicetransform_transform(idx int, cKey *C.char, cKeyLen C.size_t, cDstLen *C.size_t) *C.char {
+func registerSliceTransform(st SliceTransform) int {
+	return sliceTransforms.Append(sliceTransformWrapper{C.CString(st.Name()), st})
+}
+
+//export gorocksdb_slicetransform_transform
+func gorocksdb_slicetransform_transform(idx int, cKey *C.char, cKeyLen C.size_t, cDstLen *C.size_t) *C.char {
 	key := charToByte(cKey, cKeyLen)
-	dst := sliceTransforms[idx].Transform(key)
+	dst := sliceTransforms.Get(idx).(sliceTransformWrapper).sliceTransform.Transform(key)
 	*cDstLen = C.size_t(len(dst))
 	return cByteSlice(dst)
 }
 
-//export dragonboat_slicetransform_in_domain
-func dragonboat_slicetransform_in_domain(idx int, cKey *C.char, cKeyLen C.size_t) C.uchar {
+//export gorocksdb_slicetransform_in_domain
+func gorocksdb_slicetransform_in_domain(idx int, cKey *C.char, cKeyLen C.size_t) C.uchar {
 	key := charToByte(cKey, cKeyLen)
-	inDomain := sliceTransforms[idx].InDomain(key)
+	inDomain := sliceTransforms.Get(idx).(sliceTransformWrapper).sliceTransform.InDomain(key)
 	return boolToChar(inDomain)
 }
 
-//export dragonboat_slicetransform_in_range
-func dragonboat_slicetransform_in_range(idx int, cKey *C.char, cKeyLen C.size_t) C.uchar {
+//export gorocksdb_slicetransform_in_range
+func gorocksdb_slicetransform_in_range(idx int, cKey *C.char, cKeyLen C.size_t) C.uchar {
 	key := charToByte(cKey, cKeyLen)
-	inRange := sliceTransforms[idx].InRange(key)
+	inRange := sliceTransforms.Get(idx).(sliceTransformWrapper).sliceTransform.InRange(key)
 	return boolToChar(inRange)
 }
 
-//export dragonboat_slicetransform_name
-func dragonboat_slicetransform_name(idx int) *C.char {
-	return stringToChar(sliceTransforms[idx].Name())
+//export gorocksdb_slicetransform_name
+func gorocksdb_slicetransform_name(idx int) *C.char {
+	return sliceTransforms.Get(idx).(sliceTransformWrapper).name
 }

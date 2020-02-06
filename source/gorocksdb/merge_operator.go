@@ -1,29 +1,3 @@
-/*
-Copyright (C) 2016 Thomas Adam
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is furnished
-to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
-// This file is modified by the dragonboat project
-// exported names have been updated from gorocksdb_* to dragonboat_*
-// so user applications can use the gorocksdb package as well.
-
 package gorocksdb
 
 // #include "rocksdb/c.h"
@@ -91,15 +65,19 @@ func (mo nativeMergeOperator) PartialMerge(key, leftOperand, rightOperand []byte
 func (mo nativeMergeOperator) Name() string { return "" }
 
 // Hold references to merge operators.
-var mergeOperators []MergeOperator
+var mergeOperators = NewCOWList()
 
-func registerMergeOperator(merger MergeOperator) int {
-	mergeOperators = append(mergeOperators, merger)
-	return len(mergeOperators) - 1
+type mergeOperatorWrapper struct {
+	name          *C.char
+	mergeOperator MergeOperator
 }
 
-//export dragonboat_mergeoperator_full_merge
-func dragonboat_mergeoperator_full_merge(idx int, cKey *C.char, cKeyLen C.size_t, cExistingValue *C.char, cExistingValueLen C.size_t, cOperands **C.char, cOperandsLen *C.size_t, cNumOperands C.int, cSuccess *C.uchar, cNewValueLen *C.size_t) *C.char {
+func registerMergeOperator(merger MergeOperator) int {
+	return mergeOperators.Append(mergeOperatorWrapper{C.CString(merger.Name()), merger})
+}
+
+//export gorocksdb_mergeoperator_full_merge
+func gorocksdb_mergeoperator_full_merge(idx int, cKey *C.char, cKeyLen C.size_t, cExistingValue *C.char, cExistingValueLen C.size_t, cOperands **C.char, cOperandsLen *C.size_t, cNumOperands C.int, cSuccess *C.uchar, cNewValueLen *C.size_t) *C.char {
 	key := charToByte(cKey, cKeyLen)
 	rawOperands := charSlice(cOperands, cNumOperands)
 	operandsLen := sizeSlice(cOperandsLen, cNumOperands)
@@ -109,7 +87,7 @@ func dragonboat_mergeoperator_full_merge(idx int, cKey *C.char, cKeyLen C.size_t
 		operands[i] = charToByte(rawOperands[i], len)
 	}
 
-	newValue, success := mergeOperators[idx].FullMerge(key, existingValue, operands)
+	newValue, success := mergeOperators.Get(idx).(mergeOperatorWrapper).mergeOperator.FullMerge(key, existingValue, operands)
 	newValueLen := len(newValue)
 
 	*cNewValueLen = C.size_t(newValueLen)
@@ -118,8 +96,8 @@ func dragonboat_mergeoperator_full_merge(idx int, cKey *C.char, cKeyLen C.size_t
 	return cByteSlice(newValue)
 }
 
-//export dragonboat_mergeoperator_partial_merge_multi
-func dragonboat_mergeoperator_partial_merge_multi(idx int, cKey *C.char, cKeyLen C.size_t, cOperands **C.char, cOperandsLen *C.size_t, cNumOperands C.int, cSuccess *C.uchar, cNewValueLen *C.size_t) *C.char {
+//export gorocksdb_mergeoperator_partial_merge_multi
+func gorocksdb_mergeoperator_partial_merge_multi(idx int, cKey *C.char, cKeyLen C.size_t, cOperands **C.char, cOperandsLen *C.size_t, cNumOperands C.int, cSuccess *C.uchar, cNewValueLen *C.size_t) *C.char {
 	key := charToByte(cKey, cKeyLen)
 	rawOperands := charSlice(cOperands, cNumOperands)
 	operandsLen := sizeSlice(cOperandsLen, cNumOperands)
@@ -131,7 +109,7 @@ func dragonboat_mergeoperator_partial_merge_multi(idx int, cKey *C.char, cKeyLen
 	var newValue []byte
 	success := true
 
-	merger := mergeOperators[idx]
+	merger := mergeOperators.Get(idx).(mergeOperatorWrapper).mergeOperator
 	leftOperand := operands[0]
 	for i := 1; i < int(cNumOperands); i++ {
 		newValue, success = merger.PartialMerge(key, leftOperand, operands[i])
@@ -148,7 +126,7 @@ func dragonboat_mergeoperator_partial_merge_multi(idx int, cKey *C.char, cKeyLen
 	return cByteSlice(newValue)
 }
 
-//export dragonboat_mergeoperator_name
-func dragonboat_mergeoperator_name(idx int) *C.char {
-	return stringToChar(mergeOperators[idx].Name())
+//export gorocksdb_mergeoperator_name
+func gorocksdb_mergeoperator_name(idx int) *C.char {
+	return mergeOperators.Get(idx).(mergeOperatorWrapper).name
 }

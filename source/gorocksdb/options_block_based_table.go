@@ -1,34 +1,22 @@
-/*
-Copyright (C) 2016 Thomas Adam
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is furnished
-to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
-// This file is modified by the dragonboat project
-// exported names have been updated from gorocksdb_* to dragonboat_*
-// so user applications can use the gorocksdb package as well.
-
 package gorocksdb
 
 // #include "rocksdb/c.h"
 // #include "gorocksdb.h"
 import "C"
+
+// IndexType specifies the index type that will be used for this table.
+type IndexType uint
+
+const (
+	// A space efficient index block that is optimized for
+	// binary-search-based index.
+	KBinarySearchIndexType = 0
+	// The hash index, if enabled, will do the hash lookup when
+	// `Options.prefix_extractor` is provided.
+	KHashSearchIndexType = 1
+	// A two-level index implementation. Both levels are binary search indexes.
+	KTwoLevelIndexSearchIndexType = 2
+)
 
 // BlockBasedTableOptions represents block-based table options.
 type BlockBasedTableOptions struct {
@@ -58,6 +46,23 @@ func (opts *BlockBasedTableOptions) Destroy() {
 	opts.c = nil
 	opts.cache = nil
 	opts.compCache = nil
+}
+
+// SetCacheIndexAndFilterBlocks is indicating if we'd put index/filter blocks to the block cache.
+// If not specified, each "table reader" object will pre-load index/filter
+// block during table initialization.
+// Default: false
+func (opts *BlockBasedTableOptions) SetCacheIndexAndFilterBlocks(value bool) {
+	C.rocksdb_block_based_options_set_cache_index_and_filter_blocks(opts.c, boolToChar(value))
+}
+
+// SetPinL0FilterAndIndexBlocksInCache sets cache_index_and_filter_blocks.
+// If is true and the below is true (hash_index_allow_collision), then
+// filter and index blocks are stored in the cache, but a reference is
+// held in the "table reader" object so the blocks are pinned and only
+// evicted from cache when the table reader is freed.
+func (opts *BlockBasedTableOptions) SetPinL0FilterAndIndexBlocksInCache(value bool) {
+	C.rocksdb_block_based_options_set_pin_l0_filter_and_index_blocks_in_cache(opts.c, boolToChar(value))
 }
 
 // SetBlockSize sets the approximate size of user data packed per block.
@@ -98,7 +103,7 @@ func (opts *BlockBasedTableOptions) SetFilterPolicy(fp FilterPolicy) {
 		opts.cFp = nfp.c
 	} else {
 		idx := registerFilterPolicy(fp)
-		opts.cFp = C.dragonboat_filterpolicy_create(C.uintptr_t(idx))
+		opts.cFp = C.gorocksdb_filterpolicy_create(C.uintptr_t(idx))
 	}
 	C.rocksdb_block_based_options_set_filter_policy(opts.c, opts.cFp)
 }
@@ -134,4 +139,20 @@ func (opts *BlockBasedTableOptions) SetBlockCacheCompressed(cache *Cache) {
 // Default: true
 func (opts *BlockBasedTableOptions) SetWholeKeyFiltering(value bool) {
 	C.rocksdb_block_based_options_set_whole_key_filtering(opts.c, boolToChar(value))
+}
+
+// SetIndexType sets the index type used for this table.
+// kBinarySearch:
+// A space efficient index block that is optimized for
+// binary-search-based index.
+//
+// kHashSearch:
+// The hash index, if enabled, will do the hash lookup when
+// `Options.prefix_extractor` is provided.
+//
+// kTwoLevelIndexSearch:
+// A two-level index implementation. Both levels are binary search indexes.
+// Default: kBinarySearch
+func (opts *BlockBasedTableOptions) SetIndexType(value IndexType) {
+	C.rocksdb_block_based_options_set_index_type(opts.c, C.int(value))
 }
