@@ -116,3 +116,8 @@ message ChannelSign {
   bytes Sig = 3;    //user签名信息
   bytes PubKey = 4; //user公钥
 }
+
+message KVData {
+  bytes Key = 1;
+  bytes Value = 2;
+}

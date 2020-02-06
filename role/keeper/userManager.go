@@ -20,6 +20,8 @@ import (
 type groupInfo struct {
 	sessionID    uuid.UUID // for user
 	sessionTime  int64
+	clusterID    uint64 // raft clusterID
+	nodeID       uint64
 	groupID      string // is queryID
 	userID       string // is userID
 	localKeeper  string

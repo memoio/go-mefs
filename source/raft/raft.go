@@ -19,11 +19,13 @@ import (
 	"time"
 	"unsafe"
 
+	proto "github.com/gogo/protobuf/proto"
 	"github.com/lni/dragonboat/v3"
 	"github.com/lni/dragonboat/v3/config"
 	"github.com/lni/dragonboat/v3/logger"
 	sm "github.com/lni/dragonboat/v3/statemachine"
 	"github.com/lni/goutils/fileutil"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/source/gorocksdb"
 )
 
@@ -35,9 +37,10 @@ const (
 )
 
 var raftAddr = "0.0.0.0:3001"
-var deployID = 3001
+var deployID = uint64(3001)
 
-func StartRaftHost(dir string) *dragonboat.NodeHost {
+// StartHost starts a raft host
+func StartHost(dir string) *dragonboat.NodeHost {
 	fmt.Fprintf(os.Stdout, "node address: %s\n", raftAddr)
 	logger.GetLogger("raft").SetLevel(logger.ERROR)
 	logger.GetLogger("rsm").SetLevel(logger.WARNING)
@@ -46,7 +49,7 @@ func StartRaftHost(dir string) *dragonboat.NodeHost {
 
 	datadir := filepath.Join(dir, "raft")
 	nhc := config.NodeHostConfig{
-		DeploymentID:   uint64(deployID),
+		DeploymentID:   deployID,
 		WALDir:         datadir + "/wal",
 		NodeHostDir:    datadir,
 		RTTMillisecond: 1000,
@@ -59,7 +62,8 @@ func StartRaftHost(dir string) *dragonboat.NodeHost {
 	return nh
 }
 
-func startRaftCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[uint64]string) {
+// StartCluster starts a raft cluster
+func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[uint64]string) {
 	rc := config.Config{
 		NodeID:             nodeID,
 		ClusterID:          cluserID,
@@ -75,7 +79,8 @@ func startRaftCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members 
 	}
 }
 
-func raftRead(nh *dragonboat.NodeHost, clusterID uint64, key string) (string, error) {
+// Read reads
+func Read(nh *dragonboat.NodeHost, clusterID uint64, key string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	result, err := nh.SyncRead(ctx, clusterID, []byte(key))
 	if err != nil {
@@ -84,14 +89,15 @@ func raftRead(nh *dragonboat.NodeHost, clusterID uint64, key string) (string, er
 		fmt.Fprintf(os.Stdout, "query key: %s, result: %s\n", key, result)
 	}
 	cancel()
-	return result.(string), nil
+	return result.([]byte), nil
 }
 
-func raftWrite(nh *dragonboat.NodeHost, clusterID uint64, key, val string) error {
+// Write writes
+func Write(nh *dragonboat.NodeHost, clusterID uint64, key, val []byte) error {
 	cs := nh.GetNoOPSession(clusterID)
-	kv := &KVData{
-		Key: key,
-		Val: val,
+	kv := &pb.KVData{
+		Key:   key,
+		Value: val,
 	}
 	data, err := json.Marshal(kv)
 	if err != nil {
@@ -107,11 +113,6 @@ func raftWrite(nh *dragonboat.NodeHost, clusterID uint64, key, val string) error
 	}
 
 	return nil
-}
-
-type KVData struct {
-	Key string
-	Val string
 }
 
 // rocksdb is a wrapper to ensure lookup() and close() can be concurrently
@@ -447,11 +448,11 @@ func (d *DiskKV) Update(ents []sm.Entry) ([]sm.Entry, error) {
 	defer wb.Destroy()
 	db := (*rocksdb)(atomic.LoadPointer(&d.db))
 	for idx, e := range ents {
-		dataKV := &KVData{}
-		if err := json.Unmarshal(e.Cmd, dataKV); err != nil {
+		dataKV := &pb.KVData{}
+		if err := proto.Unmarshal(e.Cmd, dataKV); err != nil {
 			panic(err)
 		}
-		wb.Put([]byte(dataKV.Key), []byte(dataKV.Val))
+		wb.Put([]byte(dataKV.Key), []byte(dataKV.Value))
 		ents[idx].Result = sm.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 	// save the applied index to the DB.
@@ -517,11 +518,11 @@ func (d *DiskKV) saveToWriter(db *rocksdb,
 	for iter.SeekToFirst(); iter.Valid(); iter.Next() {
 		key := iter.Key()
 		val := iter.Value()
-		dataKv := &KVData{
-			Key: string(key.Data()),
-			Val: string(val.Data()),
+		dataKv := &pb.KVData{
+			Key:   key.Data(),
+			Value: val.Data(),
 		}
-		data, err := json.Marshal(dataKv)
+		data, err := proto.Marshal(dataKv)
 		if err != nil {
 			panic(err)
 		}
@@ -588,11 +589,11 @@ func (d *DiskKV) RecoverFromSnapshot(r io.Reader,
 		if _, err := io.ReadFull(r, data); err != nil {
 			return err
 		}
-		dataKv := &KVData{}
-		if err := json.Unmarshal(data, dataKv); err != nil {
+		dataKv := new(pb.KVData)
+		if err := proto.Unmarshal(data, dataKv); err != nil {
 			panic(err)
 		}
-		wb.Put([]byte(dataKv.Key), []byte(dataKv.Val))
+		wb.Put(dataKv.GetKey(), dataKv.GetValue())
 	}
 	if err := db.db.Write(db.wo, wb); err != nil {
 		return err

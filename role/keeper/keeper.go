@@ -34,18 +34,19 @@ const (
 
 //Info implements user service
 type Info struct {
-	localID   string
-	role      string
-	sk        string
-	state     bool
-	enableBft bool
-	dnh       *dragonboat.NodeHost
-	repch     chan string
-	ds        data.Service
-	keepers   sync.Map // keepers except self; value: *kInfo
-	providers sync.Map // value: *pInfo
-	users     sync.Map // value: *uInfo
-	ukpGroup  sync.Map // manage user-keeper-provider group, value: *group
+	localID    string
+	role       string
+	sk         string
+	state      bool
+	enableBft  bool
+	dnh        *dragonboat.NodeHost
+	raftNodeID uint64
+	repch      chan string
+	ds         data.Service
+	keepers    sync.Map // keepers except self; value: *kInfo
+	providers  sync.Map // value: *pInfo
+	users      sync.Map // value: *uInfo
+	ukpGroup   sync.Map // manage user-keeper-provider group, value: *group
 }
 
 // New is
@@ -71,7 +72,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	}
 
 	rootpath, _ := fsrepo.BestKnownPath()
-	m.dnh = raft.StartRaftHost(rootpath)
+	m.dnh = raft.StartHost(rootpath)
 
 	//tendermint启动相关
 	m.enableBft = false
