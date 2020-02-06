@@ -101,6 +101,9 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		g.providerSLA = int(uItem.ProviderSLA)
 		g.tempKeepers = uItem.KeeperIDs
 		g.tempProviders = uItem.ProviderIDs
+		g.storeDays = uItem.Duration
+		g.storePrice = uItem.Price
+		g.storeSize = uItem.Capacity
 		g.state = depoyDone
 		err := g.connect(ctx)
 		if err != nil {
