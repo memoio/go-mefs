@@ -183,10 +183,10 @@ func (g *groupInfo) loadContracts(proID string) error {
 func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {
 	cv, ok := g.channel.Load(chanID)
 	if !ok {
-		utils.MLogger.Warn("channel is empty, reget it for: ", chanID)
+		utils.MLogger.Info("channel is empty, reget it for: ", chanID)
 		cItem, err := role.GetChannelInfo(localID, chanID)
 		if err != nil {
-			utils.MLogger.Errorf("channelID %s is not valid", chanID)
+			utils.MLogger.Errorf("channelID %s is not valid: %s", chanID, err)
 			return nil
 		}
 

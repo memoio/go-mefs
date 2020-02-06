@@ -102,7 +102,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 	if gp.userID != gp.groupID {
 		res, chanGot, value, err := verifyChanSign(sig)
 		if err != nil {
-			utils.MLogger.Errorf("verify block %s failed, err is : %s", splitedNcid[0], err)
+			utils.MLogger.Errorf("verify sig for block %s failed, err is : %s", splitedNcid[0], err)
 			return nil, err
 		}
 

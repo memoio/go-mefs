@@ -905,7 +905,7 @@ func (g *groupInfo) loadContracts() error {
 	}
 
 	var wg sync.WaitGroup
-	for _, proInfo := range g.providers {
+	for _, pInfo := range g.providers {
 		wg.Add(1)
 		go func(proInfo *providerInfo) {
 			defer wg.Done()
@@ -913,19 +913,20 @@ func (g *groupInfo) loadContracts() error {
 				proID := proInfo.providerID
 				cItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
 				if err != nil || cItem.Money.Cmp(big.NewInt(0)) == 0 {
-					_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+					_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
 					if err != nil {
 						return
 					}
 
 					cItem, err = role.GetLatestChannel(g.shareToID, g.groupID, proID)
 					if err != nil {
+						utils.MLogger.Warn("got channel fails for: ", g.shareToID)
 						return
 					}
 				}
 				proInfo.chanItem = &cItem
 			}
-		}(proInfo)
+		}(pInfo)
 	}
 	wg.Wait()
 	return nil
