@@ -10,6 +10,7 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/source/data"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -111,7 +112,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 			gotItem, ok := gp.channel.Load(chanGot)
 			if !ok {
 				go gp.getChanItem(p.localID, chanGot)
-				return nil, errGetFromChain
+				return nil, data.ErrRetry
 			}
 
 			cItem = gotItem.(*role.ChannelItem)

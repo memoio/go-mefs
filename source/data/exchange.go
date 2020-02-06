@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	errNoRouting    = errors.New("routing is not running")
-	errGetFromChain = errors.New("Try to get contract Item from chain")
+	errNoRouting = errors.New("routing is not running")
+	ErrRetry     = errors.New("ReTry Later")
 )
 
 type impl struct {
@@ -198,7 +198,7 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	for {
 		retry++
 		bdata, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, sig, to)
-		if err == errGetFromChain {
+		if err == ErrRetry {
 			time.Sleep(time.Duration(retry) * 30 * time.Second)
 			if retry > 5 {
 				return nil, err
