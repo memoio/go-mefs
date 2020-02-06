@@ -19,6 +19,7 @@ var (
 	errUnmatchedPeerID         = errors.New("Peer ID is not match")
 	errProviderServiceNotReady = errors.New("Provider service is not ready")
 	errGetContractItem         = errors.New("Can't get contract Item")
+	errGetFromChain            = errors.New("Try to get contract Item from chain")
 )
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {

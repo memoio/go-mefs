@@ -108,16 +108,18 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 
 		var cItem *role.ChannelItem
 		if chanGot != "" {
-			cItem = gp.getChanItem(p.localID, chanGot)
-			if cItem == nil {
-				utils.MLogger.Warn("channel is empty, reget it for: ", chanGot)
-				return nil, errors.New("Channel is not valid")
+			gotItem, ok := gp.channel.Load(chanGot)
+			if !ok {
+				go gp.getChanItem(p.localID, chanGot)
+				return nil, errGetFromChain
 			}
+
+			cItem = gotItem.(*role.ChannelItem)
 		}
 
 		if value != nil {
 			if value.Cmp(cItem.Money) > 0 {
-				utils.MLogger.Errorf("verify block %s failed, money is not enough", splitedNcid[0], err)
+				utils.MLogger.Errorf("verify sig for block %s failed, money is not enough, has %s, expected %s", splitedNcid[0], cItem.Money.String(), value.String())
 				return nil, errors.New("money is not enough")
 			}
 

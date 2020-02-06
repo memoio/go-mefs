@@ -938,51 +938,56 @@ func (g *groupInfo) loadChannelValue() error {
 	}
 
 	ctx := context.Background()
-	for _, proInfo := range g.providers {
-		if proInfo.chanItem != nil {
-			proID := proInfo.providerID
-
-			km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelID, metainfo.Channel)
-			if err != nil {
-				continue
-			}
-
-			valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
-			if err == nil && len(valueByte) > 0 {
-				cSign := &pb.ChannelSign{}
-				err = proto.Unmarshal(valueByte, cSign)
-				if err == nil {
-					ok := role.VerifyChannelSign(cSign)
-					if ok {
-						value := new(big.Int).SetBytes(cSign.GetValue())
-						utils.MLogger.Info("channel value in local is:", value.String())
-						if value.Cmp(proInfo.chanItem.Value) > 0 {
-							proInfo.chanItem.Value = value
-							proInfo.chanItem.Sig = valueByte
-						}
-					}
+	var wg sync.WaitGroup
+	for _, pInfo := range g.providers {
+		wg.Add(1)
+		go func(proInfo *providerInfo) {
+			defer wg.Done()
+			if proInfo.chanItem != nil {
+				proID := proInfo.providerID
+				km, err := metainfo.NewKeyMeta(proInfo.chanItem.ChannelID, metainfo.Channel)
+				if err != nil {
+					return
 				}
 
-				utils.MLogger.Info("try to get channel value from remote: ", proID)
-				valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
-				if err == nil {
-					err = proto.Unmarshal(valueRemote, cSign)
+				valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
+				if err == nil && len(valueByte) > 0 {
+					cSign := &pb.ChannelSign{}
+					err = proto.Unmarshal(valueByte, cSign)
 					if err == nil {
 						ok := role.VerifyChannelSign(cSign)
 						if ok {
 							value := new(big.Int).SetBytes(cSign.GetValue())
-							utils.MLogger.Info("channel value from remote is:", value.String())
+							utils.MLogger.Info("channel value in local is:", value.String())
 							if value.Cmp(proInfo.chanItem.Value) > 0 {
 								proInfo.chanItem.Value = value
-								proInfo.chanItem.Sig = valueRemote
+								proInfo.chanItem.Sig = valueByte
+							}
+						}
+					}
+
+					utils.MLogger.Info("try to get channel value from remote: ", proID)
+					valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
+					if err == nil {
+						err = proto.Unmarshal(valueRemote, cSign)
+						if err == nil {
+							ok := role.VerifyChannelSign(cSign)
+							if ok {
+								value := new(big.Int).SetBytes(cSign.GetValue())
+								utils.MLogger.Info("channel value from remote is:", value.String())
+								if value.Cmp(proInfo.chanItem.Value) > 0 {
+									proInfo.chanItem.Value = value
+									proInfo.chanItem.Sig = valueRemote
+								}
 							}
 						}
 					}
 				}
 			}
-		}
+		}(pInfo)
 	}
 
+	wg.Wait()
 	return nil
 }
 

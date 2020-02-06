@@ -26,7 +26,8 @@ import (
 )
 
 var (
-	errNoRouting = errors.New("routing is not running")
+	errNoRouting    = errors.New("routing is not running")
+	errGetFromChain = errors.New("Try to get contract Item from chain")
 )
 
 type impl struct {
@@ -193,17 +194,27 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		key = km.ToString()
 	}
 
-	bdata, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, sig, to)
-	if err != nil {
-		return nil, err
-	}
+	retry := 0
+	for {
+		retry++
+		bdata, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, sig, to)
+		if err == errGetFromChain {
+			time.Sleep(time.Duration(retry) * 30 * time.Second)
+			if retry > 5 {
+				return nil, err
+			}
+			continue
+		} else if err != nil {
+			return nil, err
+		}
 
-	c := cid.NewCidV2([]byte(key))
-	b, err := blocks.NewBlockWithCid([]byte(bdata), c)
-	if err != nil {
-		return nil, err
+		c := cid.NewCidV2([]byte(key))
+		b, err := blocks.NewBlockWithCid(bdata, c)
+		if err != nil {
+			return nil, err
+		}
+		return b, nil
 	}
-	return b, nil
 }
 
 // key: blockID/"Block"
