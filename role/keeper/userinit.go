@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
-
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -26,13 +26,13 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 
 	kc, err := strconv.Atoi(options[1])
 	if err != nil {
-		utils.MLogger.Info("handleUserInitReq: ", err)
+		utils.MLogger.Error("handleUserInitReq: ", err)
 		return
 	}
 
 	pc, err := strconv.Atoi(options[2])
 	if err != nil {
-		utils.MLogger.Info("handleUserInitReq: ", err)
+		utils.MLogger.Error("handleUserInitReq: ", err)
 		return
 	}
 
@@ -152,9 +152,37 @@ func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from str
 	return []byte("ok"), nil
 }
 
-// key: queryID/"UserStart"/userID/keepercount/providercount;
+// key: queryID/"UserStop"/userID/keepercount/providercount/sessionID;
+func (k *Info) handleUserStop(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
+
+	ops := km.GetOptions()
+	if len(ops) != 4 {
+		return nil, errors.New("key is not right")
+	}
+
+	uid := ops[0]
+	qid := km.GetMid()
+
+	gp := k.getGroupInfo(uid, qid, false)
+	if gp != nil {
+
+		sessID, err := uuid.Parse(ops[3])
+		if err != nil {
+			return nil, err
+		}
+		if gp.sessionID == sessID {
+			gp.sessionID = uuid.Nil
+		}
+		return []byte("ok"), nil
+	}
+
+	return nil, errors.New("not my user")
+}
+
+// key: queryID/"UserStart"/userID/keepercount/providercount/sessionID;
 // value: kid1kid2../pid1pid2..
-func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from:", from)
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
@@ -163,7 +191,7 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 	}
 
 	ops := km.GetOptions()
-	if len(ops) != 3 {
+	if len(ops) != 4 {
 		return nil, errors.New("key is not right")
 	}
 
@@ -186,7 +214,26 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue []byte, from stri
 
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
-		return gp.sessionID.MarshalBinary()
+		if gp.sessionID == uuid.Nil {
+			kmp, _ := metainfo.NewKeyMeta(uid, metainfo.PublicKey)
+			pubByte, err := k.ds.GetKey(context.Background(), kmp.ToString(), "local")
+			if err != nil {
+				return nil, err
+			}
+
+			ok := utils.VerifySig(pubByte, uid, km.ToString(), metaValue, sig)
+			if !ok {
+				utils.MLogger.Info("key signature is wrong for: ", km.ToString())
+				return []byte(uuid.New().String()), nil
+			}
+
+			sessID, err := uuid.Parse(ops[3])
+			if err != nil {
+				return nil, err
+			}
+			gp.sessionID = sessID
+		}
+		return []byte(gp.sessionID.String()), nil
 	}
 
 	return nil, errors.New("not my user")

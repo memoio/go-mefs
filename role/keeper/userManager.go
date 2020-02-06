@@ -19,8 +19,9 @@ import (
 // user-keeper-provider map
 type groupInfo struct {
 	sessionID    uuid.UUID // for user
-	groupID      string    // is queryID
-	userID       string    // is userID
+	sessionTime  int64
+	groupID      string // is queryID
+	userID       string // is userID
 	localKeeper  string
 	masterKeeper string
 	keepers      []string
@@ -40,7 +41,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 		masterKeeper: qid,
 		keepers:      keepers,
 		providers:    providers,
-		sessionID:    uuid.New(),
+		sessionID:    uuid.Nil,
 	}
 
 	if qid != uid {

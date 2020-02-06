@@ -65,6 +65,8 @@ type groupInfo struct {
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
 
+	sessionID uuid.UUID
+
 	upKeepingItem *role.UpKeepingItem
 	queryItem     *role.QueryItem
 }
@@ -277,8 +279,25 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return ErrNoEnoughProvider
 	}
 
-	// key: queryID/"UserStart"/userID/kc/pc
-	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	// send pubKey to all kps
+	pubKey, err := utils.GetPkFromEthSk(g.privKey)
+	if err != nil {
+		utils.MLogger.Error("Get publickey for: ", g.shareToID, " fail: ", err)
+		return err
+	}
+
+	km, err := metainfo.NewKeyMeta(g.shareToID, metainfo.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	g.putToAll(ctx, km.ToString(), pubKey, nil)
+
+	newID := uuid.New()
+	g.sessionID = newID
+
+	// key: queryID/"UserStart"/userID/kc/pc/id
+	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), newID.String())
 	if err != nil {
 		return err
 	}
@@ -294,13 +313,22 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		res.WriteString(provider.providerID)
 	}
 
+	kms := kmc.ToString()
+	val := []byte(res.String())
+
+	sig, err := utils.SignForKey(g.privKey, kms, val)
+	if err != nil {
+		return err
+	}
+
 	for _, kinfo := range g.keepers {
-		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, kinfo.keeperID)
+		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kms, val, sig, kinfo.keeperID)
 		if err != nil {
 			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
 			continue
 		}
-		uuidtmp, err := uuid.FromBytes(resp)
+
+		uuidtmp, err := uuid.ParseBytes(resp)
 		if err != nil {
 			continue
 		}
@@ -308,12 +336,12 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	for _, pinfo := range g.providers {
-		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), []byte(res.String()), nil, pinfo.providerID)
+		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kms, val, sig, pinfo.providerID)
 		if err != nil {
 			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
 		}
 
-		uuidtmp, err := uuid.FromBytes(resp)
+		uuidtmp, err := uuid.ParseBytes(resp)
 		if err != nil {
 			continue
 		}
@@ -640,6 +668,77 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		wg.Wait()
 	}
 	g.state = depoyDone
+
+	return nil
+}
+
+func (g *groupInfo) stop(ctx context.Context) error {
+	if g.state != groupStarted {
+		return errors.New("Wrong state")
+	}
+
+	g.Lock()
+	defer g.Unlock()
+
+	utils.MLogger.Info("Stop user: ", g.userID)
+
+	// key: queryID/"UserStart"/userID/kc/pc/id
+	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.UserStop, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
+	if err != nil {
+		return err
+	}
+
+	for _, kinfo := range g.keepers {
+		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, kinfo.keeperID)
+		if err != nil {
+			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
+			continue
+		}
+	}
+
+	for _, pinfo := range g.providers {
+		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, pinfo.providerID)
+		if err != nil {
+			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
+		}
+	}
+
+	utils.MLogger.Info("Group Service is stop for: ", g.userID)
+
+	g.state = starting
+	return nil
+}
+
+func (g *groupInfo) heartbeat(ctx context.Context) error {
+	if g.state != groupStarted {
+		return errors.New("Wrong state")
+	}
+
+	g.Lock()
+	defer g.Unlock()
+
+	utils.MLogger.Info("Send heartbeat for user: ", g.userID)
+
+	// key: queryID/"UserStart"/userID/kc/pc/id
+	kmc, err := metainfo.NewKeyMeta(g.groupID, metainfo.HeartBeat, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
+	if err != nil {
+		return err
+	}
+
+	for _, kinfo := range g.keepers {
+		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, kinfo.keeperID)
+		if err != nil {
+			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
+			continue
+		}
+	}
+
+	for _, pinfo := range g.providers {
+		_, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kmc.ToString(), nil, nil, pinfo.providerID)
+		if err != nil {
+			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
+		}
+	}
 
 	return nil
 }

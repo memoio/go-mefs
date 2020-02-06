@@ -72,6 +72,7 @@ const (
 	ChalTime
 	LastPay
 	ChalPay // each pay
+	HeartBeat
 )
 
 // KeyMeta is datatype/mid/ops

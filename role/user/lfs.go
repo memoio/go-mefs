@@ -78,7 +78,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 	}
 
 	l.online = false
-	l.writable = false
+	l.writable = true
 
 	has, err := l.gInfo.start(ctx)
 	if err != nil {
@@ -86,18 +86,13 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return err
 	}
 
-	pubKey, err := utils.GetPkFromEthSk(l.privateKey)
-	if err != nil {
-		utils.MLogger.Error("Get publickey for: ", l.userID, " fail: ", err)
-		return err
+	for _, kinof := range l.gInfo.keepers {
+		if kinof.sessionID != l.gInfo.sessionID {
+			utils.MLogger.Infof("%s starts in readonly mode, has session %s, want session: %s ", l.userID, l.gInfo.sessionID.String(), kinof.sessionID.String())
+			l.writable = false
+			break
+		}
 	}
-
-	km, err := metainfo.NewKeyMeta(l.userID, metainfo.PublicKey)
-	if err != nil {
-		return err
-	}
-
-	l.gInfo.putToAll(l.context, km.ToString(), pubKey, nil)
 
 	if has {
 		// init or send bls config
@@ -125,7 +120,6 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return err
 	}
 	l.online = true
-	l.writable = true // need to modify
 	return nil
 }
 
@@ -194,6 +188,7 @@ func newSuperBlock() *superBlock {
 // Stop user's info
 func (l *LfsInfo) Stop() error {
 	//用于通知资源释放
+	l.gInfo.stop(l.context)
 	l.cancelFunc()
 	return nil
 }
