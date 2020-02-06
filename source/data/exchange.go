@@ -198,11 +198,12 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	for {
 		retry++
 		bdata, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, sig, to)
-		if err == ErrRetry {
-			time.Sleep(time.Duration(retry) * 30 * time.Second)
+		if err.Error() == ErrRetry.Error() {
 			if retry > 5 {
 				return nil, err
 			}
+			time.Sleep(time.Duration(retry) * 30 * time.Second)
+			utils.MLogger.Debug("Retry GetBlock: ", key, " from: ", to)
 			continue
 		} else if err != nil {
 			return nil, err
