@@ -118,12 +118,27 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 	}
 
 	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	_, err = channelInstance.ChannelTimeout(auth)
-	if err != nil {
-		log.Println("channelTimeOutErr:", err)
-		return err
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := channelInstance.ChannelTimeout(auth)
+		if err != nil {
+			log.Println("channelTimeOutErr:", err)
+			return err
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("close channel fails", err)
+				return err
+			}
+			continue
+		}
+		break
 	}
 
 	log.Println("you have called ChannelTimeout successfully!")
@@ -145,13 +160,26 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 	//用user的签名来触发closeChannel()
 	key, _ := crypto.HexToECDSA(hexKey)
 
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = 8000000
-	_, err = channelInstance.CloseChannel(auth, hashNew, value, sig)
-	if err != nil {
-		log.Println("closeChannelErr:", err)
-		return err
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := channelInstance.CloseChannel(auth, hashNew, value, sig)
+		if err != nil {
+			log.Println("closeChannelErr:", err)
+			return err
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("close channel fails", err)
+				return err
+			}
+			continue
+		}
+		break
 	}
 
 	log.Println("you have called CloseChannel successfully!")
