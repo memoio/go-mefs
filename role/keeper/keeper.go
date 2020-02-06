@@ -11,10 +11,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/lni/dragonboat/v3"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/source/raft"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -36,6 +39,7 @@ type Info struct {
 	sk        string
 	state     bool
 	enableBft bool
+	dnh       *dragonboat.NodeHost
 	repch     chan string
 	ds        data.Service
 	keepers   sync.Map // keepers except self; value: *kInfo
@@ -65,6 +69,9 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		utils.MLogger.Error("load err:", err)
 		return nil, err
 	}
+
+	rootpath, _ := fsrepo.BestKnownPath()
+	localPeerInfo.dnh = raft.StartRaftHost(rootpath)
 
 	//tendermint启动相关
 	m.enableBft = false

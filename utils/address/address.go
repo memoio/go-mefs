@@ -2,6 +2,7 @@ package address
 
 import (
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -15,6 +16,26 @@ import (
 const AddressLength = 20
 
 var errLength = errors.New("the length of address from hexString is wrong")
+
+// GetNodeIDFromID gets
+func GetNodeIDFromID(id string) (uint64, error) {
+	ID, err := peer.IDB58Decode(id)
+	if err != nil {
+		return uint64(0), err
+	}
+
+	return binary.LittleEndian.Uint64([]byte(ID)[2:]), nil
+}
+
+// GetNodeIDFromAddr gets
+func GetNodeIDFromAddr(addr string) (uint64, error) {
+	addressByte, err := decodeHex(addr)
+	if err != nil {
+		return uint64(0), err
+	}
+
+	return binary.LittleEndian.Uint64(addressByte), nil
+}
 
 //GetAddressFromID used to call smartContract, id: ipfsnode.Identity.Pretty()
 //eg: id:8MJbWXudu7hwLa2q7vuJLW9UK4Lxuo ——>  address:0xb6BACd2625155dd0B65FAb00aA96aE5a669B77Da
