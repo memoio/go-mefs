@@ -286,12 +286,12 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return err
 	}
 
-	km, err := metainfo.NewKeyMeta(g.shareToID, metainfo.PublicKey)
+	kmp, err := metainfo.NewKeyMeta(g.shareToID, metainfo.PublicKey)
 	if err != nil {
 		return err
 	}
 
-	g.putToAll(ctx, km.ToString(), pubKey, nil)
+	g.putToAll(ctx, kmp.ToString(), pubKey, nil)
 
 	newID := uuid.New()
 	g.sessionID = newID
@@ -319,6 +319,19 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	sig, err := utils.SignForKey(g.privKey, kms, val)
 	if err != nil {
 		return err
+	}
+
+	if Debug {
+		pubByte, err := g.ds.GetKey(ctx, kmp.ToString(), "local")
+		if err != nil {
+			return err
+		}
+
+		ok := utils.VerifySig(pubByte, g.userID, kms, val, sig)
+		if !ok {
+			utils.MLogger.Errorf("key signature is wrong for %s", kms)
+			return nil
+		}
 	}
 
 	for _, kinfo := range g.keepers {

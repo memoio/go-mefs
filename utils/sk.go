@@ -194,5 +194,5 @@ func VerifySig(pubKey []byte, ownerID, key string, value, sig []byte) bool {
 	}
 
 	hash := crypto.Keccak256([]byte(key), value)
-	return crypto.VerifySignature(pubKey, hash, sig)
+	return crypto.VerifySignature(pubKey, hash, sig[:64])
 }
