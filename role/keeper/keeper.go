@@ -384,7 +384,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 				continue
 			}
 			if k.ds.Connect(ctx, tmpKid) {
-				thisKinfo.availTime = utils.GetUnixNow()
+				thisKinfo.availTime = time.Now().Unix()
 				thisKinfo.online = true
 			}
 		}
@@ -411,7 +411,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 			}
 
 			if k.ds.Connect(ctx, tmpKid) {
-				thisPinfo.availTime = utils.GetUnixNow()
+				thisPinfo.availTime = time.Now().Unix()
 				thisPinfo.online = true
 			}
 		}
@@ -455,12 +455,13 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		if err != nil {
 			return nil, err
 		}
+
 		k.ukpGroup.Store(qid, gInfo)
 		ctx := context.Background()
 		for _, pid := range gInfo.providers {
 			lin := &lInfo{
 				inChallenge:  false,
-				lastChalTime: utils.GetUnixNow(),
+				lastChalTime: time.Now().Unix(),
 			}
 
 			gInfo.ledgerMap.Store(pid, lin)

@@ -20,6 +20,8 @@ type Service interface {
 	DeleteKey(ctx context.Context, key, to string) error
 	Itererate(prefix string) ([]dsq.Entry, error)
 
+	VerifyKey(ctx context.Context, key string, value, sig []byte) bool
+
 	GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error)
 	PutBlock(ctx context.Context, key string, data []byte, to string) error
 	// AppendBlock key is dtype/id/op1/op2

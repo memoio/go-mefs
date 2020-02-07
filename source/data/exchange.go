@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -20,6 +21,7 @@ import (
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
+	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
@@ -91,6 +93,47 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 	return n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
 }
 
+func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) bool {
+	keys := strings.Split(key, metainfo.DELIMITER)
+	if len(keys) < 2 {
+		utils.MLogger.Warn("key is wrong for: ", key)
+		return false
+	}
+
+	switch keys[1] {
+	case strconv.Itoa(metainfo.PublicKey):
+		gotID, err := utils.IDFromPublicKey(value)
+		if err != nil {
+			utils.MLogger.Warn("convert public key to id fails: ", err)
+			return false
+		}
+
+		if gotID != keys[1] {
+			return false
+		}
+		return true
+	default:
+		if len(keys) == 2 {
+			return true
+		}
+
+		gotID := keys[2]
+		km, _ := metainfo.NewKeyMeta(gotID, metainfo.PublicKey)
+		pubRecByte, err := n.dstore.Get(ds.NewKey(km.ToString()))
+		if err != nil {
+			return false
+		}
+
+		pubrec := new(recpb.Record)
+		err = proto.Unmarshal(pubRecByte, pubrec)
+		if err != nil {
+			return false
+		}
+
+		return utils.VerifySig(pubrec.GetValue(), gotID, key, value, sig)
+	}
+}
+
 func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error) {
 	if n.ph == nil || n.rt == nil {
 		return nil, errNoRouting
@@ -98,12 +141,28 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 
 	utils.MLogger.Debug("GetKey: ", key, " from: ", to)
 
-	if to != "local" && to != "" {
+	if to == "local" {
+		recByte, err := n.dstore.Get(ds.NewKey(key))
+		if err != nil {
+			return nil, err
+		}
+		rec := new(recpb.Record)
+		err = proto.Unmarshal(recByte, rec)
+		if err != nil {
+			return nil, err
+		}
+
+		// verify sig
+
+		return rec.GetValue(), nil
+	}
+
+	if to != "" {
 		n.Connect(ctx, to)
 	}
 
-	res, err := n.rt.(*dht.KadDHT).GetFrom(ctx, key, to)
-	if err != nil && err != routing.ErrNotFound {
+	res, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, nil, to)
+	if err != nil {
 		utils.MLogger.Error("GetKey err:", err, ", key is: ", key, " from: ", to)
 		return nil, err
 	}
@@ -117,11 +176,28 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 
 	utils.MLogger.Debug("PutKey: ", key, " to: ", to)
 
-	if to != "local" && to != "" {
+	if to == "local" {
+		rec := &recpb.Record{
+			Key:       []byte(key),
+			Value:     data,
+			Signature: sig,
+		}
+
+		recByte, err := proto.Marshal(rec)
+		if err != nil {
+			return err
+		}
+
+		return n.dstore.Put(ds.NewKey(key), recByte)
+	}
+
+	if to != "" {
 		n.Connect(ctx, to)
 	}
 
-	return n.rt.(*dht.KadDHT).PutTo(ctx, key, data, sig, to)
+	_, err := n.SendMetaRequest(ctx, int32(metainfo.Put), key, data, sig, to)
+
+	return err
 }
 
 // to modify
@@ -151,7 +227,6 @@ func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string
 		bstr := strings.Join(skey[:2], metainfo.DELIMITER)
 
 		return n.dstore.Append(ds.NewKey(bstr), data, s, len)
-
 	}
 
 	return n.SendMetaMessage(ctx, int32(metainfo.Append), key, data, nil, to)

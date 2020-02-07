@@ -291,7 +291,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return err
 	}
 
-	g.putToAll(ctx, kmp.ToString(), pubKey, nil)
+	g.putToAll(ctx, kmp.ToString(), pubKey)
 
 	newID := uuid.New()
 	g.sessionID = newID
@@ -322,12 +322,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	if Debug {
-		pubByte, err := g.ds.GetKey(ctx, kmp.ToString(), "local")
-		if err != nil {
-			return err
-		}
-
-		ok := utils.VerifySig(pubByte, g.userID, kms, val, sig)
+		ok := g.ds.VerifyKey(ctx, kms, val, sig)
 		if !ok {
 			utils.MLogger.Errorf("key signature is wrong for %s", kms)
 			return nil
@@ -855,8 +850,14 @@ func (g *groupInfo) GetProviders(count int) ([]string, []string, error) {
 	return conPro, unconPro, nil
 }
 
-func (g *groupInfo) putToAll(ctx context.Context, key string, value, sig []byte) {
+func (g *groupInfo) putToAll(ctx context.Context, key string, value []byte) {
 	g.ds.PutKey(ctx, key, value, nil, "local")
+
+	sig, err := utils.SignForKey(g.privKey, key, value)
+	if err != nil {
+		utils.MLogger.Error("sign for key %s fails: %s", key, err)
+		return
+	}
 
 	var wg sync.WaitGroup
 	//put config to
@@ -866,7 +867,7 @@ func (g *groupInfo) putToAll(ctx context.Context, key string, value, sig []byte)
 			defer wg.Done()
 			retry := 0
 			for retry < 10 {
-				err := g.ds.PutKey(ctx, key, value, nil, pid)
+				err := g.ds.PutKey(ctx, key, value, sig, pid)
 				if err != nil {
 					retry++
 					if retry >= 10 {
@@ -885,7 +886,7 @@ func (g *groupInfo) putToAll(ctx context.Context, key string, value, sig []byte)
 			defer wg.Done()
 			retry := 0
 			for retry < 10 {
-				err := g.ds.PutKey(ctx, key, value, nil, pid)
+				err := g.ds.PutKey(ctx, key, value, sig, pid)
 				if err != nil {
 					retry++
 					if retry >= 10 {

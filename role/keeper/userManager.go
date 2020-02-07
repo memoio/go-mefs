@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	mcl "github.com/memoio/go-mefs/bls12"
@@ -143,7 +144,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	}
 
 	newcidinfo := &blockInfo{
-		availtime: utils.GetUnixNow(),
+		availtime: time.Now().Unix(),
 		offset:    offset,
 		repair:    0,
 		storedOn:  pid,

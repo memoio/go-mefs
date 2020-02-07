@@ -118,7 +118,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 		startTime = thisLinfo.lastPay.endTime
 	}
 
-	spaceTime, lastTime := thisLinfo.resultSummary(startTime, utils.GetUnixNow())
+	spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().Unix())
 	amount := convertSpacetime(spaceTime, price)
 	if amount.Sign() > 0 {
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress

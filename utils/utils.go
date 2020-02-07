@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -66,33 +67,6 @@ func JoinStrings(sep string, ops ...string) string {
 	return res.String()
 }
 
-//GetTimeNow 获取当前时间的函数，保证格式一致
-func GetTimeNow() time.Time {
-	return StringToTime(TimeToString(time.Now()))
-}
-
-//TimeToString 将记录中的时间变量转换为字符串的操作，保证格式一致
-func TimeToString(time time.Time) string {
-	return time.Format(BASETIME)
-}
-
-//将字符串转换成时间变量，保证格式一致
-func StringToTime(stringTime string) time.Time {
-	local, err := time.LoadLocation("Local")
-	if err != nil {
-		fmt.Println("time.LoadLocation error!:", err)
-	}
-	timerec, err := time.ParseInLocation(BASETIME, stringTime, local)
-	if err != nil {
-		fmt.Println("time.ParseInLocation error!:", err)
-	}
-	return timerec
-}
-
-func GetUnixNow() int64 {
-	return time.Now().Unix()
-}
-
 //将unix时间戳转换为time格式，时区使用当前节点的时区
 func UnixToTime(timeStamp int64) time.Time {
 	return time.Unix(timeStamp, 0).In(time.Local)
@@ -115,13 +89,6 @@ func StringToUnix(stringTime string) int64 {
 func HexToBigInt(hex string) *big.Int {
 	s, _ := new(big.Int).SetString(hex[2:], 16)
 	return s
-}
-
-func IntMin(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
 }
 
 // Writable ensures the directory exists and is writable
@@ -153,4 +120,14 @@ func DisorderArray(array []string) []string {
 	}
 
 	return array
+}
+
+func ValidIP4(ipAddress string) bool {
+	ipAddress = strings.Trim(ipAddress, " ")
+
+	re, _ := regexp.Compile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+	if re.MatchString(ipAddress) {
+		return true
+	}
+	return false
 }

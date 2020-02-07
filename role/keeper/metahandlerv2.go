@@ -55,10 +55,44 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 		case metainfo.Delete:
 			go k.handlePosDelete(km, metaValue, from)
 		}
-	default: //没有匹配的信息，丢弃
+	default:
+		switch opType {
+		case metainfo.Put:
+			go k.handlePutKey(km, metaValue, sig, from)
+		case metainfo.Get:
+			return k.handleGetKey(km, metaValue, sig, from)
+		case metainfo.Delete:
+			go k.handleDeleteKey(km, metaValue, sig, from)
+		}
 		return nil, errors.New("Beyond the capacity")
 	}
 	return []byte(instance.MetaHandlerComplete), nil
+}
+
+func (k *Info) handlePutKey(km *metainfo.KeyMeta, metaValue, sig []byte, from string) {
+	ctx := context.Background()
+	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
+	if !ok {
+		return
+	}
+
+	k.ds.PutKey(ctx, km.ToString(), metaValue, sig, "local")
+}
+
+func (k *Info) handleGetKey(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
+	ctx := context.Background()
+
+	return k.ds.GetKey(ctx, km.ToString(), "local")
+}
+
+func (k *Info) handleDeleteKey(km *metainfo.KeyMeta, metaValue, sig []byte, from string) {
+	ctx := context.Background()
+	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
+	if !ok {
+		return
+	}
+
+	k.ds.DeleteKey(ctx, km.ToString(), "local")
 }
 
 // key: blockID/"BlockPos"

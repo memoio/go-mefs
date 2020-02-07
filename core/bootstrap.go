@@ -9,9 +9,6 @@ import (
 	"sync"
 	"time"
 
-	lgbl "github.com/libp2p/go-libp2p-loggables"
-	utils "github.com/memoio/go-mefs/utils"
-
 	goprocess "github.com/jbenet/goprocess"
 	procctx "github.com/jbenet/goprocess/context"
 	periodicproc "github.com/jbenet/goprocess/periodic"
@@ -19,6 +16,7 @@ import (
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
+	lgbl "github.com/libp2p/go-libp2p-loggables"
 	config "github.com/memoio/go-mefs/config"
 )
 
@@ -220,7 +218,11 @@ func toPeerInfos(bpeers []config.BootstrapPeer) []peer.AddrInfo {
 }
 
 func randomSubsetOfPeers(in []peer.AddrInfo, max int) []peer.AddrInfo {
-	n := utils.IntMin(max, len(in))
+	n := max
+	if max > len(in) {
+		n = len(in)
+	}
+
 	var out []peer.AddrInfo
 	for _, val := range rand.Perm(len(in)) {
 		out = append(out, in[val])

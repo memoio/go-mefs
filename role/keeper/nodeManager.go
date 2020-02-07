@@ -137,7 +137,7 @@ func (k *Info) checkPeers(ctx context.Context) {
 func (k *Info) checkLocalPeers(ctx context.Context) {
 	tmpKeepers, _ := k.GetKeepers()
 
-	ntime := utils.GetUnixNow()
+	ntime := time.Now().Unix()
 	for _, kid := range tmpKeepers {
 		thisInfoI, ok := k.keepers.Load(kid)
 		if !ok {
@@ -195,14 +195,14 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 		thisInfoI, exist := k.keepers.Load(id)
 		if exist {
 			thisInfoI.(*kInfo).online = true
-			thisInfoI.(*kInfo).availTime = utils.GetUnixNow()
+			thisInfoI.(*kInfo).availTime = time.Now().Unix()
 			continue
 		}
 
 		thisInfoP, exist := k.providers.Load(id)
 		if exist {
 			thisInfoP.(*pInfo).online = true
-			thisInfoP.(*pInfo).availTime = utils.GetUnixNow()
+			thisInfoP.(*pInfo).availTime = time.Now().Unix()
 			continue
 		}
 
@@ -228,7 +228,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 					continue
 				}
 				thiskInfo.online = true
-				thiskInfo.availTime = utils.GetUnixNow()
+				thiskInfo.availTime = time.Now().Unix()
 			}
 		} else if string(val) == metainfo.RoleProvider {
 			utils.MLogger.Info("Connect to new provider: ", id)
@@ -238,7 +238,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 			}
 
 			thispInfo.online = true
-			thispInfo.availTime = utils.GetUnixNow()
+			thispInfo.availTime = time.Now().Unix()
 		}
 	}
 	return nil

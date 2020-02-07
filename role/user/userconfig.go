@@ -42,12 +42,7 @@ func (l *LfsInfo) putUserConfig(ctx context.Context) {
 
 	blskey := kmBls.ToString()
 
-	sig, err := utils.SignForKey(l.privateKey, blskey, userBLS12Config)
-	if err != nil {
-		return
-	}
-
-	l.gInfo.putToAll(ctx, blskey, userBLS12Config, sig)
+	l.gInfo.putToAll(ctx, blskey, userBLS12Config)
 }
 
 func (l *LfsInfo) loadBLS12Config() error {
@@ -81,13 +76,6 @@ func (l *LfsInfo) loadBLS12Config() error {
 				}
 				break
 			}
-			// send to keeper
-			if len(userBLS12config) > 0 {
-				err = l.ds.PutKey(ctx, blskey, userBLS12config, nil, kid)
-				if err != nil {
-					utils.MLogger.Warn("Put bls config to: ", kid, " failed: ", err)
-				}
-			}
 		}
 	}
 
@@ -95,10 +83,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	// remote has no config; resend
 	if !has && len(userBLS12config) > 0 {
 		// store local
-		err = l.ds.PutKey(ctx, blskey, userBLS12config, nil, "local")
-		if err != nil {
-			utils.MLogger.Warn("Put bls config to local failed: ", err)
-		}
+		l.gInfo.putToAll(ctx, blskey, userBLS12config)
 	}
 
 	if l.keySet != nil {
