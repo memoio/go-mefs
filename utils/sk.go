@@ -177,12 +177,19 @@ func SignForKey(hexKey string, key string, value []byte) (sig []byte, err error)
 
 // VerifySig verifies
 func VerifySig(pubKey []byte, ownerID, key string, value, sig []byte) bool {
+	if len(sig) == 0 {
+		MLogger.Info("signature is empty")
+		return false
+	}
+
 	gotID, err := IDFromPublicKey(pubKey)
 	if err != nil {
+		MLogger.Info("convert public key to id fails: ", err)
 		return false
 	}
 
 	if gotID != ownerID {
+		MLogger.Info("public key is not equal to userid")
 		return false
 	}
 

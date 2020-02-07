@@ -223,7 +223,7 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, sig []byte, from
 
 			ok := utils.VerifySig(pubByte, uid, km.ToString(), metaValue, sig)
 			if !ok {
-				utils.MLogger.Info("key signature is wrong for: ", km.ToString())
+				utils.MLogger.Infof("key signature is wrong for %s ", km.ToString())
 				return []byte(uuid.New().String()), nil
 			}
 

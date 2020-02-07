@@ -165,6 +165,7 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.GasLimit = 8000000
 		tx, err := channelInstance.CloseChannel(auth, hashNew, value, sig)
 		if err != nil {
 			log.Println("closeChannelErr:", err)
