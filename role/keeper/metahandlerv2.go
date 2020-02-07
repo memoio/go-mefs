@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 
@@ -63,8 +62,9 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 			return k.handleGetKey(km, metaValue, sig, from)
 		case metainfo.Delete:
 			go k.handleDeleteKey(km, metaValue, sig, from)
+		default:
+			return nil, metainfo.ErrWrongType
 		}
-		return nil, errors.New("Beyond the capacity")
 	}
 	return []byte(instance.MetaHandlerComplete), nil
 }

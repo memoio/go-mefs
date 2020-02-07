@@ -108,7 +108,7 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 			return false
 		}
 
-		if gotID != keys[1] {
+		if gotID != keys[0] {
 			return false
 		}
 		return true

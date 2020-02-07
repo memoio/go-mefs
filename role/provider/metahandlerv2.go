@@ -60,8 +60,10 @@ func (p *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 			return p.handleGetKey(km, metaValue, sig, from)
 		case metainfo.Delete:
 			go p.handleDeleteKey(km, metaValue, sig, from)
+		default:
+			return nil, metainfo.ErrWrongType
 		}
-		return nil, metainfo.ErrWrongType
+
 	}
 	return []byte(instance.MetaHandlerComplete), nil
 }

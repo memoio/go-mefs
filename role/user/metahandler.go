@@ -39,8 +39,9 @@ func (u *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 			return u.handleGetKey(km, metaValue, sig, from)
 		case metainfo.Delete:
 			go u.handleDeleteKey(km, metaValue, sig, from)
+		default:
+			return nil, metainfo.ErrWrongType
 		}
-		return nil, metainfo.ErrWrongType
 	}
 	return []byte(instance.MetaHandlerComplete), nil
 }
