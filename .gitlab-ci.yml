@@ -201,6 +201,8 @@ lfs_test:
     - ./lfsTest.sh $ETHENDPOINT $NETKEY
   after_script:
     - cat ~/daemon.stdout
+    - cat ~/.mefs/logs/info.log
+    - cat ~/.mefs/logs/error.log
   tags:
     - "47.92.5.51"
   only:
