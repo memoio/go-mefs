@@ -335,6 +335,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	for _, kinfo := range g.keepers {
+		kinfo.sessionID = newID
 		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kms, val, sig, kinfo.keeperID)
 		if err != nil {
 			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
@@ -343,12 +344,14 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 		uuidtmp, err := uuid.ParseBytes(resp)
 		if err != nil {
+			utils.MLogger.Warn("uuid ParseBytes: ", string(resp), "  err: ", err)
 			continue
 		}
 		kinfo.sessionID = uuidtmp
 	}
 
 	for _, pinfo := range g.providers {
+		pinfo.sessionID = newID
 		resp, err := g.ds.SendMetaRequest(ctx, int32(metainfo.Put), kms, val, sig, pinfo.providerID)
 		if err != nil {
 			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
@@ -356,6 +359,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 		uuidtmp, err := uuid.ParseBytes(resp)
 		if err != nil {
+			utils.MLogger.Warn("uuid ParseBytes: ", string(resp), "  err: ", err)
 			continue
 		}
 		pinfo.sessionID = uuidtmp
