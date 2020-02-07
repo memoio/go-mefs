@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
@@ -204,12 +206,14 @@ func testCloseChannel() (err error) {
 		if cbalance.Cmp(moneyToChannel) != 0 {
 			log.Fatal("channel contract has wrong balance")
 		}
+
+		log.Println(channelAddr.String(), "has channel balance: ", cbalance.String())
 		break
 	}
 
 	log.Println("test query channel contract")
 	contracts.EndPoint = qethEndPoint
-	addGot, err := contracts.DeployChannelContract(userSk, localAddr, localAddr, providerAddr, timeout, moneyToChannel, false)
+	addGot, _, err := contracts.GetLatestChannel(localAddr, localAddr, providerAddr, localAddr)
 	if err != nil {
 		log.Fatal("GetChannelAddr fails:", err)
 		return err
@@ -225,14 +229,20 @@ func testCloseChannel() (err error) {
 	value := big.NewInt(11111)
 	contracts.EndPoint = ethEndPoint
 	chanID, _ := address.GetIDFromAddress(channelAddr.String())
-	sig, err := role.SignForChannel(chanID, userSk, value)
+	mes, err := role.SignForChannel(chanID, userSk, value)
 	if err != nil {
 		log.Fatal("SignForChannelErr:", err)
 		return err
 	}
 
+	cSign := new(pb.ChannelSign)
+	err = proto.Unmarshal(mes, cSign)
+	if err != nil {
+		log.Fatal("Unmarshal SignForChannelErr:", err)
+	}
+
 	//provider触发CloseChannel()
-	err = contracts.CloseChannel(channelAddr, proSk, sig, value)
+	err = contracts.CloseChannel(channelAddr, proSk, cSign.GetSig(), value)
 	if err != nil {
 		log.Fatal("CloseChannelErr:", err)
 		return err
@@ -246,9 +256,8 @@ func testCloseChannel() (err error) {
 		nbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if nbalance.Cmp(big.NewInt(0)) > 0 {
 			if retryCount > 20 {
-				log.Println("call close channel, balance has: ", nbalance.String())
-				break
-				//log.Fatal("channel contract has balance")
+				log.Fatal("call close channel error, balance has: ", nbalance.String())
+				return
 			}
 			continue
 		}
