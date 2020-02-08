@@ -30,6 +30,8 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 		switch opType {
 		case metainfo.Put:
 			go k.handleAddBlockPos(km, metaValue, from)
+		case metainfo.Get:
+			return k.handleGetKey(km, metaValue, sig, from)
 		case metainfo.Delete:
 			go k.handleDeleteBlockPos(km)
 		}
