@@ -626,7 +626,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 
 		err = k.ds.PutKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local")
 		if err != nil {
-			utils.MLogger.Info("Delete testUser block: ", blockID, " error:", err)
+			utils.MLogger.Info("Add block: ", blockID, " error:", err)
 		}
 	}
 
@@ -664,7 +664,7 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 		}
 		err = k.ds.DeleteKey(ctx, km.ToString(), "local")
 		if err != nil {
-			utils.MLogger.Warn("Delete testUser block: ", blockID, "  error:", err)
+			utils.MLogger.Warn("Delete block: ", blockID, " error:", err)
 		}
 	}
 

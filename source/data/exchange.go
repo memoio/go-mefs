@@ -166,7 +166,14 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 		utils.MLogger.Error("GetKey err:", err, ", key is: ", key, " from: ", to)
 		return nil, err
 	}
-	return res, nil
+
+	rec := new(recpb.Record)
+	err = proto.Unmarshal(res, rec)
+	if err != nil {
+		return nil, err
+	}
+
+	return rec.GetValue(), nil
 }
 
 func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to string) error {
