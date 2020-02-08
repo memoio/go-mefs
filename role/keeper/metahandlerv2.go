@@ -70,6 +70,7 @@ func (k *Info) HandleMetaMessage(opType int, metaKey string, metaValue, sig []by
 }
 
 func (k *Info) handlePutKey(km *metainfo.KeyMeta, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handlePutKey: ", km.ToString())
 	ctx := context.Background()
 	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
@@ -80,12 +81,14 @@ func (k *Info) handlePutKey(km *metainfo.KeyMeta, metaValue, sig []byte, from st
 }
 
 func (k *Info) handleGetKey(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleGetKey: ", km.ToString())
 	ctx := context.Background()
 
 	return k.ds.GetKey(ctx, km.ToString(), "local")
 }
 
 func (k *Info) handleDeleteKey(km *metainfo.KeyMeta, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handleDeleteKey: ", km.ToString())
 	ctx := context.Background()
 	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
@@ -116,7 +119,7 @@ func (k *Info) handleAddBlockPos(km *metainfo.KeyMeta, metaValue []byte, from st
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
 	err = k.addBlockMeta(bids[0], bids[1], sValue[0], offset, true)
 	if err != nil {
-		utils.MLogger.Info("handleBlockPos err: ", err)
+		utils.MLogger.Error("handleBlockPos err: ", err)
 	}
 	return
 }
@@ -126,11 +129,7 @@ func (k *Info) handleDeleteBlockPos(km *metainfo.KeyMeta) {
 	blockID := km.GetMid()
 
 	// delete from local
-	err := k.ds.DeleteKey(context.Background(), km.ToString(), "local")
-	if err != nil {
-		utils.MLogger.Info("handleBlockPos err: ", err)
-		return
-	}
+	k.ds.DeleteKey(context.Background(), km.ToString(), "local")
 
 	// delete from mem
 	bids := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)

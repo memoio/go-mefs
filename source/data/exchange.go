@@ -167,13 +167,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 		return nil, err
 	}
 
-	rec := new(recpb.Record)
-	err = proto.Unmarshal(res, rec)
-	if err != nil {
-		return nil, err
-	}
-
-	return rec.GetValue(), nil
+	return res, nil
 }
 
 func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to string) error {
