@@ -535,7 +535,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 			}
 
 			ips := strings.Split(string(ipAddr), "/")
-			utils.MLogger.Debug("ip is: ", ips)
+			utils.MLogger.Debugf("ip is: %s", ips[2])
 			if len(ips) != 5 {
 				continue
 			}
