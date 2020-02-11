@@ -106,7 +106,11 @@ func (k *Info) GetRole() string {
 
 // Stop is
 func (k *Info) Stop() error {
-	return k.save(context.Background())
+	k.save(context.Background())
+	if k.dnh != nil {
+		k.dnh.Stop()
+	}
+	return nil
 }
 
 /*====================Save and Load========================*/
