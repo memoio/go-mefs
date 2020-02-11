@@ -12,7 +12,7 @@ import (
 
 const (
 	// KeeperSLA is keeper needed
-	KeeperSLA = 2
+	KeeperSLA = 3
 	// ProviderSLA is provider needed
 	ProviderSLA = 6
 	// DefaultCapacity is default store capacity
