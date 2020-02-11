@@ -447,38 +447,44 @@ func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to stri
 
 	k.ds.PutKey(ctx, key, data, sig, "local")
 
-	rec := &recpb.Record{
-		Key:       []byte(key),
-		Value:     data,
-		Signature: sig,
-	}
-	recByte, err := proto.Marshal(rec)
-	if err != nil {
-		utils.MLogger.Error("proto Marshal fails: ", err)
-		return err
+	if k.enableBft {
+		rec := &recpb.Record{
+			Key:       []byte(key),
+			Value:     data,
+			Signature: sig,
+		}
+		recByte, err := proto.Marshal(rec)
+		if err != nil {
+			utils.MLogger.Error("proto Marshal fails: ", err)
+			return err
+		}
+
+		// need retry?
+		raft.Write(ctx, k.dnh, clusterID, key, recByte)
 	}
 
-	// need retry?
-	raft.Write(ctx, k.dnh, clusterID, key, recByte)
 	return nil
 }
 
 func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64) ([]byte, error) {
 	utils.MLogger.Debugf("get %s from %s", key, to)
-	res, err := raft.Read(ctx, k.dnh, clusterID, key)
-	if err != nil {
-		return nil, err
+
+	if k.enableBft {
+		res, err := raft.Read(ctx, k.dnh, clusterID, key)
+		if err != nil {
+			return nil, err
+		}
+
+		rec := new(recpb.Record)
+		err = proto.Unmarshal(res, rec)
+		if err != nil {
+			return nil, err
+		}
+
+		return rec.GetValue(), nil
 	}
 
-	rec := new(recpb.Record)
-	err = proto.Unmarshal(res, rec)
-	if err != nil {
-		return nil, err
-	}
-
-	return rec.GetValue(), nil
-
-	// return k.ds.GetKey(ctx, key, "local")
+	return k.ds.GetKey(ctx, key, "local")
 }
 
 /*====================Group Ops========================*/
@@ -534,8 +540,8 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				continue
 			}
 
-			ips := strings.Split(string(ipAddr), "/")
-			utils.MLogger.Debugf("ip is: %s", ips[2])
+			ips := strings.Split(utils.ByteSliceToString(ipAddr), "/")
+			utils.MLogger.Debugf("ip is: %s", ips)
 			if len(ips) != 5 {
 				continue
 			}
