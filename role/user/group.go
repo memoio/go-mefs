@@ -121,61 +121,59 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		}
 
 		res, err := g.ds.GetKey(ctx, kmUser.ToString(), "local")
-		if err != nil {
-			return false, err
-		}
+		if err == nil {
+			utils.MLogger.Info("Test user: ", g.userID, " has keepers and providers: ", string(res))
 
-		utils.MLogger.Info("Test user: ", g.userID, " has keepers and providers: ", string(res))
+			splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
+			if len(splitedMeta) == 2 {
+				count := 0
+				keepers := splitedMeta[0]
+				for i := 0; i < len(keepers)/utils.IDLength; i++ {
+					kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
+					_, err := peer.IDB58Decode(kid)
+					if err != nil {
+						continue
+					}
 
-		splitedMeta := strings.Split(string(res), metainfo.DELIMITER)
-		if len(splitedMeta) == 2 {
-			count := 0
-			keepers := splitedMeta[0]
-			for i := 0; i < len(keepers)/utils.IDLength; i++ {
-				kid := keepers[i*utils.IDLength : (i+1)*utils.IDLength]
-				_, err := peer.IDB58Decode(kid)
+					if !utils.CheckDup(g.tempKeepers, kid) {
+						continue
+					}
+
+					g.tempKeepers = append(g.tempKeepers, kid)
+					count++
+				}
+
+				g.keeperSLA = count
+
+				count = 0
+				providers := splitedMeta[1]
+				for i := 0; i < len(providers)/utils.IDLength; i++ {
+					pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
+
+					_, err := peer.IDB58Decode(pid)
+					if err != nil {
+						continue
+					}
+
+					if !utils.CheckDup(g.tempProviders, pid) {
+						continue
+					}
+
+					g.tempProviders = append(g.tempProviders, pid)
+					count++
+				}
+
+				g.providerSLA = count
+
+				utils.MLogger.Info("Start test user: ", g.userID, " and its lfs:", g.groupID)
+
+				g.state = depoyDone
+				err = g.connect(ctx)
 				if err != nil {
-					continue
+					return true, err
 				}
-
-				if !utils.CheckDup(g.tempKeepers, kid) {
-					continue
-				}
-
-				g.tempKeepers = append(g.tempKeepers, kid)
-				count++
+				return true, nil
 			}
-
-			g.keeperSLA = count
-
-			count = 0
-			providers := splitedMeta[1]
-			for i := 0; i < len(providers)/utils.IDLength; i++ {
-				pid := providers[i*utils.IDLength : (i+1)*utils.IDLength]
-
-				_, err := peer.IDB58Decode(pid)
-				if err != nil {
-					continue
-				}
-
-				if !utils.CheckDup(g.tempProviders, pid) {
-					continue
-				}
-
-				g.tempProviders = append(g.tempProviders, pid)
-				count++
-			}
-
-			g.providerSLA = count
-
-			utils.MLogger.Info("Start test user: ", g.userID, " and its lfs:", g.groupID)
-
-			g.state = depoyDone
-			err = g.connect(ctx)
-			if err != nil {
-				return true, err
-			}
-			return true, nil
 		}
 	}
 
