@@ -83,7 +83,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 		return "", nil, errors.New("no data")
 	}
 
-	challengetime := utils.GetUnixNow()
+	challengetime := time.Now().Unix()
 
 	thischalresult := &pb.ChalInfo{
 		KeeperID:    localID,

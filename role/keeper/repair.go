@@ -52,7 +52,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 					pre := pu.uid + metainfo.BLOCK_DELIMITER + pu.qid
 					thislinfo.blockMap.Range(func(key, value interface{}) bool {
 						thisinfo := value.(*blockInfo)
-						eclasped := utils.GetUnixNow() - thisinfo.availtime
+						eclasped := time.Now().Unix() - thisinfo.availtime
 						switch thisinfo.repair {
 						case 0:
 							if EXPIRETIME < eclasped {

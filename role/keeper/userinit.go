@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -173,6 +174,7 @@ func (k *Info) handleUserStop(km *metainfo.KeyMeta, metaValue []byte, from strin
 		}
 		if gp.sessionID == sessID {
 			gp.sessionID = uuid.Nil
+			gp.sessionTime = time.Now().Unix()
 		}
 		return []byte("ok"), nil
 	}
@@ -215,22 +217,17 @@ func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, sig []byte, from
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
 		if gp.sessionID == uuid.Nil {
-			kmp, _ := metainfo.NewKeyMeta(uid, metainfo.PublicKey)
-			pubByte, err := k.ds.GetKey(context.Background(), kmp.ToString(), "local")
-			if err != nil {
-				return nil, err
-			}
-
-			ok := utils.VerifySig(pubByte, uid, km.ToString(), metaValue, sig)
+			ok := k.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
 			if !ok {
 				utils.MLogger.Infof("key signature is wrong for %s", km.ToString())
-				return []byte(uuid.New().String()), nil
+				return []byte(uuid.Nil.String()), nil
 			}
 
 			sessID, err := uuid.Parse(ops[3])
 			if err != nil {
 				return nil, err
 			}
+			gp.sessionTime = time.Now().Unix()
 			gp.sessionID = sessID
 		}
 		return []byte(gp.sessionID.String()), nil
