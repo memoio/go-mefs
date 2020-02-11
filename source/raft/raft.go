@@ -36,12 +36,12 @@ const (
 	updatingDBFilename string = "current.updating"
 )
 
-var raftAddr = "0.0.0.0:3001"
+var Addr = "0.0.0.0:3001"
 var deployID = uint64(3001)
 
 // StartHost starts a raft host
 func StartHost(dir string) *dragonboat.NodeHost {
-	fmt.Fprintf(os.Stdout, "node address: %s\n", raftAddr)
+	fmt.Fprintf(os.Stdout, "node address: %s\n", Addr)
 	logger.GetLogger("raft").SetLevel(logger.ERROR)
 	logger.GetLogger("rsm").SetLevel(logger.WARNING)
 	logger.GetLogger("transport").SetLevel(logger.WARNING)
@@ -53,7 +53,7 @@ func StartHost(dir string) *dragonboat.NodeHost {
 		WALDir:         datadir + "/wal",
 		NodeHostDir:    datadir,
 		RTTMillisecond: 1000,
-		RaftAddress:    raftAddr,
+		RaftAddress:    Addr,
 	}
 	nh, err := dragonboat.NewNodeHost(nhc)
 	if err != nil {
@@ -63,7 +63,7 @@ func StartHost(dir string) *dragonboat.NodeHost {
 }
 
 // StartCluster starts a raft cluster
-func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[uint64]string) {
+func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[uint64]string) error {
 	rc := config.Config{
 		NodeID:             nodeID,
 		ClusterID:          cluserID,
@@ -73,15 +73,12 @@ func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[
 		SnapshotEntries:    10,
 		CompactionOverhead: 5,
 	}
-	if err := nh.StartOnDiskCluster(members, false, NewDiskKV, rc); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to add cluster, %v\n", err)
-		os.Exit(1)
-	}
+	return nh.StartOnDiskCluster(members, false, NewDiskKV, rc)
 }
 
 // Read reads
-func Read(nh *dragonboat.NodeHost, clusterID uint64, key string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+func Read(ctx context.Context, nh *dragonboat.NodeHost, clusterID uint64, key string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	result, err := nh.SyncRead(ctx, clusterID, []byte(key))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "SyncRead returned error %v\n", err)
@@ -93,19 +90,20 @@ func Read(nh *dragonboat.NodeHost, clusterID uint64, key string) ([]byte, error)
 }
 
 // Write writes
-func Write(nh *dragonboat.NodeHost, clusterID uint64, key, val []byte) error {
-	cs := nh.GetNoOPSession(clusterID)
+func Write(ctx context.Context, nh *dragonboat.NodeHost, clusterID uint64, key string, val []byte) error {
 	kv := &pb.KVData{
-		Key:   key,
+		Key:   []byte(key),
 		Value: val,
 	}
 	data, err := json.Marshal(kv)
 	if err != nil {
 		panic(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
+	cs := nh.GetNoOPSession(clusterID)
 	_, err = nh.SyncPropose(ctx, cs, data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "SyncPropose returned error %v\n", err)

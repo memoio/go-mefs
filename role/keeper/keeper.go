@@ -19,6 +19,7 @@ import (
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/source/raft"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -240,7 +241,13 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local")
+
+		clusterID, err := address.GetNodeIDFromID(qid)
+		if err != nil {
+			return err
+		}
+
+		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID)
 
 		//key: `qid/"chalpay"/pid/beginTime/endTime`
 		//value: `spacetime/signature/proof`
@@ -250,7 +257,8 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(ctx, km.ToString(), []byte(metaValue), nil, "local")
+
+		k.putKey(ctx, km.ToString(), []byte(metaValue), nil, "local", clusterID)
 	}
 	return nil
 }
@@ -428,6 +436,47 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	return nil
 }
 
+/*====================Key Ops========================*/
+
+func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to string, clusterID uint64) error {
+	utils.MLogger.Debugf("put %s to %s", key, to)
+
+	k.ds.PutKey(ctx, key, data, sig, "local")
+
+	rec := &recpb.Record{
+		Key:       []byte(key),
+		Value:     data,
+		Signature: sig,
+	}
+	recByte, err := proto.Marshal(rec)
+	if err != nil {
+		utils.MLogger.Error("proto Marshal fails: ", err)
+		return err
+	}
+
+	// need retry?
+	raft.Write(ctx, k.dnh, clusterID, key, recByte)
+	return nil
+}
+
+func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64) ([]byte, error) {
+	utils.MLogger.Debugf("get %s from %s", key, to)
+	res, err := raft.Read(ctx, k.dnh, clusterID, key)
+	if err != nil {
+		return nil, err
+	}
+
+	rec := new(recpb.Record)
+	err = proto.Unmarshal(res, rec)
+	if err != nil {
+		return nil, err
+	}
+
+	return rec.GetValue(), nil
+
+	// return k.ds.GetKey(ctx, key, "local")
+}
+
 /*====================Group Ops========================*/
 
 //clean unpaid users
@@ -462,6 +511,42 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		gInfo, err := newGroup(k.localID, uid, qid, keepers, providers)
 		if err != nil {
 			return nil, err
+		}
+
+		initialMembers := make(map[uint64]string)
+		for _, kid := range gInfo.keepers {
+			if kid == k.localID {
+				initialMembers[gInfo.nodeID] = raft.Addr
+				continue
+			}
+
+			t, err := address.GetNodeIDFromID(kid)
+			if err != nil {
+				continue
+			}
+
+			ipAddr, err := k.ds.GetExternalAddr(kid)
+			if err != nil {
+				continue
+			}
+
+			ips := strings.Split(string(ipAddr), "/")
+			utils.MLogger.Debug("ip is: ", ips)
+			if len(ips) != 5 {
+				continue
+			}
+
+			initialMembers[t] = ips[2] + ":3001"
+		}
+
+		err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
+		if err != nil {
+			utils.MLogger.Errorf("start cluster %d for %d, fails %s", gInfo.clusterID, gInfo.nodeID, err)
+			if err != dragonboat.ErrClusterAlreadyExist {
+				gInfo.bft = false
+			}
+		} else {
+			gInfo.bft = true
 		}
 
 		k.ukpGroup.Store(qid, gInfo)
@@ -621,25 +706,24 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 	utils.MLogger.Info("add block: ", bid, " and its offset: ", offset, " for query: ", qid, " and provider: ", pid)
 
-	if mode {
-		blockID := qid + metainfo.BLOCK_DELIMITER + bid
-
-		// notify provider, to delete block
-		km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
-		if err != nil {
-			return err
-		}
-
-		pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
-
-		err = k.ds.PutKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local")
-		if err != nil {
-			utils.MLogger.Info("Add block: ", blockID, " error:", err)
-		}
-	}
-
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
+		if mode {
+			blockID := qid + metainfo.BLOCK_DELIMITER + bid
+
+			km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+			if err != nil {
+				return err
+			}
+
+			pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
+
+			err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID)
+			if err != nil {
+				utils.MLogger.Info("Add block: ", blockID, " error:", err)
+			}
+		}
+
 		return gp.addBlockMeta(bid, pid, offset)
 	}
 

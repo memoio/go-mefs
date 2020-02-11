@@ -281,6 +281,6 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		return nil, err
 	}
 
-	k.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, nil, "local")
+	k.putKey(context.Background(), kmkps.ToString(), metaValue, nil, "local", gp.clusterID)
 	return gp, nil
 }
