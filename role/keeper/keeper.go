@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strconv"
@@ -540,13 +541,13 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				continue
 			}
 
-			ips := strings.Split(utils.ByteSliceToString(ipAddr), "/")
-			utils.MLogger.Debugf("ip is: %s", ips)
+			ips := bytes.Split(ipAddr, []byte{'/'})
+			utils.MLogger.Debug("ip is: ", ips)
 			if len(ips) != 5 {
 				continue
 			}
 
-			initialMembers[t] = ips[2] + ":3001"
+			initialMembers[t] = string(ips[2]) + ":3001"
 		}
 
 		err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
