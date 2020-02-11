@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sh ./mcl.sh
+sh ./checkbin.sh
 
 echo -e "mefs upload test"
 
