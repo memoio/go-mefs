@@ -523,45 +523,47 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 			return nil, err
 		}
 
-		initialMembers := make(map[uint64]string)
-		for _, kid := range gInfo.keepers {
-			if kid == k.localID {
-				initialMembers[gInfo.nodeID] = raft.Addr
-				continue
+		if k.enableBft {
+			initialMembers := make(map[uint64]string)
+			for _, kid := range gInfo.keepers {
+				if kid == k.localID {
+					initialMembers[gInfo.nodeID] = raft.Addr
+					continue
+				}
+
+				t, err := address.GetNodeIDFromID(kid)
+				if err != nil {
+					continue
+				}
+
+				ipAddr, err := k.ds.GetExternalAddr(kid)
+				if err != nil {
+					continue
+				}
+
+				ips := strings.Split(string(ipAddr), "/")
+				utils.MLogger.Debug("ip is: ", ips)
+				if len(ips) != 5 {
+					continue
+				}
+
+				initialMembers[t] = ips[2] + ":3001"
 			}
 
-			t, err := address.GetNodeIDFromID(kid)
+			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
 			if err != nil {
-				continue
-			}
-
-			ipAddr, err := k.ds.GetExternalAddr(kid)
-			if err != nil {
-				continue
-			}
-
-			ips := strings.Split(string(ipAddr), "/")
-			utils.MLogger.Debug("ip is: ", ips)
-			if len(ips) != 5 {
-				continue
-			}
-
-			initialMembers[t] = ips[2] + ":3001"
-		}
-
-		err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
-		if err != nil {
-			utils.MLogger.Errorf("start cluster %d for %d, fails %s", gInfo.clusterID, gInfo.nodeID, err)
-			if err != dragonboat.ErrClusterAlreadyExist {
-				gInfo.bft = false
-			}
-		} else {
-			gInfo.bft = true
-			cm, err := k.dnh.SyncGetClusterMembership(context.Background(), gInfo.clusterID)
-			if err != nil {
-				utils.MLogger.Debugf("%d has wrong members", gInfo.clusterID)
+				utils.MLogger.Errorf("start cluster %d for %d, fails %s", gInfo.clusterID, gInfo.nodeID, err)
+				if err != dragonboat.ErrClusterAlreadyExist {
+					gInfo.bft = false
+				}
 			} else {
-				utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
+				gInfo.bft = true
+				cm, err := k.dnh.SyncGetClusterMembership(context.Background(), gInfo.clusterID)
+				if err != nil {
+					utils.MLogger.Debugf("%d has wrong members", gInfo.clusterID)
+				} else {
+					utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
+				}
 			}
 		}
 
