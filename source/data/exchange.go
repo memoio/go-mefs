@@ -586,7 +586,7 @@ func (n *impl) GetExternalAddr(p string) ([]byte, error) {
 		if rid.Pretty() == p {
 			addr := c.RemoteMultiaddr()
 			utils.MLogger.Debug(p, " has extern ip: ", addr.String())
-			return addr.Bytes(), nil
+			return []byte(addr.String()), nil
 		}
 	}
 
