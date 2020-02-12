@@ -558,7 +558,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				}
 			} else {
 				gInfo.bft = true
-				cm, err := k.dnh.SyncGetClusterMembership(context.Background(), gInfo.clusterID)
+				cm, err := k.dnh.GetClusterMembership(context.Background(), gInfo.clusterID)
 				if err != nil {
 					utils.MLogger.Debugf("%d has wrong members", gInfo.clusterID)
 				} else {
