@@ -74,10 +74,11 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 
 	rootpath, _ := fsrepo.BestKnownPath()
 	m.dnh = raft.StartHost(rootpath)
-
-	//tendermint启动相关
-	m.enableBft = false
-	if !m.enableBft {
+	if m.dnh != nil {
+		m.enableBft = true
+		utils.MLogger.Info("Use bft mode")
+	} else {
+		m.enableBft = false
 		utils.MLogger.Info("Use simple mode")
 	}
 
