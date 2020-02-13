@@ -78,13 +78,13 @@ func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[
 // Read reads
 func Read(ctx context.Context, nh *dragonboat.NodeHost, clusterID uint64, key string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
 	result, err := nh.SyncRead(ctx, clusterID, []byte(key))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "SyncRead returned error %v\n", err)
 	} else {
 		fmt.Fprintf(os.Stdout, "query key: %s, result: %s\n", key, result)
 	}
-	cancel()
 	return result.([]byte), nil
 }
 

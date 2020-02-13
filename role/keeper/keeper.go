@@ -555,9 +555,8 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				}
 
 				ips := strings.Split(string(ipAddr), "/")
-				utils.MLogger.Debug("ip is: ", ips)
 				if len(ips) != 5 {
-					utils.MLogger.Debug("ip is wrong")
+					utils.MLogger.Errorf("ip %s is wrong", string(ipAddr))
 					continue
 				}
 
@@ -566,12 +565,14 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 
 			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
 			if err != nil {
-				utils.MLogger.Errorf("start cluster %d for %d, fails %s", gInfo.clusterID, gInfo.nodeID, err)
+				utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
 				if err != dragonboat.ErrClusterAlreadyExist {
 					gInfo.bft = false
 				}
 			} else {
-				cm, err := k.dnh.GetClusterMembership(context.Background(), gInfo.clusterID)
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				cm, err := k.dnh.GetClusterMembership(ctx, gInfo.clusterID)
 				if err != nil {
 					gInfo.bft = false
 					utils.MLogger.Debugf("%d has members fails: %s", gInfo.clusterID, err)
