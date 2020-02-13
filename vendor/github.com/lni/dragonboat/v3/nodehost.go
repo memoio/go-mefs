@@ -1358,6 +1358,9 @@ func (nh *NodeHost) bootstrapCluster(nodes map[uint64]string,
 	if err == raftio.ErrNoBootstrapInfo {
 		var members map[uint64]string
 		if !join {
+			if len(nodes) == 0 {
+				return nil, false, err
+			}
 			members = nodes
 		}
 		bs := pb.NewBootstrapInfo(join, smType, nodes)
