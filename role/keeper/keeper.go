@@ -538,47 +538,57 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 
 		if k.enableBft {
 			initialMembers := make(map[uint64]string)
-			for _, kid := range gInfo.keepers {
-				if kid == k.localID {
-					initialMembers[gInfo.nodeID] = raft.Addr
-					continue
-				}
-
-				t, err := address.GetNodeIDFromID(kid)
-				if err != nil {
-					continue
-				}
-
-				ipAddr, err := k.ds.GetExternalAddr(kid)
-				if err != nil {
-					continue
-				}
-
-				ips := strings.Split(string(ipAddr), "/")
-				if len(ips) != 5 {
-					utils.MLogger.Errorf("ip %s is wrong", string(ipAddr))
-					continue
-				}
-
-				initialMembers[t] = ips[2] + ":3001"
-			}
-
 			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
-			if err != nil {
+			if err == nil {
+				gInfo.bft = true
+			} else {
 				utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
 				if err != dragonboat.ErrClusterAlreadyExist {
-					gInfo.bft = false
-				}
-			} else {
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				defer cancel()
-				cm, err := k.dnh.GetClusterMembership(ctx, gInfo.clusterID)
-				if err != nil {
-					gInfo.bft = false
-					utils.MLogger.Debugf("%d has members fails: %s", gInfo.clusterID, err)
-				} else {
 					gInfo.bft = true
-					utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
+				} else {
+					for _, kid := range gInfo.keepers {
+						if kid == k.localID {
+							initialMembers[gInfo.nodeID] = raft.Addr
+							continue
+						}
+
+						t, err := address.GetNodeIDFromID(kid)
+						if err != nil {
+							continue
+						}
+
+						ipAddr, err := k.ds.GetExternalAddr(kid)
+						if err != nil {
+							continue
+						}
+
+						ips := strings.Split(string(ipAddr), "/")
+						if len(ips) != 5 {
+							utils.MLogger.Errorf("ip %s is wrong", string(ipAddr))
+							continue
+						}
+
+						initialMembers[t] = ips[2] + ":3001"
+					}
+
+					err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
+					if err != nil {
+						utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
+						if err != dragonboat.ErrClusterAlreadyExist {
+							gInfo.bft = false
+						}
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+						cm, err := k.dnh.GetClusterMembership(ctx, gInfo.clusterID)
+						if err != nil {
+							gInfo.bft = false
+							utils.MLogger.Debugf("%d has members fails: %s", gInfo.clusterID, err)
+						} else {
+							gInfo.bft = true
+							utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
+						}
+						cancel()
+					}
 				}
 			}
 		}
