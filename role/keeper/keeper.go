@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strconv"
@@ -252,7 +253,7 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 
-		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID)
+		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID, true)
 
 		//key: `qid/"chalpay"/pid/beginTime/endTime`
 		//value: `spacetime/signature/proof`
@@ -263,7 +264,7 @@ func (k *Info) savePay(qid, pid string) error {
 		}
 		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
 
-		k.putKey(ctx, km.ToString(), []byte(metaValue), nil, "local", clusterID)
+		k.putKey(ctx, km.ToString(), []byte(metaValue), nil, "local", clusterID, true)
 	}
 	return nil
 }
@@ -443,12 +444,12 @@ func (k *Info) loadPeers(ctx context.Context) error {
 
 /*====================Key Ops========================*/
 
-func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to string, clusterID uint64) error {
+func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to string, clusterID uint64, flag bool) error {
 	utils.MLogger.Debugf("put %s to %s", key, to)
 
 	k.ds.PutKey(ctx, key, data, sig, "local")
 
-	if k.enableBft {
+	if k.enableBft && flag {
 		rec := &recpb.Record{
 			Key:       []byte(key),
 			Value:     data,
@@ -467,10 +468,10 @@ func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to stri
 	return nil
 }
 
-func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64) ([]byte, error) {
+func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64, flag bool) ([]byte, error) {
 	utils.MLogger.Debugf("get %s from %s", key, to)
 
-	if k.enableBft {
+	if k.enableBft && flag {
 		res, err := raft.Read(ctx, k.dnh, clusterID, key)
 		if err != nil {
 			return nil, err
@@ -480,6 +481,17 @@ func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64) ([]
 		err = proto.Unmarshal(res, rec)
 		if err != nil {
 			return nil, err
+		}
+
+		val, err := k.ds.GetKey(ctx, key, "local")
+		if err != nil {
+			utils.MLogger.Debugf("get %s fails %s", key, err)
+		} else {
+			if bytes.Compare(val, rec.GetValue()) == 0 {
+				utils.MLogger.Debugf("get %s success", key)
+			} else {
+				utils.MLogger.Debugf("get %s success, value is not equal", key)
+			}
 		}
 
 		return rec.GetValue(), nil
@@ -737,7 +749,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 
 			pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
 
-			err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID)
+			err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID, gp.bft)
 			if err != nil {
 				utils.MLogger.Info("Add block: ", blockID, " error:", err)
 			}
