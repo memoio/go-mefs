@@ -571,11 +571,12 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 					gInfo.bft = false
 				}
 			} else {
-				gInfo.bft = true
 				cm, err := k.dnh.GetClusterMembership(context.Background(), gInfo.clusterID)
 				if err != nil {
+					gInfo.bft = false
 					utils.MLogger.Debugf("%d has members fails: %s", gInfo.clusterID, err)
 				} else {
+					gInfo.bft = true
 					utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
 				}
 			}

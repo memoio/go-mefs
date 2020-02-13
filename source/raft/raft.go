@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -95,7 +94,7 @@ func Write(ctx context.Context, nh *dragonboat.NodeHost, clusterID uint64, key s
 		Key:   []byte(key),
 		Value: val,
 	}
-	data, err := json.Marshal(kv)
+	data, err := proto.Marshal(kv)
 	if err != nil {
 		panic(err)
 	}
@@ -446,7 +445,7 @@ func (d *DiskKV) Update(ents []sm.Entry) ([]sm.Entry, error) {
 	defer wb.Destroy()
 	db := (*rocksdb)(atomic.LoadPointer(&d.db))
 	for idx, e := range ents {
-		dataKV := &pb.KVData{}
+		dataKV := new(pb.KVData)
 		if err := proto.Unmarshal(e.Cmd, dataKV); err != nil {
 			panic(err)
 		}
