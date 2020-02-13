@@ -62,7 +62,7 @@ func StartHost(dir string) *dragonboat.NodeHost {
 }
 
 // StartCluster starts a raft cluster
-func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[uint64]string) error {
+func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, join bool, members map[uint64]string) error {
 	rc := config.Config{
 		NodeID:             nodeID,
 		ClusterID:          cluserID,
@@ -72,7 +72,7 @@ func StartCluster(nh *dragonboat.NodeHost, cluserID, nodeID uint64, members map[
 		SnapshotEntries:    10,
 		CompactionOverhead: 5,
 	}
-	return nh.StartOnDiskCluster(members, false, NewDiskKV, rc)
+	return nh.StartOnDiskCluster(members, join, NewDiskKV, rc)
 }
 
 // Read reads

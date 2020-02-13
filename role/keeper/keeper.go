@@ -538,12 +538,13 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 
 		if k.enableBft {
 			initialMembers := make(map[uint64]string)
-			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
+			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, false, initialMembers)
 			if err == nil {
 				gInfo.bft = true
+				utils.MLogger.Infof("try start cluster %d for %s, success", gInfo.clusterID, gInfo.groupID)
 			} else {
 				utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
-				if err != dragonboat.ErrClusterAlreadyExist {
+				if err == dragonboat.ErrClusterAlreadyExist {
 					gInfo.bft = true
 				} else {
 					for _, kid := range gInfo.keepers {
@@ -571,7 +572,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 						initialMembers[t] = ips[2] + ":3001"
 					}
 
-					err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, initialMembers)
+					err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, false, initialMembers)
 					if err != nil {
 						utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
 						if err != dragonboat.ErrClusterAlreadyExist {

@@ -1356,11 +1356,11 @@ func (nh *NodeHost) bootstrapCluster(nodes map[uint64]string,
 	smType pb.StateMachineType) (map[uint64]string, bool, error) {
 	binfo, err := nh.logdb.GetBootstrapInfo(config.ClusterID, config.NodeID)
 	if err == raftio.ErrNoBootstrapInfo {
+		if len(nodes) == 0 {
+			return nil, false, err
+		}
 		var members map[uint64]string
 		if !join {
-			if len(nodes) == 0 {
-				return nil, false, err
-			}
 			members = nodes
 		}
 		bs := pb.NewBootstrapInfo(join, smType, nodes)
