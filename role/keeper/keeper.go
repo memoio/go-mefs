@@ -67,12 +67,6 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		return nil, err
 	}
 
-	err = m.load(ctx) //连接节点
-	if err != nil {
-		utils.MLogger.Error("load err:", err)
-		return nil, err
-	}
-
 	rootpath, _ := fsrepo.BestKnownPath()
 	m.dnh = raft.StartHost(rootpath)
 	if m.dnh != nil {
@@ -81,6 +75,12 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	} else {
 		m.enableBft = false
 		utils.MLogger.Info("Use simple mode")
+	}
+
+	err = m.load(ctx) //连接节点
+	if err != nil {
+		utils.MLogger.Error("load err:", err)
+		return nil, err
 	}
 
 	go m.persistRegular(ctx)
