@@ -579,7 +579,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 						}
 					}
 					gInfo.bft = true
-					utils.MLogger.Info("start cluster %d for %s, success, has members: %s", gInfo.clusterID, gInfo.groupID, initialMembers)
+					utils.MLogger.Infof("start cluster %d for %s, success, has members: %s", gInfo.clusterID, gInfo.groupID, initialMembers)
 				}
 			}
 		}
