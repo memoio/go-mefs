@@ -577,18 +577,9 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 						if err != dragonboat.ErrClusterAlreadyExist {
 							gInfo.bft = false
 						}
-					} else {
-						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-						cm, err := k.dnh.GetClusterMembership(ctx, gInfo.clusterID)
-						if err != nil {
-							gInfo.bft = false
-							utils.MLogger.Debugf("%d has members fails: %s", gInfo.clusterID, err)
-						} else {
-							gInfo.bft = true
-							utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
-						}
-						cancel()
 					}
+					gInfo.bft = true
+					utils.MLogger.Info("start cluster %d for %s, success, has members: %s", gInfo.clusterID, gInfo.groupID, initialMembers)
 				}
 			}
 		}
