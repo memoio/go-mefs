@@ -570,7 +570,7 @@ func (n *impl) GetPeers() ([]peer.ID, error) {
 	return n.ph.Network().Peers(), nil
 }
 
-func (n *impl) GetExternalAddr(p string) ([]byte, error) {
+func (n *impl) GetExternalAddr(p string) (ma.Multiaddr, error) {
 	if n.ph == nil || n.rt == nil {
 		return nil, errNoRouting
 	}
@@ -586,7 +586,7 @@ func (n *impl) GetExternalAddr(p string) ([]byte, error) {
 		if rid.Pretty() == p {
 			addr := c.RemoteMultiaddr()
 			utils.MLogger.Debug(p, " has extern ip: ", addr.String())
-			return []byte(addr.String()), nil
+			return addr, nil
 		}
 	}
 

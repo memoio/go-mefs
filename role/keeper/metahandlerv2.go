@@ -170,7 +170,11 @@ func (k *Info) handleStorage(km *metainfo.KeyMeta, value []byte, pid string) {
 func (k *Info) handleExternalAddr(km *metainfo.KeyMeta) ([]byte, error) {
 	utils.MLogger.Info("handleExternnalAddr: ", km.ToString())
 	peerID := km.GetMid()
-	return k.ds.GetExternalAddr(peerID)
+	addr, err := k.ds.GetExternalAddr(peerID)
+	if err != nil {
+		return nil, err
+	}
+	return addr.Bytes(), nil
 }
 
 func (k *Info) handleChalTime(km *metainfo.KeyMeta) ([]byte, error) {

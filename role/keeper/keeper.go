@@ -563,9 +563,9 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 							continue
 						}
 
-						ips := strings.Split(string(ipAddr), "/")
+						ips := strings.Split(ipAddr.String(), "/")
 						if len(ips) != 5 {
-							utils.MLogger.Errorf("ip %s is wrong", string(ipAddr))
+							utils.MLogger.Errorf("ip %s is wrong", ipAddr.String())
 							continue
 						}
 
