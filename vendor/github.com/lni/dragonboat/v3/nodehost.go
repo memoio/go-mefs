@@ -1357,7 +1357,7 @@ func (nh *NodeHost) bootstrapCluster(nodes map[uint64]string,
 	binfo, err := nh.logdb.GetBootstrapInfo(config.ClusterID, config.NodeID)
 	if err == raftio.ErrNoBootstrapInfo {
 		if len(nodes) == 0 {
-			return nil, false, err
+			return nil, false, ErrInvalidClusterSettings
 		}
 		var members map[uint64]string
 		if !join {
