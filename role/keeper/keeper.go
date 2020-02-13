@@ -557,6 +557,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				ips := strings.Split(string(ipAddr), "/")
 				utils.MLogger.Debug("ip is: ", ips)
 				if len(ips) != 5 {
+					utils.MLogger.Debug("ip is wrong")
 					continue
 				}
 
@@ -573,7 +574,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				gInfo.bft = true
 				cm, err := k.dnh.GetClusterMembership(context.Background(), gInfo.clusterID)
 				if err != nil {
-					utils.MLogger.Debugf("%d has wrong members", gInfo.clusterID)
+					utils.MLogger.Debugf("%d has members fails: %s", gInfo.clusterID, err)
 				} else {
 					utils.MLogger.Debugf("%d has members: %s", gInfo.clusterID, cm.Nodes)
 				}
