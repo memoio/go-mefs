@@ -13,6 +13,7 @@ import (
 	"time"
 
 	df "github.com/memoio/go-mefs/data-format"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
