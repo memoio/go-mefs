@@ -16,11 +16,11 @@ func TestKeyMeta(t *testing.T) {
 	km, _ := NewKeyMeta("testMainID", UserStart, "4", "6")
 	strKM := km.ToString()
 	fmt.Println("NewKeyMeta正确测试:", strKM)
-	_, err = GetKeyMeta("testMainID" + DELIMITER + "2" + DELIMITER + "123")
+	_, err = NewKeyFromString("testMainID" + DELIMITER + "2" + DELIMITER + "123")
 	if err != nil {
 		fmt.Println("GetKetMeta 错误测试：", err)
 	}
-	km, _ = GetKeyMeta("testMainID" + DELIMITER + "2" + DELIMITER + "keeperCount" + DELIMITER + "ProviderCount")
+	km, _ = NewKeyFromString("testMainID" + DELIMITER + "2" + DELIMITER + "keeperCount" + DELIMITER + "ProviderCount")
 	strKM = km.ToString()
 	fmt.Println("NewKeyMeta正确测试:", strKM)
 }
@@ -33,10 +33,10 @@ func TestBlockMeta(t *testing.T) {
 	bm, _ := NewBlockMeta("8MGm9D1EVTQwZYrkRVY4xuDJYjwJZT", "testgid", "testsid", "testbid")
 	strBm := bm.ToString()
 	fmt.Println("NewBlockMeta正确测试：", strBm)
-	_, err = GetBlockMeta(strings.Join([]string{"testUID", "testgid", "testsid", "testbid"}, BLOCK_DELIMITER))
+	_, err = GetBlockMeta(strings.Join([]string{"testUID", "testgid", "testsid", "testbid"}, BlockDelimiter))
 	if err != nil {
 		fmt.Println("GetKetMeta 错误测试：", err)
 	}
-	bm, _ = GetBlockMeta(strings.Join([]string{"8MGm9D1EVTQwZYrkRVY4xuDJYjwJZT", "testgid", "testsid", "testbid"}, BLOCK_DELIMITER))
+	bm, _ = GetBlockMeta(strings.Join([]string{"8MGm9D1EVTQwZYrkRVY4xuDJYjwJZT", "testgid", "testsid", "testbid"}, BlockDelimiter))
 	fmt.Println("GetBlockMeta正确测试", bm.ToString())
 }

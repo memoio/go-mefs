@@ -198,7 +198,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 		return errors.New("cannot create bucket info")
 	}
 
-	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 	// key: stripeID_chunkID
 	thisBucket.stripes.Store(bids[1], newcidinfo)
 
@@ -238,7 +238,7 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 	}
 
 	// delete from buckets
-	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 
 	bui, ok := g.buckets.Load(bids[0])
 	if ok {
@@ -250,7 +250,7 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 
 // bucketID_stripeID_chunkID
 func (g *groupInfo) getBlockPos(bid string) (string, error) {
-	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 
 	bui, ok := g.buckets.Load(bids[0])
 	if ok {
@@ -264,7 +264,7 @@ func (g *groupInfo) getBlockPos(bid string) (string, error) {
 }
 
 func (g *groupInfo) getBlockAvail(bid string) (int64, error) {
-	bids := strings.SplitN(bid, metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 
 	bui, ok := g.buckets.Load(bids[0])
 	if ok {

@@ -6,8 +6,9 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
+// BlockMeta is
 type BlockMeta struct {
-	queryID  string // queryID
+	queryID  string
 	bucketID string
 	stripeID string
 	chunkID  string
@@ -54,10 +55,10 @@ func (bm *BlockMeta) ToString(prefix ...int) string {
 		return ""
 	}
 	outLength := 4
-	if len(prefix) > 0 {
+	if len(prefix) > 0 && prefix[0] > 0 && prefix[0] < 4 {
 		outLength = prefix[0]
 	}
-	res := strings.Join([]string{bm.queryID, bm.bucketID, bm.stripeID, bm.chunkID}[:outLength], BLOCK_DELIMITER)
+	res := strings.Join([]string{bm.queryID, bm.bucketID, bm.stripeID, bm.chunkID}[:outLength], BlockDelimiter)
 	return res
 }
 
@@ -77,7 +78,7 @@ func NewBlockMeta(qid, bid, sid, cid string) (*BlockMeta, error) {
 
 //GetBlockMeta 对于传入的key进行整理，返回结构体KeyMeta
 func GetBlockMeta(key string) (*BlockMeta, error) {
-	splitedKey := strings.Split(key, BLOCK_DELIMITER)
+	splitedKey := strings.Split(key, BlockDelimiter)
 	if len(splitedKey) < 3 {
 		return nil, ErrIllegalKey
 	}
@@ -93,14 +94,14 @@ func GetBlockMeta(key string) (*BlockMeta, error) {
 // if key == uid_bucketid_sid_blockid, returns bucketid_sid_blockid
 // if key == bucketid_sid_blockid, returns bucketid_sid_blockid
 func GetCidFromBlock(key string) (string, error) {
-	splitedKey := strings.Split(key, BLOCK_DELIMITER)
+	splitedKey := strings.Split(key, BlockDelimiter)
 
 	if len(splitedKey) == 3 {
 		return key, nil
 	}
 
 	if len(splitedKey) == 4 {
-		return strings.Join(splitedKey[1:], BLOCK_DELIMITER), nil
+		return strings.Join(splitedKey[1:], BlockDelimiter), nil
 	}
 
 	return "", ErrIllegalKey
@@ -110,7 +111,7 @@ func GetCidFromBlock(key string) (string, error) {
 // if key == uid_bucketid_sid_blockid, returns bucketid
 // if key == bucketid_sid_blockid, returns bucketid
 func GetIDsFromBlock(key string) (string, string, string, error) {
-	splitedKey := strings.Split(key, BLOCK_DELIMITER)
+	splitedKey := strings.Split(key, BlockDelimiter)
 	if len(splitedKey) == 3 {
 		return splitedKey[0], splitedKey[1], splitedKey[2], nil
 	}

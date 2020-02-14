@@ -79,7 +79,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) {
 	opt.PreCompute()
 
 	//从磁盘读取存储的Cidprefix
-	posKM, err := metainfo.NewKeyMeta(groupID, metainfo.PosMeta)
+	posKM, err := metainfo.NewKey(groupID, pb.KeyType_PosMeta)
 	if err != nil {
 		utils.MLogger.Info("NewKeyMeta posKM error :", err)
 	} else {
@@ -231,7 +231,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 	// send BlockMeta to keepers
 	utils.MLogger.Info("generate pos blcoks")
 
-	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+	posKM, err := metainfo.NewKey(posID, pb.KeyType_PosMeta)
 	if err != nil {
 		return
 	}
@@ -283,9 +283,9 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 
 		// 向keeper发送元数据
 		metaValue := strings.Join(blockList, metainfo.DELIMITER)
-		km, err := metainfo.NewKeyMeta(p.localID, metainfo.Pos)
+		km, err := metainfo.NewKey(p.localID, pb.KeyType_Pos)
 		for _, keeper := range keeperIDs {
-			p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(metaValue), nil, keeper)
+			p.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(metaValue), nil, keeper)
 		}
 
 		// 本地更新
@@ -302,7 +302,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 func (p *Info) deletePosBlocks(decreseSpace uint64) {
 	utils.MLogger.Info("data is about to exceed the space limit, delete pos blcoks")
 
-	posKM, err := metainfo.NewKeyMeta(posID, metainfo.PosMeta)
+	posKM, err := metainfo.NewKey(posID, pb.KeyType_PosMeta)
 	if err != nil {
 		return
 	}
@@ -357,14 +357,14 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper
 		if j < 5 {
-			km, err := metainfo.NewKeyMeta(p.localID, metainfo.Pos)
+			km, err := metainfo.NewKey(p.localID, pb.KeyType_Pos)
 			if err != nil {
 				utils.MLogger.Info("construct put blockMeta KV error :", err)
 				return
 			}
 			metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
 			for _, keeper := range keeperIDs {
-				p.ds.SendMetaRequest(context.Background(), int32(metainfo.Delete), km.ToString(), []byte(metavalue), nil, keeper)
+				p.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Delete), km.ToString(), []byte(metavalue), nil, keeper)
 			}
 		}
 	}

@@ -173,9 +173,9 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			// 生成tag并装进taggroup，index为peerid_bucketid_stripeid_blockid_offsetid
 			res.Reset()
 			res.WriteString(ncidPrefix)
-			res.WriteString(metainfo.BLOCK_DELIMITER)
+			res.WriteString(metainfo.BlockDelimiter)
 			res.WriteString(strconv.Itoa(j))
-			res.WriteString(metainfo.BLOCK_DELIMITER)
+			res.WriteString(metainfo.BlockDelimiter)
 			res.WriteString(strconv.Itoa(i))
 
 			tag, err := d.GenTagForSegment([]byte(res.String()), dataGroup[j])

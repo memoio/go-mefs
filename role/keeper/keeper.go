@@ -13,6 +13,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/lni/dragonboat/v3"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -138,7 +139,7 @@ func (k *Info) save(ctx context.Context) error {
 	localID := k.localID
 
 	// persist keepers
-	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
+	kmKID, err := metainfo.NewKey(localID, pb.KeyType_Keepers)
 	if err != nil {
 		return err
 	}
@@ -158,7 +159,7 @@ func (k *Info) save(ctx context.Context) error {
 
 	// persist providers
 	pids.Reset()
-	kmPID, err := metainfo.NewKeyMeta(localID, metainfo.Providers)
+	kmPID, err := metainfo.NewKey(localID, pb.KeyType_Providers)
 	if err != nil {
 		return err
 	}
@@ -177,7 +178,7 @@ func (k *Info) save(ctx context.Context) error {
 
 	pids.Reset()
 
-	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
+	kmUID, err := metainfo.NewKey(localID, pb.KeyType_Users)
 	if err != nil {
 		return err
 	}
@@ -186,7 +187,7 @@ func (k *Info) save(ctx context.Context) error {
 	k.users.Range(func(key, value interface{}) bool {
 		uid := key.(string)
 		pids.WriteString(uid)
-		kmfs, err := metainfo.NewKeyMeta(uid, metainfo.Query)
+		kmfs, err := metainfo.NewKey(uid, pb.KeyType_Query)
 		if err != nil {
 			return true
 		}
@@ -242,7 +243,7 @@ func (k *Info) savePay(qid, pid string) error {
 
 		//key: qid/`lastpay"/pid`
 		//value: `beginTime/endTime/spacetime/signature/proof`
-		kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
+		kmLast, err := metainfo.NewKey(qid, pb.KeyType_LastPay, pid)
 		if err != nil {
 			return err
 		}
@@ -258,7 +259,7 @@ func (k *Info) savePay(qid, pid string) error {
 		//key: `qid/"chalpay"/pid/beginTime/endTime`
 		//value: `spacetime/signature/proof`
 		//for storing
-		km, err := metainfo.NewKeyMeta(qid, metainfo.ChalPay, pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
+		km, err := metainfo.NewKey(qid, pb.KeyType_ChalPay, pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
 		if err != nil {
 			return err
 		}
@@ -279,7 +280,7 @@ func (k *Info) load(ctx context.Context) error {
 func (k *Info) loadUser(ctx context.Context) error {
 	utils.MLogger.Info("Load All userID's Information")
 	localID := k.localID //本地id
-	kmUID, err := metainfo.NewKeyMeta(localID, metainfo.Users)
+	kmUID, err := metainfo.NewKey(localID, pb.KeyType_Users)
 	if err != nil {
 		return err
 	}
@@ -297,7 +298,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 			wg.Add(1)
 			go func(userID string) {
 				defer wg.Done()
-				kmfs, err := metainfo.NewKeyMeta(userID, metainfo.Query)
+				kmfs, err := metainfo.NewKey(userID, pb.KeyType_Query)
 				if err != nil {
 					return
 				}
@@ -342,7 +343,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 }
 
 func (k *Info) loadUserBlock(qid string) error {
-	prefix := qid + metainfo.BLOCK_DELIMITER
+	prefix := qid + metainfo.BlockDelimiter
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
 		rec := new(recpb.Record)
@@ -353,7 +354,7 @@ func (k *Info) loadUserBlock(qid string) error {
 
 		utils.MLogger.Debug("Load block: ", string(rec.GetKey()))
 
-		km, err := metainfo.GetKeyMeta(string(rec.GetKey()))
+		km, err := metainfo.NewKeyFromString(string(rec.GetKey()))
 		if err != nil {
 			continue
 		}
@@ -373,7 +374,7 @@ func (k *Info) loadUserBlock(qid string) error {
 			continue
 		}
 
-		getID := strings.SplitN(km.GetMid(), metainfo.BLOCK_DELIMITER, 2)
+		getID := strings.SplitN(km.GetMid(), metainfo.BlockDelimiter, 2)
 		if len(getID) != 2 || (len(getID) > 0 && getID[0] != qid) {
 			continue
 		}
@@ -387,7 +388,7 @@ func (k *Info) loadUserBlock(qid string) error {
 func (k *Info) loadPeers(ctx context.Context) error {
 	localID := k.localID
 	// load keepers
-	kmKID, err := metainfo.NewKeyMeta(localID, metainfo.Keepers)
+	kmKID, err := metainfo.NewKey(localID, pb.KeyType_Keepers)
 	if err != nil {
 
 		return err
@@ -413,7 +414,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	}
 
 	// load providers
-	kmPID, err := metainfo.NewKeyMeta(localID, metainfo.Providers)
+	kmPID, err := metainfo.NewKey(localID, pb.KeyType_Providers)
 	if err != nil {
 		return err
 	}
@@ -595,7 +596,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 
 			gInfo.ledgerMap.Store(pid, lin)
 
-			kmLast, err := metainfo.NewKeyMeta(qid, metainfo.LastPay, pid)
+			kmLast, err := metainfo.NewKey(qid, pb.KeyType_LastPay, pid)
 			if err != nil {
 				continue
 			}
@@ -619,7 +620,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 func (k *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) error {
 	if kpids == "" && flag {
 		ctx := context.Background()
-		kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
+		kmkps, err := metainfo.NewKey(groupID, pb.KeyType_LFS, userID)
 		if err != nil {
 			return err
 		}
@@ -689,10 +690,10 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 		thisLinfo := thisIlinfo.(*lInfo)
 
 		thisLinfo.blockMap.Range(func(key, value interface{}) bool {
-			blockID := qid + metainfo.BLOCK_DELIMITER + key.(string)
+			blockID := qid + metainfo.BlockDelimiter + key.(string)
 			utils.MLogger.Info("Delete testUser block: ", blockID)
 			//先通知Provider删除块
-			km, err := metainfo.NewKeyMeta(blockID, metainfo.Block)
+			km, err := metainfo.NewKey(blockID, pb.KeyType_Block)
 			if err != nil {
 				return false
 			}
@@ -701,7 +702,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 				utils.MLogger.Info("Delete testUser block: ", blockID, " error:", err)
 			}
 
-			kmBlock, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+			kmBlock, err := metainfo.NewKey(blockID, pb.KeyType_BlockPos)
 			if err != nil {
 			}
 
@@ -745,9 +746,9 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
 		if mode {
-			blockID := qid + metainfo.BLOCK_DELIMITER + bid
+			blockID := qid + metainfo.BlockDelimiter + bid
 
-			km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+			km, err := metainfo.NewKey(blockID, pb.KeyType_BlockPos)
 			if err != nil {
 				return err
 			}
@@ -783,10 +784,10 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 	}
 
 	if flag {
-		blockID := qid + metainfo.BLOCK_DELIMITER + bid
+		blockID := qid + metainfo.BlockDelimiter + bid
 
 		// notify provider, to delete block
-		km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+		km, err := metainfo.NewKey(blockID, pb.KeyType_BlockPos)
 		if err != nil {
 			return
 		}

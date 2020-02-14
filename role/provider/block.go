@@ -16,7 +16,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error {
 	utils.MLogger.Info("handlePutBlock: ", km.ToString(), "from: ", from)
 	// key is blockID/"block"
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
@@ -24,7 +24,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 		return errors.New("Wrong value for put block")
 	}
 
-	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
 	qid := bids[0]
 
 	gp := p.getGroupInfo(qid, qid, true)
@@ -55,7 +55,7 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 	return nil
 }
 
-func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string) error {
+func (p *Info) handleAppendBlock(km *metainfo.Key, value []byte, from string) error {
 	utils.MLogger.Info("handleAppendBlock: ", km.ToString(), " from: ", from)
 	// key is blockID/"Block"/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
@@ -63,7 +63,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 		return errors.New("Wrong value for put block")
 	}
 
-	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
 	qid := bids[0]
 
 	gp := p.getGroupInfo(qid, qid, true)
@@ -82,7 +82,7 @@ func (p *Info) handleAppendBlock(km *metainfo.KeyMeta, value []byte, from string
 	return nil
 }
 
-func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
+func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleGetBlock: ", km.ToString(), " from: ", from)
 
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
@@ -90,7 +90,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 		return nil, errors.New("Wrong value for get block")
 	}
 
-	bids := strings.SplitN(splitedNcid[0], metainfo.BLOCK_DELIMITER, 2)
+	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
 	qid := bids[0]
 
 	gp := p.getGroupInfo(qid, qid, true)
@@ -142,7 +142,7 @@ func (p *Info) handleGetBlock(km *metainfo.KeyMeta, metaValue, sig []byte, from 
 				cItem.Value = value
 				cItem.Sig = sig
 
-				key, err := metainfo.NewKeyMeta(cItem.ChannelID, metainfo.Channel)
+				key, err := metainfo.NewKey(cItem.ChannelID, pb.KeyType_Channel)
 				if err != nil {
 					return nil, err
 				}
@@ -205,7 +205,7 @@ func verifyChanValue(oldValue, newValue *big.Int) bool {
 	return true
 }
 
-func (p *Info) handleDeleteBlock(km *metainfo.KeyMeta, from string) error {
+func (p *Info) handleDeleteBlock(km *metainfo.Key, from string) error {
 	utils.MLogger.Info("handleDeleteBlock: ", km.ToString(), "from: ", from)
 	err := p.ds.DeleteBlock(context.Background(), km.ToString(), "local")
 	if err != nil && err != bs.ErrNotFound {

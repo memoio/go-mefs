@@ -19,6 +19,7 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	routing "github.com/libp2p/go-libp2p-routing"
+	mpb "github.com/memoio/go-mefs/proto"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
@@ -270,7 +271,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 	log.Println("handle metakey:", metaKey)
 
-	res, err := dht.metahandler.HandleMetaMessage(int(rpmes.GetOpType()), metaKey, metaValue, sig, p.Pretty())
+	res, err := dht.metahandler.HandleMetaMessage(mpb.OpType(rpmes.GetOpType()), metaKey, metaValue, sig, p.Pretty())
 	if err != nil {
 		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\n", err, metaKey, p.Pretty())
 		rpmes.ErrMsg = true

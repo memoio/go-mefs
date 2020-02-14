@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	rs "github.com/memoio/go-mefs/data-format"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
@@ -13,7 +14,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) error {
+func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error {
 	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
 	var nbid int
@@ -27,7 +28,7 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 	if len(ops) < 1 {
 		return nil
 	}
-	blkInfo := strings.Split(blockID, metainfo.BLOCK_DELIMITER)
+	blkInfo := strings.Split(blockID, metainfo.BlockDelimiter)
 	if len(blkInfo) < 4 {
 		return nil
 	}
@@ -48,12 +49,12 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 	stripe := make([][]byte, len(cpids)+1)
 	for _, cpid := range cpids {
 		if len(cpid) > 0 {
-			splitcpid := strings.Split(cpid, metainfo.BLOCK_DELIMITER)
+			splitcpid := strings.Split(cpid, metainfo.BlockDelimiter)
 			if len(splitcpid) != 2 {
 				continue
 			}
 			blkInfo[3] = splitcpid[0]
-			blkid := strings.Join(blkInfo, metainfo.BLOCK_DELIMITER)
+			blkid := strings.Join(blkInfo, metainfo.BlockDelimiter)
 			pid := splitcpid[1]
 			if splitcpid[0] != chunkID {
 				blk, err := p.ds.GetBlock(ctx, blkid, sig, pid)
@@ -122,7 +123,7 @@ func (p *Info) handleRepair(km *metainfo.KeyMeta, rpids []byte, keeper string) e
 	utils.MLogger.Info("repair success: ", blockID)
 
 	retMetaValue := "ok" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off-1)
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(retMetaValue), nil, keeper)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
 		utils.MLogger.Error("repair response err :", err)
 		return err

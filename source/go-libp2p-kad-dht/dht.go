@@ -26,6 +26,7 @@ import (
 	goprocess "github.com/jbenet/goprocess"
 	goprocessctx "github.com/jbenet/goprocess/context"
 	kb "github.com/libp2p/go-libp2p-kbucket"
+	mpb "github.com/memoio/go-mefs/proto"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-libp2p-kad-dht/metrics"
 	opts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
@@ -220,8 +221,8 @@ func (dht *KadDHT) getValueSingle(ctx context.Context, p peer.ID, key string) (*
 
 	bkey := strings.SplitN(key, metainfo.DELIMITER, 3)
 	if len(bkey) == 3 {
-		if bkey[1] == strconv.Itoa(metainfo.UserInit) {
-			pmes.OpType = int32(metainfo.BroadCast)
+		if bkey[1] == strconv.Itoa(int(mpb.KeyType_UserInit)) {
+			pmes.OpType = int32(mpb.OpType_BroadCast)
 		}
 	}
 

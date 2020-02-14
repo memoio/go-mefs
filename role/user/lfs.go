@@ -361,7 +361,7 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 		return err
 	}
 	ncid := bm.ToString()
-	km, err := metainfo.NewKeyMeta(ncid, metainfo.Block)
+	km, err := metainfo.NewKey(ncid, pb.KeyType_Block)
 	if err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
 
-		km, err := metainfo.NewKeyMeta(ncid, metainfo.Block)
+		km, err := metainfo.NewKey(ncid, pb.KeyType_Block)
 		if err != nil {
 			continue
 		}
@@ -462,7 +462,7 @@ func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 	for j := 0; j < metaBackupCount && j < len(providers); j++ { //
 		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
-		km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+		km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
 		err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 		if err != nil {
 			continue
@@ -530,7 +530,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 		for j := 0; j < len(providers); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
-			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+			km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
 			err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 			if err != nil {
 				continue
@@ -565,7 +565,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		return nil, err
 	}
 	ncidlocal := bm.ToString()
-	km, _ := metainfo.NewKeyMeta(ncidlocal, metainfo.Block)
+	km, _ := metainfo.NewKey(ncidlocal, pb.KeyType_Block)
 	ctx := context.Background()
 	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
 	if err == nil && b != nil {
@@ -591,7 +591,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				continue
 			}
 
-			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+			km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
 
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if err == nil && b != nil { //获取到有效数据块，跳出
@@ -756,7 +756,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			if err != nil || provider == "" {
 				continue
 			}
-			km, _ := metainfo.NewKeyMeta(ncid, metainfo.Block)
+			km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if b != nil && err == nil {
 				ok := enc.VerifyBlock(b.RawData(), ncid)

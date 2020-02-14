@@ -44,7 +44,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 						continue
 					}
 					utils.MLogger.Debug("Challenge: ", key)
-					go k.ds.SendMetaRequest(ctx, int32(metainfo.Get), key, value, nil, proID)
+					go k.ds.SendMetaRequest(ctx, int32(pb.OpType_Get), key, value, nil, proID)
 				}
 
 				// in case povider cannot get it
@@ -68,7 +68,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	chalnum := 0
 	l.blockMap.Range(func(key, value interface{}) bool {
 		cInfo := value.(*blockInfo)
-		ret = append(ret, key.(string)+metainfo.BLOCK_DELIMITER+strconv.Itoa(cInfo.offset))
+		ret = append(ret, key.(string)+metainfo.BlockDelimiter+strconv.Itoa(cInfo.offset))
 		psum += cInfo.offset + 1
 		chalnum++
 		if chalnum >= 100 {
@@ -107,7 +107,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	l.lastChalTime = challengetime
 
 	// key: qid/"Challenge"/uid/pid/kid/chaltime
-	km, err := metainfo.NewKeyMeta(qid, metainfo.Challenge, userID, proID, localID, utils.UnixToString(challengetime))
+	km, err := metainfo.NewKey(qid, pb.KeyType_Challenge, userID, proID, localID, utils.UnixToString(challengetime))
 	if err != nil {
 		return "", nil, err
 	}
@@ -133,7 +133,7 @@ func (l *lInfo) cleanLastChallenge() {
 
 //handleProof handles the challenge result from provider
 //key: qid/"Challenge"/uid/pid/kid/chaltime,value: proof[/FaultBlocks]
-func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) {
+func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	utils.MLogger.Info("handleProof: ", km.ToString())
 	ops := km.GetOptions()
 	if len(ops) != 4 {
@@ -199,7 +199,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) {
 	// key: bucketid_stripeid_blockid
 	cset := make(map[string]struct{}, len(splitedindex))
 	if len(splitedindex) != 0 {
-		utils.MLogger.Debug(proID, " Fault or NotFound blocks :", qid, metainfo.BLOCK_DELIMITER, splitedindex)
+		utils.MLogger.Debug(proID, " Fault or NotFound blocks :", qid, metainfo.BlockDelimiter, splitedindex)
 		for _, s := range splitedindex {
 			if len(s) == 0 {
 				continue
@@ -233,9 +233,9 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) {
 		}
 
 		buf.WriteString(qid)
-		buf.WriteString(metainfo.BLOCK_DELIMITER)
+		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(chcid)
-		buf.WriteString(metainfo.BLOCK_DELIMITER)
+		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(electedOffset))
 
 		chal.Indices = append(chal.Indices, buf.String())

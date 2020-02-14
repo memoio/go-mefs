@@ -15,7 +15,7 @@ import (
 )
 
 // key: qid/"Challenge"/uid/pid/kid/chaltime
-func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from string) error {
+func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from string) error {
 	utils.MLogger.Info("handle challenge: ", km.ToString(), " from: ", from)
 
 	ops := km.GetOptions()
@@ -69,10 +69,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 			electedOffset = 0
 		}
 		buf.WriteString(fsID)
-		buf.WriteString(metainfo.BLOCK_DELIMITER)
+		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(bid)
 		blockID := cid.NewCidV2([]byte(buf.String()))
-		buf.WriteString(metainfo.BLOCK_DELIMITER)
+		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
 		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
@@ -134,7 +134,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.KeyMeta, metaValue []byte, from
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(retValue), nil, from)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		utils.MLogger.Info("send proof err: ", err)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/memoio/go-mefs/config"
+	pb "github.com/memoio/go-mefs/proto"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -101,7 +102,7 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 	}
 
 	switch keys[1] {
-	case strconv.Itoa(metainfo.PublicKey):
+	case strconv.Itoa(int(pb.KeyType_PublicKey)):
 		gotID, err := utils.IDFromPublicKey(value)
 		if err != nil {
 			utils.MLogger.Warn("convert public key to id fails: ", err)
@@ -118,7 +119,7 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 		}
 
 		gotID := keys[2]
-		km, _ := metainfo.NewKeyMeta(gotID, metainfo.PublicKey)
+		km, _ := metainfo.NewKey(gotID, pb.KeyType_PublicKey)
 		pubRecByte, err := n.dstore.Get(ds.NewKey(km.ToString()))
 		if err != nil {
 			return false
@@ -161,7 +162,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 		n.Connect(ctx, to)
 	}
 
-	res, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, nil, to)
+	res, err := n.SendMetaRequest(ctx, int32(pb.OpType_Get), key, nil, nil, to)
 	if err != nil {
 		utils.MLogger.Error("GetKey err:", err, ", key is: ", key, " from: ", to)
 		return nil, err
@@ -196,7 +197,7 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 		n.Connect(ctx, to)
 	}
 
-	_, err := n.SendMetaRequest(ctx, int32(metainfo.Put), key, data, sig, to)
+	_, err := n.SendMetaRequest(ctx, int32(pb.OpType_Put), key, data, sig, to)
 
 	return err
 }
@@ -230,7 +231,7 @@ func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string
 		return n.dstore.Append(ds.NewKey(bstr), data, s, len)
 	}
 
-	return n.SendMetaMessage(ctx, int32(metainfo.Append), key, data, nil, to)
+	return n.SendMetaMessage(ctx, int32(pb.OpType_Append), key, data, nil, to)
 }
 
 func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
@@ -244,7 +245,7 @@ func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 		return n.dstore.Delete(ds.NewKey(key))
 	}
 
-	return n.SendMetaMessage(ctx, int32(metainfo.Delete), key, nil, nil, to)
+	return n.SendMetaMessage(ctx, int32(pb.OpType_Delete), key, nil, nil, to)
 }
 
 // GetBlock retrieves a particular block from the service,
@@ -266,14 +267,14 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	}
 
 	if len(bids) == 1 {
-		km, _ := metainfo.NewKeyMeta(bids[0], metainfo.Block)
+		km, _ := metainfo.NewKey(bids[0], pb.KeyType_Block)
 		key = km.ToString()
 	}
 
 	retry := 0
 	for {
 		retry++
-		bdata, err := n.SendMetaRequest(ctx, int32(metainfo.Get), key, nil, sig, to)
+		bdata, err := n.SendMetaRequest(ctx, int32(pb.OpType_Get), key, nil, sig, to)
 		if err != nil {
 			if err.Error() == ErrRetry.Error() {
 				if retry > 5 {
@@ -318,11 +319,11 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	}
 
 	if len(bids) == 1 {
-		km, _ := metainfo.NewKeyMeta(bids[0], metainfo.Block)
+		km, _ := metainfo.NewKey(bids[0], pb.KeyType_Block)
 		key = km.ToString()
 	}
 
-	_, err := n.SendMetaRequest(ctx, int32(metainfo.Put), key, data, nil, to)
+	_, err := n.SendMetaRequest(ctx, int32(pb.OpType_Put), key, data, nil, to)
 	if err != nil {
 		return err
 	}
@@ -362,7 +363,7 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 		return nil
 	}
 
-	_, err := n.SendMetaRequest(ctx, int32(metainfo.Append), key, data, nil, to)
+	_, err := n.SendMetaRequest(ctx, int32(pb.OpType_Append), key, data, nil, to)
 	if err != nil {
 		return err
 	}
@@ -385,11 +386,11 @@ func (n *impl) DeleteBlock(ctx context.Context, key, to string) error {
 	}
 
 	if len(bids) == 1 {
-		km, _ := metainfo.NewKeyMeta(bids[0], metainfo.Block)
+		km, _ := metainfo.NewKey(bids[0], pb.KeyType_Block)
 		key = km.ToString()
 	}
 
-	_, err := n.SendMetaRequest(ctx, int32(metainfo.Delete), key, nil, nil, to)
+	_, err := n.SendMetaRequest(ctx, int32(pb.OpType_Delete), key, nil, nil, to)
 	if err != nil {
 		return err
 	}
@@ -491,7 +492,7 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 		return false
 	}
 
-	km, err := metainfo.NewKeyMeta(to.Pretty(), metainfo.ExternalAddress)
+	km, err := metainfo.NewKey(to.Pretty(), pb.KeyType_ExternalAddress)
 	if err != nil {
 		return false
 	}
@@ -517,7 +518,7 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 			continue
 		}
 
-		res, err := n.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, pi.ID.Pretty())
+		res, err := n.SendMetaRequest(ctx, int32(pb.OpType_Get), km.ToString(), nil, nil, pi.ID.Pretty())
 		if err != nil {
 			continue
 		}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -49,28 +50,28 @@ func (k *Info) checkLedger(ctx context.Context) {
 						continue
 					}
 
-					pre := pu.uid + metainfo.BLOCK_DELIMITER + pu.qid
+					pre := pu.uid + metainfo.BlockDelimiter + pu.qid
 					thislinfo.blockMap.Range(func(key, value interface{}) bool {
 						thisinfo := value.(*blockInfo)
 						eclasped := time.Now().Unix() - thisinfo.availtime
 						switch thisinfo.repair {
 						case 0:
 							if EXPIRETIME < eclasped {
-								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+								cid := pre + metainfo.BlockDelimiter + key.(string)
 								utils.MLogger.Info("Need repair cid first time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 1:
 							if 4*EXPIRETIME < eclasped {
-								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+								cid := pre + metainfo.BlockDelimiter + key.(string)
 								utils.MLogger.Info("Need repair cid second time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 2:
 							if 16*EXPIRETIME < eclasped {
-								cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+								cid := pre + metainfo.BlockDelimiter + key.(string)
 								utils.MLogger.Info("Need repair cid third time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
@@ -80,7 +81,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 							if 480*EXPIRETIME >= eclasped {
 								// try every 32 hours
 								if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
-									cid := pre + metainfo.BLOCK_DELIMITER + key.(string)
+									cid := pre + metainfo.BlockDelimiter + key.(string)
 									utils.MLogger.Info("Need repair cid tried: ", cid)
 									thisinfo.repair++
 									k.repch <- cid
@@ -120,12 +121,12 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 
 	var response string
 	// uid_qid_bid_sid_bid
-	blkinfo := strings.Split(rBlockID, metainfo.BLOCK_DELIMITER)
+	blkinfo := strings.Split(rBlockID, metainfo.BlockDelimiter)
 	if len(blkinfo) < 5 {
 		return
 	}
 
-	blockID := strings.Join(blkinfo[1:], metainfo.BLOCK_DELIMITER)
+	blockID := strings.Join(blkinfo[1:], metainfo.BlockDelimiter)
 
 	uid := blkinfo[0]
 	qid := blkinfo[1]
@@ -149,7 +150,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	for i := 0; i < count; i++ {
 		res.Reset()
 		res.WriteString(blkinfo[3])
-		res.WriteString(metainfo.BLOCK_DELIMITER)
+		res.WriteString(metainfo.BlockDelimiter)
 		res.WriteString(strconv.Itoa(i))
 		thisinfo, ok := thisbucket.stripes.Load(res.String())
 		if !ok {
@@ -158,7 +159,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 
 		res.Reset()
 		res.WriteString(strconv.Itoa(i))
-		res.WriteString(metainfo.BLOCK_DELIMITER)
+		res.WriteString(metainfo.BlockDelimiter)
 
 		pid := thisinfo.(*blockInfo).storedOn
 
@@ -198,26 +199,26 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	// cid1_pid1/cid2_pid2
 	metaValue := strings.Join(cpids, metainfo.DELIMITER)
 
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.Repair, uid)
+	km, err := metainfo.NewKey(blockID, pb.KeyType_Repair, uid)
 	if err != nil {
 		utils.MLogger.Info("construct repair KV error: ", err)
 		return
 	}
 
 	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
-	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Get), km.ToString(), []byte(metaValue), nil, response)
+	k.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Get), km.ToString(), []byte(metaValue), nil, response)
 }
 
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
 // value: "ok" or "fail"/pid/offset
-func (k *Info) handleRepairResult(km *metainfo.KeyMeta, metaValue []byte, provider string) {
+func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider string) {
 	utils.MLogger.Info("handleRepairResult: ", km.ToString(), "From:", provider)
 	blockID := km.GetMid()
 	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) != 3 {
 		return
 	}
-	splitedKey := strings.SplitN(blockID, metainfo.BLOCK_DELIMITER, 2)
+	splitedKey := strings.SplitN(blockID, metainfo.BlockDelimiter, 2)
 	qid := splitedKey[0]
 	bid := splitedKey[1]
 

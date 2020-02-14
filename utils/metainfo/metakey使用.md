@@ -87,11 +87,11 @@
     dht层 handlers.go `handleMetaInfo()`用于数据接受，收到的数据传入角色层，根据不同角色的回调函数进行处理
   + 数据结构的构造
     ```go
-    km.err := metainfo.NewKeyMeta(mainID string, keyType MetaKeyType, listOptions ...string)
+    km.err := metainfo.NewKey(mainID string, keyType MetaKeyType, listOptions ...string)
     ```
     这个函数会检查输入的参数是否满足keytype的要求，不满足会报错，想要构造字符串信息，先构造keymeta结构，然后`km.ToString()`
     ```go
-    km,err := metainfo.GetKeyMeta(key string)
+    km,err := metainfo.NewKeyFromString(key string)
     ```
     这个函数从字符串构造keymeta，同样会根据keytype查错
   + 信息类别的添加

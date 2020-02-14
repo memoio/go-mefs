@@ -227,7 +227,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 		return latestTime, ErrNoKeepers
 	}
 
-	km, err := metainfo.NewKeyMeta(blockID, metainfo.ChalTime)
+	km, err := metainfo.NewKey(blockID, pb.KeyType_ChalTime)
 	if err != nil {
 		return latestTime, err
 	}
@@ -235,7 +235,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	var tempTime time.Time
 	ctx := context.Background()
 	for _, keeper := range conkeepers {
-		res, err := l.ds.SendMetaRequest(ctx, int32(metainfo.Get), km.ToString(), nil, nil, keeper)
+		res, err := l.ds.SendMetaRequest(ctx, int32(pb.OpType_Get), km.ToString(), nil, nil, keeper)
 		if err != nil {
 			continue
 		}

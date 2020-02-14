@@ -73,7 +73,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	}
 
 	if l.fsID == l.userID {
-		kmUser, err := metainfo.NewKeyMeta(l.fsID, metainfo.LogFS, l.userID)
+		kmUser, err := metainfo.NewKey(l.fsID, pb.KeyType_LFS, l.userID)
 		if err != nil {
 			return "", err
 		}
@@ -112,7 +112,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
 
 	if sl.UserID == sl.QueryID {
-		kmUser, err := metainfo.NewKeyMeta(sl.QueryID, metainfo.LogFS, sl.UserID)
+		kmUser, err := metainfo.NewKey(sl.QueryID, pb.KeyType_LFS, sl.UserID)
 		if err != nil {
 			return err
 		}

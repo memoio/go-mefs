@@ -1,6 +1,56 @@
 syntax = "proto3";
 package proto;
 
+enum OpType {
+    BroadCast = 0;
+	  Put = 1;
+	  Get = 2;
+	  Append = 3;
+	  Delete = 4;
+}
+
+enum KeyType {
+    Wrong = 0;
+    Role = 1;
+    PublicKey = 2;
+	  Config = 3;
+    LFS = 4;
+    Users = 5;
+	  Keepers = 6;
+	  Providers = 7;
+
+    Block = 10;    // provider handle block data
+	  BlockPos = 11; // keeper handle block pos
+    ChalTime = 12;
+    Pos = 13;
+	
+    HeartBeat = 20;
+    UserInit = 21;
+	  UserNotify = 22;
+	  UserStart = 23;
+	  UserStop = 24;
+    Challenge = 25;
+	  Repair = 26;
+    ExternalAddress = 27;
+    Storage = 28;
+
+	  Query = 30;
+	  Offer = 31;
+	  UpKeeping = 32;
+	  Channel = 33;
+
+    ChalPay = 40; // each pay
+    LastPay = 41;
+    PosMeta = 42;
+}
+
+message KeyMeta{
+    int32 Version = 1;
+    KeyType KType = 2; // indicates which key type
+	  string Mid = 3;     // main id = peerID or blockID
+    repeated string Options = 4;
+}
+
 message UserBLS12Config{
     bytes pubkeyBls = 2;
     bytes pubkeyG = 3;

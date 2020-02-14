@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	pb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -18,7 +19,7 @@ import (
 // handleUserInit collect keepers and providers for user
 // return kv, key: queryID/"UserInit"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
-func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
+func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 	utils.MLogger.Info("handleUserInit: ", km.ToString(), " from: ", from)
 	options := km.GetOptions()
 	if len(options) != 3 {
@@ -66,7 +67,7 @@ func (k *Info) handleUserInit(km *metainfo.KeyMeta, from string) {
 	}
 	utils.MLogger.Info("New fs: ", qid, " for user: ", uid, " keeperCount: ", kc, " providerCount: ", pc, " price: ", price)
 
-	k.ds.SendMetaRequest(context.Background(), int32(metainfo.Put), km.ToString(), []byte(response), nil, from)
+	k.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(response), nil, from)
 }
 
 //response: kid1kid2../pid1pid2..
@@ -133,7 +134,7 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 // handleUserNotify return kv,
 // key: queryID/"UserNotify"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
-func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+func (k *Info) handleUserNotify(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserNotify: ", km.ToString(), "From:", from)
 
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
@@ -154,7 +155,7 @@ func (k *Info) handleUserNotify(km *metainfo.KeyMeta, metaValue []byte, from str
 }
 
 // key: queryID/"UserStop"/userID/keepercount/providercount/sessionID;
-func (k *Info) handleUserStop(km *metainfo.KeyMeta, metaValue []byte, from string) ([]byte, error) {
+func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
 
 	ops := km.GetOptions()
@@ -184,7 +185,7 @@ func (k *Info) handleUserStop(km *metainfo.KeyMeta, metaValue []byte, from strin
 
 // key: queryID/"UserStart"/userID/keepercount/providercount/sessionID;
 // value: kid1kid2../pid1pid2..
-func (k *Info) handleUserStart(km *metainfo.KeyMeta, metaValue, sig []byte, from string) ([]byte, error) {
+func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from:", from)
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
@@ -276,7 +277,7 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		ui.setQuery(groupID)
 	}
 
-	kmkps, err := metainfo.NewKeyMeta(groupID, metainfo.LogFS, userID)
+	kmkps, err := metainfo.NewKey(groupID, pb.KeyType_LFS, userID)
 	if err != nil {
 		return nil, err
 	}

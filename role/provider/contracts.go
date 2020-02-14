@@ -71,7 +71,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 			if !ok {
 				return true
 			}
-			km, err := metainfo.NewKeyMeta(cItem.ChannelID, metainfo.Channel)
+			km, err := metainfo.NewKey(cItem.ChannelID, pb.KeyType_Channel)
 			if err != nil {
 				return true
 			}
@@ -96,7 +96,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				return true
 			}
 
-			km, err := metainfo.NewKeyMeta(cItem.ChannelID, metainfo.Channel)
+			km, err := metainfo.NewKey(cItem.ChannelID, pb.KeyType_Channel)
 			if err != nil {
 				return true
 			}

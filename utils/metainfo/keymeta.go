@@ -7,6 +7,8 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+
+	pb "github.com/memoio/go-mefs/proto"
 )
 
 var (
@@ -16,12 +18,12 @@ var (
 	ErrIllegalValue   = errors.New("this metavalue is illegal")
 )
 
-//DELIMITER 作为信息中的分隔符，不能与信息中的字符重复
-const DELIMITER = "/"
-const BLOCK_DELIMITER = "_"
-const REPAIR_DELIMETER = "|"
-
-const version = 100
+const (
+	// DELIMITER seps message
+	DELIMITER = "/"
+	// BlockDelimiter sep block
+	BlockDelimiter = "_"
+)
 
 const (
 	RoleKeeper   = "keeper"
@@ -29,121 +31,29 @@ const (
 	RoleProvider = "provider"
 )
 
-//这部分是操作码
-const (
-	Wrong int = iota
-	Store
-	Put
-	Get
-	Append
-	Delete
-	BroadCast
-	Test = 99
-)
-
-const (
-	Role int = iota
-	Config
-	PublicKey
-	Keepers
-	Providers
-	Users
-	LogFS
-	Managedkeepers
-	ManagedProviders
-	ManagedUsers
-	UserInit
-	UserNotify
-	UserStart
-	UserStop
-	Query
-	Offer
-	UpKeeping
-	Channel
-	Block    // provider handle block data
-	BlockPos // keeper handle block pos
-	ExternalAddress
-	Challenge
-	Repair
-	Storage
-	Pos
-	PosMeta
-	LedgerMap
-	ChalTime
-	LastPay
-	ChalPay // each pay
-	HeartBeat
-)
-
-// KeyMeta is datatype/mid/ops
-type KeyMeta struct {
-	version int
-	mid     string   // main id = peerID or blockID
-	dType   int      // indicates which data type
-	options []string // extra options
+// Key is mid/keyType/ops
+type Key struct {
+	pb.KeyMeta
 }
 
-func (km *KeyMeta) GetMid() string {
-	if km == nil {
-		return ""
+//NewKey creates a new key
+func NewKey(mainID string, dt pb.KeyType, ops ...string) (*Key, error) {
+	km := &Key{
+		KeyMeta: pb.KeyMeta{
+			Mid:   mainID,
+			KType: dt,
+		},
 	}
-	return km.mid
-}
 
-func (km *KeyMeta) GetDType() int {
-	if km == nil {
-		return Wrong
+	for i := 0; i < len(ops); i++ {
+		km.Options = append(km.Options, ops[i])
 	}
-	return km.dType
+
+	return km, nil
 }
 
-func (km *KeyMeta) GetOptions() []string {
-	if km == nil {
-		return nil
-	}
-	return km.options
-}
-
-// TODO:修改keytype时，要求的key长度可能会变化，这里需要做容错？
-func (km *KeyMeta) SetDType(keyType int) {
-	if km == nil {
-		return
-	}
-	km.dType = keyType
-}
-
-// ToByte 将KeyMeta结构体转换成byte，进行传输
-func (km *KeyMeta) ToByte() []byte {
-	return []byte(km.ToString())
-}
-
-// ToString 将KeyMeta结构体转换成字符串格式，进行传输
-// mid/datatype/op1/op2/...
-func (km *KeyMeta) ToString() string {
-	var res strings.Builder
-
-	res.WriteString(km.mid)
-	res.WriteString(DELIMITER)
-	res.WriteString(strconv.Itoa(km.dType))
-
-	for _, option := range km.options {
-		res.WriteString(DELIMITER)
-		res.WriteString(option)
-	}
-	return res.String()
-}
-
-//NewKeyMeta 获取新的keymeta结构体
-func NewKeyMeta(mainID string, dt int, ops ...string) (*KeyMeta, error) {
-	return &KeyMeta{
-		mid:     mainID,
-		dType:   dt,
-		options: ops,
-	}, nil
-}
-
-// GetKeyMeta 对于传入的key进行整理，返回结构体KeyMeta
-func GetKeyMeta(key string) (*KeyMeta, error) {
+// NewKeyFromString convert string to key
+func NewKeyFromString(key string) (*Key, error) {
 	splitedKey := strings.Split(key, DELIMITER)
 	if len(splitedKey) < 2 {
 		return nil, ErrIllegalKey
@@ -154,13 +64,32 @@ func GetKeyMeta(key string) (*KeyMeta, error) {
 		return nil, ErrWrongType
 	}
 
-	km := &KeyMeta{
-		mid:   splitedKey[0],
-		dType: dt,
+	km := &Key{
+		KeyMeta: pb.KeyMeta{
+			Mid:   splitedKey[0],
+			KType: pb.KeyType(dt),
+		},
 	}
 
-	for i := 2; i < len(splitedKey); i++ { //从第2号元素开始，添加这个信息的操作数
-		km.options = append(km.options, splitedKey[i])
+	for i := 2; i < len(splitedKey); i++ {
+		km.Options = append(km.Options, splitedKey[i])
 	}
 	return km, nil
+}
+
+// ToString converts key to string: mid/keyType/op1/op2/...
+func (k *Key) ToString() string {
+	var res strings.Builder
+
+	res.WriteString(k.GetMid())
+	res.WriteString(DELIMITER)
+	res.WriteString(strconv.Itoa(int(k.GetKType())))
+
+	ops := k.GetOptions()
+	for i := 0; i < len(ops); i++ {
+		res.WriteString(DELIMITER)
+		res.WriteString(ops[i])
+	}
+
+	return res.String()
 }

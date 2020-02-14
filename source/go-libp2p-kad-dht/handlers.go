@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
+	mpb "github.com/memoio/go-mefs/proto"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/utils"
@@ -53,7 +54,7 @@ func (dht *KadDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 	defer func() { logger.FinishWithErr(ctx, err) }()
 	logger.Debugf("%s handleGetValue for key: %s", dht.self, pmes.GetKey())
 
-	if pmes.GetOpType() == int32(metainfo.BroadCast) {
+	if pmes.GetOpType() == int32(mpb.OpType_BroadCast) {
 		dht.handleMetaInfo(ctx, p, pmes)
 	}
 
@@ -152,7 +153,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 		gotID := keys[2]
 
-		km, _ := metainfo.NewKeyMeta(gotID, metainfo.PublicKey)
+		km, _ := metainfo.NewKey(gotID, mpb.KeyType_PublicKey)
 		pubRecByte, err := dht.datastore.Get(ds.NewKey(km.ToString()))
 		if err != nil {
 			return nil, err
