@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -208,7 +208,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 		}
 
 		utils.MLogger.Info("try to get new: ", id, " roleinfo from net and chain")
-		kmRole, err := metainfo.NewKey(id, pb.KeyType_Role)
+		kmRole, err := metainfo.NewKey(id, mpb.KeyType_Role)
 		if err != nil {
 			continue
 		}

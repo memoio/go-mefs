@@ -15,7 +15,7 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	mcl "github.com/memoio/go-mefs/bls12"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
@@ -48,7 +48,7 @@ type lfsMeta struct {
 
 // superBlock has lfs bucket info
 type superBlock struct {
-	pb.SuperBlockInfo
+	mpb.SuperBlockInfo
 	bitsetInfo *bitset.BitSet
 	sync.RWMutex
 	dirty bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
@@ -56,7 +56,7 @@ type superBlock struct {
 
 // superBucket has lfs objects info
 type superBucket struct {
-	pb.BucketInfo
+	mpb.BucketInfo
 	objects        map[string]*list.Element //通过BucketID检索Bucket下文件
 	orderedObjects *list.List               //用过map和list结合，构造一个有序Map
 	dirty          bool
@@ -66,7 +66,7 @@ type superBucket struct {
 
 // objectInfo stores an object meta info
 type objectInfo struct {
-	pb.ObjectInfo
+	mpb.ObjectInfo
 	sync.RWMutex
 }
 
@@ -174,7 +174,7 @@ func initLogs() (*lfsMeta, error) {
 
 func newSuperBlock() *superBlock {
 	return &superBlock{
-		SuperBlockInfo: pb.SuperBlockInfo{
+		SuperBlockInfo: mpb.SuperBlockInfo{
 			BucketsSet:      nil,
 			MetaBackupCount: defaultMetaBackupCount,
 			NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
@@ -227,9 +227,9 @@ func (l *LfsInfo) genRoot() {
 	l.meta.sb.RLock()
 	bucketNum := l.meta.sb.GetNextBucketID()
 
-	lr := new(pb.LfsRoot)
+	lr := new(mpb.LfsRoot)
 
-	lr.BRoots = make([]*pb.BucketRoot, bucketNum)
+	lr.BRoots = make([]*mpb.BucketRoot, bucketNum)
 
 	for i, bucket := range l.meta.bucketByID {
 		if i < bucketNum || i == 0 {
@@ -361,7 +361,7 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 		return err
 	}
 	ncid := bm.ToString()
-	km, err := metainfo.NewKey(ncid, pb.KeyType_Block)
+	km, err := metainfo.NewKey(ncid, mpb.KeyType_Block)
 	if err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
 
-		km, err := metainfo.NewKey(ncid, pb.KeyType_Block)
+		km, err := metainfo.NewKey(ncid, mpb.KeyType_Block)
 		if err != nil {
 			continue
 		}
@@ -462,7 +462,7 @@ func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 	for j := 0; j < metaBackupCount && j < len(providers); j++ { //
 		bm.SetCid(strconv.Itoa(j))
 		ncid := bm.ToString()
-		km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
+		km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 		err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 		if err != nil {
 			continue
@@ -530,7 +530,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 		for j := 0; j < len(providers); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
-			km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
+			km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 			err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
 			if err != nil {
 				continue
@@ -565,7 +565,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		return nil, err
 	}
 	ncidlocal := bm.ToString()
-	km, _ := metainfo.NewKey(ncidlocal, pb.KeyType_Block)
+	km, _ := metainfo.NewKey(ncidlocal, mpb.KeyType_Block)
 	ctx := context.Background()
 	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
 	if err == nil && b != nil {
@@ -591,7 +591,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 				continue
 			}
 
-			km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
+			km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if err == nil && b != nil { //获取到有效数据块，跳出
@@ -613,7 +613,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 			utils.MLogger.Info("Decode data fail: ", err)
 			return nil, err
 		}
-		pbSuperBlock := pb.SuperBlockInfo{}
+		pbSuperBlock := mpb.SuperBlockInfo{}
 		SbBuffer := bytes.NewBuffer(data)
 		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*dataformat.BlockSize)
 		err = SbDelimitedReader.ReadMsg(&pbSuperBlock)
@@ -692,7 +692,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 				utils.MLogger.Info("Decode data fail: ", err)
 				continue
 			}
-			bucket := pb.BucketInfo{}
+			bucket := mpb.BucketInfo{}
 			BucketBuffer := bytes.NewBuffer(data)
 			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*dataformat.BlockSize)
 			err = BucketDelimitedReader.ReadMsg(&bucket)
@@ -756,7 +756,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			if err != nil || provider == "" {
 				continue
 			}
-			km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
+			km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if b != nil && err == nil {
 				ok := enc.VerifyBlock(b.RawData(), ncid)
@@ -785,7 +785,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		objectsBuffer := bytes.NewBuffer(fullData)
 		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*dataformat.BlockSize)
 		for {
-			object := pb.ObjectInfo{}
+			object := mpb.ObjectInfo{}
 			err := objectsDelimitedReader.ReadMsg(&object)
 			if err == io.EOF {
 				break

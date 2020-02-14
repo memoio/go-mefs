@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	rs "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
@@ -123,7 +123,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	utils.MLogger.Info("repair success: ", blockID)
 
 	retMetaValue := "ok" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off-1)
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
 		utils.MLogger.Error("repair response err :", err)
 		return err

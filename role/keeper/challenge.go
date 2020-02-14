@@ -10,7 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -44,7 +44,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 						continue
 					}
 					utils.MLogger.Debug("Challenge: ", key)
-					go k.ds.SendMetaRequest(ctx, int32(pb.OpType_Get), key, value, nil, proID)
+					go k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 				}
 
 				// in case povider cannot get it
@@ -85,7 +85,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 
 	challengetime := time.Now().Unix()
 
-	thischalresult := &pb.ChalInfo{
+	thischalresult := &mpb.ChalInfo{
 		KeeperID:    localID,
 		ProviderID:  proID,
 		QueryID:     qid,
@@ -107,7 +107,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	l.lastChalTime = challengetime
 
 	// key: qid/"Challenge"/uid/pid/kid/chaltime
-	km, err := metainfo.NewKey(qid, pb.KeyType_Challenge, userID, proID, localID, utils.UnixToString(challengetime))
+	km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, localID, utils.UnixToString(challengetime))
 	if err != nil {
 		return "", nil, err
 	}
@@ -125,7 +125,7 @@ func (l *lInfo) cleanLastChallenge() {
 		return
 	}
 
-	chalResult := thischalresult.(*pb.ChalInfo)
+	chalResult := thischalresult.(*mpb.ChalInfo)
 	chalResult.Res = false
 
 	l.inChallenge = false
@@ -174,7 +174,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
-	chalResult := thischalresult.(*pb.ChalInfo)
+	chalResult := thischalresult.(*mpb.ChalInfo)
 
 	spliteProof := strings.Split(string(value), metainfo.DELIMITER)
 	if len(spliteProof) < 3 {

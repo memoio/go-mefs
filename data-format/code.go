@@ -9,14 +9,14 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 type DataCoder struct {
-	Prefix     *pb.BlockOptions
+	Prefix     *mpb.BlockOptions
 	BlsKey     *mcl.KeySet
 	Repair     bool
 	RLength    int // recover how long
@@ -48,7 +48,7 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 		return nil
 	}
 
-	bo := &pb.BucketOptions{
+	bo := &mpb.BucketOptions{
 		Version:      int32(version),
 		Policy:       int32(policy),
 		DataCount:    int32(dataCount),
@@ -62,8 +62,8 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 }
 
 // NewDataCoderWithBopts contructs a new datacoder with bucketops
-func NewDataCoderWithBopts(bo *pb.BucketOptions, keyset *mcl.KeySet) *DataCoder {
-	pre := &pb.BlockOptions{
+func NewDataCoderWithBopts(bo *mpb.BucketOptions, keyset *mcl.KeySet) *DataCoder {
+	pre := &mpb.BlockOptions{
 		Bopts: bo,
 	}
 
@@ -71,7 +71,7 @@ func NewDataCoderWithBopts(bo *pb.BucketOptions, keyset *mcl.KeySet) *DataCoder 
 }
 
 // NewDataCoderWithPrefix creates a new datacoder with prefix
-func NewDataCoderWithPrefix(p *pb.BlockOptions, k *mcl.KeySet) *DataCoder {
+func NewDataCoderWithPrefix(p *mpb.BlockOptions, k *mcl.KeySet) *DataCoder {
 	d := &DataCoder{
 		Prefix: p,
 		BlsKey: k,
@@ -443,8 +443,8 @@ func createFields(stripe, dataGroup, tagGroup [][]byte) [][]byte {
 }
 
 // decode stripe returns prefix, min len
-func decodeStripe(data [][]byte) (*pb.BlockOptions, int, int, error) {
-	var prefix *pb.BlockOptions
+func decodeStripe(data [][]byte) (*mpb.BlockOptions, int, int, error) {
+	var prefix *mpb.BlockOptions
 	var avaNum, preLen int
 	lengths := make([]int, len(data))
 	for i := 0; i < len(data); i++ {

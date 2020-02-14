@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 )
 
 var (
@@ -33,13 +33,13 @@ const (
 
 // Key is mid/keyType/ops
 type Key struct {
-	pb.KeyMeta
+	mpb.KeyMeta
 }
 
 //NewKey creates a new key
-func NewKey(mainID string, dt pb.KeyType, ops ...string) (*Key, error) {
+func NewKey(mainID string, dt mpb.KeyType, ops ...string) (*Key, error) {
 	km := &Key{
-		KeyMeta: pb.KeyMeta{
+		KeyMeta: mpb.KeyMeta{
 			Mid:   mainID,
 			KType: dt,
 		},
@@ -65,9 +65,9 @@ func NewKeyFromString(key string) (*Key, error) {
 	}
 
 	km := &Key{
-		KeyMeta: pb.KeyMeta{
+		KeyMeta: mpb.KeyMeta{
 			Mid:   splitedKey[0],
-			KType: pb.KeyType(dt),
+			KType: mpb.KeyType(dt),
 		},
 	}
 

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	df "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
@@ -155,7 +155,7 @@ func challengeTest() error {
 	}
 
 	cid := bm.ToString()
-	kmBlock, err := metainfo.NewKey(cid, pb.KeyType_BlockPos)
+	kmBlock, err := metainfo.NewKey(cid, mpb.KeyType_BlockPos)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -196,7 +196,7 @@ func challengeTest() error {
 	log.Println("md5 of block`s rawdata :", ret)
 
 	//在provider上删除指定块
-	km, err := metainfo.NewKey(cid, pb.KeyType_Block)
+	km, err := metainfo.NewKey(cid, mpb.KeyType_Block)
 	if err != nil {
 		log.Println("construct del block KV error :", err)
 		return err

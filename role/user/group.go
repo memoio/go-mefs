@@ -13,7 +13,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
@@ -115,7 +115,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 	}
 
 	if g.userID == g.groupID {
-		kmUser, err := metainfo.NewKey(g.groupID, pb.KeyType_LFS, g.userID)
+		kmUser, err := metainfo.NewKey(g.groupID, mpb.KeyType_LFS, g.userID)
 		if err != nil {
 			return false, err
 		}
@@ -284,7 +284,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return err
 	}
 
-	kmp, err := metainfo.NewKey(g.shareToID, pb.KeyType_PublicKey)
+	kmp, err := metainfo.NewKey(g.shareToID, mpb.KeyType_PublicKey)
 	if err != nil {
 		return err
 	}
@@ -295,7 +295,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	g.sessionID = newID
 
 	// key: queryID/"UserStart"/userID/kc/pc/id
-	kmc, err := metainfo.NewKey(g.groupID, pb.KeyType_UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), newID.String())
+	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), newID.String())
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 	for _, kinfo := range g.keepers {
 		kinfo.sessionID = newID
-		resp, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kms, val, sig, kinfo.keeperID)
+		resp, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kms, val, sig, kinfo.keeperID)
 		if err != nil {
 			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
 			continue
@@ -345,7 +345,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 	for _, pinfo := range g.providers {
 		pinfo.sessionID = newID
-		resp, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kms, val, sig, pinfo.providerID)
+		resp, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kms, val, sig, pinfo.providerID)
 		if err != nil {
 			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
 		}
@@ -372,7 +372,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 // for test: queryID = userID
 func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
-	kmInit, err := metainfo.NewKey(g.groupID, pb.KeyType_UserInit, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmInit, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserInit, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		return err
 	}
@@ -573,7 +573,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 
 	g.Unlock()
 
-	kmNotify, err := metainfo.NewKey(g.groupID, pb.KeyType_UserNotify, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
+	kmNotify, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserNotify, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		return
 	}
@@ -591,7 +591,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 				retry := 0
 				// retry
 				for retry < 10 {
-					res, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kmes, []byte(res.String()), nil, kid)
+					res, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmes, []byte(res.String()), nil, kid)
 					if err != nil || string(res) != "ok" {
 						retry++
 						time.Sleep(30 * time.Second)
@@ -643,7 +643,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		res.WriteString(pid)
 	}
 
-	kmUser, err := metainfo.NewKey(g.groupID, pb.KeyType_LFS, g.userID)
+	kmUser, err := metainfo.NewKey(g.groupID, mpb.KeyType_LFS, g.userID)
 	if err != nil {
 		return err
 	}
@@ -693,13 +693,13 @@ func (g *groupInfo) stop(ctx context.Context) error {
 	utils.MLogger.Info("Stop user: ", g.userID)
 
 	// key: queryID/"UserStart"/userID/kc/pc/id
-	kmc, err := metainfo.NewKey(g.groupID, pb.KeyType_UserStop, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
+	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserStop, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
 	if err != nil {
 		return err
 	}
 
 	for _, kinfo := range g.keepers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kmc.ToString(), nil, nil, kinfo.keeperID)
+		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kinfo.keeperID)
 		if err != nil {
 			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
 			continue
@@ -707,7 +707,7 @@ func (g *groupInfo) stop(ctx context.Context) error {
 	}
 
 	for _, pinfo := range g.providers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kmc.ToString(), nil, nil, pinfo.providerID)
+		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pinfo.providerID)
 		if err != nil {
 			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
 		}
@@ -730,13 +730,13 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	utils.MLogger.Info("Send heartbeat for user: ", g.userID)
 
 	// key: queryID/"UserStart"/userID/kc/pc/id
-	kmc, err := metainfo.NewKey(g.groupID, pb.KeyType_HeartBeat, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
+	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_HeartBeat, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
 	if err != nil {
 		return err
 	}
 
 	for _, kinfo := range g.keepers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kmc.ToString(), nil, nil, kinfo.keeperID)
+		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kinfo.keeperID)
 		if err != nil {
 			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
 			continue
@@ -744,7 +744,7 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	}
 
 	for _, pinfo := range g.providers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), kmc.ToString(), nil, nil, pinfo.providerID)
+		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pinfo.providerID)
 		if err != nil {
 			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
 		}
@@ -757,7 +757,7 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 	var pidstr string
 	var offset int
 
-	kmBlock, err := metainfo.NewKey(blockID, pb.KeyType_BlockPos)
+	kmBlock, err := metainfo.NewKey(blockID, mpb.KeyType_BlockPos)
 	if err != nil {
 		return "", 0, err
 	}
@@ -915,7 +915,7 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 			defer wg.Done()
 			i := 0
 			for {
-				_, err := g.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), key, value, nil, pid)
+				_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, value, nil, pid)
 				if err != nil {
 					i++
 					if i == 5 {
@@ -943,7 +943,7 @@ func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
-	kmBlock, err := metainfo.NewKey(blockID, pb.KeyType_BlockPos)
+	kmBlock, err := metainfo.NewKey(blockID, mpb.KeyType_BlockPos)
 	if err != nil {
 		return err
 	}
@@ -964,7 +964,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 		return err
 	}
 
-	km, err := metainfo.NewKey(blockID, pb.KeyType_Block)
+	km, err := metainfo.NewKey(blockID, mpb.KeyType_Block)
 	if err != nil {
 		return err
 	}
@@ -981,7 +981,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	}
 
 	// or sent by provider?
-	km.KType = pb.KeyType_BlockPos
+	km.KType = mpb.KeyType_BlockPos
 	for _, kp := range g.tempKeepers {
 		go g.ds.DeleteKey(ctx, km.ToString(), kp)
 	}
@@ -1063,14 +1063,14 @@ func (g *groupInfo) loadChannelValue() error {
 			defer wg.Done()
 			if proInfo.chanItem != nil {
 				proID := proInfo.providerID
-				km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, pb.KeyType_Channel)
+				km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, mpb.KeyType_Channel)
 				if err != nil {
 					return
 				}
 
 				valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
 				if err == nil && len(valueByte) > 0 {
-					cSign := &pb.ChannelSign{}
+					cSign := &mpb.ChannelSign{}
 					err = proto.Unmarshal(valueByte, cSign)
 					if err == nil {
 						ok := role.VerifyChannelSign(cSign)
@@ -1117,7 +1117,7 @@ func (g *groupInfo) saveChannelValue() error {
 	ctx := context.Background()
 	for _, proInfo := range g.providers {
 		if proInfo.chanItem != nil && proInfo.chanItem.Sig != nil && proInfo.chanItem.Dirty {
-			km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, pb.KeyType_Channel)
+			km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, mpb.KeyType_Channel)
 			if err != nil {
 				continue
 			}

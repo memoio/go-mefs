@@ -14,7 +14,7 @@ import (
 	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -808,7 +808,7 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 		return nil, err
 	}
 
-	message := &pb.ChannelSign{
+	message := &mpb.ChannelSign{
 		Sig:       sig,
 		PubKey:    pubKey,
 		Value:     value.Bytes(),
@@ -824,7 +824,7 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 }
 
 //VerifyChannelSig provider used to verify user's signature for channel-contract
-func VerifyChannelSign(cSign *pb.ChannelSign) (verify bool) {
+func VerifyChannelSign(cSign *mpb.ChannelSign) (verify bool) {
 	channelAddr, err := address.GetAddressFromID(cSign.GetChannelID())
 	if err != nil {
 		return false
@@ -895,7 +895,7 @@ func SaveKpMap(peerID string) error {
 
 // BuildSignMessage builds sign message for test or repair
 func BuildSignMessage() ([]byte, error) {
-	message := &pb.ChannelSign{
+	message := &mpb.ChannelSign{
 		Value:     []byte("123"),
 		ChannelID: "test",
 	}

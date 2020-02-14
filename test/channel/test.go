@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
@@ -235,7 +235,7 @@ func testCloseChannel() (err error) {
 		return err
 	}
 
-	cSign := new(pb.ChannelSign)
+	cSign := new(mpb.ChannelSign)
 	err = proto.Unmarshal(mes, cSign)
 	if err != nil {
 		log.Fatal("Unmarshal SignForChannelErr:", err)

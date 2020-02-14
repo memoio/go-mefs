@@ -6,7 +6,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 )
 
@@ -40,7 +40,7 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	userBLS12ConfigProto := &pb.UserBLS12Config{
+	userBLS12ConfigProto := &mpb.UserBLS12Config{
 		PubkeyBls: pubkeyBls,
 		PubkeyG:   pubkeyG,
 		PubkeyU:   pubkeyU,
@@ -64,7 +64,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 
 	mkey := new(mcl.KeySet)
 
-	userBLS12ConfigProto := new(pb.UserBLS12Config)
+	userBLS12ConfigProto := new(mpb.UserBLS12Config)
 	err := proto.Unmarshal(userBLS12config, userBLS12ConfigProto)
 	if err != nil {
 		return mkey, err

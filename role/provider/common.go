@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -32,7 +32,7 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 		return gp.blsKey, nil
 	}
 
-	kmBls12, err := metainfo.NewKey(groupID, pb.KeyType_Config, userID)
+	kmBls12, err := metainfo.NewKey(groupID, mpb.KeyType_Config, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error)
 		return gp.blsKey.Sk, nil
 	}
 
-	kmBls12, err := metainfo.NewKey(groupID, pb.KeyType_Role, userID)
+	kmBls12, err := metainfo.NewKey(groupID, mpb.KeyType_Role, userID)
 	if err != nil {
 		return nil, err
 	}

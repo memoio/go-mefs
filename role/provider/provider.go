@@ -11,7 +11,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
@@ -155,7 +155,7 @@ func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo 
 func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *groupInfo {
 	if kpids == "" && flag {
 		ctx := context.Background()
-		kmkps, err := metainfo.NewKey(groupID, pb.KeyType_LFS, userID)
+		kmkps, err := metainfo.NewKey(groupID, mpb.KeyType_LFS, userID)
 		if err != nil {
 			return nil
 		}
@@ -266,7 +266,7 @@ func (p *Info) saveRegular(ctx context.Context) {
 func (p *Info) load(ctx context.Context) error {
 	localID := p.localID
 	// load keepers
-	kmKID, err := metainfo.NewKey(localID, pb.KeyType_Keepers)
+	kmKID, err := metainfo.NewKey(localID, mpb.KeyType_Keepers)
 	if err != nil {
 
 		return err
@@ -292,7 +292,7 @@ func (p *Info) load(ctx context.Context) error {
 		}
 	}
 
-	kmUID, err := metainfo.NewKey(localID, pb.KeyType_Users)
+	kmUID, err := metainfo.NewKey(localID, mpb.KeyType_Users)
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func (p *Info) load(ctx context.Context) error {
 			wg.Add(1)
 			go func(userID string) {
 				defer wg.Done()
-				kmfs, err := metainfo.NewKey(userID, pb.KeyType_Query)
+				kmfs, err := metainfo.NewKey(userID, mpb.KeyType_Query)
 				if err != nil {
 					return
 				}
@@ -358,7 +358,7 @@ func (p *Info) save(ctx context.Context) error {
 	var pids strings.Builder
 
 	// persist keepers
-	kmKID, err := metainfo.NewKey(localID, pb.KeyType_Keepers)
+	kmKID, err := metainfo.NewKey(localID, mpb.KeyType_Keepers)
 	if err != nil {
 		return err
 	}
@@ -376,7 +376,7 @@ func (p *Info) save(ctx context.Context) error {
 	}
 
 	pids.Reset()
-	kmUID, err := metainfo.NewKey(localID, pb.KeyType_Users)
+	kmUID, err := metainfo.NewKey(localID, mpb.KeyType_Users)
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func (p *Info) save(ctx context.Context) error {
 		ui := value.(*uInfo)
 		qus := ui.getQuery()
 		if len(qus) > 0 {
-			kmQID, err := metainfo.NewKey(uid, pb.KeyType_Query)
+			kmQID, err := metainfo.NewKey(uid, mpb.KeyType_Query)
 			if err != nil {
 				return true
 			}
@@ -477,7 +477,7 @@ func (p *Info) storageSync(ctx context.Context) error {
 		return nil
 	}
 
-	km, err := metainfo.NewKey(p.localID, pb.KeyType_Storage)
+	km, err := metainfo.NewKey(p.localID, mpb.KeyType_Storage)
 	if err != nil {
 		utils.MLogger.Info("construct StorageSync KV error :", err)
 		return err
@@ -486,7 +486,7 @@ func (p *Info) storageSync(ctx context.Context) error {
 	value := strconv.FormatUint(maxSpace, 10) + metainfo.DELIMITER + strconv.FormatUint(actulDataSpace, 10)
 
 	for _, kid := range klist {
-		_, err = p.ds.SendMetaRequest(ctx, int32(pb.OpType_Put), km.ToString(), []byte(value), nil, kid)
+		_, err = p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), km.ToString(), []byte(value), nil, kid)
 		if err != nil {
 			utils.MLogger.Info("storage info send to", kid, "error: ", err)
 		}

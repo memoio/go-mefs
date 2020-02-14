@@ -3,7 +3,7 @@ package instance
 import (
 	"errors"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 )
 
 var (
@@ -21,7 +21,7 @@ const (
 // Service is
 type Service interface {
 	// type, key, value, from
-	HandleMetaMessage(pb.OpType, string, []byte, []byte, string) ([]byte, error)
+	HandleMetaMessage(mpb.OpType, string, []byte, []byte, string) ([]byte, error)
 	GetRole() string
 	Stop() error
 }

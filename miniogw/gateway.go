@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/core"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role/user"
 	"github.com/memoio/go-mefs/utils/address"
@@ -137,7 +137,7 @@ func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options
 		return errLfsServiceNotReady
 	}
 
-	bucketOptions := &pb.BucketOptions{}
+	bucketOptions := &mpb.BucketOptions{}
 	err := json.Unmarshal([]byte(options), bucketOptions)
 	if err != nil {
 		log.Println("bucketOptions Unmarshal err", err)

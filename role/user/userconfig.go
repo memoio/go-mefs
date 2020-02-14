@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -31,7 +31,7 @@ func parseBLS12ConfigMeta(privKey, userBLS12config []byte) (*mcl.KeySet, error) 
 }
 
 func (l *LfsInfo) putUserConfig(ctx context.Context) {
-	kmBls, err := metainfo.NewKey(l.fsID, pb.KeyType_Config, l.userID)
+	kmBls, err := metainfo.NewKey(l.fsID, mpb.KeyType_Config, l.userID)
 	if err != nil {
 		return
 	}
@@ -47,7 +47,7 @@ func (l *LfsInfo) putUserConfig(ctx context.Context) {
 }
 
 func (l *LfsInfo) loadBLS12Config() error {
-	kmBls, err := metainfo.NewKey(l.fsID, pb.KeyType_Config, l.userID)
+	kmBls, err := metainfo.NewKey(l.fsID, mpb.KeyType_Config, l.userID)
 	if err != nil {
 		return err
 	}

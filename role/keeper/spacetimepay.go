@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -192,7 +192,7 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 			utils.MLogger.Info("fetch challenge results err, time:", utils.UnixToTime(key))
 		}
 
-		chalres := chalresI.(*pb.ChalInfo)
+		chalres := chalresI.(*mpb.ChalInfo)
 
 		timeList = append(timeList, key)
 		lenghList = append(lenghList, chalres.TotalLength)

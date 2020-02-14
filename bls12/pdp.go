@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -236,7 +236,7 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 }
 
 // GenChallenge 根据时间随机选取的待挑战segments由随机数c对各offset取模而得
-func GenChallenge(chal *pb.ChalInfo) int {
+func GenChallenge(chal *mpb.ChalInfo) int {
 	var nb strings.Builder
 	nb.WriteString(chal.QueryID)
 	nb.WriteString(chal.UserID)

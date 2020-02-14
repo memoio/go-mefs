@@ -6,7 +6,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -71,7 +71,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 			if !ok {
 				return true
 			}
-			km, err := metainfo.NewKey(cItem.ChannelID, pb.KeyType_Channel)
+			km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
 			if err != nil {
 				return true
 			}
@@ -96,7 +96,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				return true
 			}
 
-			km, err := metainfo.NewKey(cItem.ChannelID, pb.KeyType_Channel)
+			km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
 			if err != nil {
 				return true
 			}
@@ -107,7 +107,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				return true
 			}
 
-			cSign := &pb.ChannelSign{}
+			cSign := &mpb.ChannelSign{}
 			err = proto.Unmarshal(valueByte, cSign)
 			if err != nil {
 				utils.MLogger.Error("proto.Unmarshal err:", err)
@@ -122,7 +122,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 			}
 
 			if cItem.Value.Cmp(cItem.Money) >= 0 {
-				cSign := new(pb.ChannelSign)
+				cSign := new(mpb.ChannelSign)
 				err = proto.Unmarshal(cItem.Sig, cSign)
 				if err != nil {
 					return true

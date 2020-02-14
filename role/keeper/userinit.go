@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -67,7 +67,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 	}
 	utils.MLogger.Info("New fs: ", qid, " for user: ", uid, " keeperCount: ", kc, " providerCount: ", pc, " price: ", price)
 
-	k.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(response), nil, from)
+	k.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(response), nil, from)
 }
 
 //response: kid1kid2../pid1pid2..
@@ -277,7 +277,7 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		ui.setQuery(groupID)
 	}
 
-	kmkps, err := metainfo.NewKey(groupID, pb.KeyType_LFS, userID)
+	kmkps, err := metainfo.NewKey(groupID, mpb.KeyType_LFS, userID)
 	if err != nil {
 		return nil, err
 	}

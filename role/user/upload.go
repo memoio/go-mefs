@@ -13,7 +13,7 @@ import (
 
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -41,7 +41,7 @@ type uploadTask struct { //一个上传任务实例
 }
 
 // PutObject constructs upload process
-func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*pb.ObjectInfo, error) {
+func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -84,13 +84,13 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
 
-	opart := &pb.ObjectPart{
+	opart := &mpb.ObjectPart{
 		Name:  objectName,
 		Start: start,
 	}
 
 	object := &objectInfo{
-		ObjectInfo: pb.ObjectInfo{
+		ObjectInfo: mpb.ObjectInfo{
 			ObjectID: bucket.NextObjectID,
 			OPart:    opart,
 			BucketID: bucketID,
@@ -303,7 +303,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					for i := 0; i < bc; i++ {
 						bm.SetCid(strconv.Itoa(i))
 						ncid := bm.ToString()
-						km, _ := metainfo.NewKey(ncid, pb.KeyType_Block)
+						km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 						blockMetas[i].cid = ncid
 						blockMetas[i].offset = offset
 						blockMetas[i].provider = u.fsID
@@ -334,7 +334,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					for i := 0; i < bc; i++ {
 						bm.SetCid(strconv.Itoa(i))
 						ncid := bm.ToString()
-						km, _ := metainfo.NewKey(ncid, pb.KeyType_Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
+						km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
 						blockMetas[i].cid = ncid
 						blockMetas[i].offset = offset
 						blockMetas[i].provider = u.fsID

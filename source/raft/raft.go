@@ -24,7 +24,7 @@ import (
 	"github.com/lni/dragonboat/v3/logger"
 	sm "github.com/lni/dragonboat/v3/statemachine"
 	"github.com/lni/goutils/fileutil"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/source/gorocksdb"
 )
 
@@ -90,7 +90,7 @@ func Read(ctx context.Context, nh *dragonboat.NodeHost, clusterID uint64, key st
 
 // Write writes
 func Write(ctx context.Context, nh *dragonboat.NodeHost, clusterID uint64, key string, val []byte) error {
-	kv := &pb.KVData{
+	kv := &mpb.KVData{
 		Key:   []byte(key),
 		Value: val,
 	}
@@ -445,7 +445,7 @@ func (d *DiskKV) Update(ents []sm.Entry) ([]sm.Entry, error) {
 	defer wb.Destroy()
 	db := (*rocksdb)(atomic.LoadPointer(&d.db))
 	for idx, e := range ents {
-		dataKV := new(pb.KVData)
+		dataKV := new(mpb.KVData)
 		if err := proto.Unmarshal(e.Cmd, dataKV); err != nil {
 			panic(err)
 		}
@@ -515,7 +515,7 @@ func (d *DiskKV) saveToWriter(db *rocksdb,
 	for iter.SeekToFirst(); iter.Valid(); iter.Next() {
 		key := iter.Key()
 		val := iter.Value()
-		dataKv := &pb.KVData{
+		dataKv := &mpb.KVData{
 			Key:   key.Data(),
 			Value: val.Data(),
 		}
@@ -586,7 +586,7 @@ func (d *DiskKV) RecoverFromSnapshot(r io.Reader,
 		if _, err := io.ReadFull(r, data); err != nil {
 			return err
 		}
-		dataKv := new(pb.KVData)
+		dataKv := new(mpb.KVData)
 		if err := proto.Unmarshal(data, dataKv); err != nil {
 			panic(err)
 		}

@@ -22,7 +22,7 @@ import (
 	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/core/commands"
 	"github.com/memoio/go-mefs/core/corehttp"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/role/keeper"
@@ -308,7 +308,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	}
 
-	kmRole, err := metainfo.NewKey(nid, pb.KeyType_Role)
+	kmRole, err := metainfo.NewKey(nid, mpb.KeyType_Role)
 	if err != nil {
 		return err
 	}

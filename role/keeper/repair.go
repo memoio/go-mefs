@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -199,14 +199,14 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	// cid1_pid1/cid2_pid2
 	metaValue := strings.Join(cpids, metainfo.DELIMITER)
 
-	km, err := metainfo.NewKey(blockID, pb.KeyType_Repair, uid)
+	km, err := metainfo.NewKey(blockID, mpb.KeyType_Repair, uid)
 	if err != nil {
 		utils.MLogger.Info("construct repair KV error: ", err)
 		return
 	}
 
 	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
-	k.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Get), km.ToString(), []byte(metaValue), nil, response)
+	k.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Get), km.ToString(), []byte(metaValue), nil, response)
 }
 
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid

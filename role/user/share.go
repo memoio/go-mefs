@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -41,14 +41,14 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		return "", ErrObjectNotExist
 	}
 
-	sl := &pb.ShareLink{
+	sl := &mpb.ShareLink{
 		UserID:     l.userID,
 		QueryID:    l.fsID,
 		BucketName: bucketName,
 		ObjectName: objectName,
 		BOpts:      bucket.BOpts,
 		BucketID:   bucket.BucketID,
-		OParts:     make([]*pb.ObjectPart, 1),
+		OParts:     make([]*mpb.ObjectPart, 1),
 	}
 
 	opart := object.GetOPart()
@@ -73,7 +73,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	}
 
 	if l.fsID == l.userID {
-		kmUser, err := metainfo.NewKey(l.fsID, pb.KeyType_LFS, l.userID)
+		kmUser, err := metainfo.NewKey(l.fsID, mpb.KeyType_LFS, l.userID)
 		if err != nil {
 			return "", err
 		}
@@ -102,7 +102,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 		return err
 	}
 
-	sl := new(pb.ShareLink)
+	sl := new(mpb.ShareLink)
 	err = proto.Unmarshal(shareByte, sl)
 	if err != nil {
 		utils.MLogger.Warn("Download Share Object Unmarshal failed: ", err)
@@ -112,7 +112,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
 
 	if sl.UserID == sl.QueryID {
-		kmUser, err := metainfo.NewKey(sl.QueryID, pb.KeyType_LFS, sl.UserID)
+		kmUser, err := metainfo.NewKey(sl.QueryID, mpb.KeyType_LFS, sl.UserID)
 		if err != nil {
 			return err
 		}

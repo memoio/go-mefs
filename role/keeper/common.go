@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -50,7 +50,7 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 }
 
 func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
-	kmBls12, err := metainfo.NewKey(qid, pb.KeyType_Config, uid)
+	kmBls12, err := metainfo.NewKey(qid, mpb.KeyType_Config, uid)
 	if err != nil {
 		return nil, err
 	}

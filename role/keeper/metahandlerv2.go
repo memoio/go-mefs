@@ -5,65 +5,65 @@ import (
 	"strconv"
 	"strings"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 // HandleMetaMessage callback
-func (k *Info) HandleMetaMessage(opType pb.OpType, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
+func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
 	km, err := metainfo.NewKeyFromString(metaKey)
 	if err != nil {
 		return nil, err
 	}
 	dtype := km.GetKType()
 	switch dtype {
-	case pb.KeyType_UserInit: //user初始化
+	case mpb.KeyType_UserInit: //user初始化
 		go k.handleUserInit(km, from)
-	case pb.KeyType_UserNotify: //user初始化确认
+	case mpb.KeyType_UserNotify: //user初始化确认
 		return k.handleUserNotify(km, metaValue, from)
-	case pb.KeyType_UserStart: //user部署好合约
+	case mpb.KeyType_UserStart: //user部署好合约
 		return k.handleUserStart(km, metaValue, sig, from)
-	case pb.KeyType_UserStop: //user部署好合约
+	case mpb.KeyType_UserStop: //user部署好合约
 		go k.handleUserStop(km, metaValue, from)
-	case pb.KeyType_BlockPos:
+	case mpb.KeyType_BlockPos:
 		switch opType {
-		case pb.OpType_Put:
+		case mpb.OpType_Put:
 			go k.handleAddBlockPos(km, metaValue, from)
-		case pb.OpType_Get:
+		case mpb.OpType_Get:
 			return k.handleGetKey(km, metaValue, sig, from)
-		case pb.OpType_Delete:
+		case mpb.OpType_Delete:
 			go k.handleDeleteBlockPos(km)
 		}
-	case pb.KeyType_Challenge:
-		if opType == pb.OpType_Put {
+	case mpb.KeyType_Challenge:
+		if opType == mpb.OpType_Put {
 			go k.handleProof(km, metaValue)
 		}
-	case pb.KeyType_Repair: //provider 修复回复
-		if opType == pb.OpType_Put {
+	case mpb.KeyType_Repair: //provider 修复回复
+		if opType == mpb.OpType_Put {
 			go k.handleRepairResult(km, metaValue, from)
 		}
-	case pb.KeyType_Storage:
+	case mpb.KeyType_Storage:
 		go k.handleStorage(km, metaValue, from)
-	case pb.KeyType_ExternalAddress:
+	case mpb.KeyType_ExternalAddress:
 		return k.handleExternalAddr(km)
-	case pb.KeyType_ChalTime:
+	case mpb.KeyType_ChalTime:
 		return k.handleChalTime(km)
-	case pb.KeyType_Pos:
+	case mpb.KeyType_Pos:
 		switch opType {
-		case pb.OpType_Put:
+		case mpb.OpType_Put:
 			go k.handlePosAdd(km, metaValue, from)
-		case pb.OpType_Delete:
+		case mpb.OpType_Delete:
 			go k.handlePosDelete(km, metaValue, from)
 		}
 	default:
 		switch opType {
-		case pb.OpType_Put:
+		case mpb.OpType_Put:
 			go k.handlePutKey(km, metaValue, sig, from)
-		case pb.OpType_Get:
+		case mpb.OpType_Get:
 			return k.handleGetKey(km, metaValue, sig, from)
-		case pb.OpType_Delete:
+		case mpb.OpType_Delete:
 			go k.handleDeleteKey(km, metaValue, sig, from)
 		default:
 			return nil, metainfo.ErrWrongType

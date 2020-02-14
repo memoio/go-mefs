@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/minio/minio-go/v6/pkg/s3utils"
 )
 
@@ -66,8 +66,8 @@ var (
 )
 
 // DefaultBucketOptions is default bucket option
-func DefaultBucketOptions() *pb.BucketOptions {
-	return &pb.BucketOptions{
+func DefaultBucketOptions() *mpb.BucketOptions {
+	return &mpb.BucketOptions{
 		Version:      1,
 		Policy:       dataformat.RsPolicy,
 		DataCount:    3,

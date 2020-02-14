@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -13,53 +13,53 @@ import (
 
 // HandleMetaMessage provider角色层metainfo的回调函数,传入对方节点发来的kv，和对方节点的peerid
 //没有返回值时，返回complete，或者返回规定信息
-func (p *Info) HandleMetaMessage(opType pb.OpType, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
+func (p *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
 	km, err := metainfo.NewKeyFromString(metaKey)
 	if err != nil {
 		return nil, err
 	}
 	dtype := km.GetKType()
 	switch dtype {
-	case pb.KeyType_UserStart:
+	case mpb.KeyType_UserStart:
 		return p.handleUserStart(km, metaValue, sig, from)
-	case pb.KeyType_UserStop:
+	case mpb.KeyType_UserStop:
 		return p.handleUserStop(km, metaValue, from)
-	case pb.KeyType_Challenge:
-		if opType == pb.OpType_Get {
+	case mpb.KeyType_Challenge:
+		if opType == mpb.OpType_Get {
 			go p.handleChallengeBls12(km, metaValue, from)
 		}
-	case pb.KeyType_Repair:
-		if opType == pb.OpType_Get {
+	case mpb.KeyType_Repair:
+		if opType == mpb.OpType_Get {
 			go p.handleRepair(km, metaValue, from)
 		}
-	case pb.KeyType_Block:
+	case mpb.KeyType_Block:
 		switch opType {
-		case pb.OpType_Put:
+		case mpb.OpType_Put:
 			err := p.handlePutBlock(km, metaValue, from)
 			if err != nil {
 				utils.MLogger.Error("put blcok error: ", err)
 				return nil, err
 			}
-		case pb.OpType_Get:
+		case mpb.OpType_Get:
 			return p.handleGetBlock(km, metaValue, sig, from)
-		case pb.OpType_Append:
+		case mpb.OpType_Append:
 			err := p.handleAppendBlock(km, metaValue, from)
 			if err != nil {
 				utils.MLogger.Info("append blcok error: ", err)
 				return nil, err
 			}
-		case pb.OpType_Delete:
+		case mpb.OpType_Delete:
 			go p.handleDeleteBlock(km, from)
 		}
-	case pb.KeyType_UserInit:
+	case mpb.KeyType_UserInit:
 		return nil, metainfo.ErrWrongType
 	default: //没有匹配的信息，报错
 		switch opType {
-		case pb.OpType_Put:
+		case mpb.OpType_Put:
 			go p.handlePutKey(km, metaValue, sig, from)
-		case pb.OpType_Get:
+		case mpb.OpType_Get:
 			return p.handleGetKey(km, metaValue, sig, from)
-		case pb.OpType_Delete:
+		case mpb.OpType_Delete:
 			go p.handleDeleteKey(km, metaValue, sig, from)
 		default:
 			return nil, metainfo.ErrWrongType
@@ -136,7 +136,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		ui.(*uInfo).setQuery(groupID)
 	}
 
-	kmkps, _ := metainfo.NewKey(gid, pb.KeyType_LFS, uid)
+	kmkps, _ := metainfo.NewKey(gid, mpb.KeyType_LFS, uid)
 	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, nil, "local")
 
 	gpi, ok := p.fsGroup.Load(gid)

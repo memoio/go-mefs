@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -52,7 +52,7 @@ func (k *Info) handlePosDelete(km *metainfo.Key, metaValue []byte, from string) 
 	}
 	for _, blockID := range deleteBlocks {
 		//先删除本地信息
-		kmBlock, err := metainfo.NewKey(blockID, pb.KeyType_BlockPos)
+		kmBlock, err := metainfo.NewKey(blockID, mpb.KeyType_BlockPos)
 		if err != nil {
 			return
 		}

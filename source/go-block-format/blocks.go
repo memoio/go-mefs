@@ -10,7 +10,7 @@ import (
 
 	proto "github.com/gogo/protobuf/proto"
 	u "github.com/ipfs/go-ipfs-util"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -84,7 +84,7 @@ func (b *BasicBlock) Loggable() map[string]interface{} {
 	}
 }
 
-func (b *BasicBlock) Prefix() (*pb.BlockOptions, int, error) {
+func (b *BasicBlock) Prefix() (*mpb.BlockOptions, int, error) {
 	return PrefixDecode(b.RawData())
 }
 
@@ -97,7 +97,7 @@ func PrefixLen(data []byte) (int, int, error) {
 	return int(len), n + int(len), nil
 }
 
-func PrefixDecode(data []byte) (*pb.BlockOptions, int, error) {
+func PrefixDecode(data []byte) (*mpb.BlockOptions, int, error) {
 	if len(data) < 10 {
 		log.Println("wrong proto prefix len")
 		return nil, 0, errors.New("wrong proto prefix length")
@@ -113,7 +113,7 @@ func PrefixDecode(data []byte) (*pb.BlockOptions, int, error) {
 		return nil, 0, errors.New("short proto prefix message")
 	}
 
-	pre := new(pb.BlockOptions)
+	pre := new(mpb.BlockOptions)
 	err := proto.Unmarshal(data[n:n+int(x)], pre)
 	if err != nil {
 		return nil, 0, err
@@ -121,7 +121,7 @@ func PrefixDecode(data []byte) (*pb.BlockOptions, int, error) {
 	return pre, n + int(x), nil
 }
 
-func PrefixEncode(pre *pb.BlockOptions) ([]byte, int, error) {
+func PrefixEncode(pre *mpb.BlockOptions) ([]byte, int, error) {
 	preData, err := proto.Marshal(pre)
 	if err != nil {
 		fmt.Println(err)

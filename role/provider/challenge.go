@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -37,7 +37,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return nil
 	}
 
-	hProto := &pb.ChalInfo{}
+	hProto := &mpb.ChalInfo{}
 	err = proto.Unmarshal(metaValue, hProto)
 	if err != nil {
 		utils.MLogger.Error("unmarshal h failed: ", err)
@@ -134,7 +134,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(pb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
+	_, err = p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		utils.MLogger.Info("send proof err: ", err)
 	}

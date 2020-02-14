@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	df "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
@@ -142,7 +142,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 				cItem.Value = value
 				cItem.Sig = sig
 
-				key, err := metainfo.NewKey(cItem.ChannelID, pb.KeyType_Channel)
+				key, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
 				if err != nil {
 					return nil, err
 				}
@@ -168,7 +168,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 
 // verify verifies the transaction
 func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
-	cSign := &pb.ChannelSign{}
+	cSign := &mpb.ChannelSign{}
 	err := proto.Unmarshal(mes, cSign)
 	if err != nil {
 		utils.MLogger.Error("proto.Unmarshal when provider verify err:", err)

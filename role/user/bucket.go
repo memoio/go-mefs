@@ -10,13 +10,13 @@ import (
 	"time"
 
 	dataformat "github.com/memoio/go-mefs/data-format"
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
 // CreateBucket create a bucket for a specified LFSservice
-func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *pb.BucketOptions) (*pb.BucketInfo, error) {
+func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *mpb.BucketOptions) (*mpb.BucketInfo, error) {
 	// TODO judge datacount + parity count <= providers
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
@@ -55,7 +55,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 	objects := make(map[string]*list.Element)
 	bucket := &superBucket{
-		BucketInfo: pb.BucketInfo{
+		BucketInfo: mpb.BucketInfo{
 			Name:         bucketName,
 			BucketID:     bucketID,
 			BOpts:        options,
@@ -86,7 +86,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 }
 
 // DeleteBucket deletes a bucket from a specified LFSservice
-func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error) {
+func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -123,7 +123,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*pb.Buck
 }
 
 // HeadBucket get a superBucket's metainfo
-func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*pb.BucketInfo, error) {
+func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -146,7 +146,7 @@ func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*pb.Bucket
 }
 
 // ListBuckets lists all Buckets information
-func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketInfo, error) {
+func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*mpb.BucketInfo, error) {
 	if !l.online {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -155,7 +155,7 @@ func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*pb.BucketI
 		return nil, ErrBucketNotExist
 	}
 
-	var lsuperBucket []*pb.BucketInfo
+	var lsuperBucket []*mpb.BucketInfo
 	for _, bs := range l.meta.bucketByID {
 		if bs.Deletion {
 			continue

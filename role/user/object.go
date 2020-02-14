@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -18,7 +18,7 @@ type ObjectOptions struct {
 }
 
 // DeleteObject deletes a object in lfs
-func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName string) (*pb.ObjectInfo, error) {
+func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -71,7 +71,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 }
 
 // HeadObject get the info of an object
-func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*pb.ObjectInfo, error) {
+func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*mpb.ObjectInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -114,7 +114,7 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 }
 
 // ListObjects lists all objects of a bucket
-func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*pb.ObjectInfo, error) {
+func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*mpb.ObjectInfo, error) {
 	if !l.online || l.meta.bucketNameToID == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -132,7 +132,7 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	var objects []*pb.ObjectInfo
+	var objects []*mpb.ObjectInfo
 	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
 		if objectElement == nil {
 			continue
@@ -227,7 +227,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 		return latestTime, ErrNoKeepers
 	}
 
-	km, err := metainfo.NewKey(blockID, pb.KeyType_ChalTime)
+	km, err := metainfo.NewKey(blockID, mpb.KeyType_ChalTime)
 	if err != nil {
 		return latestTime, err
 	}
@@ -235,7 +235,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	var tempTime time.Time
 	ctx := context.Background()
 	for _, keeper := range conkeepers {
-		res, err := l.ds.SendMetaRequest(ctx, int32(pb.OpType_Get), km.ToString(), nil, nil, keeper)
+		res, err := l.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), nil, nil, keeper)
 		if err != nil {
 			continue
 		}
@@ -249,7 +249,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 }
 
 // GetObjectAvailTime get available time of objects
-func (l *LfsInfo) GetObjectAvailTime(object *pb.ObjectInfo) (string, error) {
+func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
 	bucket := l.meta.bucketByID[object.BucketID]
 	blockCount := bucket.BOpts.DataCount + bucket.BOpts.ParityCount
