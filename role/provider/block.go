@@ -32,24 +32,24 @@ func (p *Info) handlePutBlock(km *metainfo.KeyMeta, value []byte, from string) e
 		return errors.New("NotMyUser")
 	}
 
-	ctx := context.Background()
-
 	go func() {
-		if Debug {
-			blskey, _ := p.getNewUserConfig(gp.userID, qid)
-			if blskey != nil && blskey.Pk != nil {
-				ok := df.VerifyBlock(value, splitedNcid[0], blskey)
-				if !ok {
-					utils.MLogger.Warnf("Verify data for %s fails", splitedNcid[0])
-				}
-			}
-		}
+		ctx := context.Background()
 		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {
 			utils.MLogger.Info("Error writing block to datastore: %s", err)
 			return
 		}
-		return
+
+		if Debug {
+			blskey, _ := p.getNewUserConfig(gp.userID, qid)
+			if blskey != nil && blskey.Pk != nil {
+				ok := df.VerifyBlock(value, splitedNcid[0], blskey)
+				if !ok {
+					utils.MLogger.Errorf("Verify data for %s fails, delete it", splitedNcid[0])
+					p.ds.DeleteBlock(ctx, splitedNcid[0], "local")
+				}
+			}
+		}
 	}()
 
 	return nil

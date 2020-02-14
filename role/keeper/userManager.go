@@ -14,6 +14,7 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -21,10 +22,13 @@ import (
 type groupInfo struct {
 	sessionID    uuid.UUID // for user
 	sessionTime  int64
+	clusterID    uint64 // raft clusterID
+	nodeID       uint64
 	groupID      string // is queryID
 	userID       string // is userID
 	localKeeper  string
 	masterKeeper string
+	bft          bool
 	keepers      []string
 	providers    []string
 	upkeeping    *role.UpKeepingItem
@@ -64,6 +68,20 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 			return nil, errors.New("Not my user")
 		}
 	}
+
+	nodeID, err := address.GetNodeIDFromID(localID)
+	if err != nil {
+		return nil, err
+	}
+
+	tempInfo.nodeID = nodeID
+
+	clusterID, err := address.GetNodeIDFromID(qid)
+	if err != nil {
+		return nil, err
+	}
+
+	tempInfo.clusterID = clusterID
 
 	tempInfo.masterKeeper = getMasterID(tempInfo.keepers)
 

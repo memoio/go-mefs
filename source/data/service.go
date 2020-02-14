@@ -8,6 +8,7 @@ import (
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // Service is for data
@@ -35,7 +36,7 @@ type Service interface {
 	TestConnect() error
 	Connect(ctx context.Context, to string) bool
 	GetPeers() ([]peer.ID, error)
-	GetExternalAddr(p string) ([]byte, error)
+	GetExternalAddr(p string) (ma.Multiaddr, error)
 	BlockStore() bs.Blockstore
 	DataStore() ds.Datastore
 }

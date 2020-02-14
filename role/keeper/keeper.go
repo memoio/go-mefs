@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strconv"
@@ -11,11 +12,15 @@ import (
 	"github.com/golang/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/lni/dragonboat/v3"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/source/raft"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -31,17 +36,19 @@ const (
 
 //Info implements user service
 type Info struct {
-	localID   string
-	role      string
-	sk        string
-	state     bool
-	enableBft bool
-	repch     chan string
-	ds        data.Service
-	keepers   sync.Map // keepers except self; value: *kInfo
-	providers sync.Map // value: *pInfo
-	users     sync.Map // value: *uInfo
-	ukpGroup  sync.Map // manage user-keeper-provider group, value: *group
+	localID    string
+	role       string
+	sk         string
+	state      bool
+	enableBft  bool
+	dnh        *dragonboat.NodeHost
+	raftNodeID uint64
+	repch      chan string
+	ds         data.Service
+	keepers    sync.Map // keepers except self; value: *kInfo
+	providers  sync.Map // value: *pInfo
+	users      sync.Map // value: *uInfo
+	ukpGroup   sync.Map // manage user-keeper-provider group, value: *group
 }
 
 // New is
@@ -60,16 +67,20 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		return nil, err
 	}
 
+	rootpath, _ := fsrepo.BestKnownPath()
+	m.dnh = raft.StartHost(rootpath)
+	if m.dnh != nil {
+		m.enableBft = true
+		utils.MLogger.Info("Use bft mode")
+	} else {
+		m.enableBft = false
+		utils.MLogger.Info("Use simple mode")
+	}
+
 	err = m.load(ctx) //连接节点
 	if err != nil {
 		utils.MLogger.Error("load err:", err)
 		return nil, err
-	}
-
-	//tendermint启动相关
-	m.enableBft = false
-	if !m.enableBft {
-		utils.MLogger.Info("Use simple mode")
 	}
 
 	go m.persistRegular(ctx)
@@ -97,7 +108,11 @@ func (k *Info) GetRole() string {
 
 // Stop is
 func (k *Info) Stop() error {
-	return k.save(context.Background())
+	k.save(context.Background())
+	if k.dnh != nil {
+		k.dnh.Stop()
+	}
+	return nil
 }
 
 /*====================Save and Load========================*/
@@ -232,7 +247,13 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local")
+
+		clusterID, err := address.GetNodeIDFromID(qid)
+		if err != nil {
+			return err
+		}
+
+		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID, true)
 
 		//key: `qid/"chalpay"/pid/beginTime/endTime`
 		//value: `spacetime/signature/proof`
@@ -242,7 +263,8 @@ func (k *Info) savePay(qid, pid string) error {
 			return err
 		}
 		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
-		k.ds.PutKey(ctx, km.ToString(), []byte(metaValue), nil, "local")
+
+		k.putKey(ctx, km.ToString(), []byte(metaValue), nil, "local", clusterID, true)
 	}
 	return nil
 }
@@ -420,6 +442,64 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	return nil
 }
 
+/*====================Key Ops========================*/
+
+func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to string, clusterID uint64, flag bool) error {
+	utils.MLogger.Debugf("put %s to %s", key, to)
+
+	k.ds.PutKey(ctx, key, data, sig, "local")
+
+	if k.enableBft && flag {
+		rec := &recpb.Record{
+			Key:       []byte(key),
+			Value:     data,
+			Signature: sig,
+		}
+		recByte, err := proto.Marshal(rec)
+		if err != nil {
+			utils.MLogger.Error("proto Marshal fails: ", err)
+			return err
+		}
+
+		// need retry?
+		raft.Write(ctx, k.dnh, clusterID, key, recByte)
+	}
+
+	return nil
+}
+
+func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64, flag bool) ([]byte, error) {
+	utils.MLogger.Debugf("get %s from %s", key, to)
+
+	if k.enableBft && flag {
+		res, err := raft.Read(ctx, k.dnh, clusterID, key)
+		if err != nil {
+			return nil, err
+		}
+
+		rec := new(recpb.Record)
+		err = proto.Unmarshal(res, rec)
+		if err != nil {
+			return nil, err
+		}
+
+		val, err := k.ds.GetKey(ctx, key, "local")
+		if err != nil {
+			utils.MLogger.Debugf("get %s fails %s", key, err)
+		} else {
+			if bytes.Compare(val, rec.GetValue()) == 0 {
+				utils.MLogger.Debugf("get %s success", key)
+			} else {
+				utils.MLogger.Debugf("get %s success, value is not equal", key)
+			}
+		}
+
+		return rec.GetValue(), nil
+	}
+
+	return k.ds.GetKey(ctx, key, "local")
+}
+
 /*====================Group Ops========================*/
 
 //clean unpaid users
@@ -454,6 +534,55 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		gInfo, err := newGroup(k.localID, uid, qid, keepers, providers)
 		if err != nil {
 			return nil, err
+		}
+
+		if k.enableBft {
+			initialMembers := make(map[uint64]string)
+			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, false, initialMembers)
+			if err == nil {
+				gInfo.bft = true
+				utils.MLogger.Infof("try start cluster %d for %s, success", gInfo.clusterID, gInfo.groupID)
+			} else {
+				utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
+				if err == dragonboat.ErrClusterAlreadyExist {
+					gInfo.bft = true
+				} else {
+					for _, kid := range gInfo.keepers {
+						if kid == k.localID {
+							initialMembers[gInfo.nodeID] = raft.Addr
+							continue
+						}
+
+						t, err := address.GetNodeIDFromID(kid)
+						if err != nil {
+							continue
+						}
+
+						ipAddr, err := k.ds.GetExternalAddr(kid)
+						if err != nil {
+							continue
+						}
+
+						ips := strings.Split(ipAddr.String(), "/")
+						if len(ips) != 5 {
+							utils.MLogger.Errorf("ip %s is wrong", ipAddr.String())
+							continue
+						}
+
+						initialMembers[t] = ips[2] + ":3001"
+					}
+
+					err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, false, initialMembers)
+					if err != nil {
+						utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
+						if err != dragonboat.ErrClusterAlreadyExist {
+							gInfo.bft = false
+						}
+					}
+					gInfo.bft = true
+					utils.MLogger.Infof("start cluster %d for %s, success, has members: %s", gInfo.clusterID, gInfo.groupID, initialMembers)
+				}
+			}
 		}
 
 		k.ukpGroup.Store(qid, gInfo)
@@ -613,25 +742,24 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 	utils.MLogger.Info("add block: ", bid, " and its offset: ", offset, " for query: ", qid, " and provider: ", pid)
 
-	if mode {
-		blockID := qid + metainfo.BLOCK_DELIMITER + bid
-
-		// notify provider, to delete block
-		km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
-		if err != nil {
-			return err
-		}
-
-		pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
-
-		err = k.ds.PutKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local")
-		if err != nil {
-			utils.MLogger.Info("Add block: ", blockID, " error:", err)
-		}
-	}
-
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
+		if mode {
+			blockID := qid + metainfo.BLOCK_DELIMITER + bid
+
+			km, err := metainfo.NewKeyMeta(blockID, metainfo.BlockPos)
+			if err != nil {
+				return err
+			}
+
+			pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
+
+			err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID, gp.bft)
+			if err != nil {
+				utils.MLogger.Info("Add block: ", blockID, " error:", err)
+			}
+		}
+
 		return gp.addBlockMeta(bid, pid, offset)
 	}
 

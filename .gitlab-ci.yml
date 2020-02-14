@@ -1,4 +1,4 @@
-image: memoio/mefs-env:go13
+image: memoio/mefs-env:latest
 
 stages:
   - golangci-lint
@@ -105,7 +105,7 @@ unit_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off make test
   tags:
     - "47.92.5.51"
@@ -116,7 +116,7 @@ role_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/roleContract/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
@@ -129,7 +129,7 @@ query_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/query/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
@@ -142,7 +142,7 @@ offer_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/offer/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
@@ -155,7 +155,7 @@ upkeeping_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/upkeeping/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
@@ -168,7 +168,7 @@ channel_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/channel/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"
@@ -181,7 +181,7 @@ pos_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/mcl.sh
+    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/pos/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "47.92.5.51"

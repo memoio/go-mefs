@@ -209,9 +209,14 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 		utils.MLogger.Info("try to get new: ", id, " roleinfo from net and chain")
 		kmRole, err := metainfo.NewKeyMeta(id, metainfo.Role)
 		if err != nil {
-			return err
+			continue
 		}
-		val, _ := k.ds.GetKey(ctx, kmRole.ToString(), id)
+		val, err := k.ds.GetKey(ctx, kmRole.ToString(), id)
+		if err != nil {
+			continue
+		}
+
+		utils.MLogger.Infof("get %s role: %s from net", id, string(val))
 		if string(val) == metainfo.RoleKeeper {
 			addr, err := address.GetAddressFromID(id)
 			if err != nil {

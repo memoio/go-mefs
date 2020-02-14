@@ -133,11 +133,11 @@ func (l *lInfo) cleanLastChallenge() {
 
 //handleProof handles the challenge result from provider
 //key: qid/"Challenge"/uid/pid/kid/chaltime,value: proof[/FaultBlocks]
-func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
+func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) {
 	utils.MLogger.Info("handleProof: ", km.ToString())
 	ops := km.GetOptions()
 	if len(ops) != 4 {
-		return false
+		return
 	}
 
 	qid := km.GetMid()
@@ -147,26 +147,38 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	chaltime := ops[3]
 
 	if kid != k.localID {
-		return false
+		return
 	}
 
 	thisGroup := k.getGroupInfo(userID, qid, false)
 	if thisGroup == nil {
-		return false
+		return
 	}
 
 	thisLinfo := thisGroup.getLInfo(proID, false)
 	if thisLinfo == nil {
-		return false
+		return
 	}
 
 	defer func() {
 		thisLinfo.inChallenge = false
 	}()
 
+	challengetime := utils.StringToUnix(chaltime)
+	if thisLinfo.lastChalTime != challengetime {
+		return
+	}
+
+	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
+	if !ok {
+		return
+	}
+
+	chalResult := thischalresult.(*pb.ChalInfo)
+
 	spliteProof := strings.Split(string(value), metainfo.DELIMITER)
 	if len(spliteProof) < 3 {
-		return false
+		return
 	}
 
 	var splitedindex []string
@@ -174,18 +186,6 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 		indices, _ := b58.Decode(spliteProof[3])
 		splitedindex = strings.Split(string(indices), metainfo.DELIMITER)
 	}
-
-	challengetime := utils.StringToUnix(chaltime)
-	if thisLinfo.lastChalTime != challengetime {
-		return false
-	}
-
-	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
-	if !ok {
-		return false
-	}
-
-	chalResult := thischalresult.(*pb.ChalInfo)
 
 	var chal mcl.Challenge
 	var slength int64 //success length
@@ -246,20 +246,20 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 
 	// recheck the status again
 	if len(chal.Indices) == 0 {
-		return false
+		return
 	}
 
 	muByte, err := b58.Decode(spliteProof[0])
 	if err != nil {
-		return false
+		return
 	}
 	nuByte, err := b58.Decode(spliteProof[1])
 	if err != nil {
-		return false
+		return
 	}
 	deltaByte, err := b58.Decode(spliteProof[2])
 	if err != nil {
-		return false
+		return
 	}
 	pf := &mcl.Proof{
 		Mu:    muByte,
@@ -271,7 +271,7 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 	if err != nil {
 		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, "verify fails: ", err)
 		utils.MLogger.Warn("verify blocks: ", chal.Indices)
-		return false
+		return
 	}
 
 	if res {
@@ -291,15 +291,24 @@ func (k *Info) handleProof(km *metainfo.KeyMeta, value []byte) bool {
 			return true
 		})
 
-		//update thischalinfo.chalMap
-		blsProof := strings.Join(spliteProof[:3], metainfo.DELIMITER)
-		chalResult.BlsProof = blsProof
 		chalResult.Res = true
 		chalResult.SuccessLength = int64((float64(slength) / float64(chalResult.ChalLength)) * float64(chalResult.TotalLength))
-		return true
+	} else {
+		chalResult.Res = false
+		chalResult.SuccessLength = 0
+		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
+
 	}
 
-	utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
+	//update thischalinfo.chalMap
+	chalResult.BlsProof = strings.Join(spliteProof[:3], metainfo.DELIMITER)
 
-	return false
+	hByte, err := proto.Marshal(chalResult)
+	if err != nil {
+		return
+	}
+
+	k.putKey(context.Background(), km.ToString(), hByte, nil, "local", thisGroup.clusterID, thisGroup.bft)
+
+	return
 }

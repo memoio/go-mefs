@@ -10,6 +10,7 @@ require (
 	github.com/aristanetworks/goarista v0.0.0-20190712234253-ed1100a1c015 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cespare/cp v1.1.1 // indirect
+	github.com/cockroachdb/pebble v0.0.0-20200205143253-dc0074b9a99a // indirect
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/dustin/go-humanize v1.0.0
@@ -65,6 +66,8 @@ require (
 	github.com/libp2p/go-libp2p-yamux v0.2.1
 	github.com/libp2p/go-maddr-filter v0.0.5
 	github.com/libp2p/go-msgio v0.0.4
+	github.com/lni/dragonboat/v3 v3.1.5
+	github.com/lni/goutils v1.0.3
 	github.com/memoio/mefs-go-http-client v0.0.0-20190807085537-81d338e169a3
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
