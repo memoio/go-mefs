@@ -100,13 +100,15 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		return ErrBucketNotExist
 	}
 
-	objectElement, ok := bucket.objects[objectName]
+	object, ok := bucket.objects[objectName]
 	if !ok {
 		return ErrObjectNotExist
 	}
 
-	object, ok := objectElement.Value.(*objectInfo)
-	if !ok || object == nil || object.Deletion {
+	object.RLock()
+	defer object.RUnlock()
+
+	if object.Deletion {
 		return ErrObjectNotExist
 	}
 

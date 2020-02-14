@@ -52,20 +52,16 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	if bucket.objects == nil {
 		return nil, ErrObjectNotExist
 	}
-	objectElement, ok := bucket.objects[objectName]
-	if !ok || objectElement == nil {
-		return nil, ErrObjectNotExist
-	}
-	object, ok := objectElement.Value.(*objectInfo)
+
+	object, ok := bucket.objects[objectName]
 	if !ok {
 		return nil, ErrObjectNotExist
 	}
 
+	object.Lock()
+	defer object.Unlock()
+
 	object.Deletion = true
-	delete(bucket.objects, objectName)
-	// move deletions to special name
-	object.OPart.Name = objectName + "/" + strconv.Itoa(int(object.ObjectID))
-	bucket.objects[object.OPart.Name] = objectElement
 	bucket.dirty = true
 	return &object.ObjectInfo, nil
 }
@@ -90,26 +86,21 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 	if !ok {
 		return nil, ErrBucketNotExist
 	}
+
 	bucket, ok := l.meta.bucketByID[bucketID]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	// TODO:具体实现
+
 	if bucket.objects == nil {
 		return nil, ErrObjectNotExist
 	}
-	objectElement, ok := bucket.objects[objectName]
-	if !ok || objectElement == nil {
+
+	object, ok := bucket.objects[objectName]
+	if !ok || bucket.Deletion {
 		return nil, ErrObjectNotExist
 	}
-	object, ok := objectElement.Value.(*objectInfo)
-	if !ok {
-		return nil, ErrObjectNotExist
-	}
-	//var AvailTime string
-	//if avail {
-	//	AvailTime, _ = l.GetObjectAvailTime(object)
-	//}
+
 	return &object.ObjectInfo, nil
 }
 
@@ -132,21 +123,13 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
+
 	var objects []*mpb.ObjectInfo
-	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
-		if objectElement == nil {
+	for _, object := range bucket.objects {
+		if object.Deletion {
 			continue
 		}
-		object, ok := objectElement.Value.(*objectInfo)
-		if !ok || object.Deletion {
-			continue
-		}
-		//if avail {
-		//	if strings.HasPrefix(object.Name, pre) {
-		//		objects = append(objects, &object.ObjectInfo)
-		//		availTime, _ := l.GetObjectAvailTime(object)
-		//		availTimes = append(availTimes, availTime)
-		//	}
+
 		if strings.HasPrefix(object.OPart.Name, prefix) {
 			objects = append(objects, &object.ObjectInfo)
 		}
@@ -166,13 +149,8 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 	var storageSpace uint64
 	for _, bucket := range l.meta.bucketByID {
 
-		for _, objectElement := range bucket.objects {
-			if objectElement == nil {
-				continue
-			}
-
-			object, ok := objectElement.Value.(*objectInfo)
-			if !ok || object.Deletion {
+		for _, object := range bucket.objects {
+			if object.Deletion {
 				continue
 			}
 
@@ -203,12 +181,8 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 		return 0, ErrBucketNotExist
 	}
 	var storageSpace uint64
-	for _, objectElement := range bucket.objects {
-		if objectElement == nil {
-			continue
-		}
-		object, ok := objectElement.Value.(*objectInfo)
-		if !ok || object.Deletion {
+	for _, object := range bucket.objects {
+		if object.Deletion {
 			continue
 		}
 		storageSpace += uint64(object.OPart.GetLength())

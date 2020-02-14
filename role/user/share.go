@@ -31,13 +31,8 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		return "", ErrBucketNotExist
 	}
 
-	objectElement, ok := bucket.objects[objectName]
-	if !ok {
-		return "", ErrObjectNotExist
-	}
-
-	object, ok := objectElement.Value.(*objectInfo)
-	if !ok || object == nil || object.Deletion {
+	object, ok := bucket.objects[objectName]
+	if !ok || object.Deletion {
 		return "", ErrObjectNotExist
 	}
 
@@ -54,15 +49,11 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	opart := object.GetOPart()
 	sl.OParts[0] = opart
 	for opart.GetNextPart() != "" {
-		objectElement, ok := bucket.objects[opart.GetNextPart()]
+		object, ok := bucket.objects[opart.GetNextPart()]
 		if !ok {
 			break
 		}
 
-		object, ok = objectElement.Value.(*objectInfo)
-		if !ok || object == nil || object.Deletion {
-			break
-		}
 		opart = object.GetOPart()
 		sl.OParts = append(sl.OParts, opart)
 	}

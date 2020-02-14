@@ -2,7 +2,6 @@ package user
 
 import (
 	"bytes"
-	"container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -57,9 +56,8 @@ type superBlock struct {
 // superBucket has lfs objects info
 type superBucket struct {
 	mpb.BucketInfo
-	objects        map[string]*list.Element //通过BucketID检索Bucket下文件
-	orderedObjects *list.List               //用过map和list结合，构造一个有序Map
-	dirty          bool
+	objects map[string]*objectInfo
+	dirty   bool
 	sync.RWMutex
 	mtree *mt.Tree
 }
@@ -248,14 +246,14 @@ func (l *LfsInfo) genRoot() {
 	ctime := time.Now().Unix()
 	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buf, uint64(ctime))
-
 	mtree.Push([]byte(l.fsID))
 	mtree.Push(buf)
 
 	for i := 0; i < int(bucketNum); i++ {
+		bbuf := make([]byte, 8)
 		binary.LittleEndian.PutUint64(buf, uint64(lr.BRoots[i].Length))
-		mtree.Push(buf)
-		mtree.Push(lr.BRoots[i].Root)
+		bbuf = append(bbuf, lr.BRoots[i].Root...)
+		mtree.Push(bbuf)
 	}
 
 	lr.Root = mtree.Root()
@@ -499,12 +497,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 	objectsBlockLength := 0
 	ctx := context.Background()
 
-	for objectElement := bucket.orderedObjects.Front(); objectElement != nil; objectElement = objectElement.Next() {
-		object, ok := objectElement.Value.(*objectInfo)
-		if !ok {
-			continue
-		}
-
+	for _, object := range bucket.objects {
 		err := objectDelimitedWriter.WriteMsg(&object.ObjectInfo)
 		if err != nil {
 			continue
@@ -699,13 +692,19 @@ func (l *LfsInfo) loadBucketInfo() error {
 			if err != nil && err != io.EOF {
 				continue
 			}
-			objects := make(map[string]*list.Element)
-			l.meta.bucketByID[int32(bucketID)] = &superBucket{
-				BucketInfo:     bucket,
-				objects:        objects,
-				orderedObjects: list.New(),
-				dirty:          false,
+			objects := make(map[string]*objectInfo)
+			tsb := &superBucket{
+				BucketInfo: bucket,
+				objects:    objects,
+				dirty:      false,
+				mtree:      mt.New(sha256.New()),
 			}
+
+			tsb.mtree.SetIndex(0)
+			tsb.mtree.Push([]byte(l.fsID + bucket.Name))
+
+			l.meta.bucketByID[int32(bucketID)] = tsb
+
 			l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
 		}
 	}
@@ -782,6 +781,8 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 
 		fullData = append(fullData, data...)
 
+		objectSlice := make([]*mpb.ObjectInfo, bucket.NextObjectID)
+
 		objectsBuffer := bytes.NewBuffer(fullData)
 		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*dataformat.BlockSize)
 		for {
@@ -798,14 +799,22 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				continue
 			}
 
-			if object.OPart.Length == 0 {
+			if object.GetOPart().GetLength() == 0 {
 				continue
 			}
 
-			objectElement := bucket.orderedObjects.PushBack(&objectInfo{
+			objectSlice[int(object.ObjectID)] = &object
+
+			bucket.objects[object.OPart.Name] = &objectInfo{
 				ObjectInfo: object,
-			})
-			bucket.objects[object.OPart.Name] = objectElement
+			}
+		}
+
+		for i := 0; i < int(bucket.NextObjectID); i++ {
+			if objectSlice[i] != nil {
+				continue
+			}
+			bucket.mtree.Push([]byte(objectSlice[i].GetOPart().GetName() + objectSlice[i].GetOPart().GetETag()))
 		}
 	}
 	return nil

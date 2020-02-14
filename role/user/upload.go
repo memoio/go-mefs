@@ -100,8 +100,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		},
 	}
 
-	objectElement := bucket.orderedObjects.PushBack(object)
-	bucket.objects[objectName] = objectElement
+	bucket.objects[objectName] = object
 
 	encoder := dataformat.NewDataCoderWithBopts(bucket.BOpts, l.keySet)
 
@@ -123,8 +122,6 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	err = ul.Start(ctx)
 	if err != nil && ul.length == 0 {
-		objectElement := bucket.objects[objectName]
-		bucket.orderedObjects.Remove(objectElement)
 		delete(bucket.objects, objectName)
 		return &object.ObjectInfo, err
 	}
@@ -135,9 +132,8 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	bucket.CurStripe = ul.curStripe
 	bucket.NextSeg = ul.curOffset
 
-	// left is objectname; right is md5
-	bucket.mtree.Push([]byte(bucketName))
-	bucket.mtree.Push([]byte(ul.etag))
+	// leaf is objectname + md5
+	bucket.mtree.Push([]byte(objectName + object.OPart.ETag))
 	bucket.Root = bucket.mtree.Root()
 
 	bucket.dirty = true

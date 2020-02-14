@@ -1,11 +1,9 @@
 package user
 
 import (
-	"container/list"
 	"context"
 	"crypto/sha256"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -53,7 +51,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 	bucketID := l.meta.sb.NextBucketID
 
-	objects := make(map[string]*list.Element)
+	objects := make(map[string]*objectInfo)
 	bucket := &superBucket{
 		BucketInfo: mpb.BucketInfo{
 			Name:         bucketName,
@@ -65,15 +63,13 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 			Deletion:     false,
 			NextObjectID: 0,
 		},
-		dirty:          true,
-		objects:        objects,
-		orderedObjects: list.New(),
-		mtree:          mt.New(sha256.New()),
+		dirty:   true,
+		objects: objects,
+		mtree:   mt.New(sha256.New()),
 	}
 
 	bucket.mtree.SetIndex(0)
-	bucket.mtree.Push([]byte(l.fsID))
-	bucket.mtree.Push([]byte(bucketName))
+	bucket.mtree.Push([]byte(l.fsID + bucketName))
 
 	//将此Bucket信息添加到LFS中
 	l.meta.sb.NextBucketID++
@@ -114,8 +110,6 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	bucket.Lock()
 	bucket.Deletion = true
 	delete(l.meta.bucketNameToID, bucket.Name)
-	bucket.Name = bucket.Name + "/" + strconv.Itoa(int(bucket.BucketID))
-	l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
 	bucket.dirty = true
 	bucket.Unlock()
 	defer l.meta.sb.Unlock()
