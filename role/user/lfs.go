@@ -236,11 +236,17 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 
 func (l *LfsInfo) genRoot() {
 	l.meta.sb.RLock()
-	bucketNum := l.meta.sb.GetNextBucketID()
+	bucketNum := l.meta.sb.GetNextBucketID() - 1
+	if bucketNum == 0 {
+		return
+	}
+	ctime := time.Now().Unix()
 
-	lr := new(mpb.LfsRoot)
+	lr := &mpb.LfsRoot{
+		BRoots: make([]*mpb.BucketRoot, bucketNum),
+		CTime:  ctime,
+	}
 
-	lr.BRoots = make([]*mpb.BucketRoot, bucketNum)
 	for _, bucket := range l.meta.buckets {
 		bucket.RLock()
 		i := int(bucket.BucketID - 1)
@@ -253,7 +259,7 @@ func (l *LfsInfo) genRoot() {
 
 	mtree := mt.New(sha256.New())
 	mtree.SetIndex(0)
-	ctime := time.Now().Unix()
+
 	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buf, uint64(ctime))
 	mtree.Push([]byte(l.fsID))
@@ -267,7 +273,6 @@ func (l *LfsInfo) genRoot() {
 	}
 
 	lr.Root = mtree.Root()
-	lr.CTime = ctime
 
 	// add root to contract
 

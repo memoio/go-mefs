@@ -33,7 +33,7 @@ func NewDefaultDataCoder(policy, dataCount, pairtyCount int, keyset *mcl.KeySet)
 	return NewDataCoder(policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, keyset)
 }
 
-// 构建一个dataformat配置
+// NewDataCoder 构建一个dataformat配置
 func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount int, keyset *mcl.KeySet) *DataCoder {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
