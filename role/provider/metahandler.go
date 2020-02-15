@@ -101,7 +101,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gid := km.GetMid()
 	ops := km.GetOptions()
-	if len(ops) != 4 {
+	if len(ops) != 5 {
 		return nil, errors.New("wrong key")
 	}
 
@@ -130,7 +130,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gp := p.getGroupInfo(uid, gid, false)
 	if gp != nil {
-		if gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
+		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
 			return []byte(gp.sessionID.String()), nil
 		}
 		ok := p.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)

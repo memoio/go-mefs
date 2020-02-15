@@ -278,7 +278,7 @@ var lfsKillUserCmd = &cmds.Command{
 var errTimeOut = errors.New("Time Out")
 var lfsStartUserCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
-		Tagline:          "Start groupService and lfsService by userid",
+		Tagline:          "Start lfsService for user",
 		ShortDescription: ``,
 	},
 
@@ -294,6 +294,7 @@ var lfsStartUserCmd = &cmds.Command{
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(user.KeeperSLA),
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(user.ProviderSLA),
 		cmds.BoolOption("reDeployQuery", "rdo", "reDeploy query contract if user has not deploy upkeeping contract").WithDefault(false),
+		cmds.BoolOption("force", "f", "force user to write mode").WithDefault(false),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -381,6 +382,12 @@ var lfsStartUserCmd = &cmds.Command{
 			return errWrongInput
 		}
 
+		force, ok := req.Options["force"].(bool)
+		if !ok {
+			fmt.Println("input wrong value for force.")
+			return errWrongInput
+		}
+
 		// 读keystore下uid文件
 		hexSk, err := fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
 
@@ -403,7 +410,7 @@ var lfsStartUserCmd = &cmds.Command{
 			}
 		}
 
-		lfs, err := node.Inst.(*user.Info).NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo)
+		lfs, err := node.Inst.(*user.Info).NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo, force)
 		if err != nil {
 			node.Inst.(*user.Info).KillUser(uid)
 			return err
@@ -458,7 +465,6 @@ var lfsHeadObjectCmd = &cmds.Command{
  	ObjectSize	The Object Size(not include tag data)
  	Ctime       The Create time
  	Dir         Directory or Not
-
 `,
 	},
 

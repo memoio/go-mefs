@@ -20,13 +20,13 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	}
 	dtype := km.GetKType()
 	switch dtype {
-	case mpb.KeyType_UserInit: //user初始化
+	case mpb.KeyType_UserInit:
 		go k.handleUserInit(km, from)
-	case mpb.KeyType_UserNotify: //user初始化确认
+	case mpb.KeyType_UserNotify:
 		return k.handleUserNotify(km, metaValue, from)
-	case mpb.KeyType_UserStart: //user部署好合约
+	case mpb.KeyType_UserStart:
 		return k.handleUserStart(km, metaValue, sig, from)
-	case mpb.KeyType_UserStop: //user部署好合约
+	case mpb.KeyType_UserStop:
 		go k.handleUserStop(km, metaValue, from)
 	case mpb.KeyType_HeartBeat:
 		go k.handleHeartBeat(km, metaValue, from)

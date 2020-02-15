@@ -56,12 +56,13 @@ type groupInfo struct {
 	keepers   map[string]*keeperInfo
 	providers map[string]*providerInfo
 
-	storeDays     int64    //表示部署合约时的存储数据时间，单位是“天”
-	storeSize     int64    //表示部署合约时的存储数据大小，单位是“MB”
-	storePrice    int64    //表示部署合约时的存储价格大小，单位是“wei”
-	keeperSLA     int      //表示部署合约时的keeper参数，目前是keeper数量
-	providerSLA   int      //表示部署合约时的provider参数，目前是provider数量
-	reDeploy      bool     // 是否重新部署offer
+	storeDays     int64 //表示部署合约时的存储数据时间，单位是“天”
+	storeSize     int64 //表示部署合约时的存储数据大小，单位是“MB”
+	storePrice    int64 //表示部署合约时的存储价格大小，单位是“wei”
+	keeperSLA     int   //表示部署合约时的keeper参数，目前是keeper数量
+	providerSLA   int   //表示部署合约时的provider参数，目前是provider数量
+	reDeploy      bool  // 是否重新部署offer
+	force         bool
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
 
@@ -71,7 +72,7 @@ type groupInfo struct {
 	queryItem     *role.QueryItem
 }
 
-func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps int, redeploy bool, d data.Service) *groupInfo {
+func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps int, d data.Service) *groupInfo {
 	return &groupInfo{
 		userID:      uid,
 		shareToID:   shareTo,
@@ -83,7 +84,6 @@ func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps i
 		storePrice:  price,
 		keeperSLA:   ks,
 		providerSLA: ps,
-		reDeploy:    redeploy,
 		keepers:     make(map[string]*keeperInfo, ks),
 		providers:   make(map[string]*providerInfo, ps),
 	}
@@ -294,8 +294,13 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	newID := uuid.New()
 	g.sessionID = newID
 
+	force := "0"
+	if g.force {
+		force = "1"
+	}
+
 	// key: queryID/"UserStart"/userID/kc/pc/id
-	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), newID.String())
+	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserStart, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), newID.String(), force)
 	if err != nil {
 		return err
 	}

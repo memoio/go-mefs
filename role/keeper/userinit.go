@@ -208,7 +208,7 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 	return nil, errors.New("not my user")
 }
 
-// key: queryID/"UserStart"/userID/keepercount/providercount/sessionID;
+// key: queryID/"UserStart"/userID/keepercount/providercount/sessionID/"force";
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from:", from)
@@ -219,7 +219,7 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	}
 
 	ops := km.GetOptions()
-	if len(ops) != 4 {
+	if len(ops) != 5 {
 		return nil, errors.New("key is not right")
 	}
 
@@ -242,7 +242,7 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
-		if gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
+		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
 			return []byte(gp.sessionID.String()), nil
 		}
 		ok := k.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
