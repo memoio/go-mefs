@@ -37,6 +37,7 @@ type Info struct {
 
 type groupInfo struct {
 	sessionID    uuid.UUID
+	sessionTime  int64
 	userID       string
 	groupID      string
 	storageUsed  uint64
@@ -153,7 +154,10 @@ func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo 
 }
 
 func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *groupInfo {
-	if kpids == "" && flag {
+	if kpids == "" {
+		if !flag {
+			return nil
+		}
 		ctx := context.Background()
 		kmkps, err := metainfo.NewKey(groupID, mpb.KeyType_LFS, userID)
 		if err != nil {

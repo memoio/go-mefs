@@ -150,6 +150,8 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 	}
 	utils.MLogger.Infof("Lfs Service %s is ready for: %s", l.fsID, l.userID)
 	go l.persistMetaBlock(ctx)
+	go l.persistRoot(ctx)
+	go l.sendHeartBeat(ctx)
 	return nil
 }
 
@@ -199,6 +201,22 @@ func (l *LfsInfo) Online() bool {
 
 func (l *LfsInfo) GetGroup() *groupInfo {
 	return l.gInfo
+}
+
+func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
+	utils.MLogger.Infof("Send Heartbeat %s is ready for: %s", l.fsID, l.userID)
+	tick := time.NewTicker(5 * time.Minute)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			if l.online && l.writable {
+				l.gInfo.heartbeat(ctx)
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化

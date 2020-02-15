@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -111,18 +112,6 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		if gp == nil {
 			return nil, errors.New("Not my user")
 		}
-		if gp.sessionID == uuid.Nil {
-			ok := p.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
-			if !ok {
-				utils.MLogger.Info("key signature is wrong for: ", km.ToString())
-				return []byte(uuid.Nil.String()), nil
-			}
-			sessID, err := uuid.Parse(ops[3])
-			if err != nil {
-				return nil, err
-			}
-			gp.sessionID = sessID
-		}
 	}
 
 	ui, ok := p.users.Load(uid)
@@ -139,27 +128,40 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	kmkps, _ := metainfo.NewKey(gid, mpb.KeyType_LFS, uid)
 	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, nil, "local")
 
-	gpi, ok := p.fsGroup.Load(gid)
-	if !ok {
-		return nil, errors.New("Not my user")
+	gp := p.getGroupInfo(uid, gid, false)
+	if gp != nil {
+		if gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
+			return []byte(gp.sessionID.String()), nil
+		}
+		ok := p.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
+		if !ok {
+			utils.MLogger.Info("key signature is wrong for: ", km.ToString())
+			return []byte(uuid.Nil.String()), nil
+		}
+		sessID, err := uuid.Parse(ops[3])
+		if err != nil {
+			return nil, err
+		}
+		gp.sessionID = sessID
+		gp.sessionTime = time.Now().Unix()
+		return []byte(sessID.String()), nil
 	}
 
-	return []byte(gpi.(*groupInfo).sessionID.String()), nil
+	return nil, errors.New("Not my user")
 }
 
 func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from: ", from)
 
-	gid := km.GetMid()
 	ops := km.GetOptions()
 	if len(ops) != 4 {
 		return nil, errors.New("wrong key")
 	}
+	gid := km.GetMid()
 
-	gpi, ok := p.fsGroup.Load(gid)
-	if ok {
-		gp := gpi.(*groupInfo)
-
+	uid := ops[0]
+	gp := p.getGroupInfo(uid, gid, false)
+	if gp != nil {
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
 			return nil, err
@@ -167,10 +169,37 @@ func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 
 		if gp.sessionID == sessID {
 			gp.sessionID = uuid.Nil
+			gp.sessionTime = time.Now().Unix()
 		}
 
 		return []byte("ok"), nil
 	}
 
 	return nil, errors.New("Not my user")
+}
+
+func (p *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) {
+	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
+
+	ops := km.GetOptions()
+	if len(ops) != 4 {
+		return
+	}
+
+	uid := ops[0]
+	qid := km.GetMid()
+
+	gp := p.getGroupInfo(uid, qid, false)
+	if gp != nil {
+		sessID, err := uuid.Parse(ops[3])
+		if err != nil {
+			return
+		}
+		if gp.sessionID == sessID {
+			gp.sessionTime = time.Now().Unix()
+		}
+		return
+	}
+
+	return
 }

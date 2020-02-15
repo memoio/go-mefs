@@ -45,7 +45,7 @@ type providerInfo struct {
 
 // group stores use's groupinfo
 type groupInfo struct {
-	sync.Mutex
+	sync.RWMutex
 	groupID   string // id format of query address
 	userID    string // id format of user address
 	shareToID string // shareToID = userID when not share
@@ -724,8 +724,8 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 		return errors.New("Wrong state")
 	}
 
-	g.Lock()
-	defer g.Unlock()
+	g.RLock()
+	defer g.RUnlock()
 
 	utils.MLogger.Info("Send heartbeat for user: ", g.userID)
 
@@ -735,19 +735,12 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 		return err
 	}
 
-	for _, kinfo := range g.keepers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kinfo.keeperID)
-		if err != nil {
-			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
-			continue
-		}
+	for _, kid := range g.tempKeepers {
+		g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kid)
 	}
 
-	for _, pinfo := range g.providers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pinfo.providerID)
-		if err != nil {
-			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
-		}
+	for _, pid := range g.tempProviders {
+		g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pid)
 	}
 
 	return nil

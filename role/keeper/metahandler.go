@@ -27,6 +27,8 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		return k.handleUserStart(km, metaValue, sig, from)
 	case mpb.KeyType_UserStop: //user部署好合约
 		go k.handleUserStop(km, metaValue, from)
+	case mpb.KeyType_HeartBeat:
+		go k.handleHeartBeat(km, metaValue, from)
 	case mpb.KeyType_BlockPos:
 		switch opType {
 		case mpb.OpType_Put:

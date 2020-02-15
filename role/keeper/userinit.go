@@ -154,6 +154,32 @@ func (k *Info) handleUserNotify(km *metainfo.Key, metaValue []byte, from string)
 	return []byte("ok"), nil
 }
 
+func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) {
+	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
+
+	ops := km.GetOptions()
+	if len(ops) != 4 {
+		return
+	}
+
+	uid := ops[0]
+	qid := km.GetMid()
+
+	gp := k.getGroupInfo(uid, qid, false)
+	if gp != nil {
+		sessID, err := uuid.Parse(ops[3])
+		if err != nil {
+			return
+		}
+		if gp.sessionID == sessID {
+			gp.sessionTime = time.Now().Unix()
+		}
+		return
+	}
+
+	return
+}
+
 // key: queryID/"UserStop"/userID/keepercount/providercount/sessionID;
 func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
@@ -168,7 +194,6 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp != nil {
-
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
 			return nil, err
@@ -217,21 +242,23 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
-		if gp.sessionID == uuid.Nil {
-			ok := k.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
-			if !ok {
-				utils.MLogger.Infof("key signature is wrong for %s", km.ToString())
-				return []byte(uuid.Nil.String()), nil
-			}
-
-			sessID, err := uuid.Parse(ops[3])
-			if err != nil {
-				return nil, err
-			}
-			gp.sessionTime = time.Now().Unix()
-			gp.sessionID = sessID
+		if gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
+			return []byte(gp.sessionID.String()), nil
 		}
-		return []byte(gp.sessionID.String()), nil
+		ok := k.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
+		if !ok {
+			utils.MLogger.Infof("key signature is wrong for %s", km.ToString())
+			return []byte(uuid.Nil.String()), nil
+		}
+
+		sessID, err := uuid.Parse(ops[3])
+		if err != nil {
+			return nil, err
+		}
+		gp.sessionTime = time.Now().Unix()
+		gp.sessionID = sessID
+
+		return []byte(sessID.String()), nil
 	}
 
 	return nil, errors.New("not my user")
