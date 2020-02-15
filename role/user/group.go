@@ -324,7 +324,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		return err
 	}
 
-	if Debug {
+	if role.Debug {
 		ok := g.ds.VerifyKey(ctx, kms, val, sig)
 		if !ok {
 			utils.MLogger.Errorf("key signature is wrong for %s", kms)

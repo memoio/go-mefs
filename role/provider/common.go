@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	Debug                 = true
 	DefaultCapacity int64 = 100000 //单位：MB
 	DefaultDuration int64 = 365    //单位：天
 	EXPIRETIME            = int64(30 * 60)

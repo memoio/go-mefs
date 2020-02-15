@@ -40,7 +40,7 @@ func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error
 			return
 		}
 
-		if Debug {
+		if role.Debug {
 			blskey, _ := p.getNewUserConfig(gp.userID, qid)
 			if blskey != nil && blskey.Pk != nil {
 				ok := df.VerifyBlock(value, splitedNcid[0], blskey)
