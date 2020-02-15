@@ -184,11 +184,14 @@ func (k *Info) handleChalTime(km *metainfo.Key) ([]byte, error) {
 	utils.MLogger.Info("handleChalTime: ", km.ToString())
 
 	blockID := km.GetMid()
-	if len(blockID) < utils.IDLength {
+	if len(blockID) <= utils.IDLength {
 		return nil, errUnmatchedPeerID
 	}
 
 	sValue := strings.SplitN(string(blockID), metainfo.BlockDelimiter, 2)
+	if len(sValue) != 2 {
+		return nil, errors.New("Wrong value")
+	}
 	qid := sValue[0]
 	bid := sValue[1]
 	avail, err := k.getBlockAvail(qid, bid)
