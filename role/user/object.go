@@ -63,6 +63,9 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 
 	object.Deletion = true
 	bucket.dirty = true
+	oName := object.GetOPart().Name + "." + strconv.Itoa(int(object.ObjectID))
+	delete(bucket.objects, object.GetOPart().Name)
+	bucket.objects[oName] = object
 	return &object.ObjectInfo, nil
 }
 

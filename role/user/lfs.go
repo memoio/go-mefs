@@ -705,7 +705,11 @@ func (l *LfsInfo) loadBucketInfo() error {
 
 			l.meta.bucketByID[int32(bucketID)] = tsb
 
-			l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
+			bname := bucket.Name
+			if bucket.Deletion {
+				bname = bucket.Name + "." + strconv.Itoa(int(bucket.BucketID))
+			}
+			l.meta.bucketNameToID[bname] = bucket.BucketID
 		}
 	}
 	return nil
@@ -803,9 +807,14 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				continue
 			}
 
+			oName := object.GetOPart().Name
+			if object.Deletion {
+				oName = object.GetOPart().Name + "." + strconv.Itoa(int(object.ObjectID))
+			}
+
 			objectSlice[int(object.ObjectID)] = &object
 
-			bucket.objects[object.OPart.Name] = &objectInfo{
+			bucket.objects[oName] = &objectInfo{
 				ObjectInfo: object,
 			}
 		}

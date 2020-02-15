@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,12 +108,15 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	}
 
 	l.meta.sb.Lock()
+	defer l.meta.sb.Unlock()
 	bucket.Lock()
 	bucket.Deletion = true
 	delete(l.meta.bucketNameToID, bucket.Name)
+	bname := bucket.Name + "." + strconv.Itoa(int(bucket.BucketID))
+	l.meta.bucketNameToID[bname] = bucket.BucketID
 	bucket.dirty = true
 	bucket.Unlock()
-	defer l.meta.sb.Unlock()
+
 	return &bucket.BucketInfo, nil
 }
 
