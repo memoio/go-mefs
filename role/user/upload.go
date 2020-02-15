@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"math/rand"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -310,7 +311,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 								err := u.gInfo.ds.PutBlock(ctx, km.ToString(), edata, proID)
 								if err != nil {
 									utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", proID, " failed: ", err)
-									time.Sleep(30 * time.Second)
+									tdelay := rand.Int63n(int64(k+1) * 60000000000)
+									time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
 									continue
 								} else {
 									atomic.AddInt32(&count, 1)
@@ -320,7 +322,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 						}(encodedData[i], pros[i])
 					}
-					pwg.Wait()
 				} else {
 					for i := 0; i < bc; i++ {
 						bm.SetCid(strconv.Itoa(i))
@@ -343,7 +344,10 @@ func (u *uploadTask) Start(ctx context.Context) error {
 								err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), edata, proID)
 								if err != nil {
 									utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", proID, " failed: ", err)
-									time.Sleep(30 * time.Second)
+
+									tdelay := rand.Int63n(int64(k+1) * 60000000000)
+									time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
+
 									continue
 								} else {
 									atomic.AddInt32(&count, 1)
@@ -352,8 +356,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 							}
 						}(encodedData[i], provider)
 					}
-					pwg.Wait()
 				}
+
+				pwg.Wait()
 
 				//没有达到最低安全标准，返回错误
 				if count >= dc {
