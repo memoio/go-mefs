@@ -19,7 +19,7 @@ type ObjectOptions struct {
 
 // DeleteObject deletes a object in lfs
 func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -37,15 +37,11 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 		return nil, ErrObjectNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
+
 	// TODO:具体实现
 	bucket.Lock()
 	defer bucket.Unlock()
@@ -71,7 +67,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 
 // HeadObject get the info of an object
 func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*mpb.ObjectInfo, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -85,12 +81,7 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 		return nil, ErrObjectNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -109,7 +100,7 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 
 // ListObjects lists all objects of a bucket
 func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*mpb.ObjectInfo, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -118,11 +109,7 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 		return nil, ErrBucketNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
-	}
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -145,13 +132,13 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 
 // ShowStorage show lfs used space without appointed bucket
 func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return 0, ErrLfsServiceNotReady
 	}
 
 	var storageSpace uint64
-	for _, bucket := range l.meta.bucketByID {
-
+	for _, bucket := range l.meta.buckets {
+		bucket.RLock()
 		for _, object := range bucket.objects {
 			if object.Deletion {
 				continue
@@ -159,6 +146,7 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 
 			storageSpace += uint64(object.OPart.GetLength())
 		}
+		bucket.RUnlock()
 	}
 
 	return storageSpace, nil
@@ -166,7 +154,7 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 
 // ShowBucketStorage show lfs used spaceBucket
 func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uint64, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return 0, ErrLfsServiceNotReady
 	}
 
@@ -175,14 +163,11 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 		return 0, ErrBucketNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return 0, ErrBucketNotExist
-	}
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return 0, ErrBucketNotExist
 	}
+
 	var storageSpace uint64
 	for _, object := range bucket.objects {
 		if object.Deletion {
@@ -228,7 +213,16 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 // GetObjectAvailTime get available time of objects
 func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
-	bucket := l.meta.bucketByID[object.BucketID]
+	bucketName, ok := l.meta.bucketIDToName[object.BucketID]
+	if !ok {
+		return latestTime.Format(utils.BASETIME), ErrBucketNotExist
+	}
+
+	bucket, ok := l.meta.buckets[bucketName]
+	if !ok {
+		return latestTime.Format(utils.BASETIME), ErrBucketNotExist
+	}
+
 	blockCount := bucket.BOpts.DataCount + bucket.BOpts.ParityCount
 
 	bo := bucket.BOpts

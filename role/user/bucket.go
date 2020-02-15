@@ -17,7 +17,7 @@ import (
 // CreateBucket create a bucket for a specified LFSservice
 func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *mpb.BucketOptions) (*mpb.BucketInfo, error) {
 	// TODO judge datacount + parity count <= providers
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -33,7 +33,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	l.meta.sb.Lock()
 	defer l.meta.sb.Unlock()
 
-	if _, ok := l.meta.bucketNameToID[bucketName]; ok {
+	if _, ok := l.meta.buckets[bucketName]; ok {
 		return nil, ErrBucketAlreadyExist
 	}
 
@@ -74,17 +74,16 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 	//将此Bucket信息添加到LFS中
 	l.meta.sb.NextBucketID++
-	l.meta.sb.bitsetInfo.Set(uint(bucketID))
 	l.meta.sb.dirty = true
 
-	l.meta.bucketByID[bucket.BucketID] = bucket
-	l.meta.bucketNameToID[bucket.Name] = bucket.BucketID
+	l.meta.buckets[bucket.Name] = bucket
+	l.meta.bucketIDToName[bucketID] = bucketName
 	return &bucket.BucketInfo, nil
 }
 
 // DeleteBucket deletes a bucket from a specified LFSservice
 func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -97,12 +96,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 		return nil, ErrBucketNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -111,9 +105,10 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	defer l.meta.sb.Unlock()
 	bucket.Lock()
 	bucket.Deletion = true
-	delete(l.meta.bucketNameToID, bucket.Name)
+	delete(l.meta.buckets, bucket.Name)
 	bname := bucket.Name + "." + strconv.Itoa(int(bucket.BucketID))
-	l.meta.bucketNameToID[bname] = bucket.BucketID
+	l.meta.buckets[bname] = bucket
+	l.meta.bucketIDToName[bucket.BucketID] = bname
 	bucket.dirty = true
 	bucket.Unlock()
 
@@ -122,7 +117,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 
 // HeadBucket get a superBucket's metainfo
 func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -131,12 +126,7 @@ func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.Bucke
 		return nil, ErrBucketNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -145,16 +135,12 @@ func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.Bucke
 
 // ListBuckets lists all Buckets information
 func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*mpb.BucketInfo, error) {
-	if !l.online {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
-	if l.meta.bucketByID == nil {
-		return nil, ErrBucketNotExist
-	}
-
 	var lsuperBucket []*mpb.BucketInfo
-	for _, bs := range l.meta.bucketByID {
+	for _, bs := range l.meta.buckets {
 		if bs.Deletion {
 			continue
 		}

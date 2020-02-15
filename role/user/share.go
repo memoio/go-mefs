@@ -17,16 +17,11 @@ import (
 // GenShareObject constructs sharelink
 func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) (string, error) {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return "", ErrLfsServiceNotReady
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return "", ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return "", ErrBucketNotExist
 	}

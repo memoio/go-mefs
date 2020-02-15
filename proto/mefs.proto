@@ -61,8 +61,8 @@ message UserBLS12Config{
 }
 
 message BucketRoot {
-  int32 BucketID = 1;
-  int64 Length = 2;
+  int64 BucketID = 1;
+  int64 ObjectCount = 2;
   bytes Root = 3; //merkle root
 }
 
@@ -73,12 +73,10 @@ message LfsRoot {
 }
 
 message SuperBlockInfo {
-  repeated uint64 BucketsSet = 1; // User现有的Buckets
+  int32 Version = 1;         //版本号
   int32 MetaBackupCount = 2; //对于所有的元数据块，副本数
-  int32 NextBucketID = 3;
-  int32 MagicNumber = 4;
-  int32 Version = 5; //版本号
-  int64 CTime = 6;
+  int64 CTime = 3;
+  int64 NextBucketID = 4;
   repeated LfsRoot LRoot = 7;  // merkle root of bucket root 
 }
 
@@ -95,7 +93,7 @@ message BucketOptions {
 
 message BucketInfo {
   string Name = 1;
-  int32 BucketID = 2;
+  int64 BucketID = 2;
   int64 Ctime = 3;          //本Bucket的创建时间
   BucketOptions BOpts = 4;
   int64 CurStripe = 5;      //当前写到哪一个Stripe
@@ -108,7 +106,7 @@ message BucketInfo {
 }
 
 message ObjectInfo {
-  int32 BucketID = 1;               //本对象所属的Bucket
+  int64 BucketID = 1;               //本对象所属的Bucket
   int64 Ctime = 2;                  //对象创建时间
   string ContentType = 3;           //对象的类型，如文本、图片
   bool Dir = 4;                     //是否为目录
@@ -138,7 +136,7 @@ message ShareLink{
     string QueryID = 2;
     string BucketName = 3;
     string ObjectName = 4;
-    int32 BucketID = 5;
+    int64 BucketID = 5;
     BucketOptions BOpts = 6;
     repeated ObjectPart OParts = 7;
     bytes DecKey = 8;

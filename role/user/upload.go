@@ -29,7 +29,7 @@ type uploadTask struct { //一个上传任务实例
 	fsID      string
 	encrypt   int32
 	sKey      [32]byte
-	bucketID  int32
+	bucketID  int64
 	curStripe int64
 	curOffset int64
 	length    int64
@@ -42,7 +42,7 @@ type uploadTask struct { //一个上传任务实例
 
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -55,12 +55,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		return nil, ErrObjectNameInvalid
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
@@ -93,7 +88,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		ObjectInfo: mpb.ObjectInfo{
 			ObjectID: bucket.NextObjectID,
 			OPart:    opart,
-			BucketID: bucketID,
+			BucketID: bucket.BucketID,
 			Ctime:    time.Now().Unix(),
 			Deletion: false,
 			Dir:      false,
@@ -109,7 +104,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		startTime: time.Now(), // for queue?
 		reader:    reader,
 		gInfo:     l.gInfo,
-		bucketID:  bucketID,
+		bucketID:  bucket.BucketID,
 		curStripe: bucket.CurStripe,
 		curOffset: bucket.NextSeg,
 		encoder:   encoder,
@@ -117,7 +112,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	if bo.Encryption == 1 {
-		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, start)
+		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, start)
 	}
 
 	err = ul.Start(ctx)

@@ -82,7 +82,7 @@ func (obs Objects) String() string {
 
 type BucketStat struct {
 	Name        string
-	BucketID    int32
+	BucketID    int64
 	Ctime       string
 	Policy      int32
 	DataCount   int32

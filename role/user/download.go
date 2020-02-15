@@ -42,7 +42,7 @@ type notif struct {
 //针对Bucket内stripe的下载，可复用
 type downloadJob struct {
 	fsID           string
-	bucketID       int32
+	bucketID       int64
 	encrypt        int32
 	sKey           [32]byte
 	decoder        *dataformat.DataCoder //用于解码数据
@@ -52,7 +52,7 @@ type downloadJob struct {
 	writer         io.Writer //用于调度下载，以及返回是否出错
 }
 
-func newDownloadJob(uid string, bid, cry int32, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
+func newDownloadJob(uid string, bid int64, cry int32, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
 	return &downloadJob{
 		fsID:     uid,
 		bucketID: bid,
@@ -67,7 +67,7 @@ func newDownloadJob(uid string, bid, cry int32, sk [32]byte, dec *dataformat.Dat
 //下载一整个对象的下载任务
 type downloadTask struct {
 	fsID         string
-	bucketID     int32
+	bucketID     int64
 	encrypt      int32
 	sKey         [32]byte
 	group        *groupInfo            //groupInfo
@@ -86,16 +86,11 @@ type downloadTask struct {
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
-	if !l.online || l.meta.bucketNameToID == nil {
+	if !l.online || l.meta.buckets == nil {
 		return ErrLfsServiceNotReady
 	}
 
-	bucketID, ok := l.meta.bucketNameToID[bucketName]
-	if !ok {
-		return ErrBucketNotExist
-	}
-
-	bucket, ok := l.meta.bucketByID[bucketID]
+	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
 		return ErrBucketNotExist
 	}
@@ -155,7 +150,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	// default AES
 	if bo.Encryption == 1 {
-		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucketID, object.OPart.Start)
+		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
 	}
 
 	return dl.Start(ctx)

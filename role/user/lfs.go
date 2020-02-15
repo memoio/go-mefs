@@ -18,7 +18,6 @@ import (
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
@@ -41,14 +40,13 @@ type LfsInfo struct {
 // Logs records lfs metainfo
 type lfsMeta struct {
 	sb             *superBlock
-	bucketNameToID map[string]int32       //通过BucketName找到Bucket信息
-	bucketByID     map[int32]*superBucket //通过BucketID知道到Bucket信息
+	bucketIDToName map[int64]string        //bucketID-> bucketName
+	buckets        map[string]*superBucket //bucketName -> bucket
 }
 
 // superBlock has lfs bucket info
 type superBlock struct {
 	mpb.SuperBlockInfo
-	bitsetInfo *bitset.BitSet
 	sync.RWMutex
 	dirty bool //看看superBlock是否需要更新（仅在新创建Bucket时需要）
 }
@@ -139,7 +137,7 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 			utils.MLogger.Info("Load bucket info fail: ", err)
 			return err
 		}
-		for _, bucket := range l.meta.bucketByID {
+		for _, bucket := range l.meta.buckets {
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
 			if err != nil {
 				utils.MLogger.Error("Load objects in bucket", bucket.Name, " fail: ", err)
@@ -167,21 +165,18 @@ func initLogs() (*lfsMeta, error) {
 	sb := newSuperBlock()
 	return &lfsMeta{
 		sb:             sb,
-		bucketByID:     make(map[int32]*superBucket),
-		bucketNameToID: make(map[string]int32),
+		bucketIDToName: make(map[int64]string),
+		buckets:        make(map[string]*superBucket),
 	}, nil
 }
 
 func newSuperBlock() *superBlock {
 	return &superBlock{
 		SuperBlockInfo: mpb.SuperBlockInfo{
-			BucketsSet:      nil,
 			MetaBackupCount: defaultMetaBackupCount,
 			NextBucketID:    1, //从1开始是因为SuperBlock的元数据块抢占了Bucket编号0的位置
-			MagicNumber:     0xfb,
-			Version:         1},
-		bitsetInfo: bitset.New(256),
-		dirty:      true,
+			Version:         1001},
+		dirty: true,
 	}
 }
 
@@ -246,15 +241,12 @@ func (l *LfsInfo) genRoot() {
 	lr := new(mpb.LfsRoot)
 
 	lr.BRoots = make([]*mpb.BucketRoot, bucketNum)
-
-	for i, bucket := range l.meta.bucketByID {
-		if i < bucketNum || i == 0 {
-			continue
-		}
+	for _, bucket := range l.meta.buckets {
 		bucket.RLock()
-		lr.BRoots[i-1].BucketID = bucket.BucketID
-		lr.BRoots[i-1].Root = bucket.Root
-		lr.BRoots[i-1].Length = bucket.NextObjectID
+		i := int(bucket.BucketID - 1)
+		lr.BRoots[i].BucketID = bucket.BucketID
+		lr.BRoots[i].Root = bucket.Root
+		lr.BRoots[i].ObjectCount = bucket.NextObjectID
 		bucket.Unlock()
 	}
 	l.meta.sb.RUnlock()
@@ -269,7 +261,7 @@ func (l *LfsInfo) genRoot() {
 
 	for i := 0; i < int(bucketNum); i++ {
 		bbuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(buf, uint64(lr.BRoots[i].Length))
+		binary.LittleEndian.PutUint64(buf, uint64(lr.BRoots[i].ObjectCount))
 		bbuf = append(bbuf, lr.BRoots[i].Root...)
 		mtree.Push(bbuf)
 	}
@@ -326,7 +318,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 		return err
 	}
 
-	for _, bucket := range l.meta.bucketByID {
+	for _, bucket := range l.meta.buckets {
 		err := l.flushBucketAndObjects(bucket, isForce)
 		if err != nil {
 			return err
@@ -350,7 +342,6 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 	}
 
 	sb := l.meta.sb
-	sb.BucketsSet = sb.bitsetInfo.Bytes()
 	sbBuffer := bytes.NewBuffer(nil)
 	sbDelimitedWriter := ggio.NewDelimitedWriter(sbBuffer)
 	defer sbDelimitedWriter.Close()
@@ -553,7 +544,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 			}
 		}
 
-		l.meta.bucketByID[bucketID].ObjectsBlockSize = int64(objectsBlockLength)
+		l.meta.buckets[bucket.Name].ObjectsBlockSize = int64(objectsBlockLength)
 	}
 
 	return nil
@@ -632,17 +623,14 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		bucketByID := make(map[int32]*superBucket)
-		bucketNameToID := make(map[string]int32)
 
 		return &lfsMeta{
 			sb: &superBlock{
 				SuperBlockInfo: pbSuperBlock,
 				dirty:          false,
-				bitsetInfo:     bitset.From(pbSuperBlock.BucketsSet),
 			},
-			bucketByID:     bucketByID,
-			bucketNameToID: bucketNameToID,
+			buckets:        make(map[string]*superBucket),
+			bucketIDToName: make(map[int64]string),
 		}, nil
 	}
 	utils.MLogger.Warn("Cannot load Lfs superblock.")
@@ -660,10 +648,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 
 	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, metaBackupCount-1, l.keySet)
 	ctx := context.Background()
-	for bucketID, ok := l.meta.sb.bitsetInfo.NextSet(0); ok; bucketID, ok = l.meta.sb.bitsetInfo.NextSet(bucketID + 1) {
-		if !ok {
-			break
-		}
+	for bucketID := int64(1); bucketID < l.meta.sb.NextBucketID; bucketID++ {
 		var data []byte
 		bm, _ := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(-bucketID)), "0", "0")
 		ncidlocal := bm.ToString()
@@ -721,13 +706,12 @@ func (l *LfsInfo) loadBucketInfo() error {
 			tsb.mtree.SetIndex(0)
 			tsb.mtree.Push([]byte(l.fsID + bucket.Name))
 
-			l.meta.bucketByID[int32(bucketID)] = tsb
-
 			bname := bucket.Name
 			if bucket.Deletion {
 				bname = bucket.Name + "." + strconv.Itoa(int(bucket.BucketID))
 			}
-			l.meta.bucketNameToID[bname] = bucket.BucketID
+			l.meta.buckets[bname] = tsb
+			l.meta.bucketIDToName[bucketID] = bname
 		}
 	}
 	return nil

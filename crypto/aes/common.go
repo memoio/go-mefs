@@ -18,11 +18,11 @@ var (
 )
 
 // CreateAesKey creates
-func CreateAesKey(privateKey, queryID []byte, bucketID int32, objectStart int64) [32]byte {
-	tmpkey := make([]byte, len(privateKey)+len(queryID)+12)
+func CreateAesKey(privateKey, queryID []byte, bucketID, objectStart int64) [32]byte {
+	tmpkey := make([]byte, len(privateKey)+len(queryID)+16)
 	copy(tmpkey, privateKey)
 	copy(tmpkey[len(privateKey):], queryID)
-	binary.LittleEndian.PutUint32(tmpkey[len(privateKey)+len(queryID):], uint32(bucketID))
-	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID)+4:], uint64(objectStart))
+	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID):], uint64(bucketID))
+	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID)+8:], uint64(objectStart))
 	return blake2b.Sum256(tmpkey)
 }
