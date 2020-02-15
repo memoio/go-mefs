@@ -195,6 +195,11 @@ func (p *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 		if err != nil {
 			return
 		}
+
+		if gp.sessionID == uuid.Nil {
+			gp.sessionID = sessID
+		}
+
 		if gp.sessionID == sessID {
 			gp.sessionTime = time.Now().Unix()
 		}
