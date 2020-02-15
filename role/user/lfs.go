@@ -250,10 +250,16 @@ func (l *LfsInfo) genRoot() {
 	for _, bucket := range l.meta.buckets {
 		bucket.RLock()
 		i := int(bucket.BucketID - 1)
-		lr.BRoots[i].BucketID = bucket.BucketID
-		lr.BRoots[i].Root = bucket.Root
-		lr.BRoots[i].ObjectCount = bucket.NextObjectID
-		bucket.Unlock()
+		if i >= int(bucketNum) {
+			utils.MLogger.Errorf("bucketID is %d, but total is %d", bucket.BucketID, bucketNum)
+		}
+
+		lr.BRoots[i] = &mpb.BucketRoot{
+			BucketID:    bucket.BucketID,
+			Root:        bucket.Root,
+			ObjectCount: bucket.NextObjectID,
+		}
+		bucket.RUnlock()
 	}
 	l.meta.sb.RUnlock()
 
@@ -266,6 +272,9 @@ func (l *LfsInfo) genRoot() {
 	mtree.Push(buf)
 
 	for i := 0; i < int(bucketNum); i++ {
+		if lr.BRoots[i] == nil {
+			continue
+		}
 		bbuf := make([]byte, 8)
 		binary.LittleEndian.PutUint64(buf, uint64(lr.BRoots[i].ObjectCount))
 		bbuf = append(bbuf, lr.BRoots[i].Root...)
@@ -806,7 +815,6 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			}
 
 			if object.GetOPart() == nil {
-				utils.MLogger.Warnf("got bucket %s objectinfo fails", bucket.Name)
 				continue
 			}
 
