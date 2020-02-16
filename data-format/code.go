@@ -28,13 +28,8 @@ type DataCoder struct {
 	prefixSize int
 }
 
-// NewDefaultDataCoder creates a new datacoder with default
-func NewDefaultDataCoder(policy, dataCount, pairtyCount int, keyset *mcl.KeySet) *DataCoder {
-	return NewDataCoder(policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, keyset)
-}
-
 // NewDataCoder 构建一个dataformat配置
-func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount int, keyset *mcl.KeySet) *DataCoder {
+func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount int, userID, fsID string) *DataCoder {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
 	}
@@ -58,23 +53,31 @@ func NewDataCoder(policy, dataCount, parityCount, version, tagFlag, segmentSize,
 		SegmentCount: int32(segCount),
 	}
 
-	return NewDataCoderWithBopts(bo, keyset)
+	return NewDataCoderWithBopts(keyset, bo, userID, fsID)
+}
+
+// NewDataCoderWithDefault creates a new datacoder with default
+func NewDataCoderWithDefault(keyset *mcl.KeySet, policy, dataCount, pairtyCount int, userID, fsID string) *DataCoder {
+	return NewDataCoder(keyset, policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, userID, fsID)
 }
 
 // NewDataCoderWithBopts contructs a new datacoder with bucketops
-func NewDataCoderWithBopts(bo *mpb.BucketOptions, keyset *mcl.KeySet) *DataCoder {
+func NewDataCoderWithBopts(keyset *mcl.KeySet, bo *mpb.BucketOptions, userID, fsID string) *DataCoder {
 	pre := &mpb.BlockOptions{
-		Bopts: bo,
+		Bopts:   bo,
+		Start:   0,
+		UserID:  userID,
+		QueryID: fsID,
 	}
 
-	return NewDataCoderWithPrefix(pre, keyset)
+	return NewDataCoderWithPrefix(keyset, pre)
 }
 
 // NewDataCoderWithPrefix creates a new datacoder with prefix
-func NewDataCoderWithPrefix(p *mpb.BlockOptions, k *mcl.KeySet) *DataCoder {
+func NewDataCoderWithPrefix(keyset *mcl.KeySet, p *mpb.BlockOptions) *DataCoder {
 	d := &DataCoder{
 		Prefix: p,
-		BlsKey: k,
+		BlsKey: keyset,
 	}
 	d.PreCompute()
 	return d
@@ -257,7 +260,7 @@ func Repair(stripe [][]byte) ([][]byte, int, error) {
 		return nil, 0, err
 	}
 
-	coder := NewDataCoderWithPrefix(prefix, nil)
+	coder := NewDataCoderWithPrefix(nil, prefix)
 
 	coder.RLength = minLen
 

@@ -7,11 +7,14 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
+	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -41,7 +44,6 @@ type notif struct {
 
 //针对Bucket内stripe的下载，可复用
 type downloadJob struct {
-	fsID           string
 	bucketID       int64
 	encrypt        int32
 	sKey           [32]byte
@@ -52,9 +54,8 @@ type downloadJob struct {
 	writer         io.Writer //用于调度下载，以及返回是否出错
 }
 
-func newDownloadJob(uid string, bid int64, cry int32, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
+func newDownloadJob(bid int64, cry int32, sk [32]byte, dec *dataformat.DataCoder, group *groupInfo, writer io.Writer) *downloadJob {
 	return &downloadJob{
-		fsID:     uid,
 		bucketID: bid,
 		encrypt:  cry,
 		sKey:     sk,
@@ -66,7 +67,6 @@ func newDownloadJob(uid string, bid int64, cry int32, sk [32]byte, dec *dataform
 
 //下载一整个对象的下载任务
 type downloadTask struct {
-	fsID         string
 	bucketID     int64
 	encrypt      int32
 	sKey         [32]byte
@@ -130,10 +130,16 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	// segment的偏移
 	dPos := start % segStripeSize
 
-	decoder := dataformat.NewDataCoderWithBopts(bo, l.keySet)
+	bopt := &mpb.BlockOptions{
+		Bopts:   bo,
+		Start:   0,
+		UserID:  l.userID,
+		QueryID: l.fsID,
+	}
+
+	decoder := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
 
 	dl := &downloadTask{
-		fsID:         l.fsID,
 		bucketID:     bucket.BucketID,
 		group:        l.gInfo,
 		decoder:      decoder,
@@ -167,7 +173,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
 	segPos := segStart * int64(segSize) * int64(dc)
 
-	job := newDownloadJob(do.fsID, do.bucketID, do.encrypt, do.sKey, do.decoder, do.group, do.writer)
+	job := newDownloadJob(do.bucketID, do.encrypt, do.sKey, do.decoder, do.group, do.writer)
 	//构造任务并运行
 	var remain int64
 	//只有下载任务的第一个stripe才可能从非0的offset开始
@@ -260,16 +266,32 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	dataCount := ds.decoder.Prefix.Bopts.DataCount
 	parityCount := ds.decoder.Prefix.Bopts.ParityCount
 	blockCount := dataCount + parityCount
-	bm, err := metainfo.NewBlockMeta(ds.fsID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
+	segSize := ds.decoder.Prefix.Bopts.SegmentSize
+	bm, err := metainfo.NewBlockMeta(ds.group.groupID, strconv.Itoa(int(ds.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
 		utils.MLogger.Error("Download failed: ", err)
 		return 0, err
 	}
 
+	segRemains := int(1 + (remain-1)/int64(dataCount*segSize))
+
+	tagSize, ok := dataformat.TagMap[int(ds.decoder.Prefix.Bopts.TagFlag)]
+	if !ok {
+		tagSize = 48
+	}
+
+	ds.decoder.Prefix.Start = int32(segStart)
+	_, preLen, err := bf.PrefixEncode(ds.decoder.Prefix)
+	if err != nil {
+		return 0, err
+	}
+
+	eachLen := preLen + segRemains*(int(segSize)+int(2+(parityCount-1)/dataCount)*tagSize)
+
 	var count int32
 	needRepair := true //是否需要修复
 	datas := make([][]byte, blockCount)
-
+	var buf strings.Builder
 	for i := 0; i < int(blockCount); i++ {
 		// fails too many, no need to download
 		if blockCount-int32(i)+count < dataCount {
@@ -280,26 +302,31 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		bm.SetCid(strconv.Itoa(i))
 		ncid := bm.ToString()
 		provider, _, err := ds.group.getBlockProviders(ncid)
-		if err != nil || provider == ds.fsID {
+		if err != nil || provider == ds.group.groupID {
 			utils.MLogger.Warnf("Get Block %s 's provider from keeper failed, Err: %s", ncid, err)
 			continue
 		}
 
 		//user给channel合约签名，发给provider
-		mes, money, err := ds.getChannelSign(ncid, provider)
+		mes, money, err := ds.getChannelSign(ncid, eachLen, provider)
 		if err != nil {
 			continue
 		}
 
 		//获取数据块
+		buf.Reset()
+		buf.WriteString(ncid)
+		buf.WriteString(metainfo.DELIMITER)
+		buf.WriteString(strconv.Itoa(int(segStart)))
+		buf.WriteString(metainfo.DELIMITER)
+		buf.WriteString(strconv.Itoa(segRemains))
 		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
 		if err != nil {
 			utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
 			continue
 		}
 		blkData := b.RawData()
-		//需要检查数据块的长度也没问题f
-		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), int(remain))
+		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), segRemains)
 		if !ok || err != nil {
 			utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", ncid, provider, err)
 			continue
@@ -382,11 +409,11 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	return remain, nil
 }
 
-func (ds *downloadJob) getChannelSign(ncid string, provider string) ([]byte, *big.Int, error) {
+func (ds *downloadJob) getChannelSign(ncid string, readLen int, provider string) ([]byte, *big.Int, error) {
 	// for test
 	money := big.NewInt(0)
 	hexSK := ds.group.privKey
-	channelID := ds.fsID
+	channelID := ds.group.groupID
 
 	pinfo, ok := ds.group.providers[provider]
 	if !ok {
@@ -396,7 +423,7 @@ func (ds *downloadJob) getChannelSign(ncid string, provider string) ([]byte, *bi
 
 	if pinfo.chanItem != nil {
 		channelID = pinfo.chanItem.ChannelID
-		addValue := int64((dataformat.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
+		addValue := int64(readLen) * utils.READPRICEPERMB
 		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
 	}
 

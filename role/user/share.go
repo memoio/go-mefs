@@ -126,7 +126,16 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	sul.privateKey = localSk
 
 	bo := sl.BOpts
-	decoder := dataformat.NewDataCoderWithBopts(bo, sul.keySet)
+
+	bopt := &mpb.BlockOptions{
+		Bopts:   bo,
+		Start:   0,
+		UserID:  sl.UserID,
+		QueryID: sl.QueryID,
+	}
+
+	decoder := dataformat.NewDataCoderWithPrefix(sul.keySet, bopt)
+
 	segSize := int64(bo.GetSegmentSize())
 	stripeSize := int64(bo.SegmentCount * bo.SegmentSize * bo.GetDataCount())
 
@@ -140,7 +149,6 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 		offsetPos := opart.Start % segSize
 
 		dl := &downloadTask{
-			fsID:         sl.QueryID,
 			bucketID:     sl.BucketID,
 			group:        su.(*LfsInfo).gInfo,
 			decoder:      decoder,

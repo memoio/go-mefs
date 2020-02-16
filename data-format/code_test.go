@@ -21,6 +21,8 @@ var buckid = 1
 var Rslen = 2 * 1024 * 1024
 var Mullen = 1 * 1024 * 1024
 
+var userID = "8MGxCuiT75bje883b7uFb6eMrJt5cP"
+
 func BenchmarkEncode(b *testing.B) {
 	err := mcl.Init(mcl.BLS12_381)
 	if err != nil {
@@ -31,7 +33,7 @@ func BenchmarkEncode(b *testing.B) {
 		log.Fatal(err)
 	}
 
-	opt := NewDefaultDataCoder(RsPolicy, 3, 2, keyset)
+	opt := NewDataCoderWithDefault(keyset, RsPolicy, 3, 2, userID, userID)
 
 	data := make([]byte, 4096*3)
 	fillRandom(data)
@@ -56,7 +58,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 		log.Fatal(err)
 	}
 
-	opt := NewDefaultDataCoder(policy, dc, pc, keyset)
+	opt := NewDataCoderWithDefault(keyset, policy, dc, pc, userID, userID)
 
 	dlen := size
 

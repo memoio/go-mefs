@@ -27,7 +27,6 @@ type UploadOptions struct {
 
 // uploadTask has info for upload
 type uploadTask struct { //一个上传任务实例
-	fsID      string
 	encrypt   int32
 	sKey      [32]byte
 	bucketID  int64
@@ -98,10 +97,16 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	bucket.objects[objectName] = object
 
-	encoder := dataformat.NewDataCoderWithBopts(bucket.BOpts, l.keySet)
+	bopt := &mpb.BlockOptions{
+		Bopts:   bucket.BOpts,
+		Start:   0,
+		UserID:  l.userID,
+		QueryID: l.fsID,
+	}
+
+	encoder := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
 
 	ul := &uploadTask{
-		fsID:      l.fsID,
 		startTime: time.Now(), // for queue?
 		reader:    reader,
 		gInfo:     l.gInfo,
@@ -274,7 +279,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					}
 				}
 
-				bm, _ := metainfo.NewBlockMeta(u.fsID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
+				bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
 
 				encodedData, offset, err := enc.Encode(data, bm.ToString(3), start)
 				if err != nil {
@@ -298,7 +303,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 						blockMetas[i].cid = ncid
 						blockMetas[i].offset = offset
-						blockMetas[i].provider = u.fsID
+						blockMetas[i].provider = u.gInfo.groupID
 						if i >= len(pros) {
 							continue
 						}
@@ -329,10 +334,10 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
 						blockMetas[i].cid = ncid
 						blockMetas[i].offset = offset
-						blockMetas[i].provider = u.fsID
+						blockMetas[i].provider = u.gInfo.groupID
 
 						provider, _, err := u.gInfo.getBlockProviders(ncid)
-						if err != nil || provider == u.fsID {
+						if err != nil || provider == u.gInfo.groupID {
 							continue
 						}
 						blockMetas[i].provider = provider

@@ -123,11 +123,6 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 				utils.MLogger.Errorf("verify sig for block %s failed, money is not enough, has %s, expected %s", splitedNcid[0], cItem.Money.String(), value.String())
 				return nil, errors.New("money is not enough")
 			}
-
-			ok := verifyChanValue(cItem.Value, value)
-			if !ok {
-				return nil, errors.New("money is not right")
-			}
 		}
 
 		if res {
@@ -138,7 +133,13 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 				return nil, err
 			}
 
+			readLen := len(b.RawData())
 			if value != nil {
+				ok := verifyChanValue(cItem.Value, value, readLen)
+				if !ok {
+					return nil, errors.New("money is not right")
+				}
+
 				cItem.Value = value
 				cItem.Sig = sig
 
@@ -193,9 +194,9 @@ func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
 	return res, chanGot, valueGot, nil
 }
 
-func verifyChanValue(oldValue, newValue *big.Int) bool {
+func verifyChanValue(oldValue, newValue *big.Int, readLen int) bool {
 	//verify value;： value ?= oldValue + 100
-	addValue := big.NewInt(int64((df.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB))
+	addValue := big.NewInt(int64(readLen) * utils.READPRICEPERMB)
 	addValue.Add(addValue, oldValue)
 	if newValue.Cmp(addValue) < 0 {
 		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", addValue.String())

@@ -376,7 +376,7 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 	}
 	ncidPrefix := bm.ToString(3)
 
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int(defaultMetaBackupCount)-1, l.keySet)
+	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, int(defaultMetaBackupCount)-1, l.userID, l.fsID)
 	dataEncoded, offset, err := enc.Encode(data, ncidPrefix, 0)
 	if err != nil {
 		return err
@@ -457,7 +457,7 @@ func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 	}
 
 	metaBackupCount := int(l.meta.sb.MetaBackupCount)
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, metaBackupCount-1, l.keySet)
+	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
 
 	bm, err := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(-bucket.BucketID)), "0", "0")
 	if err != nil {
@@ -508,7 +508,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 	defer objectDelimitedWriter.Close()
 
 	metaBackupCount := l.meta.sb.MetaBackupCount
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int(metaBackupCount-1), l.keySet)
+	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, int(metaBackupCount-1), l.userID, l.fsID)
 
 	providers, _, err := l.gInfo.GetProviders(int(metaBackupCount))
 	if err != nil && len(providers) == 0 {
@@ -572,7 +572,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 	if l.keySet == nil {
 		return nil, ErrKeySetIsNil
 	}
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, int(defaultMetaBackupCount-1), l.keySet)
+	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, int(defaultMetaBackupCount-1), l.userID, l.fsID)
 
 	var data []byte
 
@@ -660,7 +660,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 
 	metaBackupCount := int(l.meta.sb.MetaBackupCount)
 
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, metaBackupCount-1, l.keySet)
+	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
 	ctx := context.Background()
 	for bucketID := int64(1); bucketID < l.meta.sb.NextBucketID; bucketID++ {
 		var data []byte
@@ -746,7 +746,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 	fullData := make([]byte, 0, objectsBlockSize)
 
 	metaBackupCount := int(l.meta.sb.MetaBackupCount)
-	enc := dataformat.NewDefaultDataCoder(dataformat.MulPolicy, 1, metaBackupCount-1, l.keySet)
+	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
 
 	stripeID := 1 //ObjectsBlock的Stripe从1开始计算
 	ctx := context.Background()
