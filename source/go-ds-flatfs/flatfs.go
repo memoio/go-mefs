@@ -728,7 +728,8 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 	bkey := key
 	sval := strings.Split(key.String(), metainfo.DELIMITER)
 	switch len(sval) {
-	case 1:
+	case 1, 2:
+		bkey = datastore.NewKey(sval[0])
 		_, path := fs.encode(bkey)
 		data, err := ioutil.ReadFile(path)
 		if err != nil {

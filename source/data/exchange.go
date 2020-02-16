@@ -257,15 +257,15 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	}
 
 	utils.MLogger.Debug("GetBlock: ", key, " from: ", to)
-	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
-		block, err := n.bstore.Get(cid.NewCidV2([]byte(bids[0])))
+		block, err := n.bstore.Get(cid.NewCidV2([]byte(key)))
 		if err == nil {
 			return block, nil
 		}
 		return nil, err
 	}
 
+	bids := strings.Split(key, metainfo.DELIMITER)
 	if len(bids) == 1 {
 		km, _ := metainfo.NewKey(bids[0], mpb.KeyType_Block)
 		key = km.ToString()
