@@ -19,7 +19,7 @@ import (
 
 func (k *Info) stPayRegular(ctx context.Context) {
 	utils.MLogger.Info("SpaceTime Pay start!")
-	ticker := time.NewTicker(SPACETIMEPAYTIME)
+	ticker := time.NewTicker(spaceTimePayTime)
 	defer ticker.Stop()
 	for {
 		select {

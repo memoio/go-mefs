@@ -2,11 +2,22 @@ package keeper
 
 import (
 	"context"
+	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/metainfo"
+)
+
+const (
+	expireTime       = int64(30 * 60) //超过这个时间，触发修复，单位：秒
+	chalTime         = 5 * time.Minute
+	chalRepairTime   = 7 * time.Minute
+	persistTime      = 3 * time.Minute
+	spaceTimePayTime = 61 * time.Minute
+	checkConnTime    = 5 * time.Minute
+	kpMapTime        = 11 * time.Minute
 )
 
 //---config----

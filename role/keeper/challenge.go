@@ -18,7 +18,7 @@ import (
 
 func (k *Info) challengeRegular(ctx context.Context) {
 	utils.MLogger.Info("Challenge service start!")
-	ticker := time.NewTicker(CHALTIME)
+	ticker := time.NewTicker(chalTime)
 	defer ticker.Stop()
 	for {
 		select {

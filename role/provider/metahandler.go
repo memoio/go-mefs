@@ -130,7 +130,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gp := p.getGroupInfo(uid, gid, false)
 	if gp != nil {
-		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < EXPIRETIME {
+		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < expireTime {
 			return []byte(gp.sessionID.String()), nil
 		}
 		ok := p.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)

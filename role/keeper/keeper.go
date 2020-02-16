@@ -25,16 +25,6 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-const (
-	EXPIRETIME       = int64(30 * 60) //超过这个时间，触发修复，单位：秒
-	CHALTIME         = 5 * time.Minute
-	CHECKTIME        = 7 * time.Minute
-	PERSISTTIME      = 3 * time.Minute
-	SPACETIMEPAYTIME = 61 * time.Minute
-	CONPEERTIME      = 5 * time.Minute
-	KPMAPTIME        = 11 * time.Minute
-)
-
 //Info implements user service
 type Info struct {
 	localID    string
@@ -120,7 +110,7 @@ func (k *Info) Stop() error {
 
 func (k *Info) persistRegular(ctx context.Context) {
 	utils.MLogger.Info("Persist local peerInfo start!")
-	ticker := time.NewTicker(PERSISTTIME)
+	ticker := time.NewTicker(persistTime)
 	defer ticker.Stop()
 	for {
 		select {

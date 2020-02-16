@@ -103,7 +103,7 @@ func (k *Info) getKpMapRegular(ctx context.Context) {
 
 	peerID := k.localID
 	role.SaveKpMap(peerID)
-	ticker := time.NewTicker(KPMAPTIME)
+	ticker := time.NewTicker(kpMapTime)
 	defer ticker.Stop()
 	for {
 		select {

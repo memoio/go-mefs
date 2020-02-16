@@ -14,8 +14,8 @@ import (
 
 func (k *Info) checkLedger(ctx context.Context) {
 	utils.MLogger.Info("Check Ledger start!")
-	time.Sleep(2 * CHALTIME)
-	ticker := time.NewTicker(CHECKTIME)
+	time.Sleep(2 * chalTime)
+	ticker := time.NewTicker(chalRepairTime)
 	defer ticker.Stop()
 	for {
 		select {
@@ -56,21 +56,21 @@ func (k *Info) checkLedger(ctx context.Context) {
 						eclasped := time.Now().Unix() - thisinfo.availtime
 						switch thisinfo.repair {
 						case 0:
-							if EXPIRETIME < eclasped {
+							if expireTime < eclasped {
 								cid := pre + metainfo.BlockDelimiter + key.(string)
 								utils.MLogger.Info("Need repair cid first time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 1:
-							if 4*EXPIRETIME < eclasped {
+							if 4*expireTime < eclasped {
 								cid := pre + metainfo.BlockDelimiter + key.(string)
 								utils.MLogger.Info("Need repair cid second time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 2:
-							if 16*EXPIRETIME < eclasped {
+							if 16*expireTime < eclasped {
 								cid := pre + metainfo.BlockDelimiter + key.(string)
 								utils.MLogger.Info("Need repair cid third time: ", cid)
 								thisinfo.repair++
@@ -78,9 +78,9 @@ func (k *Info) checkLedger(ctx context.Context) {
 							}
 						default:
 							// > 30 days; we donnot repair
-							if 480*EXPIRETIME >= eclasped {
+							if 480*expireTime >= eclasped {
 								// try every 32 hours
-								if int64(64*thisinfo.repair-2)*EXPIRETIME < eclasped {
+								if int64(64*thisinfo.repair-2)*expireTime < eclasped {
 									cid := pre + metainfo.BlockDelimiter + key.(string)
 									utils.MLogger.Info("Need repair cid tried: ", cid)
 									thisinfo.repair++

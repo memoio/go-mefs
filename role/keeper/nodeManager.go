@@ -120,7 +120,7 @@ func (k *Info) checkPeers(ctx context.Context) {
 	// sleep 1 minutes and then check
 	time.Sleep(time.Minute)
 	k.checkConnectedPeer(ctx)
-	ticker := time.NewTicker(CONPEERTIME)
+	ticker := time.NewTicker(checkConnTime)
 	defer ticker.Stop()
 	for {
 		select {
@@ -152,7 +152,7 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 			continue
 		}
 
-		if ntime-thisInfo.availTime > EXPIRETIME {
+		if ntime-thisInfo.availTime > expireTime {
 			thisInfo.online = false
 		}
 	}
@@ -172,7 +172,7 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 			continue
 		}
 
-		if ntime-thisInfo.availTime > EXPIRETIME {
+		if ntime-thisInfo.availTime > expireTime {
 			thisInfo.online = false
 		}
 	}
