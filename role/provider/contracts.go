@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
@@ -96,6 +97,10 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				return true
 			}
 
+			if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+				return true
+			}
+
 			km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
 			if err != nil {
 				return true
@@ -121,27 +126,25 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				cItem.Sig = valueByte
 			}
 
-			if cItem.Value.Cmp(cItem.Money) >= 0 {
+			// close before timeout
+			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) {
 				cSign := new(mpb.ChannelSign)
 				err = proto.Unmarshal(cItem.Sig, cSign)
 				if err != nil {
 					return true
 				}
 
-				// need verify value again
-				retry := 3
-				for retry > 0 {
-					retry--
-					err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
-					if err != nil {
-						continue
-					}
-					break
+				// need verify value again;
+				err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
+				if err != nil {
+					return true
 				}
+
+				cItem.Money = role.GetBalance(cItem.ChannelID)
 			}
+
 			return true
 		})
-
 	}
 
 	return nil
@@ -175,7 +178,9 @@ func (g *groupInfo) loadContracts(proID string) error {
 		return err
 	}
 
-	g.channel.Store(cItem.ChannelID, &cItem)
+	if cItem.Money.Cmp(big.NewInt(0)) > 0 {
+		g.channel.Store(cItem.ChannelID, &cItem)
+	}
 
 	return nil
 }
@@ -190,9 +195,19 @@ func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {
 			return nil
 		}
 
-		g.channel.Store(chanID, &cItem)
-		return &cItem
+		if cItem.Money.Cmp(big.NewInt(0)) > 0 {
+			g.channel.Store(chanID, &cItem)
+			return &cItem
+		}
+
+		return nil
 	}
 
-	return cv.(*role.ChannelItem)
+	cItem := cv.(*role.ChannelItem)
+
+	if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+		g.channel.Delete(chanID)
+	}
+
+	return cItem
 }

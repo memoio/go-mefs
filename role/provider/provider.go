@@ -255,7 +255,7 @@ func (p *Info) getGroups() []quKey {
 
 func (p *Info) saveRegular(ctx context.Context) {
 	time.Sleep(time.Minute)
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
@@ -427,6 +427,7 @@ func (p *Info) save(ctx context.Context) error {
 	pids.Reset()
 	for _, qu := range res {
 		p.saveChannelValue(qu.uid, qu.qid, p.localID)
+		p.loadChannelValue(qu.uid, qu.qid)
 	}
 
 	return nil

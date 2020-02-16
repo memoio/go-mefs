@@ -1016,74 +1016,78 @@ func (g *groupInfo) loadContracts(pid string) error {
 	}
 
 	ctx := context.Background()
+	g.Lock()
+	defer g.Unlock()
+
 	var wg sync.WaitGroup
 	for _, pInfo := range g.providers {
 		wg.Add(1)
 		go func(proInfo *providerInfo) {
 			defer wg.Done()
 			proID := proInfo.providerID
-			var cItem *role.ChannelItem
-			if proInfo.chanItem != nil {
-				cItem = proInfo.chanItem
+			cItem := proInfo.chanItem
+			if cItem != nil {
 				if pid == proID {
 					cItem.Money = role.GetBalance(cItem.ChannelID)
 				}
 			} else {
 				gotItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
-				if err != nil {
+				if err == nil {
 					cItem = &gotItem
 				}
 			}
 
-			if time.Now().Unix()-cItem.StartTime < cItem.Duration {
-				if cItem.Money.Cmp(big.NewInt(0)) != 0 {
-					km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
-					if err != nil {
-						return
-					}
-
-					valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
-					if err == nil && len(valueByte) > 0 {
-						cSign := &mpb.ChannelSign{}
-						err = proto.Unmarshal(valueByte, cSign)
-						if err == nil {
-							ok := role.VerifyChannelSign(cSign)
-							if ok {
-								value := new(big.Int).SetBytes(cSign.GetValue())
-								utils.MLogger.Info("channel value in local is:", value.String())
-								if value.Cmp(cItem.Value) > 0 {
-									cItem.Value = value
-									cItem.Sig = valueByte
-								}
-							}
+			if cItem != nil {
+				if time.Now().Unix()-cItem.StartTime < cItem.Duration {
+					if cItem.Money.Cmp(big.NewInt(0)) != 0 {
+						km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
+						if err != nil {
+							return
 						}
 
-						utils.MLogger.Info("try to get channel value from remote: ", proID)
-						valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
-						if err == nil {
-							err = proto.Unmarshal(valueRemote, cSign)
+						valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
+						if err == nil && len(valueByte) > 0 {
+							cSign := &mpb.ChannelSign{}
+							err = proto.Unmarshal(valueByte, cSign)
 							if err == nil {
 								ok := role.VerifyChannelSign(cSign)
 								if ok {
 									value := new(big.Int).SetBytes(cSign.GetValue())
-									utils.MLogger.Info("channel value from remote is:", value.String())
+									utils.MLogger.Info("channel value in local is:", value.String())
 									if value.Cmp(cItem.Value) > 0 {
 										cItem.Value = value
-										cItem.Sig = valueRemote
+										cItem.Sig = valueByte
+									}
+								}
+							}
+
+							utils.MLogger.Info("try to get channel value from remote: ", proID)
+							valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
+							if err == nil {
+								err = proto.Unmarshal(valueRemote, cSign)
+								if err == nil {
+									ok := role.VerifyChannelSign(cSign)
+									if ok {
+										value := new(big.Int).SetBytes(cSign.GetValue())
+										utils.MLogger.Info("channel value from remote is:", value.String())
+										if value.Cmp(cItem.Value) > 0 {
+											cItem.Value = value
+											cItem.Sig = valueRemote
+										}
 									}
 								}
 							}
 						}
+						if cItem.Value.Cmp(cItem.Money) < 0 {
+							proInfo.chanItem = cItem
+							return
+						}
 					}
-					if cItem.Value.Cmp(cItem.Money) < 0 {
-						proInfo.chanItem = cItem
-						return
+				} else {
+					err := role.KillChannel(cItem.ChannelID, g.privKey)
+					if err != nil {
+						utils.MLogger.Errorf("close channel %s fails: %s", cItem.ChannelID, err)
 					}
-				}
-			} else {
-				err := role.KillChannel(cItem.ChannelID, g.privKey)
-				if err != nil {
-					utils.MLogger.Errorf("close channel %s fails: %s", cItem.ChannelID, err)
 				}
 			}
 
