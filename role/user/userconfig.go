@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -92,5 +91,5 @@ func (l *LfsInfo) loadBLS12Config() error {
 		return nil
 	}
 
-	return errors.New("No bls key")
+	return role.ErrEmptyBlsKey
 }

@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"sort"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -56,11 +56,11 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	utils.MLogger.Info(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
 	defer utils.MLogger.Info("========spacetimepay========")
 	if !g.isMaster(proID) {
-		return errors.New("fail to pay")
+		return nil
 	}
 
 	if g.upkeeping != nil {
-		return errors.New("fail to pay")
+		return nil
 	}
 
 	// TODO: exit when balance is too low
@@ -78,37 +78,36 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	// PosAdd
 	if !found {
-		if g.userID == pos.GetPosId() {
-			providerAddr, err := address.GetAddressFromID(proID)
-			if err != nil {
-				return err
-			}
-
-			userAddr, err := address.GetAddressFromID(pos.GetPosId())
-			if err != nil {
-				return err
-			}
-
-			queryAddr, err := address.GetAddressFromID(pos.GetPosGID())
-			if err != nil {
-				return err
-			}
-
-			err = contracts.AddProvider(pos.PosSkStr, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
-			if err != nil {
-				utils.MLogger.Info("st AddProvider() error: ", err)
-				return err
-			}
-
-			price = pos.GetPosPrice()
-		} else {
-			return errors.New("fail to pay")
+		if g.userID != pos.GetPosId() {
+			return nil
 		}
+		providerAddr, err := address.GetAddressFromID(proID)
+		if err != nil {
+			return err
+		}
+
+		userAddr, err := address.GetAddressFromID(pos.GetPosId())
+		if err != nil {
+			return err
+		}
+
+		queryAddr, err := address.GetAddressFromID(pos.GetPosGID())
+		if err != nil {
+			return err
+		}
+
+		err = contracts.AddProvider(pos.PosSkStr, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
+		if err != nil {
+			utils.MLogger.Info("st AddProvider() error: ", err)
+			return err
+		}
+
+		price = pos.GetPosPrice()
 	}
 
 	thisIlinfo, ok := g.ledgerMap.Load(proID)
 	if !ok {
-		return errors.New("No such provider")
+		return role.ErrNotMyProvider
 	}
 
 	thisLinfo := thisIlinfo.(*lInfo)
@@ -227,7 +226,7 @@ func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
 func (l *lInfo) parseLastPayKV(value []byte) error {
 	splitedValue := strings.Split(string(value), metainfo.DELIMITER)
 	if len(splitedValue) < 5 {
-		return errParaseMetaFailed
+		return role.ErrWrongValue
 	}
 
 	st, ok := big.NewInt(0).SetString(splitedValue[2], 10)

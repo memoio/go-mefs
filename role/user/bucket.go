@@ -22,7 +22,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	}
 
 	if !l.writable {
-		return nil, ErrReadOnly
+		return nil, ErrLfsReadOnly
 	}
 
 	err := checkBucketName(bucketName)
@@ -88,7 +88,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	}
 
 	if !l.writable {
-		return nil, ErrReadOnly
+		return nil, ErrLfsReadOnly
 	}
 
 	err := checkBucketName(bucketName)

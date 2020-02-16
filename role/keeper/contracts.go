@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,8 +14,9 @@ import (
 // force update if mode is set true
 func (g *groupInfo) loadContracts(mode bool) error {
 	if g.groupID == g.userID {
-		return errors.New("not deploying contracts")
+		return nil
 	}
+
 	// get upkkeeping addr
 	if g.query == nil || mode {
 		qItem, err := role.GetQueryInfo(g.userID, g.groupID)
@@ -42,7 +42,7 @@ func (g *groupInfo) loadContracts(mode bool) error {
 		// not my user
 		if !flag {
 			utils.MLogger.Warnf("user %s 's fsID %s not my user", g.userID, g.groupID)
-			return errors.New("Not my user")
+			return role.ErrNotMyUser
 		}
 
 		g.providers = uItem.ProviderIDs
@@ -58,7 +58,7 @@ func (g *groupInfo) loadContracts(mode bool) error {
 func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 	gp := k.getGroupInfo(uid, gid, false)
 	if gp == nil || gp.upkeeping == nil {
-		return errors.New("No upkeeping")
+		return role.ErrNoContract
 	}
 
 	providerAddr, err := address.GetAddressFromID(pid)

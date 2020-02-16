@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -191,7 +190,7 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 
 	ops := km.GetOptions()
 	if len(ops) != 4 {
-		return nil, errors.New("key is not right")
+		return nil, role.ErrWrongKey
 	}
 
 	uid := ops[0]
@@ -210,7 +209,7 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 		return []byte("ok"), nil
 	}
 
-	return nil, errors.New("not my user")
+	return nil, role.ErrNotMyUser
 }
 
 // key: queryID/"UserStart"/userID/keepercount/providercount/sessionID/"force";
@@ -220,12 +219,12 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
 		utils.MLogger.Info("UserStart value is not correct: ", metaValue)
-		return nil, errors.New("value is not right")
+		return nil, role.ErrWrongValue
 	}
 
 	ops := km.GetOptions()
 	if len(ops) != 5 {
-		return nil, errors.New("key is not right")
+		return nil, role.ErrWrongKey
 	}
 
 	kc, err := strconv.Atoi(ops[1])
@@ -266,7 +265,7 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		return []byte(sessID.String()), nil
 	}
 
-	return nil, errors.New("not my user")
+	return nil, role.ErrNotMyUser
 }
 
 // fillPinfo fill user's uInfo, groupInfo in ukpMap
@@ -275,7 +274,7 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {
 		utils.MLogger.Info("UserNotif value is not correct: ", metaValue)
-		return nil, errors.New("metavalue is not right")
+		return nil, role.ErrWrongValue
 	}
 
 	var keepers, providers []string

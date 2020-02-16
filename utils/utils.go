@@ -25,8 +25,8 @@ const (
 	//utils.IDLength  目前ID的长度
 	IDLength = 30
 
-	//READPRICEPERMB 读支付中1MB内容需要支付的金额
-	READPRICEPERMB int64 = 1000000
+	//READPRICEPERMB 读支付中1KB内容需要支付的金额
+	READPRICEPERMB int64 = 1024 * 1024
 
 	// Stored price 3$/TB*Month
 	// 1 eth=0.01$

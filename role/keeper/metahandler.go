@@ -2,11 +2,11 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -186,12 +186,12 @@ func (k *Info) handleChalTime(km *metainfo.Key) ([]byte, error) {
 
 	blockID := km.GetMid()
 	if len(blockID) <= utils.IDLength {
-		return nil, errUnmatchedPeerID
+		return nil, role.ErrWrongKey
 	}
 
 	sValue := strings.SplitN(string(blockID), metainfo.BlockDelimiter, 2)
 	if len(sValue) != 2 {
-		return nil, errors.New("Wrong value")
+		return nil, role.ErrWrongValue
 	}
 	qid := sValue[0]
 	bid := sValue[1]

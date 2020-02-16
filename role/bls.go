@@ -1,8 +1,6 @@
 package role
 
 import (
-	"errors"
-
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
@@ -59,7 +57,7 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 
 func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, error) {
 	if len(userBLS12config) == 0 {
-		return nil, errors.New("empty blskey byte")
+		return nil, ErrEmptyBlsKey
 	}
 
 	mkey := new(mcl.KeySet)
@@ -106,7 +104,8 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		c := btcec.S256()
 		seck, _ := btcec.PrivKeyFromBytes(c, privKey)
 		if seck == nil {
-			return mkey, errors.New("get user's secrete key error")
+			utils.MLogger.Info("calculate private key fails")
+			return mkey, nil
 		}
 
 		blsk, err := btcec.Decrypt(seck, userBLS12ConfigProto.PrikeyBls)

@@ -1,7 +1,6 @@
 package role
 
 import (
-	"errors"
 	"math/big"
 	"sync"
 	"time"
@@ -18,8 +17,6 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
-
-var errBalance = errors.New("your account's balance is insufficient, we will not deploy resolver")
 
 // ProviderItem has provider's info
 type ProviderItem struct {
@@ -137,7 +134,7 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 		break
 	}
 
-	return item, errors.New("is not a keeper")
+	return item, ErrNotKeeper
 }
 
 func IsKeeper(userID string) (bool, error) {
@@ -189,7 +186,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 		break
 	}
 
-	return item, errors.New("is not a provider")
+	return item, ErrNotProvider
 }
 
 func IsProvider(userID string) (bool, error) {
@@ -332,7 +329,7 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	leastMoney = leastMoney.Add(moneyAccount, deployPrice)
 	if balance.Cmp(leastMoney) < 0 { //余额不足
 		utils.MLogger.Info(uaddr.String(), " need more balance to start")
-		return queryID, errBalance
+		return queryID, ErrNotEnoughBalance
 	}
 
 	// deploy query
@@ -640,10 +637,9 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 		return chanAddr, err
 	}
 
-	//依次与各provider签署channel合约
-	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60)) //秒，存储时间
-	var moneyToChannel = new(big.Int)
-	moneyToChannel = moneyToChannel.Mul(big.NewInt(storeSize*1000), big.NewInt(int64(utils.READPRICEPERMB))) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
+	//依次与各provider签署channel合约，存储时间单位秒
+	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60))
+	moneyToChannel := big.NewInt(utils.READPRICEPERMB * int64(storeSize*100)) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
 
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
@@ -735,6 +731,29 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 	}
 }
 
+// GetBalance gets balance from
+func GetBalance(pid string) *big.Int {
+	paddr, err := address.GetAddressFromID(pid)
+	if err != nil {
+		return big.NewInt(0)
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		balance, err := contracts.QueryBalance(paddr.String())
+		if err != nil {
+			if retryCount > 10 {
+				return big.NewInt(0)
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		return balance
+	}
+}
+
 // GetLatestChannel gets
 func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 	utils.MLogger.Debugf("get channel for user %s, provider %s, and query %s", userID, proID, queryID)
@@ -773,7 +792,7 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 
 	if item.UserID != userID || item.ProID != proID {
 		utils.MLogger.Errorf("got queryID %s, sender %s and receiver %s are not compatabile: ", item.ChannelID, item.UserID, item.ProID)
-		return item, errors.New("sender and receiver are not compatabile")
+		return item, ErrWrongContarctContent
 	}
 
 	return item, nil
@@ -846,6 +865,16 @@ func CloseChannel(channelID, sk string, sign []byte, value *big.Int) error {
 	}
 
 	return contracts.CloseChannel(chanAddress, sk, sign, value)
+}
+
+// KillChannel closes chnannel by users
+func KillChannel(channelID, sk string) error {
+	chanAddress, err := address.GetAddressFromID(channelID)
+	if err != nil {
+		return err
+	}
+
+	return contracts.ChannelTimeout(chanAddress, sk)
 }
 
 // GetKeepersOfPro get keepers of some provider

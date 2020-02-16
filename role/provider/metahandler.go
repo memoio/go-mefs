@@ -2,11 +2,11 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -102,7 +102,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	gid := km.GetMid()
 	ops := km.GetOptions()
 	if len(ops) != 5 {
-		return nil, errors.New("wrong key")
+		return nil, role.ErrWrongKey
 	}
 
 	uid := ops[0]
@@ -110,7 +110,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	if !ok {
 		gp := p.newGroupWithFS(uid, gid, string(metaValue), false)
 		if gp == nil {
-			return nil, errors.New("Not my user")
+			return nil, role.ErrNotMyUser
 		}
 	}
 
@@ -147,7 +147,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		return []byte(sessID.String()), nil
 	}
 
-	return nil, errors.New("Not my user")
+	return nil, role.ErrNotMyUser
 }
 
 func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
@@ -155,7 +155,7 @@ func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 
 	ops := km.GetOptions()
 	if len(ops) != 4 {
-		return nil, errors.New("wrong key")
+		return nil, role.ErrWrongKey
 	}
 	gid := km.GetMid()
 
@@ -175,7 +175,7 @@ func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 		return []byte("ok"), nil
 	}
 
-	return nil, errors.New("Not my user")
+	return nil, role.ErrNotMyUser
 }
 
 func (p *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) {

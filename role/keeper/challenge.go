@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -80,7 +80,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 	// no data
 	if len(ret) == 0 || psum == 0 {
 		l.inChallenge = false
-		return "", nil, errors.New("no data")
+		return "", nil, role.ErrEmptyData
 	}
 
 	challengetime := time.Now().Unix()

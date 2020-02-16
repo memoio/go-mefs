@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"io"
 	"math/rand"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -47,7 +47,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	if !l.writable {
-		return nil, ErrReadOnly
+		return nil, ErrLfsReadOnly
 	}
 
 	err := checkObjectName(objectName)
@@ -251,7 +251,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// handle it before
 			if endOffset >= int(u.encoder.Prefix.Bopts.GetSegmentCount()) {
 				utils.MLogger.Error("Wrong offset, need to handle: ", endOffset)
-				return errors.New("Read length unexpected err")
+				return role.ErrRead
 			}
 
 			u.length += int64(n)

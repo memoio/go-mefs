@@ -354,7 +354,7 @@ func (p *Info) load(ctx context.Context) error {
 
 func (p *Info) save(ctx context.Context) error {
 	if !p.state {
-		return errProviderServiceNotReady
+		return role.ErrServiceNotReady
 	}
 
 	localID := p.localID

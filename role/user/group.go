@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strconv"
 	"strings"
@@ -188,7 +187,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 
 func (g *groupInfo) connect(ctx context.Context) error {
 	if g.state != depoyDone {
-		return errors.New("Wrong state")
+		return role.ErrWrongState
 	}
 
 	g.Lock()
@@ -365,8 +364,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 	utils.MLogger.Info("Group Service is ready for: ", g.userID)
 
-	g.loadContracts()
-	g.loadChannelValue()
+	g.loadContracts("")
 
 	g.state = groupStarted
 	return nil
@@ -394,7 +392,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 		select {
 		case <-tick:
 			if timeOutCount >= 30 {
-				return errTimeOut
+				return role.ErrTimeOut
 			}
 			switch g.state {
 			case collecting:
@@ -413,7 +411,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return errors.New("cancel init")
+			return role.ErrCancel
 		}
 	}
 }
@@ -634,7 +632,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 	defer g.Unlock()
 
 	if g.state != deploying {
-		return errors.New("State is wrong")
+		return role.ErrWrongState
 	}
 
 	var res strings.Builder
@@ -689,7 +687,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 
 func (g *groupInfo) stop(ctx context.Context) error {
 	if g.state != groupStarted {
-		return errors.New("Wrong state")
+		return role.ErrWrongState
 	}
 
 	g.Lock()
@@ -726,7 +724,7 @@ func (g *groupInfo) stop(ctx context.Context) error {
 
 func (g *groupInfo) heartbeat(ctx context.Context) error {
 	if g.state != groupStarted {
-		return errors.New("Wrong state")
+		return role.ErrWrongState
 	}
 
 	g.RLock()
@@ -970,10 +968,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	ctx := context.Background()
 
 	if updateMeta { //这个需要等待返回
-		err := g.ds.DeleteBlock(ctx, km.ToString(), provider)
-		if err != nil {
-			return ErrCannotDeleteMetaBlock
-		}
+		g.ds.DeleteBlock(ctx, km.ToString(), provider)
 	} else {
 		go g.ds.DeleteBlock(ctx, km.ToString(), provider)
 	}
@@ -987,7 +982,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	return nil
 }
 
-func (g *groupInfo) loadContracts() error {
+func (g *groupInfo) loadContracts(pid string) error {
 	if g.groupID == g.userID {
 		return nil
 	}
@@ -1020,28 +1015,91 @@ func (g *groupInfo) loadContracts() error {
 		}
 	}
 
+	ctx := context.Background()
 	var wg sync.WaitGroup
 	for _, pInfo := range g.providers {
 		wg.Add(1)
 		go func(proInfo *providerInfo) {
 			defer wg.Done()
-			if proInfo.chanItem == nil {
-				proID := proInfo.providerID
-				cItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
-				if err != nil || cItem.Money.Cmp(big.NewInt(0)) == 0 {
-					_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+			proID := proInfo.providerID
+			var cItem *role.ChannelItem
+			if proInfo.chanItem != nil {
+				cItem = proInfo.chanItem
+				if pid == proID {
+					cItem.Money = role.GetBalance(cItem.ChannelID)
+				}
+			} else {
+				gotItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
+				if err != nil {
+					cItem = &gotItem
+				}
+			}
+
+			if time.Now().Unix()-cItem.StartTime < cItem.Duration {
+				if cItem.Money.Cmp(big.NewInt(0)) != 0 {
+					km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
 					if err != nil {
 						return
 					}
 
-					cItem, err = role.GetLatestChannel(g.shareToID, g.groupID, proID)
-					if err != nil {
-						utils.MLogger.Warn("got channel fails for: ", g.shareToID)
+					valueByte, err := g.ds.GetKey(ctx, km.ToString(), "local")
+					if err == nil && len(valueByte) > 0 {
+						cSign := &mpb.ChannelSign{}
+						err = proto.Unmarshal(valueByte, cSign)
+						if err == nil {
+							ok := role.VerifyChannelSign(cSign)
+							if ok {
+								value := new(big.Int).SetBytes(cSign.GetValue())
+								utils.MLogger.Info("channel value in local is:", value.String())
+								if value.Cmp(cItem.Value) > 0 {
+									cItem.Value = value
+									cItem.Sig = valueByte
+								}
+							}
+						}
+
+						utils.MLogger.Info("try to get channel value from remote: ", proID)
+						valueRemote, err := g.ds.GetKey(ctx, km.ToString(), proID)
+						if err == nil {
+							err = proto.Unmarshal(valueRemote, cSign)
+							if err == nil {
+								ok := role.VerifyChannelSign(cSign)
+								if ok {
+									value := new(big.Int).SetBytes(cSign.GetValue())
+									utils.MLogger.Info("channel value from remote is:", value.String())
+									if value.Cmp(cItem.Value) > 0 {
+										cItem.Value = value
+										cItem.Sig = valueRemote
+									}
+								}
+							}
+						}
+					}
+					if cItem.Value.Cmp(cItem.Money) < 0 {
+						proInfo.chanItem = cItem
 						return
 					}
 				}
-				proInfo.chanItem = &cItem
+			} else {
+				err := role.KillChannel(cItem.ChannelID, g.privKey)
+				if err != nil {
+					utils.MLogger.Errorf("close channel %s fails: %s", cItem.ChannelID, err)
+				}
 			}
+
+			// need redeploy
+			_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+			if err != nil {
+				return
+			}
+
+			gotItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
+			if err != nil {
+				utils.MLogger.Warn("got channel fails for: ", g.shareToID)
+				return
+			}
+
+			proInfo.chanItem = &gotItem
 		}(pInfo)
 	}
 	wg.Wait()

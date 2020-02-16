@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strings"
 
@@ -21,7 +20,7 @@ func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error
 	// key is blockID/"block"
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
-		return errors.New("Wrong value for put block")
+		return role.ErrWrongValue
 	}
 
 	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
@@ -29,7 +28,7 @@ func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error
 
 	gp := p.getGroupInfo(qid, qid, true)
 	if gp == nil {
-		return errors.New("NotMyUser")
+		return role.ErrNotMyUser
 	}
 
 	go func() {
@@ -60,7 +59,7 @@ func (p *Info) handleAppendBlock(km *metainfo.Key, value []byte, from string) er
 	// key is blockID/"Block"/begin/end
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 4 {
-		return errors.New("Wrong value for put block")
+		return role.ErrWrongValue
 	}
 
 	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
@@ -68,7 +67,7 @@ func (p *Info) handleAppendBlock(km *metainfo.Key, value []byte, from string) er
 
 	gp := p.getGroupInfo(qid, qid, true)
 	if gp == nil {
-		return errors.New("NotMyUser")
+		return role.ErrNotMyUser
 	}
 
 	ctx := context.Background()
@@ -87,7 +86,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
-		return nil, errors.New("Wrong value for get block")
+		return nil, role.ErrWrongValue
 	}
 
 	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
@@ -95,7 +94,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 
 	gp := p.getGroupInfo(qid, qid, true)
 	if gp == nil {
-		return nil, errors.New("NotMyUser")
+		return nil, role.ErrNotMyUser
 	}
 
 	ctx := context.Background()
@@ -121,7 +120,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 		if value != nil {
 			if value.Cmp(cItem.Money) > 0 {
 				utils.MLogger.Errorf("verify sig for block %s failed, money is not enough, has %s, expected %s", splitedNcid[0], cItem.Money.String(), value.String())
-				return nil, errors.New("money is not enough")
+				return nil, role.ErrNotEnoughMoney
 			}
 		}
 
@@ -137,7 +136,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 			if value != nil {
 				ok := verifyChanValue(cItem.Value, value, readLen)
 				if !ok {
-					return nil, errors.New("money is not right")
+					return nil, role.ErrWrongMoney
 				}
 
 				cItem.Value = value
@@ -154,7 +153,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 			return b.RawData(), nil
 		}
 		utils.MLogger.Warnf("sign verify is false for %s", splitedNcid[0])
-		return nil, errors.New("Signature is wrong")
+		return nil, role.ErrWrongSign
 	}
 
 	utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
@@ -196,7 +195,7 @@ func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
 
 func verifyChanValue(oldValue, newValue *big.Int, readLen int) bool {
 	//verify value;： value ?= oldValue + 100
-	addValue := big.NewInt(int64(readLen) * utils.READPRICEPERMB)
+	addValue := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
 	addValue.Add(addValue, oldValue)
 	if newValue.Cmp(addValue) < 0 {
 		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", addValue.String())

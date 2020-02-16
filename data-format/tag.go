@@ -12,14 +12,14 @@ const (
 	BLS12 = 3
 )
 
-// DefaultLengths maps a hash code to it's default length
+// TagMap maps a hash code to it's default length
 var TagMap = map[int]int{
 	CRC32: 4,
 	BLS:   32,
 	BLS12: 48,
 }
 
-//根据指定段大小生成标签，index是生成BLS-tag的需要
+//GenTagForSegment 根据指定段大小生成标签，index是生成BLS-tag的需要
 func (d *DataCoder) GenTagForSegment(index, data []byte) ([]byte, error) {
 	switch d.Prefix.GetBopts().TagFlag {
 	case CRC32:

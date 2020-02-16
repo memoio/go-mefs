@@ -3,7 +3,6 @@ package keeper
 import (
 	"bytes"
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/lni/dragonboat/v3"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
@@ -725,7 +725,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 func (k *Info) getBlockPos(qid, bid string) (string, error) {
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp == nil {
-		return "", errBlockNotExist
+		return "", role.ErrNoBlock
 	}
 
 	return gp.getBlockPos(bid)
@@ -734,7 +734,7 @@ func (k *Info) getBlockPos(qid, bid string) (string, error) {
 func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp == nil {
-		return 0, errBlockNotExist
+		return 0, role.ErrNoBlock
 	}
 
 	return gp.getBlockAvail(bid)
@@ -764,7 +764,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 		return gp.addBlockMeta(bid, pid, offset)
 	}
 
-	return errors.New("Not my user")
+	return role.ErrNotMyUser
 }
 
 // flag: weather noyify provider to actual delete

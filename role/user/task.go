@@ -2,14 +2,9 @@ package user
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	mpb "github.com/memoio/go-mefs/proto"
-)
-
-var (
-	ErrJobIsNil = errors.New("job is nil")
 )
 
 // TQuene is a basic priority queue.

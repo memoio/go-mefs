@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -16,16 +15,10 @@ const (
 	EXPIRETIME            = int64(30 * 60)
 )
 
-var (
-	errUnmatchedPeerID         = errors.New("Peer ID is not match")
-	errProviderServiceNotReady = errors.New("Provider service is not ready")
-	errGetContractItem         = errors.New("Can't get contract Item")
-)
-
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	gp := p.getGroupInfo(userID, groupID, true)
 	if gp == nil {
-		return nil, errors.New("No user")
+		return nil, role.ErrNotMyUser
 	}
 
 	if gp.blsKey != nil {
@@ -63,13 +56,13 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 		}
 	}
 
-	return nil, errors.New("No bls config")
+	return nil, role.ErrEmptyBlsKey
 }
 
 func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error) {
 	gp := p.getGroupInfo(userID, groupID, true)
 	if gp == nil {
-		return nil, errors.New("No user")
+		return nil, role.ErrNotMyUser
 	}
 
 	if gp.blsKey != nil && gp.blsKey.Sk != nil {
@@ -109,7 +102,7 @@ func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error)
 		return mkey.Sk, nil
 	}
 
-	return nil, errors.New("No bls config")
+	return nil, role.ErrEmptyBlsKey
 }
 
 // getDiskUsage gets the disk usage

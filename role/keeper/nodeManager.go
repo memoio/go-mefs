@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -88,7 +87,7 @@ func (k *Info) getUInfo(pid string) (*uInfo, error) {
 
 func (k *Info) getKInfo(pid string) (*kInfo, error) {
 	if k.localID == pid {
-		return nil, errors.New("is local keeper")
+		return nil, role.ErrNotMyKeeper
 	}
 
 	thisInfoI, ok := k.keepers.Load(pid)
@@ -253,7 +252,7 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 // GetUsers is
 func (k *Info) GetUsers() ([]string, error) {
 	if !k.state {
-		return nil, errKeeperServiceNotReady
+		return nil, role.ErrServiceNotReady
 	}
 	var res []string
 	k.ukpGroup.Range(func(key, v interface{}) bool {
@@ -282,7 +281,7 @@ func (k *Info) GetUsers() ([]string, error) {
 // GetProviders is
 func (k *Info) GetProviders() ([]string, error) {
 	if !k.state {
-		return nil, errKeeperServiceNotReady
+		return nil, role.ErrServiceNotReady
 	}
 
 	var res []string
@@ -297,7 +296,7 @@ func (k *Info) GetProviders() ([]string, error) {
 // GetKeepers is
 func (k *Info) GetKeepers() ([]string, error) {
 	if !k.state {
-		return nil, errKeeperServiceNotReady
+		return nil, role.ErrServiceNotReady
 	}
 	var res []string
 	k.keepers.Range(func(k, v interface{}) bool {

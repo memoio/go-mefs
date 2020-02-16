@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"errors"
 
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -10,24 +9,11 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-var (
-	errKeeperServiceNotReady = errors.New("keeper service is not ready")
-	errUnmatchedPeerID       = errors.New("peer ID is not match")
-	errBlockNotExist         = errors.New("block does not exist")
-	errNoGroupsInfo          = errors.New("can not find groupInfo")
-	errParaseMetaFailed      = errors.New("no enough data in metainfo")
-	errNotKeeperInThisGroup  = errors.New("local node is not keeper in this group")
-	errPInfoTypeAssert       = errors.New("type asserts err in ukpInfo")
-	errNoChalInfo            = errors.New("can not find this chalinfo")
-	errGetContractItem       = errors.New("Can't get contract Item")
-	errIncorrectParams       = errors.New("Input incorrect params")
-)
-
 //---config----
 func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 	thisGroup := k.getGroupInfo(userID, groupID, false)
 	if thisGroup == nil {
-		return nil, errors.New("No Bls Key")
+		return nil, role.ErrNotMyUser
 	}
 
 	if thisGroup.blsKey != nil {
@@ -65,7 +51,7 @@ func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
 	}
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp == nil {
-		return nil, errors.New("no groupinfo")
+		return nil, role.ErrNotMyUser
 	}
 
 	for _, keeperID := range gp.keepers {
@@ -77,5 +63,5 @@ func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
 		}
 	}
 
-	return nil, errors.New("no user configkey")
+	return nil, role.ErrEmptyBlsKey
 }

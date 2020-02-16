@@ -32,7 +32,7 @@ var (
 	ErrRecoverData      = errors.New("The recovered data is incorrect")
 )
 
-//VerifyBlockLength  verify blocks length
+//VerifyBlockLength verify blocks length
 func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 	if data == nil {
 		return false, ErrDataTooShort

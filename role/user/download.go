@@ -3,7 +3,6 @@ package user
 import (
 	"bufio"
 	"context"
-	"errors"
 	"io"
 	"math/big"
 	"strconv"
@@ -323,6 +322,9 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
 		if err != nil {
 			utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
+			if err == role.ErrNotEnoughMoney || err == role.ErrWrongMoney{
+				ds.group.loadContracts(provider)
+			}
 			continue
 		}
 		blkData := b.RawData()
@@ -410,28 +412,34 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 }
 
 func (ds *downloadJob) getChannelSign(ncid string, readLen int, provider string) ([]byte, *big.Int, error) {
-	// for test
-	money := big.NewInt(0)
 	hexSK := ds.group.privKey
 	channelID := ds.group.groupID
 
-	pinfo, ok := ds.group.providers[provider]
-	if !ok {
-		utils.MLogger.Warn(provider, " is not my provider")
-		return nil, nil, errors.New("No such provider")
-	}
+	for {
+		pinfo, ok := ds.group.providers[provider]
+		if !ok {
+			utils.MLogger.Warn(provider, " is not my provider")
+			return nil, nil, role.ErrNotMyProvider
+		}
 
-	if pinfo.chanItem != nil {
-		channelID = pinfo.chanItem.ChannelID
-		addValue := int64(readLen) * utils.READPRICEPERMB
-		money = money.Add(pinfo.chanItem.Value, big.NewInt(addValue)) //100 + valueBase
-	}
+		if pinfo.chanItem != nil {
+			money := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
+			money.Add(money, pinfo.chanItem.Value) //100 + valueBase
+			if money.Cmp(pinfo.chanItem.Money) > 0 {
+				utils.MLogger.Warn("need to redeploy channel contract for: ", provider)
+				ds.group.loadContracts(provider)
+			}
 
-	mes, err := role.SignForChannel(channelID, hexSK, money)
-	if err != nil {
-		utils.MLogger.Errorf("Signature about Block %s from %s failed.", ncid, provider)
-		return nil, nil, err
-	}
+			channelID = pinfo.chanItem.ChannelID
 
-	return mes, money, nil
+			mes, err := role.SignForChannel(channelID, hexSK, money)
+			if err != nil {
+				utils.MLogger.Errorf("Signature about Block %s from %s failed.", ncid, provider)
+				return nil, nil, err
+			}
+
+			return mes, money, nil
+		}
+		return nil, nil, role.ErrNotMyProvider
+	}
 }

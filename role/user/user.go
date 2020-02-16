@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -85,7 +84,7 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 			ginfo.queryItem = &qItem
 		} else {
 			if sk == "" {
-				return nil, errors.New("user has no private key")
+				return nil, role.ErrEmptyPrivateKey
 			}
 			qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
 			if err != nil {

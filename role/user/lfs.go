@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	"io"
 	"strconv"
 	"sync"
@@ -70,7 +69,7 @@ type objectInfo struct {
 func (l *LfsInfo) Start(ctx context.Context) error {
 	// 证明该user已经启动
 	if l.online || (l.gInfo != nil && l.gInfo.state > starting) {
-		return errors.New("The user is running")
+		return nil
 	}
 
 	l.online = false
@@ -129,7 +128,7 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 		utils.MLogger.Warn("Load superblock fail, so begin to init Lfs :", l.fsID)
 		l.meta, err = initLfs() //初始化
 		if err != nil {
-			return ErrCannotStartLfsService
+			return err
 		}
 	} else {
 		err = l.loadBucketInfo() //再加载Group元数据
@@ -570,7 +569,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 	utils.MLogger.Info("Load superblock: ", l.fsID, " for user:", l.userID)
 	if l.keySet == nil {
-		return nil, ErrKeySetIsNil
+		return nil, role.ErrEmptyBlsKey
 	}
 	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, int(defaultMetaBackupCount-1), l.userID, l.fsID)
 

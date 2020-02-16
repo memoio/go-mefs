@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"errors"
 	"math/big"
 	"sort"
 	"strconv"
@@ -65,7 +64,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 		// not my user
 		if !flag {
 			utils.MLogger.Warn(uid, " is not my user, keepers are: ", keepers)
-			return nil, errors.New("Not my user")
+			return nil, role.ErrNotMyUser
 		}
 	}
 
@@ -158,7 +157,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 
 	thisLinfo := g.getLInfo(pid, true)
 	if thisLinfo == nil {
-		return errors.New("group addBlockMeta err")
+		return nil
 	}
 
 	newcidinfo := &blockInfo{
@@ -195,7 +194,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 
 	thisBucket := g.getBucketInfo(bucketID, true)
 	if thisBucket == nil {
-		return errors.New("cannot create bucket info")
+		return nil
 	}
 
 	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
@@ -260,7 +259,7 @@ func (g *groupInfo) getBlockPos(bid string) (string, error) {
 		}
 	}
 
-	return "", errors.New("No such block")
+	return "", role.ErrNoBlock
 }
 
 func (g *groupInfo) getBlockAvail(bid string) (int64, error) {
@@ -274,7 +273,7 @@ func (g *groupInfo) getBlockAvail(bid string) (int64, error) {
 		}
 	}
 
-	return 0, errors.New("No such block")
+	return 0, role.ErrNoBlock
 }
 
 type bucketInfo struct {

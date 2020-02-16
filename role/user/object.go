@@ -24,7 +24,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	}
 
 	if !l.writable {
-		return nil, ErrReadOnly
+		return nil, ErrLfsReadOnly
 	}
 
 	err := checkBucketName(bucketName)
