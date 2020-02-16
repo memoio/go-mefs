@@ -57,11 +57,6 @@ func (d *Datastore) Get(k ds.Key) ([]byte, error) {
 	return d.child.Get(k)
 }
 
-// GetSegAndTag get
-func (d *Datastore) GetSegAndTag(k ds.Key, offset uint64) ([]byte, []byte, error) {
-	return d.child.GetSegAndTag(k, offset)
-}
-
 // Put stores a key/value.
 func (d *Datastore) Put(k ds.Key, val []byte) error {
 	d.buffer[k] = op{value: val}

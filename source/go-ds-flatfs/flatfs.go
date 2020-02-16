@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -453,7 +454,7 @@ func (fs *Datastore) doOp(oper *op) error {
 	case opRename:
 		return fs.renameAndUpdateDiskUsage(oper.tmp, oper.path)
 	case opAppend:
-		return fs.doAppend(oper.key, oper.v, oper.begin, oper.length)
+		return fs.doAppend(oper.key, oper.v)
 	default:
 		panic("bad operation, this is a bug")
 	}
@@ -534,7 +535,7 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 	return nil
 }
 
-func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length int) error {
+func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 	dir, path := fs.encode(key)
 	fi, err := os.Lstat(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -567,10 +568,6 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length in
 		return dataformat.ErrWrongField
 	}
 
-	if length*int(fieldSize) != len(fields)-preLen {
-		return errUnmatchOffset
-	}
-
 	f, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
 		return err
@@ -594,13 +591,13 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length in
 	writeStart := fsize
 
 	segStart := ((int(fsize)-oldpreLen)-1)/int(fieldSize) + 1
-	if segStart > begin {
-		writeStart = int64(oldpreLen + begin*int(fieldSize))
+	if segStart > int(pre.Start) {
+		writeStart = int64(oldpreLen + int(pre.Start*fieldSize))
 		err = f.Truncate(writeStart)
 		if err != nil {
 			return err
 		}
-	} else if segStart < begin {
+	} else if segStart < int(pre.Start) {
 		return errUnmatchOffset
 	}
 
@@ -721,85 +718,98 @@ func (fs *Datastore) putMany(data map[datastore.Key][]byte) error {
 }
 
 func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
-	_, path := fs.encode(key)
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, datastore.ErrNotFound
-		}
-		// no specific error to return, so just pass it through
-		return nil, err
-	}
-	return data, nil
-}
 
-func (fs *Datastore) GetSegAndTag(key datastore.Key, offset uint64) ([]byte, []byte, error) {
 	fs.shutdownLock.RLock()
 	defer fs.shutdownLock.RUnlock()
 	if fs.shutdown {
-		return nil, nil, ErrClosed
+		return nil, ErrClosed
 	}
 
-	_, path := fs.encode(key)
+	bkey := key
+	sval := strings.Split(key.String(), metainfo.DELIMITER)
+	switch len(sval) {
+	case 1:
+		_, path := fs.encode(bkey)
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, datastore.ErrNotFound
+			}
+			// no specific error to return, so just pass it through
+			return nil, err
+		}
+		return data, nil
+	case 3:
+		bkey = datastore.NewKey(sval[0])
 
-	f, err := os.OpenFile(path, os.O_RDONLY, 0666)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
+		segStart, err := strconv.Atoi(sval[1])
+		if err != nil {
+			return nil, err
+		}
 
-	fInfo, err := f.Stat()
-	if err != nil {
-		return nil, nil, err
-	}
-	fileSize := fInfo.Size()
+		segLength, err := strconv.Atoi(sval[2])
+		if err != nil {
+			return nil, err
+		}
 
-	fReader := bufio.NewReader(f)
-	prefix := make([]byte, 8*binary.MaxVarintLen64)
-	_, err = fReader.Read(prefix)
-	if err != nil {
-		return nil, nil, err
-	}
+		_, path := fs.encode(key)
+		f, err := os.OpenFile(path, os.O_RDONLY, 0666)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
 
-	pre, preLen, err := bf.PrefixDecode(prefix)
-	if err != nil {
-		return nil, nil, err
-	}
+		fInfo, err := f.Stat()
+		if err != nil {
+			return nil, err
+		}
+		fileSize := fInfo.Size()
 
-	tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
-	if !ok {
-		return nil, nil, dataformat.ErrWrongTagFlag
-	}
+		fReader := bufio.NewReader(f)
+		prefix := make([]byte, 8*binary.MaxVarintLen64)
+		_, err = fReader.Read(prefix)
+		if err != nil {
+			return nil, err
+		}
 
-	tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
-	fieldSize := uint64(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
+		pre, preLen, err := bf.PrefixDecode(prefix)
+		if err != nil {
+			return nil, err
+		}
 
-	start := uint64(preLen) + offset*fieldSize
-	if uint64(fileSize) < offset+fieldSize {
-		return nil, nil, dataformat.ErrDataTooShort
-	}
+		tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
+		if !ok {
+			return nil, dataformat.ErrWrongTagFlag
+		}
 
-	segment := make([]byte, pre.Bopts.SegmentSize)
-	tag := make([]byte, tagSize)
-	//-------
-	n, err := f.ReadAt(segment, int64(start))
-	if err != nil {
-		return nil, nil, err
-	}
-	if n != int(pre.Bopts.SegmentSize) {
-		return nil, nil, dataformat.ErrCannotGetSegment
-	}
-	start += uint64(n)
-	//-------
-	n, err = f.ReadAt(tag, int64(start))
-	if err != nil {
-		return nil, nil, err
-	}
-	if n != int(tagSize) {
-		return nil, nil, dataformat.ErrCannotGetSegment
-	}
+		tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
+		fieldSize := int(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
 
-	return segment, tag, nil
+		start := preLen + segStart*fieldSize
+		if fileSize < int64(start+fieldSize*segLength) {
+			return nil, dataformat.ErrDataTooShort
+		}
+
+		pre.Start = int32(segStart)
+		prebuf, preLen, err := bf.PrefixEncode(pre)
+		if err != nil {
+			return nil, err
+		}
+
+		res := make([]byte, preLen+fieldSize*segLength)
+		copy(res, prebuf)
+		n, err := f.ReadAt(res[preLen:], int64(start))
+		if err != nil {
+			return nil, err
+		}
+		if n != int(preLen+fieldSize*segLength) {
+			return nil, dataformat.ErrCannotGetSegment
+		}
+
+		return res, nil
+	default:
+		return nil, ErrNotExist
+	}
 }
 
 func (fs *Datastore) Has(key datastore.Key) (exists bool, err error) {

@@ -45,9 +45,6 @@ type Blockstore interface {
 	// Append appends
 	Append(c cid.Cid, field []byte, begin, length int) error
 
-	// GetSegAndTag
-	GetSegAndTag(cid.Cid, uint64) ([]byte, []byte, error)
-
 	// PutMany puts a slice of blocks at the same time using batching
 	// capabilities of the underlying datastore whenever possible.
 	PutMany([]blocks.Block) error
@@ -146,19 +143,6 @@ func (bs *blockstore) Get(k cid.Cid) (blocks.Block, error) {
 		return blocks.NewBlockWithCid(bdata, rbcid)
 	}
 	return blocks.NewBlockWithCid(bdata, k)
-}
-
-func (bs *blockstore) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	if !k.Defined() {
-		log.Error("undefined cid in blockstore")
-		return nil, nil, ErrNotFound
-	}
-
-	segment, tag, err := bs.datastore.GetSegAndTag(dshelp.CidToDsKey(k), offset)
-	if err != nil {
-		return nil, nil, err
-	}
-	return segment, tag, nil
 }
 
 func (bs *blockstore) Put(block blocks.Block) error {

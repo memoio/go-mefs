@@ -585,7 +585,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 	ctx := context.Background()
 	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
 	if err == nil && b != nil {
-		ok := enc.VerifyBlock(b.RawData(), ncidlocal)
+		_, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
 		if ok {
 			data = append(data, b.RawData()...)
 		}
@@ -611,7 +611,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if err == nil && b != nil { //获取到有效数据块，跳出
-				ok := enc.VerifyBlock(b.RawData(), ncid)
+				_, _, ok := enc.VerifyBlock(b.RawData(), ncid)
 				if ok {
 					data = append(data, b.RawData()...)
 					utils.MLogger.Warn("Load superblock in block: ", ncid, " from provider: ", provider)
@@ -668,7 +668,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 		ncidlocal := bm.ToString()
 		b, err := l.ds.GetBlock(ctx, ncidlocal, nil, "local")
 		if err == nil && b != nil {
-			ok := enc.VerifyBlock(b.RawData(), ncidlocal)
+			_, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
 			if ok {
 				data = append(data, b.RawData()...)
 			}
@@ -685,7 +685,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 				}
 				b, err = l.ds.GetBlock(ctx, ncid, sig, provider)
 				if err == nil && b != nil {
-					ok := enc.VerifyBlock(b.RawData(), ncid)
+					_, _, ok := enc.VerifyBlock(b.RawData(), ncid)
 					if ok {
 						data = append(data, b.RawData()...)
 						break
@@ -760,7 +760,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 	var data []byte
 	b, err := l.ds.GetBlock(ctx, ncidlocal, nil, "local")
 	if b != nil && err == nil {
-		ok := enc.VerifyBlock(b.RawData(), ncidlocal)
+		_, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
 		if ok {
 			data = append(data, b.RawData()...)
 		}
@@ -778,7 +778,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if b != nil && err == nil {
-				ok := enc.VerifyBlock(b.RawData(), ncid)
+				_, _, ok := enc.VerifyBlock(b.RawData(), ncid)
 				if ok {
 					data = append(data, b.RawData()...)
 					break

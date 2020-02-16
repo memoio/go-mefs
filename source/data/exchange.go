@@ -248,8 +248,9 @@ func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 	return n.SendMetaMessage(ctx, int32(mpb.OpType_Delete), key, nil, nil, to)
 }
 
-// GetBlock retrieves a particular block from the service,
+// GetBlock retrieves a particular partial block from the service,
 // Getting it from the datastore using the key (hash).
+// key: blockID/"Block"/start/length (todo)
 func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error) {
 	if n.ph == nil || n.rt == nil {
 		return nil, errNoRouting
@@ -262,7 +263,6 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		if err == nil {
 			return block, nil
 		}
-
 		return nil, err
 	}
 
@@ -331,7 +331,7 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	return nil
 }
 
-// key: blockID/"Block"/start/length (segSize)
+// key: blockID/"Block"/start/length (calculated before, todo)
 func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to string) error {
 	if n.ph == nil || n.rt == nil {
 		return errNoRouting

@@ -99,10 +99,6 @@ func (a *accessor) Get(key ds.Key) (value []byte, err error) {
 	return val, nil
 }
 
-func (a *accessor) GetSegAndTag(key ds.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	return nil, nil, nil
-}
-
 func (a *accessor) Has(key ds.Key) (exists bool, err error) {
 	return a.ldb.Has(key.Bytes(), nil)
 }

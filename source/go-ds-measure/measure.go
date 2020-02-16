@@ -218,13 +218,6 @@ func (m *measure) Get(key datastore.Key) (value []byte, err error) {
 	return value, err
 }
 
-func (m *measure) GetSegAndTag(key datastore.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	defer recordLatency(m.getLatency, time.Now())
-	m.getNum.Inc()
-	segment, tag, err = m.backend.GetSegAndTag(key, offset)
-	return segment, tag, err
-}
-
 func (m *measure) Has(key datastore.Key) (exists bool, err error) {
 	defer recordLatency(m.hasLatency, time.Now())
 	m.hasNum.Inc()

@@ -52,11 +52,6 @@ func (d *Datastore) Get(key ds.Key) (value []byte, err error) {
 	return d.child.Get(d.ConvertKey(key))
 }
 
-// GetSegAndTag returns the value for given key, transforming the key first.
-func (d *Datastore) GetSegAndTag(key ds.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	return d.child.GetSegAndTag(d.ConvertKey(key), offset)
-}
-
 // Has returns whether the datastore has a value for a given key, transforming
 // the key first.
 func (d *Datastore) Has(key ds.Key) (exists bool, err error) {

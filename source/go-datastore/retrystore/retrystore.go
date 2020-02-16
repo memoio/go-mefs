@@ -66,18 +66,6 @@ func (d *Datastore) Get(k ds.Key) ([]byte, error) {
 	return val, err
 }
 
-// Get retrieves a value given a key.
-func (d *Datastore) GetSegAndTag(k ds.Key, offset uint64) ([]byte, []byte, error) {
-	var segment, tag []byte
-	err := d.runOp(func() error {
-		var err error
-		segment, tag, err = d.Batching.GetSegAndTag(k, offset)
-		return err
-	})
-
-	return segment, tag, err
-}
-
 // Put stores a key/value.
 func (d *Datastore) Put(k ds.Key, val []byte) error {
 	return d.runOp(func() error {

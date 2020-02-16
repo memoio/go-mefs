@@ -54,13 +54,6 @@ func (d *MutexDatastore) Get(key ds.Key) (value []byte, err error) {
 	return d.child.Get(key)
 }
 
-// GetSegAndTag implements Datastore.GetSegAndTag
-func (d *MutexDatastore) GetSegAndTag(key ds.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	d.RLock()
-	defer d.RUnlock()
-	return d.child.GetSegAndTag(key, offset)
-}
-
 // Has implements Datastore.Has
 func (d *MutexDatastore) Has(key ds.Key) (exists bool, err error) {
 	d.RLock()

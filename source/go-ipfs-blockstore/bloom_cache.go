@@ -159,14 +159,6 @@ func (b *bloomcache) Get(k cid.Cid) (blocks.Block, error) {
 	return b.blockstore.Get(k)
 }
 
-func (b *bloomcache) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	if has, ok := b.hasCached(k); ok && !has {
-		return nil, nil, ErrNotFound
-	}
-
-	return b.blockstore.GetSegAndTag(k, offset)
-}
-
 func (b *bloomcache) Put(bl blocks.Block) error {
 	// See comment in PutMany
 	err := b.blockstore.Put(bl)

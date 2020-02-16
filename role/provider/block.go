@@ -195,11 +195,10 @@ func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
 
 func verifyChanValue(oldValue, newValue *big.Int) bool {
 	//verify value;： value ?= oldValue + 100
-	addValue := int64((df.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB)
-	addV := big.NewInt(addValue)
-	addV = addV.Add(addV, oldValue)
-	if newValue.Cmp(addV) < 0 {
-		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", addV.String())
+	addValue := big.NewInt(int64((df.BlockSize / (1024 * 1024)) * utils.READPRICEPERMB))
+	addValue.Add(addValue, oldValue)
+	if newValue.Cmp(addValue) < 0 {
+		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", addValue.String())
 		return false
 	}
 	return true

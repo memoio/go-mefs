@@ -124,24 +124,6 @@ func (b *arccache) Get(k cid.Cid) (blocks.Block, error) {
 	return bl, err
 }
 
-func (b *arccache) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	//fmt.Println("arccache")
-	if !k.Defined() {
-		log.Error("undefined cid in arc cache")
-		return nil, nil, ErrNotFound
-	}
-
-	if has, _, ok := b.hasCached(k); ok && !has {
-		return nil, nil, ErrNotFound
-	}
-
-	segment, tag, err := b.blockstore.GetSegAndTag(k, offset)
-	if err != nil {
-		return nil, nil, err
-	}
-	return segment, tag, nil
-}
-
 func (b *arccache) Put(bl blocks.Block) error {
 	if has, _, ok := b.hasCached(bl.Cid()); ok && has {
 		return nil

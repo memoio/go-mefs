@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	rs "github.com/memoio/go-mefs/data-format"
+	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
@@ -59,7 +59,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 			if splitcpid[0] != chunkID {
 				blk, err := p.ds.GetBlock(ctx, blkid, sig, pid)
 				if blk != nil && err == nil {
-					right := rs.VerifyBlock(blk.RawData(), blkid, pubKey)
+					right := df.VerifyBlock(blk.RawData(), blkid, pubKey)
 					if right {
 						chNum, err := strconv.Atoi(splitcpid[0])
 						if err != nil {
@@ -96,13 +96,13 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 		}
 	}
 
-	newstripe, off, err := rs.Repair(stripe)
+	newstripe, off, err := df.Repair(stripe)
 	if err != nil {
 		utils.MLogger.Info("repair ", blockID, " failed: ", err)
 		return err
 	}
 
-	right := rs.VerifyBlock(newstripe[nbid], blockID, pubKey)
+	right := df.VerifyBlock(newstripe[nbid], blockID, pubKey)
 	if !right {
 		utils.MLogger.Warnf("Block %s is not right", blockID)
 		return nil

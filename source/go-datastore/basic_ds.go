@@ -50,11 +50,6 @@ func (d *MapDatastore) Get(key Key) (value []byte, err error) {
 	return val, nil
 }
 
-// GetSegAndTag implements Datastore.Get
-func (d *MapDatastore) GetSegAndTag(key Key, offset uint64) (segment []byte, tag []byte, err error) {
-	return nil, nil, ErrNotFound
-}
-
 // Has implements Datastore.Has
 func (d *MapDatastore) Has(key Key) (exists bool, err error) {
 	_, found := d.values[key]
@@ -126,11 +121,6 @@ func (d *NullDatastore) Sync(prefix Key) error {
 // Get implements Datastore.Get
 func (d *NullDatastore) Get(key Key) (value []byte, err error) {
 	return nil, ErrNotFound
-}
-
-// GetSegAndTag implements Datastore.Get
-func (d *NullDatastore) GetSegAndTag(key Key, offset uint64) (segment []byte, tag []byte, err error) {
-	return nil, nil, ErrNotFound
 }
 
 // Has implements Datastore.Has
@@ -210,12 +200,6 @@ func (d *LogDatastore) Sync(prefix Key) error {
 func (d *LogDatastore) Get(key Key) (value []byte, err error) {
 	log.Printf("%s: Get %s\n", d.Name, key)
 	return d.child.Get(key)
-}
-
-// GetSegAndTag implements Datastore.GetSegAndTag
-func (d *LogDatastore) GetSegAndTag(key Key, offset uint64) (segment []byte, tag []byte, err error) {
-	log.Printf("%s: GetSegAndTag %s offset %d\n", d.Name, key, offset)
-	return d.child.GetSegAndTag(key, offset)
 }
 
 // Has implements Datastore.Has

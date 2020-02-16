@@ -45,11 +45,6 @@ func (dds *Delayed) Get(key ds.Key) (value []byte, err error) {
 	return dds.ds.Get(key)
 }
 
-func (dds *Delayed) GetSegAndTag(key ds.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	dds.delay.Wait()
-	return dds.ds.GetSegAndTag(key, offset)
-}
-
 // Has implements the ds.Datastore interface.
 func (dds *Delayed) Has(key ds.Key) (exists bool, err error) {
 	dds.delay.Wait()

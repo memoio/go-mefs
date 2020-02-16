@@ -221,14 +221,6 @@ func (d *Datastore) Get(key ds.Key) (value []byte, err error) {
 	return cds.Get(k)
 }
 
-func (d *Datastore) GetSegAndTag(key ds.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	cds, _, k := d.lookup(key)
-	if cds == nil {
-		return nil, nil, ds.ErrNotFound
-	}
-	return cds.GetSegAndTag(k, offset)
-}
-
 func (d *Datastore) Has(key ds.Key) (exists bool, err error) {
 	cds, _, k := d.lookup(key)
 	if cds == nil {

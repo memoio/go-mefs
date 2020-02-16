@@ -70,9 +70,6 @@ type Read interface {
 	// Get will return ErrNotFound if the key is not mapped to a value.
 	Get(key Key) (value []byte, err error)
 
-	// GetSegAndTag will return ErrNotFound if the key is not mapped to a value.
-	GetSegAndTag(key Key, offset uint64) (segment []byte, tag []byte, err error)
-
 	// Has returns whether the `key` is mapped to a `value`.
 	// In some contexts, it may be much cheaper only to check for existence of
 	// a value, rather than retrieving the value itself. (e.g. HTTP HEAD).

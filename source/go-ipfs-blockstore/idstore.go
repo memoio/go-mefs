@@ -61,11 +61,6 @@ func (b *idstore) Get(k cid.Cid) (blocks.Block, error) {
 	return b.bs.Get(k)
 }
 
-func (b *idstore) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	//fmt.Println("idstore")
-	return b.bs.GetSegAndTag(k, offset)
-}
-
 func (b *idstore) Put(bl blocks.Block) error {
 	isId, _ := extractContents(bl.Cid())
 	if isId {

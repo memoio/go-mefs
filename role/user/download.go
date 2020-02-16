@@ -305,7 +305,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			continue
 		}
 
-		ok = ds.decoder.VerifyBlock(blkData, ncid)
+		_, _, ok = ds.decoder.VerifyBlock(blkData, ncid)
 		if !ok {
 			utils.MLogger.Warn("Fail to verify block: ", ncid, " from:", provider)
 			continue

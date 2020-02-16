@@ -46,10 +46,6 @@ func (tr *Transaction) Get(key []byte, ro *opt.ReadOptions) ([]byte, error) {
 	return tr.db.get(tr.mem.DB, tr.tables, key, tr.seq, ro)
 }
 
-func (tr *Transaction) GetSegAndTag(key []byte, ro *opt.ReadOptions) ([]byte, error) {
-	return nil, nil
-}
-
 // Has returns true if the DB does contains the given key.
 //
 // It is safe to modify the contents of the argument after Has returns.

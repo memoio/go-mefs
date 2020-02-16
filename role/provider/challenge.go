@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
+	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
@@ -50,7 +50,8 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	var data, tag [][]byte
 	var faultBlocks []string
 	var electedOffset int
-	var buf strings.Builder
+	var buf, cbuf strings.Builder
+	ctx := context.Background()
 	for _, index := range hProto.Blocks {
 		if len(index) == 0 {
 			continue
@@ -71,30 +72,39 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(fsID)
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(bid)
-		blockID := cid.NewCidV2([]byte(buf.String()))
+		blockID := buf.String()
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		electedIndex := buf.String()
-		tmpdata, tmptag, err := p.ds.BlockStore().GetSegAndTag(blockID, uint64(electedOffset))
+
+		cbuf.Reset()
+		cbuf.WriteString(blockID)
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(electedOffset))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString("1")
+
+		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
 		if err != nil {
 			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
 			faultBlocks = append(faultBlocks, index)
-		} else {
-			isTrue := blskey.VerifyTag(tmpdata, tmptag, electedIndex)
-			if !isTrue {
-				utils.MLogger.Warnf("verify %s data and tag failed", blockID)
-				//验证失败，则在本地删除此块
-				err := p.ds.DeleteBlock(context.Background(), blockID.String(), "local")
-				if err != nil {
-					utils.MLogger.Info("Delete block", blockID.String(), "error:", err)
-				}
-				faultBlocks = append(faultBlocks, index)
-			} else {
-				data = append(data, tmpdata)
-				tag = append(tag, tmptag)
-				chal.Indices = append(chal.Indices, electedIndex)
-			}
+			continue
 		}
+
+		tmpseg, tmptag, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
+		if !isTrue {
+			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
+			//验证失败，则在本地删除此块
+			err := p.ds.DeleteBlock(context.Background(), blockID, "local")
+			if err != nil {
+				utils.MLogger.Info("Delete block", blockID, "error:", err)
+			}
+			faultBlocks = append(faultBlocks, index)
+			continue
+		}
+		data = append(data, tmpseg[0])
+		tag = append(tag, tmptag[0])
+		chal.Indices = append(chal.Indices, electedIndex)
 	}
 
 	if len(chal.Indices) == 0 {
