@@ -739,15 +739,15 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 			return nil, err
 		}
 		return data, nil
-	case 3:
+	case 4:
 		bkey = datastore.NewKey(sval[0])
 
-		segStart, err := strconv.Atoi(sval[1])
+		segStart, err := strconv.Atoi(sval[2])
 		if err != nil {
 			return nil, err
 		}
 
-		segLength, err := strconv.Atoi(sval[2])
+		segLength, err := strconv.Atoi(sval[3])
 		if err != nil {
 			return nil, err
 		}
