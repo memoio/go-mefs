@@ -25,12 +25,13 @@ import (
 	sm "github.com/lni/dragonboat/v3/statemachine"
 	"github.com/lni/goutils/fileutil"
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/source/gorocksdb"
 )
 
 const (
 	appliedIndexKey    string = "disk_kv_applied_index"
-	testDBDirName      string = "example-data"
+	testDBDirName      string = "cluster"
 	currentDBFilename  string = "current"
 	updatingDBFilename string = "current.updating"
 )
@@ -226,8 +227,10 @@ func isNewRun(dir string) bool {
 }
 
 func getNodeDBDirName(clusterID uint64, nodeID uint64) string {
+	rootpath, _ := fsrepo.BestKnownPath()
 	part := fmt.Sprintf("%d_%d", clusterID, nodeID)
-	return filepath.Join(testDBDirName, part)
+
+	return filepath.Join(rootpath, testDBDirName, part)
 }
 
 func getNewRandomDBDirName(dir string) string {
