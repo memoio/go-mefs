@@ -983,8 +983,6 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 }
 
 func (g *groupInfo) loadContracts(pid string) error {
-	g.Lock()
-	defer g.Unlock()
 	if g.groupID == g.userID {
 		return nil
 	}
