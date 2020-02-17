@@ -295,15 +295,14 @@ func (fs *Datastore) encode(key datastore.Key) (dir, file string) {
 	noslash := key.String()[1:]
 	blkInfo, err := metainfo.GetBlockMeta(noslash)
 	if err != nil {
-		fmt.Printf("get block meta in encode error :", err)
 		return "", ""
 	}
 	uid := blkInfo.GetQid()
-	gid := blkInfo.GetBid()
+	bucketID := blkInfo.GetBid()
 	//dir = fs.path
 	dir1 := filepath.Join(fs.path, uid)
 	fs.makeDir(dir1)
-	dir = filepath.Join(dir1, gid)
+	dir = filepath.Join(dir1, bucketID)
 	file = filepath.Join(dir, noslash+extension)
 	return dir, file
 }
@@ -718,7 +717,6 @@ func (fs *Datastore) putMany(data map[datastore.Key][]byte) error {
 }
 
 func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
-
 	fs.shutdownLock.RLock()
 	defer fs.shutdownLock.RUnlock()
 	if fs.shutdown {
@@ -726,7 +724,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 	}
 
 	bkey := key
-	sval := strings.Split(key.String(), metainfo.DELIMITER)
+	sval := strings.Split(key.String()[1:], metainfo.DELIMITER)
 	switch len(sval) {
 	case 1, 2:
 		bkey = datastore.NewKey(sval[0])
@@ -753,7 +751,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 			return nil, err
 		}
 
-		_, path := fs.encode(key)
+		_, path := fs.encode(bkey)
 		f, err := os.OpenFile(path, os.O_RDONLY, 0666)
 		if err != nil {
 			return nil, err
