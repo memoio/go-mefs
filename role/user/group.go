@@ -983,6 +983,8 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 }
 
 func (g *groupInfo) loadContracts(pid string) error {
+	g.Lock()
+	defer g.Unlock()
 	if g.groupID == g.userID {
 		return nil
 	}
@@ -1016,8 +1018,6 @@ func (g *groupInfo) loadContracts(pid string) error {
 	}
 
 	ctx := context.Background()
-	g.Lock()
-	defer g.Unlock()
 
 	var wg sync.WaitGroup
 	for _, pInfo := range g.providers {

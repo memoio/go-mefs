@@ -82,6 +82,8 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 		qItem, err := role.GetQueryInfo(userID, queryID)
 		if err == nil {
 			ginfo.queryItem = &qItem
+			ginfo.keeperSLA = int(qItem.KeeperNums)
+			ginfo.providerSLA = int(qItem.ProviderNums)
 		} else {
 			if sk == "" {
 				return nil, role.ErrEmptyPrivateKey

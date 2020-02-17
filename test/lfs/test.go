@@ -67,7 +67,7 @@ func lfsTest() error {
 	log.Println("2. test start lfs")
 	var startOpts []func(*shell.RequestBuilder) error
 	//set option of bucket
-	startOpts = append(startOpts, shell.SetOp("ks", "2"))
+	startOpts = append(startOpts, shell.SetOp("ks", "3"))
 	startOpts = append(startOpts, shell.SetOp("ps", "6"))
 	err = sh.StartUser(addr, startOpts...)
 	if err != nil {
