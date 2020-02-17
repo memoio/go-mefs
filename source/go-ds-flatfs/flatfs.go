@@ -5,7 +5,6 @@ package flatfs
 
 import (
 	"bufio"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -765,7 +764,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 		fileSize := fInfo.Size()
 
 		fReader := bufio.NewReader(f)
-		prefix := make([]byte, 8*binary.MaxVarintLen64)
+		prefix := make([]byte, 4096)
 		_, err = fReader.Read(prefix)
 		if err != nil {
 			return nil, err

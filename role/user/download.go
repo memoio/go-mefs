@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/memoio/go-mefs/crypto/aes"
@@ -287,86 +288,119 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 
 	eachLen := preLen + segRemains*(int(segSize)+int(2+(parityCount-1)/dataCount)*tagSize)
 
-	var count int32
 	needRepair := true //是否需要修复
 	datas := make([][]byte, blockCount)
-	var buf strings.Builder
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	parllel := int32(0)
+	success := int32(0)
+	fail := int32(0)
 	for i := 0; i < int(blockCount); i++ {
 		// fails too many, no need to download
-		if blockCount-int32(i)+count < dataCount {
+		if atomic.LoadInt32(&fail) > blockCount-dataCount {
 			utils.MLogger.Error("Download Obeject failed: ", ErrCannotGetEnoughBlock)
 			return 0, ErrCannotGetEnoughBlock
 		}
 
+		if i >= int(dataCount)-1 {
+			needRepair = false
+		}
+
+		atomic.AddInt32(&parllel, 1)
 		bm.SetCid(strconv.Itoa(i))
 		ncid := bm.ToString()
-		provider, _, err := ds.group.getBlockProviders(ncid)
-		if err != nil || provider == ds.group.groupID {
-			utils.MLogger.Warnf("Get Block %s 's provider from keeper failed, Err: %s", ncid, err)
-			continue
-		}
+		go func(inum int, chunkid string) {
+			defer atomic.AddInt32(&parllel, -1)
+			defer atomic.AddInt32(&fail, 1)
+			var buf strings.Builder
+			provider, _, err := ds.group.getBlockProviders(chunkid)
+			if err != nil || provider == ds.group.groupID {
+				utils.MLogger.Warnf("Get Block %s 's provider from keeper failed, Err: %s", chunkid, err)
+				return
+			}
 
-		//user给channel合约签名，发给provider
-		mes, money, err := ds.getChannelSign(ncid, eachLen, provider)
-		if err != nil {
-			continue
-		}
+			pinfo, ok := ds.group.providers[provider]
+			if !ok {
+				utils.MLogger.Warn(provider, " is not my provider")
+				return
+			}
 
-		//获取数据块
-		buf.Reset()
-		buf.WriteString(ncid)
-		buf.WriteString(metainfo.DELIMITER)
-		buf.WriteString(strconv.Itoa(int(segStart)))
-		buf.WriteString(metainfo.DELIMITER)
-		buf.WriteString(strconv.Itoa(segRemains))
-		b, err := ds.group.ds.GetBlock(ctx, ncid, mes, provider)
-		if err != nil {
-			utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
-			if err == role.ErrNotEnoughMoney || err == role.ErrWrongMoney{
+			//user给channel合约签名，发给provider
+			mes, money, err := ds.getChannelSign(pinfo.chanItem, eachLen)
+			if err != nil {
 				ds.group.loadContracts(provider)
+				if ds.group.userID != ds.group.groupID {
+					return
+				}
 			}
-			continue
-		}
-		blkData := b.RawData()
-		ok, err := dataformat.VerifyBlockLength(blkData, int(segStart), segRemains)
-		if !ok || err != nil {
-			utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", ncid, provider, err)
-			continue
-		}
 
-		_, _, ok = ds.decoder.VerifyBlock(blkData, ncid)
-		if !ok {
-			utils.MLogger.Warn("Fail to verify block: ", ncid, " from:", provider)
-			continue
-		}
-
-		//下载数据成功，将内存的channel的value更改
-		pinfo, ok := ds.group.providers[provider]
-		if !ok {
-			continue
-		}
-		if pinfo.chanItem != nil {
-			pinfo.chanItem.Value = money
-			pinfo.chanItem.Sig = mes
-			pinfo.chanItem.Dirty = true
-			utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
-		}
-
-		if ds.decoder.Prefix.Bopts.Policy == dataformat.RsPolicy {
-			datas[i] = blkData
-		} else {
-			datas[0] = blkData
-		}
-		count++
-
-		if count >= dataCount {
-			if i == int(dataCount)-1 {
-				needRepair = false
+			//获取数据块
+			buf.Reset()
+			buf.WriteString(chunkid)
+			buf.WriteString(metainfo.DELIMITER)
+			buf.WriteString(strconv.Itoa(int(segStart)))
+			buf.WriteString(metainfo.DELIMITER)
+			buf.WriteString(strconv.Itoa(segRemains))
+			b, err := ds.group.ds.GetBlock(ctx, chunkid, mes, provider)
+			if err != nil {
+				utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
+				if err.Error() == role.ErrNotEnoughMoney.Error() || err.Error() == role.ErrWrongMoney.Error() {
+					utils.MLogger.Infof("Try load channel value from %s", provider)
+					ds.group.loadContracts(provider)
+				}
+				return
 			}
-			break
+			blkData := b.RawData()
+			ok, err = dataformat.VerifyBlockLength(blkData, int(segStart), segRemains)
+			if !ok || err != nil {
+				utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", chunkid, provider, err)
+				return
+			}
+
+			_, _, ok = ds.decoder.VerifyBlock(blkData, chunkid)
+			if !ok {
+				utils.MLogger.Warn("Fail to verify block: ", chunkid, " from:", provider)
+				return
+			}
+
+			//下载数据成功，将内存的channel的value更改
+			if pinfo.chanItem != nil {
+				pinfo.chanItem.Value = money
+				pinfo.chanItem.Sig = mes
+				pinfo.chanItem.Dirty = true
+				utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
+
+				key, err := metainfo.NewKey(pinfo.chanItem.ChannelID, mpb.KeyType_Channel)
+				if err == nil {
+					ds.group.ds.PutKey(ctx, key.ToString(), mes, nil, "local")
+				}
+			}
+
+			datas[inum] = blkData
+			atomic.AddInt32(&success, 1)
+			atomic.AddInt32(&fail, -1)
+		}(i, ncid)
+
+		if i >= int(dataCount-1) {
+			for {
+				if atomic.LoadInt32(&parllel)+atomic.LoadInt32(&success) < dataCount {
+					break
+				}
+
+				if atomic.LoadInt32(&success) == dataCount {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+
+			if atomic.LoadInt32(&success) == dataCount {
+				break
+			}
 		}
 	}
-	if count < dataCount {
+
+	if success < dataCount {
 		utils.MLogger.Error("Download failed: ", ErrCannotGetEnoughBlock)
 		return 0, ErrCannotGetEnoughBlock
 	}
@@ -411,35 +445,27 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	return remain, nil
 }
 
-func (ds *downloadJob) getChannelSign(ncid string, readLen int, provider string) ([]byte, *big.Int, error) {
+func (ds *downloadJob) getChannelSign(cItem *role.ChannelItem, readLen int) ([]byte, *big.Int, error) {
 	hexSK := ds.group.privKey
 	channelID := ds.group.groupID
 
-	for {
-		pinfo, ok := ds.group.providers[provider]
-		if !ok {
-			utils.MLogger.Warn(provider, " is not my provider")
-			return nil, nil, role.ErrNotMyProvider
+	if cItem != nil {
+		money := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
+		money.Add(money, cItem.Value) //100 + valueBase
+		if money.Cmp(cItem.Money) > 0 {
+			utils.MLogger.Warn("need to redeploy channel contract for: ")
+
 		}
 
-		if pinfo.chanItem != nil {
-			money := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
-			money.Add(money, pinfo.chanItem.Value) //100 + valueBase
-			if money.Cmp(pinfo.chanItem.Money) > 0 {
-				utils.MLogger.Warn("need to redeploy channel contract for: ", provider)
-				ds.group.loadContracts(provider)
-			}
+		channelID = cItem.ChannelID
 
-			channelID = pinfo.chanItem.ChannelID
-
-			mes, err := role.SignForChannel(channelID, hexSK, money)
-			if err != nil {
-				utils.MLogger.Errorf("Signature about Block %s from %s failed.", ncid, provider)
-				return nil, nil, err
-			}
-
-			return mes, money, nil
+		mes, err := role.SignForChannel(channelID, hexSK, money)
+		if err != nil {
+			utils.MLogger.Errorf("Signature about channelID %s fails: %s", channelID, err)
+			return nil, nil, err
 		}
-		return nil, nil, role.ErrNotMyProvider
+
+		return mes, money, nil
 	}
+	return nil, nil, role.ErrNotMyProvider
 }
