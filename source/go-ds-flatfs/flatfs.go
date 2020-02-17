@@ -574,7 +574,7 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 	defer f.Close()
 	fReader := bufio.NewReader(f)
 
-	prefix := make([]byte, 10*binary.MaxVarintLen64)
+	prefix := make([]byte, 4096)
 	_, err = fReader.Read(prefix)
 	if err != nil {
 		return err
