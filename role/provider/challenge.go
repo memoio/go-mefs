@@ -80,6 +80,8 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		cbuf.Reset()
 		cbuf.WriteString(blockID)
 		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
+		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString(strconv.Itoa(electedOffset))
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString("1")
