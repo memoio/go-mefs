@@ -185,6 +185,8 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		remain = stripeSize - segPos - do.dStart
 	}
 
+	do.group.loadContracts("")
+
 	breakFlag := false
 	for !breakFlag {
 		select {
@@ -300,7 +302,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		// fails too many, no need to download
 		if atomic.LoadInt32(&fail) > blockCount-dataCount {
 			utils.MLogger.Error("Download Obeject failed: ", ErrCannotGetEnoughBlock)
-			return 0, ErrCannotGetEnoughBlock
+			continue
 		}
 
 		if i > int(dataCount)-1 {
@@ -398,6 +400,14 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 				break
 			}
 		}
+	}
+
+	for {
+		if atomic.LoadInt32(&parllel) == 0 {
+			break
+		}
+
+		time.Sleep(time.Second)
 	}
 
 	if success < dataCount {
