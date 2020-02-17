@@ -288,7 +288,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 
 	eachLen := preLen + segRemains*(int(segSize)+int(2+(parityCount-1)/dataCount)*tagSize)
 
-	needRepair := true //是否需要修复
+	needRepair := false //是否需要修复
 	datas := make([][]byte, blockCount)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -303,8 +303,8 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			return 0, ErrCannotGetEnoughBlock
 		}
 
-		if i >= int(dataCount)-1 {
-			needRepair = false
+		if i > int(dataCount)-1 {
+			needRepair = true
 		}
 
 		atomic.AddInt32(&parllel, 1)
