@@ -88,8 +88,8 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, b
 	segments := make([][]byte, count)
 	tags := make([][]byte, count)
 	indices := make([]string, count)
-	for i := int(pre.Start); i < int(pre.Start)+count; i++ {
-		indices[i] = ncid + metainfo.BlockDelimiter + strconv.Itoa(i)
+	for i := 0; i < count; i++ {
+		indices[i] = ncid + metainfo.BlockDelimiter + strconv.Itoa(int(pre.Start)+i)
 		segments[i] = append(segments[i], noPreRawdata[i*d.fieldSize:i*d.fieldSize+d.segSize]...)
 		tags[i] = append(tags[i], noPreRawdata[i*d.fieldSize+d.segSize:i*d.fieldSize+d.segSize+d.tagSize]...)
 	}
