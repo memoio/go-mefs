@@ -1075,6 +1075,8 @@ func (g *groupInfo) loadContracts(pid string) error {
 								}
 							}
 						}
+
+						g.ds.PutKey(ctx, km.ToString(), cItem.Sig, nil, "local")
 						if cItem.Value.Cmp(cItem.Money) < 0 {
 							proInfo.chanItem = cItem
 							return

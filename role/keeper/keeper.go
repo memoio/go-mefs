@@ -741,15 +741,13 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 			blockID := qid + metainfo.BlockDelimiter + bid
 
 			km, err := metainfo.NewKey(blockID, mpb.KeyType_BlockPos)
-			if err != nil {
-				return err
-			}
+			if err == nil {
+				pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
 
-			pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
-
-			err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID, gp.bft)
-			if err != nil {
-				utils.MLogger.Info("Add block: ", blockID, " error:", err)
+				err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID, gp.bft)
+				if err != nil {
+					utils.MLogger.Info("Add block: ", blockID, " error:", err)
+				}
 			}
 		}
 

@@ -800,7 +800,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 		if err != nil {
 			return nil, err
 		}
-		if n != int(preLen+fieldSize*segLength) {
+		if n != int(fieldSize*segLength) {
 			return nil, dataformat.ErrCannotGetSegment
 		}
 
