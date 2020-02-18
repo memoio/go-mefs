@@ -6,7 +6,6 @@ import (
 	"io"
 	"math/big"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -319,7 +318,6 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 		go func(inum int, chunkid string) {
 			defer atomic.AddInt32(&parllel, -1)
 			defer atomic.AddInt32(&fail, 1)
-			var buf strings.Builder
 			provider, _, err := ds.group.getBlockProviders(chunkid)
 			if err != nil || provider == ds.group.groupID {
 				utils.MLogger.Warnf("Get Block %s 's provider from keeper failed, Err: %s", chunkid, err)
@@ -341,13 +339,8 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			}
 
 			//获取数据块
-			buf.Reset()
-			buf.WriteString(chunkid)
-			buf.WriteString(metainfo.DELIMITER)
-			buf.WriteString(strconv.Itoa(int(segStart)))
-			buf.WriteString(metainfo.DELIMITER)
-			buf.WriteString(strconv.Itoa(segRemains))
-			b, err := ds.group.ds.GetBlock(ctx, chunkid, mes, provider)
+			bgm, _ := metainfo.NewKey(chunkid, mpb.KeyType_Block, strconv.Itoa(int(segStart)), strconv.Itoa(segRemains))
+			b, err := ds.group.ds.GetBlock(ctx, bgm.ToString(), mes, provider)
 			if err != nil {
 				utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
 				if err.Error() == role.ErrWrongMoney.Error() {

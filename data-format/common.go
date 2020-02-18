@@ -57,7 +57,7 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 	fieldSize := int(pre.GetBopts().GetSegmentSize()) + s*int(2+(pre.GetBopts().ParityCount-1)/pre.GetBopts().DataCount)
 
 	if dataLen != length*fieldSize {
-		utils.MLogger.Error("VerifyBlockLength has: ", dataLen, ", need: ", start*fieldSize+1+(length-1)/int(pre.GetBopts().DataCount))
+		utils.MLogger.Error("VerifyBlockLength has length: ", dataLen, ", need: ", length*fieldSize)
 		return false, nil
 	}
 

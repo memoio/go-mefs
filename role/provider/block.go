@@ -85,7 +85,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 	utils.MLogger.Info("handleGetBlock: ", km.ToString(), " from: ", from)
 
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
-	if len(splitedNcid) != 2 {
+	if len(splitedNcid) < 2 {
 		return nil, role.ErrWrongValue
 	}
 
