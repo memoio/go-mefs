@@ -185,8 +185,6 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		remain = stripeSize - segPos - do.dStart
 	}
 
-	do.group.loadContracts("")
-
 	breakFlag := false
 	for !breakFlag {
 		select {
@@ -196,8 +194,13 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		default:
 			n, err := job.rangeRead(ctx, curStripe-1, segStart, dStart, remain)
 			if err != nil {
-				do.Complete(err)
-				return err
+				if err.Error() == role.ErrWrongMoney.Error() {
+					do.group.loadContracts("")
+					continue
+				} else {
+					do.Complete(err)
+					return err
+				}
 			}
 
 			if n != remain {
@@ -298,6 +301,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 	parllel := int32(0)
 	success := int32(0)
 	fail := int32(0)
+	wrongMoney := int32(0)
 	for i := 0; i < int(blockCount); i++ {
 		// fails too many, no need to download
 		if atomic.LoadInt32(&fail) > blockCount-dataCount {
@@ -331,7 +335,6 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			//user给channel合约签名，发给provider
 			mes, money, err := ds.getChannelSign(pinfo.chanItem, eachLen)
 			if err != nil {
-				ds.group.loadContracts(provider)
 				if ds.group.userID != ds.group.groupID {
 					return
 				}
@@ -347,8 +350,13 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 			b, err := ds.group.ds.GetBlock(ctx, chunkid, mes, provider)
 			if err != nil {
 				utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
-				if err.Error() == role.ErrNotEnoughMoney.Error() || err.Error() == role.ErrWrongMoney.Error() {
+				if err.Error() == role.ErrWrongMoney.Error() {
 					utils.MLogger.Infof("Try load channel value from %s", provider)
+					atomic.AddInt32(&wrongMoney, 1)
+				}
+
+				if err.Error() == role.ErrNotEnoughMoney.Error() {
+					atomic.AddInt32(&wrongMoney, 1)
 					ds.group.loadContracts(provider)
 				}
 				return
@@ -412,6 +420,10 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 
 	if success < dataCount {
 		utils.MLogger.Error("Download failed: ", ErrCannotGetEnoughBlock)
+		//  handle channel money problem
+		if atomic.LoadInt32(&wrongMoney) > blockCount-dataCount {
+			return 0, role.ErrWrongMoney
+		}
 		return 0, ErrCannotGetEnoughBlock
 	}
 

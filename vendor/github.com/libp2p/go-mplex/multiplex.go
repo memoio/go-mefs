@@ -17,7 +17,8 @@ import (
 
 var log = logging.Logger("mplex")
 
-var MaxMessageSize = 1 << 20
+// 4MB
+var MaxMessageSize = 1 << 22
 
 // Max time to block waiting for a slow reader to read from a stream before
 // resetting it. Preferably, we'd have some form of back-pressure mechanism but
