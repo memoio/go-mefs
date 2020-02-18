@@ -422,7 +422,7 @@ func (ds *downloadJob) rangeRead(ctx context.Context, stripeID, segStart, offset
 
 	ds.decoder.Repair = needRepair
 	// decode returns bytes of 16B
-	data, err := ds.decoder.Decode(datas, int(segStart), int(offset+remain))
+	data, err := ds.decoder.Decode(datas, 0, int(offset+remain))
 	if err != nil {
 		utils.MLogger.Errorf("Download failed due to decode err: ", err)
 		return 0, err
