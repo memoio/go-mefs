@@ -58,7 +58,7 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 
 	if dataLen != length*fieldSize {
 		utils.MLogger.Error("VerifyBlockLength has length: ", dataLen, ", need: ", length*fieldSize)
-		return false, nil
+		return false, errors.New("wrong data")
 	}
 
 	return true, nil

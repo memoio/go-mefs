@@ -83,8 +83,8 @@ func (p *Info) handleAppendBlock(km *metainfo.Key, value []byte, from string) er
 
 func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleGetBlock: ", km.ToString(), " from: ", from)
-
-	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
+	kms := km.ToString()
+	splitedNcid := strings.Split(kms, metainfo.DELIMITER)
 	if len(splitedNcid) < 2 {
 		return nil, role.ErrWrongValue
 	}
@@ -127,7 +127,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 
 		if res {
 			utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
-			b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+			b, err := p.ds.GetBlock(ctx, kms, nil, "local")
 			if err != nil {
 				utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
 				return nil, err
@@ -158,7 +158,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 	}
 
 	utils.MLogger.Infof("try to get block %s form local", splitedNcid[0])
-	b, err := p.ds.GetBlock(ctx, splitedNcid[0], nil, "local")
+	b, err := p.ds.GetBlock(ctx, kms, nil, "local")
 	if err != nil {
 		utils.MLogger.Errorf("get block %s from local fail: %s", splitedNcid[0], err)
 		return nil, err
