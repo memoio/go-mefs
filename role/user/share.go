@@ -152,7 +152,6 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 			bucketID:     sl.BucketID,
 			group:        su.(*LfsInfo).gInfo,
 			decoder:      decoder,
-			state:        Pending,
 			startTime:    time.Now(),
 			curStripe:    stripePos,
 			segOffset:    segPos,
