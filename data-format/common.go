@@ -14,7 +14,7 @@ const (
 	RsPolicy            = 1
 	MulPolicy           = 2
 	DefaultSegmentSize  = 4096
-	DefaultSegmentCount = 4
+	DefaultSegmentCount = 256
 	DefaultTagFlag      = BLS12
 	CurrentVersion      = 1
 	BlockSize           = DefaultSegmentSize * DefaultSegmentCount

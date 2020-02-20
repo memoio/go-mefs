@@ -234,6 +234,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 				if i == connectTryCount-1 {
 					utils.MLogger.Warn("Connect to keeper: ", kinfo.keeperID, " failed.")
 				}
+				time.Sleep(time.Minute)
 			} else {
 				kinfo.connected = true
 			}

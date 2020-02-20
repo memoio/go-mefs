@@ -85,14 +85,14 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	bo := bucket.BOpts
 
-	segStripeSize := int64(bo.SegmentSize)
-	stripeSize := int64(bo.SegmentCount*bo.DataCount) * segStripeSize
+	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
+	stripeSize := int64(bo.SegmentCount) * segStripeSize
 
-	// 下载的开始条带
+	// 下载的开始条带内偏移
 	stripePos := start / stripeSize
 	// 下载开始的segment
 	segPos := (start % stripeSize) / segStripeSize
-	// segment的偏移
+	// segment内的偏移
 	dPos := start % segStripeSize
 
 	bopt := &mpb.BlockOptions{
@@ -127,26 +127,18 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 }
 
 func (do *downloadTask) Start(ctx context.Context) error {
-	curStripe := do.curStripe + 1
+	curStripe := do.curStripe
 	segStart := do.segOffset
 	dStart := do.dStart // 0
-	dc := do.decoder.Prefix.Bopts.DataCount
-	segSize := do.decoder.Prefix.Bopts.SegmentSize
-	stripeSize := int64(do.decoder.Prefix.Bopts.SegmentCount * segSize * dc)
+	dc := int64(do.decoder.Prefix.Bopts.DataCount)
+	segStripeSize := int64(do.decoder.Prefix.Bopts.SegmentSize) * dc
+	stripeSize := int64(do.decoder.Prefix.Bopts.SegmentCount) * segStripeSize
 
 	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
-	segPos := segStart * int64(segSize) * int64(dc)
+	segPos := segStart * segStripeSize
+	readUnit := int64(transNum) * segStripeSize
 
-	//构造任务并运行
 	var remain int64
-	//只有下载任务的第一个stripe才可能从非0的offset开始
-	if do.dLength <= stripeSize-segPos-do.dStart {
-		//第一种情况，处在某一个stripe的中间
-		remain = do.dLength
-	} else {
-		//第二种情况，此stripe填到末尾
-		remain = stripeSize - segPos - do.dStart
-	}
 
 	breakFlag := false
 	for !breakFlag {
@@ -155,7 +147,22 @@ func (do *downloadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("download cancel")
 			return nil
 		default:
-			n, err := do.rangeRead(ctx, curStripe-1, segStart, dStart, remain)
+			if (do.sizeReceived+segPos+do.dStart)%stripeSize == 0 {
+				curStripe++
+				segStart = 0
+			}
+
+			remain = (curStripe-do.curStripe+1)*stripeSize - segPos - do.dStart - do.sizeReceived
+
+			if remain > do.dLength-do.sizeReceived {
+				remain = do.dLength - do.sizeReceived
+			}
+
+			if remain > readUnit {
+				remain = readUnit
+			}
+
+			n, err := do.rangeRead(ctx, curStripe, segStart, dStart, remain)
 			if err != nil {
 				if err.Error() == role.ErrWrongMoney.Error() {
 					do.group.loadContracts("")
@@ -175,18 +182,8 @@ func (do *downloadTask) Start(ctx context.Context) error {
 			if do.sizeReceived >= do.dLength {
 				breakFlag = true
 			} else {
-				curStripe++
 				dStart = 0
-				segStart = 0
-
-				if do.dLength <= (curStripe-do.curStripe)*stripeSize-segPos-do.dStart {
-					//最后剩下一部分
-					remain = (do.dLength + segPos + do.dStart) % (stripeSize)
-				} else {
-					//填满一整个stripe
-					remain = stripeSize
-
-				}
+				segStart += (1 + (n-1)/(segStripeSize))
 			}
 		}
 	}
