@@ -158,11 +158,15 @@ func (do *downloadTask) Start(ctx context.Context) error {
 				remain = do.dLength - do.sizeReceived
 			}
 
+			if remain > stripeSize {
+				remain = stripeSize
+			}
+
 			if remain > readUnit {
 				remain = readUnit
 			}
 
-			n, err := do.rangeRead(ctx, curStripe, segStart, dStart, remain)
+			data, n, err := do.rangeRead(ctx, curStripe, segStart, dStart, remain)
 			if err != nil {
 				if err.Error() == role.ErrWrongMoney.Error() {
 					do.group.loadContracts("")
@@ -171,6 +175,33 @@ func (do *downloadTask) Start(ctx context.Context) error {
 					do.Complete(err)
 					return err
 				}
+			}
+
+			if do.encrypt == 1 {
+				padding := aes.BlockSize - ((dStart+remain-1)%aes.BlockSize + 1)
+				data = data[:dStart+remain+padding]
+				data, err = aes.AesDecrypt(data, do.sKey[:])
+				if err != nil {
+					utils.MLogger.Info("Download failed due to decrypt err: ", err)
+					return err
+				}
+				data = data[:len(data)-int(padding)]
+				if remain+dStart > int64(len(data)) {
+					return ErrCannotGetEnoughBlock
+				}
+			}
+
+			if remain+dStart > int64(len(data)) {
+				return ErrCannotGetEnoughBlock
+			}
+
+			wl, err := do.writer.Write(data[dStart : dStart+remain])
+			if err != nil {
+				return err
+			}
+
+			if int64(wl) != remain {
+				utils.MLogger.Warn("write length is not equal")
 			}
 
 			if n != remain {
@@ -226,7 +257,7 @@ type (
 )
 
 //从一个stripe内指定范围读取数据写入到writer内
-func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offset, remain int64) (int64, error) {
+func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offset, remain int64) ([]byte, int64, error) {
 	//首先设置一些本次stripe下载的基本参数
 	dataCount := do.decoder.Prefix.Bopts.DataCount
 	parityCount := do.decoder.Prefix.Bopts.ParityCount
@@ -235,7 +266,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 	bm, err := metainfo.NewBlockMeta(do.group.groupID, strconv.Itoa(int(do.bucketID)), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
 		utils.MLogger.Error("Download failed: ", err)
-		return 0, err
+		return nil, 0, err
 	}
 
 	segRemains := int(1 + (remain-1)/int64(dataCount*segSize))
@@ -248,7 +279,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 	do.decoder.Prefix.Start = int32(segStart)
 	_, preLen, err := bf.PrefixEncode(do.decoder.Prefix)
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 
 	eachLen := preLen + segRemains*(int(segSize)+int(2+(parityCount-1)/dataCount)*tagSize)
@@ -377,9 +408,9 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 		utils.MLogger.Errorf("Download object failed: %s", ErrCannotGetEnoughBlock)
 		//  handle channel money problem
 		if atomic.LoadInt32(&wrongMoney) > blockCount-dataCount {
-			return 0, role.ErrWrongMoney
+			return nil, 0, role.ErrWrongMoney
 		}
-		return 0, ErrCannotGetEnoughBlock
+		return nil, 0, ErrCannotGetEnoughBlock
 	}
 
 	do.decoder.Repair = needRepair
@@ -387,39 +418,12 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 	data, err := do.decoder.Decode(datas, 0, int(offset+remain))
 	if err != nil {
 		utils.MLogger.Errorf("Download failed due to decode err: ", err)
-		return 0, err
+		return nil, 0, err
 	}
 
 	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, offset)
 
-	if do.encrypt == 1 {
-		padding := aes.BlockSize - ((offset+remain-1)%aes.BlockSize + 1)
-		data = data[:offset+remain+padding]
-		data, err = aes.AesDecrypt(data, do.sKey[:])
-		if err != nil {
-			utils.MLogger.Info("Download failed due to decrypt err: ", err)
-			return 0, err
-		}
-		data = data[:len(data)-int(padding)]
-		if remain+offset > int64(len(data)) {
-			return 0, ErrCannotGetEnoughBlock
-		}
-	}
-
-	if remain+offset > int64(len(data)) {
-		return 0, ErrCannotGetEnoughBlock
-	}
-
-	wl, err := do.writer.Write(data[offset : offset+remain])
-	if err != nil {
-		return 0, err
-	}
-
-	if int64(wl) != remain {
-		utils.MLogger.Warn("write length is not equal")
-	}
-
-	return remain, nil
+	return data, int64(len(data)), nil
 }
 
 func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]byte, *big.Int, error) {
