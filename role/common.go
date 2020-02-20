@@ -33,4 +33,6 @@ var (
 	ErrEmptyData       = errors.New("Data is empty")
 	ErrEmptyPrivateKey = errors.New("Empty private key")
 	ErrEmptyBlsKey     = errors.New("Empty blskey")
+
+	ErrTestUser = errors.New("Test user")
 )

@@ -446,5 +446,5 @@ func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]
 
 		return mes, money, nil
 	}
-	return nil, nil, role.ErrNotMyProvider
+	return nil, nil, role.ErrTestUser
 }
