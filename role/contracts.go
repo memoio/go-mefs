@@ -84,6 +84,13 @@ type QueryItem struct {
 	Completed    bool
 }
 
+// RootItem has root information
+type RootItem struct {
+	UserID  string // 部署Query的userid
+	QueryID string
+	Keys    []int64
+}
+
 type kpItem struct {
 	keeperIDs []string
 }
@@ -621,6 +628,93 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 		}
 		return item, nil
 	}
+}
+
+// DeployRoot is
+func DeployRoot(sk, userID, queryID string, rdo bool) (rootID string, err error) {
+	utils.MLogger.Info("Begin to deploy root contract...")
+	uaddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return rootID, err
+	}
+
+	queryAddr, err := address.GetAddressFromID(queryID)
+	if err != nil {
+		return rootID, err
+	}
+
+	// getbalance
+	balance, err := contracts.QueryBalance(uaddr.String())
+	if err == nil {
+		utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
+	}
+
+	// deploy root
+	rootAddr, err := contracts.DeployRoot(sk, uaddr, queryAddr, rdo)
+	if err != nil {
+		utils.MLogger.Error("fail to deploy root contract: ", err)
+		return queryID, err
+	}
+
+	utils.MLogger.Info(uaddr.String(), " has new root: ", rootAddr.String())
+
+	rootID, err = address.GetIDFromAddress(rootAddr.String())
+	if err != nil {
+		return rootID, err
+	}
+
+	utils.MLogger.Info("Finish deploy root contract: ", rootID)
+
+	return rootID, nil
+}
+
+// GetRoot gets
+func GetRoot(userID, queryID string) (string, error) {
+	userAddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return "", err
+	}
+
+	queryAddr, err := address.GetAddressFromID(queryID)
+	if err != nil {
+		return "", err
+	}
+
+	rootAddr, _, err := contracts.GetRoot(userAddr, userAddr, queryAddr.String())
+	if err != nil {
+		return "", err
+	}
+
+	rootID, err := address.GetIDFromAddress(rootAddr.String())
+	if err != nil {
+		return "", err
+	}
+
+	return rootID, nil
+}
+
+func SetMerkleRoot(sk, rootID string, key int64, val [32]byte) error {
+	rootAddr, err := address.GetAddressFromID(rootID)
+	if err != nil {
+		return err
+	}
+
+	err = contracts.SetMerkleRoot(sk, rootAddr, key, val)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetLatestMerkleRoot(rootID string) (int64, [32]byte, error) {
+	var val [32]byte
+	rootAddr, err := address.GetAddressFromID(rootID)
+	if err != nil {
+		return 0, val, err
+	}
+
+	return contracts.GetLatestMerkleRoot(rootAddr, rootAddr)
 }
 
 // DeployChannel is

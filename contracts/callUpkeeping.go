@@ -81,7 +81,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 }
 
 //GetUpkeepingAddrs get all upKeeping address
-func GetUpkeepingAddrs(localAddress, userAddress common.Address, key string) ([]common.Address, error) {
+func GetUpkeepingAddrs(localAddress, userAddress common.Address) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
 	if err != nil {
@@ -145,7 +145,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 		}
 	}
 
-	return ukaddr, uk, errors.New("No upkeeping")
+	return ukaddr, uk, ErrEmpty
 }
 
 // SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey

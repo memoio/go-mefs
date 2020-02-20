@@ -175,6 +175,19 @@ channel_test:
   only:
     - schedules
 
+root_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - echo $ETHENDPOINT
+    - sh ./bin/checkbin.sh
+    - GO111MODULE=off go run test/root/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
 pos_test:
   stage: short-test
   when: always

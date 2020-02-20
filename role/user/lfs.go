@@ -288,6 +288,24 @@ func (l *LfsInfo) genRoot() {
 	l.meta.sb.LRoot = append(l.meta.sb.LRoot, lr)
 	l.meta.sb.dirty = true
 	l.meta.sb.Unlock()
+
+	if l.gInfo.userID != l.gInfo.rootID {
+		var val [32]byte
+		copy(val[:], lr.Root[:32])
+		role.SetMerkleRoot(l.privateKey, l.gInfo.rootID, ctime, val)
+		utils.MLogger.Debugf("set root %d for %s", ctime, l.gInfo.groupID)
+		keyTime, res, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
+		if err != nil {
+			return
+		}
+		if keyTime != ctime {
+			utils.MLogger.Debugf("get root expected: %d, but got %d", ctime, keyTime)
+		}
+
+		if bytes.Compare(res[:], val[:]) != 0 {
+			utils.MLogger.Debugf("get root expected: %s, but got %d", val, res)
+		}
+	}
 }
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化

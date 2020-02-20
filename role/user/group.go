@@ -49,6 +49,7 @@ type groupInfo struct {
 	userID    string // id format of user address
 	shareToID string // shareToID = userID when not share
 	privKey   string // EthString of shareTo
+	rootID    string // Root contract addr
 	state     int8   // atomic?
 	ds        data.Service
 
@@ -74,6 +75,7 @@ type groupInfo struct {
 func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps int, d data.Service) *groupInfo {
 	return &groupInfo{
 		userID:      uid,
+		rootID:      uid,
 		shareToID:   shareTo,
 		privKey:     sk,
 		ds:          d,
@@ -1001,6 +1003,14 @@ func (g *groupInfo) loadContracts(pid string) error {
 			return err
 		}
 		g.upKeepingItem = &uItem
+	}
+
+	if g.rootID == g.userID {
+		rID, err := role.GetRoot(g.userID, g.groupID)
+		if err != nil {
+			return err
+		}
+		g.rootID = rID
 	}
 
 	for _, proInfo := range g.providers {
