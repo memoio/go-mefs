@@ -185,12 +185,12 @@ func challengeTest() error {
 	}
 
 	if len(provider) == 0 {
-		log.Println("cannot get block pos")
+		log.Fatal("cannot get block pos")
 	}
 
 	ret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if err != nil || ret == "" {
-		log.Println("get block from old provider error: ", err)
+		log.Fatal("get block from old provider error: ", err)
 		return err
 	}
 	log.Println("md5 of block`s rawdata :", ret)
@@ -198,20 +198,20 @@ func challengeTest() error {
 	//在provider上删除指定块
 	km, err := metainfo.NewKey(cid, mpb.KeyType_Block)
 	if err != nil {
-		log.Println("construct del block KV error :", err)
+		log.Fatal("construct del block KV error :", err)
 		return err
 	}
 
 	_, err = sh.DeleteFrom(km.ToString(), provider)
 	if err != nil {
-		fmt.Println("run dht delete error :", err)
+		log.Fatal("run dht delete error :", err)
 		return err
 	}
 
 	time.Sleep(1 * time.Minute)
 	nret, err := getBlock(sh, cid, provider) //获取块的MD5
 	if nret != "" && err == nil {
-		log.Println("get block from provider: ", provider, " expcted not")
+		log.Fatal("get block from provider: ", provider, " expcted not")
 		return err
 	}
 
@@ -220,14 +220,14 @@ func challengeTest() error {
 	// read whole file again
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
+		log.Fatal("download file ", objectName, " err:", err)
 		return err
 	}
 
 	obuf := new(bytes.Buffer)
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(r) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", r)
+		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", r)
 	}
 
 	log.Println("successfully get object :", objectName, " in bucket:", bucketName)
@@ -256,12 +256,12 @@ func challengeTest() error {
 	}
 
 	if len(newProvider) == 0 {
-		log.Println("cannot get block pos")
+		log.Fatal("cannot get block pos")
 	}
 
 	newRet, err := getBlock(sh, cid, newProvider)
 	if err != nil || newRet == "" {
-		log.Println("get block from new provider error :", err)
+		log.Fatal("get block from new provider error :", err)
 		return err
 	}
 
@@ -269,7 +269,7 @@ func challengeTest() error {
 	if ret == newRet {
 		log.Println("Repair success")
 	} else {
-		log.Println("old and new block`s rawdata md5 not match")
+		log.Fatal("old and new block`s rawdata md5 not match")
 		return errors.New("repair failed")
 	}
 	return nil

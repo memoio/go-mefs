@@ -267,7 +267,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 	wrongMoney := int32(0)
 	for i := 0; i < int(blockCount); i++ {
 		// fails too many, no need to download
-		if atomic.LoadInt32(&fail) > blockCount-dataCount {
+		if atomic.LoadInt32(&fail) > parityCount {
 			utils.MLogger.Error("Download obeject failed too much: ", ErrCannotGetEnoughBlock)
 			continue
 		}
@@ -284,7 +284,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 			defer atomic.AddInt32(&fail, 1)
 			provider, _, err := do.group.getBlockProviders(chunkid)
 			if err != nil || provider == do.group.groupID {
-				utils.MLogger.Warnf("Get Block %s 's provider from keeper failed, Err: %s", chunkid, err)
+				utils.MLogger.Warnf("Get Block %s 's provider from keeper failed: %s", chunkid, err)
 				return
 			}
 
@@ -298,6 +298,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 			mes, money, err := do.getChannelSign(pinfo.chanItem, eachLen)
 			if err != nil {
 				if do.group.userID != do.group.groupID {
+					utils.MLogger.Warnf("get channel fails: %s", err)
 					return
 				}
 			}
@@ -376,7 +377,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 	}
 
 	if success < dataCount {
-		utils.MLogger.Errorf("Download object %s failed: %s", ErrCannotGetEnoughBlock)
+		utils.MLogger.Errorf("Download object failed: %s", ErrCannotGetEnoughBlock)
 		//  handle channel money problem
 		if atomic.LoadInt32(&wrongMoney) > blockCount-dataCount {
 			return 0, role.ErrWrongMoney
@@ -432,8 +433,7 @@ func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]
 		money := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
 		money.Add(money, cItem.Value) //100 + valueBase
 		if money.Cmp(cItem.Money) > 0 {
-			utils.MLogger.Warn("need to redeploy channel contract for: ")
-
+			utils.MLogger.Warn("need to redeploy channel contract for ", cItem.ProID)
 		}
 
 		channelID = cItem.ChannelID

@@ -668,6 +668,13 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 
 		g.upKeepingItem = &uItem
 
+		rootID, err := role.DeployRoot(g.privKey, g.userID, g.groupID, true)
+		if err != nil {
+			utils.MLogger.Error("Deploy root contract failed: ", err)
+		}
+
+		g.rootID = rootID
+
 		var wg sync.WaitGroup
 		for _, proID := range g.tempProviders {
 			wg.Add(1)
