@@ -1,8 +1,8 @@
 package mcl
 
 import (
+	"crypto/sha256"
 	"errors"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -75,31 +75,74 @@ type Proof struct {
 	Nu    []byte `json:"nu"`
 }
 
+// GenKeySetWithSeed create instance
+func GenKeySetWithSeed(seed []byte) (*KeySet, error) {
+	pk := &PublicKey{
+		ElemG1s: make([]G1, PDPCount),
+		ElemG2s: make([]G2, PDPCount),
+	}
+	sk := new(SecretKey)
+	ks := &KeySet{pk, sk}
+
+	// bls
+	// private key
+	seed1 := sha256.Sum256(seed)
+	sk.BlsSk.SetHashOf(seed1[:])
+
+	seed2 := sha256.Sum256(seed1[:])
+	sk.ElemSk.SetHashOf(seed)
+
+	var frSeed Fr
+	seed3 := sha256.Sum256(seed2[:])
+	frSeed.SetHashOf(seed3[:])
+	err := pk.ElemG1s[0].HashAndMapTo(frSeed.Serialize())
+	if err != nil {
+		return nil, err
+	}
+
+	seed4 := sha256.Sum256(seed3[:])
+	frSeed.SetHashOf(seed4[:])
+	err = pk.ElemG2s[0].HashAndMapTo(frSeed.Serialize())
+	if err != nil {
+		return nil, err
+	}
+
+	seed5 := sha256.Sum256(seed4[:])
+	frSeed.SetHashOf(seed5[:])
+	err = pk.SignG2.HashAndMapTo(frSeed.Serialize())
+	if err != nil {
+		return nil, err
+	}
+
+	ks.Calculate()
+
+	// return instance
+	return ks, nil
+}
+
 // GenKeySet create instance
 func GenKeySet() (*KeySet, error) {
-	pk := new(PublicKey)
+	pk := &PublicKey{
+		ElemG1s: make([]G1, PDPCount),
+		ElemG2s: make([]G2, PDPCount),
+	}
 	sk := new(SecretKey)
+	ks := &KeySet{pk, sk}
 
 	// bls
 	// private key
 	sk.BlsSk.SetByCSPRNG()
 	sk.ElemSk.SetByCSPRNG()
-	err := sk.CalculateXi()
-	if err != nil {
-		fmt.Println(err)
-	}
 
-	//public key
-	var u G1
-	var w G2
-	// 借助Fr的随机方法为G1和G2产生随机元素
 	var seed Fr
 	seed.SetByCSPRNG()
-	err = u.HashAndMapTo(seed.Serialize())
+	err := pk.ElemG1s[0].HashAndMapTo(seed.Serialize())
 	if err != nil {
 		return nil, err
 	}
-	err = w.HashAndMapTo(seed.Serialize())
+
+	seed.SetByCSPRNG()
+	err = pk.ElemG2s[0].HashAndMapTo(seed.Serialize())
 	if err != nil {
 		return nil, err
 	}
@@ -109,35 +152,35 @@ func GenKeySet() (*KeySet, error) {
 	if err != nil {
 		return nil, err
 	}
-	G2Mul(&pk.BlsPk, &pk.SignG2, &sk.BlsSk)
-	// 各atom具有不同U
-	// U = u^(x^i), i = 0, 1, ..., N-1
-	// W = w^(x^i), i = 0, 1, ..., N-1
-	pk.ElemG1s = make([]G1, PDPCount) // 须指定大小，否则出现"index out of range"错误
-	pk.ElemG2s = make([]G2, PDPCount)
-	for i := 0; i < PDPCount; i++ {
-		G1Mul(&pk.ElemG1s[i], &u, &sk.ElemPowerSk[i])
-		G2Mul(&pk.ElemG2s[i], &w, &sk.ElemPowerSk[i])
-	}
+
+	ks.Calculate()
 
 	// return instance
-	return &KeySet{pk, sk}, nil
+	return ks, nil
 }
 
-// CalculateXi cals Xi = x^i, i = 0, 1, ..., N
-func (s *SecretKey) CalculateXi() error {
-	// var mid Fr
-	if len(s.ElemPowerSk) != PDPCount {
-		s.ElemPowerSk = make([]Fr, PDPCount)
+// Calculate cals Xi = x^i, Ui and Wi i = 0, 1, ..., N
+func (k *KeySet) Calculate() {
+	if len(k.Sk.ElemPowerSk) != PDPCount {
+		k.Sk.ElemPowerSk = make([]Fr, PDPCount)
 	}
-	err := s.ElemPowerSk[0].SetString("1", 10)
-	if err != nil {
-		return err
+
+	k.Sk.ElemPowerSk[1] = k.Sk.ElemSk
+
+	for i := 2; i < PDPCount; i++ {
+		FrMul(&k.Sk.ElemPowerSk[i], &k.Sk.ElemPowerSk[i-1], &k.Sk.ElemSk)
 	}
+
+	G2Mul(&k.Pk.BlsPk, &k.Pk.SignG2, &k.Sk.BlsSk)
+	// U = u^(x^i), i = 0, 1, ..., N-1
+	// W = w^(x^i), i = 0, 1, ..., N-1
+	k.Pk.ElemG1s = make([]G1, PDPCount)
+	k.Pk.ElemG2s = make([]G2, PDPCount)
 	for i := 1; i < PDPCount; i++ {
-		FrMul(&s.ElemPowerSk[i], &s.ElemPowerSk[i-1], &s.ElemSk)
+		G1Mul(&k.Pk.ElemG1s[i], &k.Pk.ElemG1s[0], &k.Sk.ElemPowerSk[i])
+		G2Mul(&k.Pk.ElemG2s[i], &k.Pk.ElemG2s[0], &k.Sk.ElemPowerSk[i])
 	}
-	return nil
+	return
 }
 
 // -------------------- proof related routines ------------------------ //

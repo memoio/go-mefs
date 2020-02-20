@@ -10,9 +10,9 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func initBLS12Config() (*mcl.KeySet, error) {
+func initBLS12Config(seed []byte) (*mcl.KeySet, error) {
 	utils.MLogger.Info("Generating BLS12 Sk and Pk")
-	kset, err := mcl.GenKeySet()
+	kset, err := mcl.GenKeySetWithSeed(seed)
 	if err != nil {
 		utils.MLogger.Error("Init BlS12 keyset error: ", err)
 		return nil, err

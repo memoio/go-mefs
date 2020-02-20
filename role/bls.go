@@ -128,12 +128,9 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 			return mkey, err
 		}
 
-		sk.ElemPowerSk = make([]mcl.Fr, mcl.PDPCount)
-		err = sk.CalculateXi()
-		if err != nil {
-			return mkey, err
-		}
 		mkey.Sk = sk
+
+		mkey.Calculate()
 	}
 
 	return mkey, nil
