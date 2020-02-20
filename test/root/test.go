@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/hex"
 	"flag"
 	"log"
 	"math/big"
@@ -75,11 +74,9 @@ func main() {
 
 	keyTime := time.Now().Unix()
 	res, err := contracts.GetMerkleRoot(localAddr, gotAddr, keyTime)
-	if err != nil {
-		log.Fatal("get empty merkle root:", err)
+	if err == nil {
+		log.Fatal("get empty merkle root fail, should return err")
 	}
-
-	log.Println(hex.EncodeToString(res[:]))
 
 	val := sha256.Sum256([]byte{'1'})
 	err = contracts.SetMerkleRoot(userSk, gotAddr, keyTime, val)
