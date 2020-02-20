@@ -136,8 +136,8 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 
 	decoder := dataformat.NewDataCoderWithPrefix(sul.keySet, bopt)
 
-	segSize := int64(bo.GetSegmentSize())
-	stripeSize := int64(bo.SegmentCount * bo.SegmentSize * bo.GetDataCount())
+	segSize := int64(bo.GetSegmentSize() * bo.SegmentSize)
+	stripeSize := int64(bo.GetDataCount()) * segSize
 
 	for i := 0; i < len(sl.GetOParts()); i++ {
 		opart := sl.GetOParts()[i]
