@@ -3,6 +3,7 @@ package user
 import (
 	"bufio"
 	"context"
+	"crypto/cipher"
 	"io"
 	"math/big"
 	"strconv"
@@ -138,6 +139,15 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	segPos := segStart * segStripeSize
 	readUnit := int64(transNum) * segStripeSize
 
+	var bEnc cipher.BlockMode
+	if do.encrypt == 1 {
+		tmpEnc, err := aes.ContructAes(do.sKey[:])
+		if err != nil {
+			return err
+		}
+		bEnc = tmpEnc
+	}
+
 	var remain int64
 
 	breakFlag := false
@@ -180,15 +190,9 @@ func (do *downloadTask) Start(ctx context.Context) error {
 			if do.encrypt == 1 {
 				padding := aes.BlockSize - ((dStart+remain-1)%aes.BlockSize + 1)
 				data = data[:dStart+remain+padding]
-				data, err = aes.AesDecrypt(data, do.sKey[:])
-				if err != nil {
-					utils.MLogger.Info("Download failed due to decrypt err: ", err)
-					return err
-				}
-				data = data[:len(data)-int(padding)]
-				if remain+dStart > int64(len(data)) {
-					return ErrCannotGetEnoughBlock
-				}
+				decrypted := make([]byte, len(data))
+				bEnc.CryptBlocks(decrypted, data)
+				data = decrypted[:len(data)-int(padding)]
 			}
 
 			if remain+dStart > int64(len(data)) {

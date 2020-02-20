@@ -1,6 +1,8 @@
 package aes
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/binary"
 	"errors"
 	"golang.org/x/crypto/blake2b"
@@ -12,7 +14,6 @@ const (
 )
 
 var (
-	ErrCipher    = errors.New("NewCIpher error")
 	ErrKeySize   = errors.New("Keysize error")
 	ErrBlockSize = errors.New("Blocksize error,the blocksize must be an integer which can be divisible by 128")
 )
@@ -25,4 +26,18 @@ func CreateAesKey(privateKey, queryID []byte, bucketID, objectStart int64) [32]b
 	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID):], uint64(bucketID))
 	binary.LittleEndian.PutUint64(tmpkey[len(privateKey)+len(queryID)+8:], uint64(objectStart))
 	return blake2b.Sum256(tmpkey)
+}
+
+// ContructAes contructs a new aes
+func ContructAes(key []byte) (cipher.BlockMode, error) {
+	if len(key) != KeySize {
+		return nil, ErrKeySize
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	blockSize := block.BlockSize()
+	iv := blake2b.Sum256(key)
+	return cipher.NewCBCDecrypter(block, iv[:blockSize]), nil
 }

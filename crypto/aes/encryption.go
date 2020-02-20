@@ -16,7 +16,7 @@ func AesEncrypt(origData, key []byte) ([]byte, error) {
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, ErrCipher
+		return nil, err
 	}
 	blockSize := block.BlockSize()
 	// 目前初始向量vi为key的前blocksize个字节

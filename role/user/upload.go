@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"crypto/cipher"
 	"crypto/md5"
 	"encoding/hex"
 	"io"
@@ -206,6 +207,15 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		}
 	}
 
+	var bEnc cipher.BlockMode
+	if u.encrypt == 1 {
+		tmpEnc, err := aes.ContructAes(u.sKey[:])
+		if err != nil {
+			return err
+		}
+		bEnc = tmpEnc
+	}
+
 	breakFlag = false
 	for !breakFlag {
 		select {
@@ -265,19 +275,19 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			atomic.AddInt32(&parllel, 1)
 			wg.Add(1)
 
+			// encrypt
+			if u.encrypt == 1 {
+				if len(data)%aes.BlockSize != 0 {
+					data = aes.PKCS5Padding(data)
+				}
+				crypted := make([]byte, len(data))
+				bEnc.CryptBlocks(crypted, data)
+				copy(data, crypted)
+			}
+
 			go func(data []byte, stripeID, start int) {
 				defer wg.Done()
 				defer atomic.AddInt32(&parllel, -1)
-				// encrypt
-				if u.encrypt == 1 {
-					if len(data)%aes.BlockSize != 0 {
-						data = aes.PKCS5Padding(data)
-					}
-					data, err = aes.AesEncrypt(data, u.sKey[:])
-					if err != nil {
-						return
-					}
-				}
 
 				bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
 
