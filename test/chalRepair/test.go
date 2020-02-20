@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -228,6 +230,17 @@ func challengeTest() error {
 	obuf.ReadFrom(outer)
 	if obuf.Len() != int(r) {
 		log.Fatal("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", r)
+	}
+
+	obj, err := sh.HeadObject(objectName, bucketName, shell.SetAddress(addr))
+	if err != nil {
+		log.Fatal("head file ", objectName, " err:", err)
+		return err
+	}
+
+	gotTag := md5.Sum(obuf.Bytes())
+	if hex.EncodeToString(gotTag[:]) != obj.Objects[0].MD5 {
+		log.Fatal("download file ", objectName, "failed, got md5: ", hex.EncodeToString(gotTag[:]), "expected: ", obj.Objects[0].MD5)
 	}
 
 	log.Println("successfully get object :", objectName, " in bucket:", bucketName)

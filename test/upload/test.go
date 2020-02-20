@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -162,6 +164,12 @@ func uploadTest(count int) error {
 		buf.ReadFrom(outer)
 		if buf.Len() != int(obj.Objects[0].Size) {
 			log.Println("download file ", objectName, "failed, got: ", buf.Len(), "expected: ", obj.Objects[0].Size)
+			return true
+		}
+
+		gotTag := md5.Sum(buf.Bytes())
+		if hex.EncodeToString(gotTag[:]) != obj.Objects[0].MD5 {
+			log.Println("download file ", objectName, "failed, got md5: ", hex.EncodeToString(gotTag[:]), "expected: ", obj.Objects[0].MD5)
 			return true
 		}
 
