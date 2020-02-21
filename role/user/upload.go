@@ -254,12 +254,12 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.Bopts.SegmentSize*u.encoder.Prefix.Bopts.DataCount)
+			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.Bopts.SegmentSize*u.encoder.Prefix.Bopts.DataCount) + 1
 
 			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, length: %d", u.curStripe, u.curOffset, n)
 
 			// handle it before
-			if endOffset >= int(u.encoder.Prefix.Bopts.GetSegmentCount()) {
+			if endOffset > int(u.encoder.Prefix.Bopts.GetSegmentCount()) {
 				utils.MLogger.Error("Wrong offset, need to handle: ", endOffset)
 				return role.ErrRead
 			}
@@ -292,14 +292,22 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
 
 				blockMetas := make([]blockMeta, bc)
-				for be := 0; (be+transNum)*readUnit <= len(data); be += transNum {
-					transData := data[be*readUnit : (be+transNum)*readUnit]
+				count := int32(0)
+				for be := 0; be*readUnit < len(data); be += transNum {
+					var transData []byte
+					if len(data) > (be+transNum)*readUnit {
+						transData = data[be*readUnit : (be+transNum)*readUnit]
+					} else {
+						// last one
+						transData = data[be*readUnit:]
+					}
+
 					encodedData, offset, err := enc.Encode(transData, bm.ToString(3), start)
 					if err != nil {
 						return
 					}
 
-					count := int32(0)
+					count = 0
 					var pwg sync.WaitGroup
 					if start == 0 {
 						pros, _, _ := u.gInfo.GetProviders(bc)
@@ -344,7 +352,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						for i := 0; i < bc; i++ {
 							bm.SetCid(strconv.Itoa(i))
 							ncid := bm.ToString()
-							km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start+1))
+							km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start))
 							blockMetas[i].cid = ncid
 							blockMetas[i].offset = offset
 							blockMetas[i].provider = u.gInfo.groupID
@@ -380,24 +388,21 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					pwg.Wait()
 
 					//没有达到最低安全标准，返回错误
-					if count >= dc {
-						for _, v := range blockMetas {
-							err = u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
-							if err != nil {
-								utils.MLogger.Errorf("put metablock: %s to keepers failed", v.cid)
-							}
-						}
-					}
-					start += offset
+					start = offset
 				}
 
+				if count >= dc {
+					for _, v := range blockMetas {
+						go u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
+					}
+				}
 			}(data, int(u.curStripe), int(u.curOffset))
 
-			if endOffset == int(u.encoder.Prefix.Bopts.GetSegmentCount())-1 { //如果写满了一个stripe
+			if endOffset == int(u.encoder.Prefix.Bopts.GetSegmentCount()) { //如果写满了一个stripe
 				u.curStripe++
 				u.curOffset = 0
 			} else {
-				u.curOffset = int64(endOffset + 1)
+				u.curOffset = int64(endOffset)
 			}
 		}
 	}

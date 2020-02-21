@@ -339,7 +339,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 			bgm, _ := metainfo.NewKey(chunkid, mpb.KeyType_Block, strconv.Itoa(int(segStart)), strconv.Itoa(segRemains))
 			b, err := do.group.ds.GetBlock(ctx, bgm.ToString(), mes, provider)
 			if err != nil {
-				utils.MLogger.Warnf("Get Block %s from %s failed, Err: %s", ncid, provider, err)
+				utils.MLogger.Warnf("Get Block %s from %s failed: %s", ncid, provider, err)
 				if err.Error() == role.ErrWrongMoney.Error() {
 					utils.MLogger.Infof("Try load channel value from %s", provider)
 					atomic.AddInt32(&wrongMoney, 1)

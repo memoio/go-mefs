@@ -84,6 +84,7 @@ func lfsTest() error {
 	opts = append(opts, shell.SetDataCount(dataCount))
 	opts = append(opts, shell.SetParityCount(parityCount))
 	opts = append(opts, shell.SetPolicy(df.RsPolicy))
+	opts = append(opts, shell.SetCrypto(false))
 	_, err = sh.CreateBucket(bucketName, opts...)
 	if err != nil {
 		log.Println("create bucket err: ", err)

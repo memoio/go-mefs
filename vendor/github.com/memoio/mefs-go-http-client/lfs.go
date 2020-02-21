@@ -88,6 +88,13 @@ func SetParityCount(parityCount int) LfsOpts {
 	}
 }
 
+func SetCrypto(crypto bool) LfsOpts {
+	return func(rb *RequestBuilder) error {
+		rb.Option("Encryption", crypto)
+		return nil
+	}
+}
+
 func NeedAvailTime(enabled bool) LfsOpts {
 	return func(rb *RequestBuilder) error {
 		rb.Option("Avail", enabled)

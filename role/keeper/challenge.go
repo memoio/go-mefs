@@ -239,7 +239,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		buf.WriteString(strconv.Itoa(electedOffset))
 
 		chal.Indices = append(chal.Indices, buf.String())
-		slength += int64(off + 1)
+		slength += int64(off)
 	}
 
 	slength *= df.DefaultSegmentSize

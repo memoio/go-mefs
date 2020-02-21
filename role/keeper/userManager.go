@@ -168,7 +168,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	}
 
 	// store in cidMap
-	oldOffset := -1
+	oldOffset := 0
 	v, ok := thisLinfo.blockMap.Load(bid)
 	if ok {
 		newcidinfo = v.(*blockInfo)
@@ -232,7 +232,7 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 	thisICid, ok := thisLinfo.blockMap.Load(bid)
 	if ok {
 		thisCid := thisICid.(*blockInfo)
-		thisLinfo.maxlength -= (int64(thisCid.offset+1) * df.DefaultSegmentSize)
+		thisLinfo.maxlength -= (int64(thisCid.offset) * df.DefaultSegmentSize)
 		thisLinfo.blockMap.Delete(bid)
 	}
 

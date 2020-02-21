@@ -207,7 +207,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 		}
 	}
 	// endoffset
-	return stripe, start + endSegment - 1, nil
+	return stripe, start + endSegment, nil
 }
 
 func (d *DataCoder) Decode(stripe [][]byte, start, length int) ([]byte, error) {
