@@ -418,7 +418,6 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 
 	ctx := context.Background()
 
-	l.ds.DeleteBlock(ctx, km.ToString(), "local")
 	l.ds.PutBlock(ctx, km.ToString(), dataEncoded[0], "local")
 
 	providers, _, err := l.gInfo.GetProviders(int(sb.MetaBackupCount))
@@ -500,8 +499,6 @@ func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 	}
 
 	ctx := context.Background()
-
-	l.ds.DeleteBlock(ctx, bm.ToString(), "local")
 	l.ds.PutBlock(ctx, bm.ToString(), dataEncoded[0], "local")
 
 	providers, _, err := l.gInfo.GetProviders(metaBackupCount)
@@ -569,7 +566,6 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 			return err
 		}
 
-		l.ds.DeleteBlock(ctx, bm.ToString(), "local")
 		l.ds.PutBlock(ctx, bm.ToString(), dataEncoded[0], "local")
 
 		for j := 0; j < len(providers); j++ {
@@ -625,8 +621,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		return nil, err
 	}
 
-	if len(data) == 0 { //若本地无超级块，向自己的provider进行查询
-		l.ds.DeleteBlock(ctx, km.ToString(), "local")
+	if len(data) == 0 {
 		utils.MLogger.Info("Try to get: ", ncidlocal, " from remote servers")
 		for j := 0; j < int(defaultMetaBackupCount); j++ {
 			bm.SetCid(strconv.Itoa(j))
@@ -704,7 +699,6 @@ func (l *LfsInfo) loadBucketInfo() error {
 		}
 
 		if len(data) == 0 {
-			l.ds.DeleteBlock(ctx, ncidlocal, "local")
 			for j := 0; j < int(l.meta.sb.MetaBackupCount); j++ {
 				bm.SetCid(strconv.Itoa(j))
 				ncid := bm.ToString()
@@ -796,7 +790,6 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 	}
 
 	if len(data) == 0 {
-		l.ds.DeleteBlock(ctx, ncidlocal, "local")
 		for j := 0; j < int(l.meta.sb.MetaBackupCount); j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()

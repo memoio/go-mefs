@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"io"
 	"math/big"
+	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -141,7 +142,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 
 	var bEnc cipher.BlockMode
 	if do.encrypt == 1 {
-		tmpEnc, err := aes.ContructAes(do.sKey[:])
+		tmpEnc, err := aes.ContructAesDec(do.sKey[:])
 		if err != nil {
 			return err
 		}
@@ -149,7 +150,17 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	}
 
 	var remain int64
-
+	tn := os.Getenv("MEFS_TRANS")
+	if tn != "" {
+		tNum, err := strconv.Atoi(tn)
+		if err != nil {
+			transNum = DefaultTransNum
+		} else {
+			transNum = tNum
+		}
+	} else {
+		transNum = DefaultTransNum
+	}
 	breakFlag := false
 	for !breakFlag {
 		select {
@@ -157,19 +168,10 @@ func (do *downloadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("download cancel")
 			return nil
 		default:
-			if (do.sizeReceived+segPos+do.dStart)%stripeSize == 0 {
-				curStripe++
-				segStart = 0
-			}
-
 			remain = (curStripe-do.curStripe+1)*stripeSize - segPos - do.dStart - do.sizeReceived
 
 			if remain > do.dLength-do.sizeReceived {
 				remain = do.dLength - do.sizeReceived
-			}
-
-			if remain > stripeSize {
-				remain = stripeSize
 			}
 
 			if remain > readUnit {
@@ -195,10 +197,6 @@ func (do *downloadTask) Start(ctx context.Context) error {
 				data = decrypted[:len(data)-int(padding)]
 			}
 
-			if remain+dStart > int64(len(data)) {
-				return ErrCannotGetEnoughBlock
-			}
-
 			wl, err := do.writer.Write(data[dStart : dStart+remain])
 			if err != nil {
 				return err
@@ -214,11 +212,16 @@ func (do *downloadTask) Start(ctx context.Context) error {
 
 			do.sizeReceived += n
 
-			if do.sizeReceived >= do.dLength {
-				breakFlag = true
+			if (do.sizeReceived+segPos+do.dStart)%stripeSize == 0 {
+				curStripe++
+				segStart = 0
 			} else {
 				dStart = 0
 				segStart += (1 + (n-1)/(segStripeSize))
+			}
+
+			if do.sizeReceived >= do.dLength {
+				breakFlag = true
 			}
 		}
 	}
@@ -425,7 +428,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 		return nil, 0, err
 	}
 
-	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, offset)
+	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, segStart*int64(segSize*dataCount)+offset)
 
 	return data, int64(len(data)), nil
 }

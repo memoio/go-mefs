@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"io"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -169,7 +170,8 @@ func (u *uploadTask) Info() (interface{}, error) {
 type blockMeta struct {
 	cid      string
 	provider string
-	offset   int
+	end      int
+	start    int
 }
 
 //Start 上传文件
@@ -190,6 +192,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	parllel := int32(0)
 	var wg sync.WaitGroup
 
+	var pros []string
 	breakFlag := false
 	for !breakFlag {
 		select {
@@ -197,7 +200,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("upload cancel")
 			return nil
 		default:
-			pros, _, _ := u.gInfo.GetProviders(bc)
+			pros, _, _ = u.gInfo.GetProviders(bc)
 			if len(pros) >= least {
 				breakFlag = true
 			} else {
@@ -209,11 +212,23 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 	var bEnc cipher.BlockMode
 	if u.encrypt == 1 {
-		tmpEnc, err := aes.ContructAes(u.sKey[:])
+		tmpEnc, err := aes.ContructAesEnc(u.sKey[:])
 		if err != nil {
 			return err
 		}
 		bEnc = tmpEnc
+	}
+
+	tn := os.Getenv("MEFS_TRANS")
+	if tn != "" {
+		tNum, err := strconv.Atoi(tn)
+		if err != nil {
+			transNum = DefaultTransNum
+		} else {
+			transNum = tNum
+		}
+	} else {
+		transNum = DefaultTransNum
 	}
 
 	breakFlag = false
@@ -266,15 +281,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 			u.length += int64(n)
 
-			for {
-				if atomic.LoadInt32(&parllel) < 32 {
-					break
-				}
-				time.Sleep(time.Second)
-			}
-			atomic.AddInt32(&parllel, 1)
-			wg.Add(1)
-
 			// encrypt
 			if u.encrypt == 1 {
 				if len(data)%aes.BlockSize != 0 {
@@ -285,6 +291,14 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				copy(data, crypted)
 			}
 
+			for {
+				if atomic.LoadInt32(&parllel) < 32 {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+			atomic.AddInt32(&parllel, 1)
+			wg.Add(1)
 			go func(data []byte, stripeID, start int) {
 				defer wg.Done()
 				defer atomic.AddInt32(&parllel, -1)
@@ -292,6 +306,24 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
 
 				blockMetas := make([]blockMeta, bc)
+				for i := 0; i < bc; i++ {
+					bm.SetCid(strconv.Itoa(i))
+					ncid := bm.ToString()
+					blockMetas[i].cid = ncid
+					if i < len(pros) {
+						blockMetas[i].provider = pros[i]
+					} else {
+						blockMetas[i].provider = u.gInfo.groupID
+					}
+
+					if start != 0 {
+						provider, _, err := u.gInfo.getBlockProviders(ncid)
+						if err != nil {
+							continue
+						}
+						blockMetas[i].provider = provider
+					}
+				}
 				count := int32(0)
 				for be := 0; be*readUnit < len(data); be += transNum {
 					var transData []byte
@@ -309,27 +341,18 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 					count = 0
 					var pwg sync.WaitGroup
-					if start == 0 {
-						pros, _, _ := u.gInfo.GetProviders(bc)
-						if len(pros) < least {
-							return
+					for i := 0; i < bc; i++ {
+						blockMetas[i].end = int(offset)
+						blockMetas[i].start = int(start)
+						provider := blockMetas[i].provider
+						if provider == u.gInfo.groupID {
+							continue
 						}
-
-						for i := 0; i < bc; i++ {
-							bm.SetCid(strconv.Itoa(i))
-							ncid := bm.ToString()
-							km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = u.gInfo.groupID
-							if i >= len(pros) {
-								continue
-							}
-
-							blockMetas[i].provider = pros[i]
-							pwg.Add(1)
-							go func(edata []byte, proID string) {
+						pwg.Add(1)
+						if start == 0 {
+							go func(num int, edata []byte, proID string) {
 								defer pwg.Done()
+								km, _ := metainfo.NewKey(blockMetas[num].cid, mpb.KeyType_Block)
 								for k := 0; k < 10; k++ {
 									err := u.gInfo.ds.PutBlock(ctx, km.ToString(), edata, proID)
 									if err != nil {
@@ -345,32 +368,15 @@ func (u *uploadTask) Start(ctx context.Context) error {
 										break
 									}
 								}
-
-							}(encodedData[i], pros[i])
-						}
-					} else {
-						for i := 0; i < bc; i++ {
-							bm.SetCid(strconv.Itoa(i))
-							ncid := bm.ToString()
-							km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block, strconv.Itoa(int(start)), strconv.Itoa(offset-start))
-							blockMetas[i].cid = ncid
-							blockMetas[i].offset = offset
-							blockMetas[i].provider = u.gInfo.groupID
-
-							provider, _, err := u.gInfo.getBlockProviders(ncid)
-							if err != nil || provider == u.gInfo.groupID {
-								continue
-							}
-							blockMetas[i].provider = provider
-
-							pwg.Add(1)
-							go func(edata []byte, proID string) {
+							}(i, encodedData[i], provider)
+						} else {
+							go func(num int, edata []byte, proID string) {
 								defer pwg.Done()
+								km, _ := metainfo.NewKey(blockMetas[num].cid, mpb.KeyType_Block, strconv.Itoa(blockMetas[num].start), strconv.Itoa(blockMetas[num].end-blockMetas[num].start))
 								for k := 0; k < 10; k++ {
-									err = u.gInfo.ds.AppendBlock(ctx, km.ToString(), edata, proID)
+									err := u.gInfo.ds.AppendBlock(ctx, km.ToString(), edata, proID)
 									if err != nil {
 										utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", proID, " failed: ", err)
-
 										if u.gInfo.ds.Connect(ctx, proID) {
 											tdelay := rand.Int63n(int64(k+1) * 60000000000)
 											time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
@@ -382,18 +388,16 @@ func (u *uploadTask) Start(ctx context.Context) error {
 										break
 									}
 								}
-							}(encodedData[i], provider)
+							}(i, encodedData[i], provider)
 						}
 					}
-					pwg.Wait()
 
-					//没有达到最低安全标准，返回错误
+					pwg.Wait()
 					start = offset
 				}
-
 				if count >= dc {
 					for _, v := range blockMetas {
-						go u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.offset)
+						u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.end)
 					}
 				}
 			}(data, int(u.curStripe), int(u.curOffset))

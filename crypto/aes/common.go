@@ -28,8 +28,21 @@ func CreateAesKey(privateKey, queryID []byte, bucketID, objectStart int64) [32]b
 	return blake2b.Sum256(tmpkey)
 }
 
-// ContructAes contructs a new aes
-func ContructAes(key []byte) (cipher.BlockMode, error) {
+// ContructAesEnc contructs a new aes encrypt
+func ContructAesEnc(key []byte) (cipher.BlockMode, error) {
+	if len(key) != KeySize {
+		return nil, ErrKeySize
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	blockSize := block.BlockSize()
+	iv := blake2b.Sum256(key)
+	return cipher.NewCBCEncrypter(block, iv[:blockSize]), nil
+}
+
+func ContructAesDec(key []byte) (cipher.BlockMode, error) {
 	if len(key) != KeySize {
 		return nil, ErrKeySize
 	}

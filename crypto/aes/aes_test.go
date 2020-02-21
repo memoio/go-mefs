@@ -1,6 +1,7 @@
 package aes
 
 import (
+	"bytes"
 	"fmt"
 	blake2bsimd "github.com/minio/blake2b-simd"
 	"golang.org/x/crypto/blake2b"
@@ -46,6 +47,44 @@ func BenchmarkBlake2bsimd512(b *testing.B) {
 		h.Reset()
 		h.Write([]byte("1234567sjjskdjkdlsllslagfgadddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddslkvjjk"))
 		h.Sum(nil)
+	}
+}
+
+func TestNewAes(t *testing.T) {
+	key := make([]byte, KeySize)
+	data := make([]byte, BlockSize*5)
+	rand.Seed(0)
+	fillRandom(key)
+	fillRandom(data)
+	fmt.Println(data)
+	fmt.Println(key)
+
+	bme, err := ContructAesEnc(key)
+	if err != nil {
+		t.Fatal("ContructAes error:", err)
+	}
+
+	bmd, err := ContructAesDec(key)
+	if err != nil {
+		t.Fatal("ContructAes error:", err)
+	}
+
+	dhash := blake2b.Sum256(data)
+
+	crypted := make([]byte, len(data))
+	bme.CryptBlocks(crypted[:2*BlockSize], data[:2*BlockSize])
+	bme.CryptBlocks(crypted[2*BlockSize:], data[2*BlockSize:])
+
+	//bme.CryptBlocks(crypted, data)
+	data = make([]byte, len(data))
+	//bmd.CryptBlocks(data, crypted)
+	bmd.CryptBlocks(data[:3*BlockSize], crypted[:3*BlockSize])
+	bmd.CryptBlocks(data[3*BlockSize:], crypted[3*BlockSize:])
+
+	dhash2 := blake2b.Sum256(data)
+	if bytes.Compare(dhash[:], dhash2[:]) != 0 {
+		fmt.Println(data)
+		t.Fatal("decrypto error")
 	}
 }
 

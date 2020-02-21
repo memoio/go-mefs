@@ -993,6 +993,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 			Policy:      bucket.BOpts.Policy,
 			DataCount:   bucket.BOpts.DataCount,
 			ParityCount: bucket.BOpts.ParityCount,
+			Encryption:  bucket.BOpts.Encryption,
 		}
 		return cmds.EmitOnce(res, &Buckets{
 			Method:  "Head Bucket",
@@ -1177,6 +1178,7 @@ It outputs the following to stdout:
 				Policy:      bucket.BOpts.Policy,
 				DataCount:   bucket.BOpts.DataCount,
 				ParityCount: bucket.BOpts.ParityCount,
+				Encryption:  bucket.BOpts.Encryption,
 			}
 			bucketStats.Buckets = append(bucketStats.Buckets, bucketStat)
 		}
@@ -1253,6 +1255,7 @@ It outputs the following to stdout:
 			Policy:      bucket.BOpts.Policy,
 			DataCount:   bucket.BOpts.DataCount,
 			ParityCount: bucket.BOpts.ParityCount,
+			Encryption:  bucket.BOpts.Encryption,
 		}
 		return cmds.EmitOnce(res, &Buckets{
 			Method:  "Delete Bucket",
