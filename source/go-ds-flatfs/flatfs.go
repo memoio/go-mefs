@@ -613,8 +613,8 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 			return err
 		}
 	}
-	addSize := int64(len(fields) - preLen)
-	fs.updateDiskUsageinAppend(addSize)
+
+	fs.updateDiskUsageinAppend(int64(len(fields) - preLen))
 	if fs.sync {
 		if err := syncDir(dir); err != nil {
 			return err

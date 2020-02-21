@@ -97,8 +97,6 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		},
 	}
 
-	bucket.objects[objectName] = object
-
 	bopt := &mpb.BlockOptions{
 		Bopts:   bucket.BOpts,
 		Start:   0,
@@ -125,12 +123,12 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	err = ul.Start(ctx)
 	if err != nil && ul.length == 0 {
-		delete(bucket.objects, objectName)
 		return &object.ObjectInfo, err
 	}
 
 	object.OPart.ETag = ul.etag
 	object.OPart.Length = ul.length
+	bucket.objects[objectName] = object
 	bucket.NextObjectID++
 	bucket.CurStripe = ul.curStripe
 	bucket.NextSeg = ul.curOffset

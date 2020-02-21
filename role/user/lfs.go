@@ -547,10 +547,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 	ctx := context.Background()
 
 	for _, object := range bucket.objects {
-		err := objectDelimitedWriter.WriteMsg(&object.ObjectInfo)
-		if err != nil {
-			continue
-		}
+		objectDelimitedWriter.WriteMsg(&object.ObjectInfo)
 	}
 
 	if objectsBuffer.Len() != 0 { //处理最后的剩余部分
@@ -824,7 +821,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		fullData = append(fullData, data...)
 
 		objectSlice := make([]*mpb.ObjectInfo, bucket.NextObjectID)
-
+		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
 		objectsBuffer := bytes.NewBuffer(fullData)
 		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*dataformat.BlockSize)
 		for {
@@ -836,11 +833,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 				return err
 			}
 
-			if object.GetOPart() == nil {
-				continue
-			}
-
-			if object.GetOPart().GetLength() == 0 {
+			if object.GetOPart() == nil || object.GetOPart().GetLength() == 0 {
 				continue
 			}
 
@@ -854,6 +847,8 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			bucket.objects[oName] = &objectInfo{
 				ObjectInfo: object,
 			}
+
+			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", oName)
 		}
 
 		for i := 0; i < int(bucket.NextObjectID); i++ {
