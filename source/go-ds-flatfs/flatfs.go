@@ -537,11 +537,9 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 	dir, path := fs.encode(key)
 	fi, err := os.Lstat(path)
 	if err != nil && !os.IsNotExist(err) {
-		fmt.Println(key.String(), ErrNotExist)
 		return ErrNotExist
 	}
 	if fi == nil {
-		fmt.Println(key.String(), ErrNotExist)
 		return ErrNotExist
 	}
 	if fi.IsDir() {
@@ -590,12 +588,14 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 
 	segStart := ((int(fsize)-oldpreLen)-1)/int(fieldSize) + 1
 	if segStart > int(pre.Start) {
+		fmt.Printf("need length %d, but got %d", pre.Start, segStart)
 		writeStart = int64(oldpreLen + int(pre.Start*fieldSize))
 		err = f.Truncate(writeStart)
 		if err != nil {
 			return err
 		}
 	} else if segStart < int(pre.Start) {
+		fmt.Printf("need length %d, but got %d", pre.Start, segStart)
 		return errUnmatchOffset
 	}
 
