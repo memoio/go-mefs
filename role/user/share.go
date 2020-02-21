@@ -136,27 +136,15 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 
 	decoder := dataformat.NewDataCoderWithPrefix(sul.keySet, bopt)
 
-	segSize := int64(bo.GetSegmentSize() * bo.SegmentSize)
-	stripeSize := int64(bo.GetDataCount()) * segSize
-
 	for i := 0; i < len(sl.GetOParts()); i++ {
 		opart := sl.GetOParts()[i]
-		// 下载的开始条带
-		stripePos := opart.Start / stripeSize
-		// 下载开始的segment
-		segPos := (opart.Start % stripeSize) / segSize
-		// segment的偏移
-		offsetPos := opart.Start % segSize
-
 		dl := &downloadTask{
 			bucketID:     sl.BucketID,
 			group:        su.(*LfsInfo).gInfo,
 			decoder:      decoder,
 			startTime:    time.Now(),
-			curStripe:    stripePos,
-			segOffset:    segPos,
-			dStart:       offsetPos,
-			dLength:      opart.Length,
+			start:        opart.Start,
+			length:       opart.Length,
 			encrypt:      bo.Encryption,
 			writer:       writer,
 			completeFunc: completeFuncs,

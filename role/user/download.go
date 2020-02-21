@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -36,18 +37,17 @@ func DefaultDownloadOptions() *DownloadOptions {
 
 type downloadTask struct {
 	bucketID     int64
+	start        int64
+	length       int64
+	sizeReceived int64
 	encrypt      int32
 	sKey         [32]byte
 	group        *groupInfo            //groupInfo
 	decoder      *dataformat.DataCoder //用于解码数据
-	curStripe    int64                 //当前已进行到哪个stripe
-	segOffset    int64                 //此次下载起始offset，表示在stripe中的起始segment
-	dStart       int64                 // startPos
-	dLength      int64                 //下载所需大小，用于后续指定范围下载
-	sizeReceived int64                 //可以统计下载进度
 	startTime    time.Time
 	writer       io.Writer
 	completeFunc []CompleteFunc //完成任务或出错的通知函数
+	cidMaps      sync.Map
 }
 
 // GetObject constructs lfs download process
@@ -83,19 +83,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		return ErrObjectOptionsInvalid
 	}
 
-	start := opts.Start + object.OPart.GetStart()
-
 	bo := bucket.BOpts
-
-	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
-	stripeSize := int64(bo.SegmentCount) * segStripeSize
-
-	// 下载的开始条带内偏移
-	stripePos := start / stripeSize
-	// 下载开始的segment
-	segPos := (start % stripeSize) / segStripeSize
-	// segment内的偏移
-	dPos := start % segStripeSize
 
 	bopt := &mpb.BlockOptions{
 		Bopts:   bo,
@@ -111,10 +99,8 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		group:        l.gInfo,
 		decoder:      decoder,
 		startTime:    time.Now(),
-		curStripe:    stripePos,
-		segOffset:    segPos,
-		dStart:       dPos,
-		dLength:      length,
+		start:        opts.Start + object.OPart.GetStart(),
+		length:       length,
 		writer:       writer,
 		completeFunc: completeFuncs,
 		encrypt:      bo.Encryption,
@@ -129,15 +115,9 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 }
 
 func (do *downloadTask) Start(ctx context.Context) error {
-	curStripe := do.curStripe
-	segStart := do.segOffset
-	dStart := do.dStart // 0
 	dc := int64(do.decoder.Prefix.Bopts.DataCount)
 	segStripeSize := int64(do.decoder.Prefix.Bopts.SegmentSize) * dc
 	stripeSize := int64(do.decoder.Prefix.Bopts.SegmentCount) * segStripeSize
-
-	//下载的第一个stripe前已经有多少数据，等于此文件追加在后面
-	segPos := segStart * segStripeSize
 	readUnit := int64(transNum) * segStripeSize
 
 	var bEnc cipher.BlockMode
@@ -149,7 +129,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		bEnc = tmpEnc
 	}
 
-	var remain int64
+	var length int64
 	tn := os.Getenv("MEFS_TRANS")
 	if tn != "" {
 		tNum, err := strconv.Atoi(tn)
@@ -161,6 +141,8 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	} else {
 		transNum = DefaultTransNum
 	}
+
+	utils.MLogger.Debugf("download rate is: ", transNum)
 	breakFlag := false
 	for !breakFlag {
 		select {
@@ -168,17 +150,19 @@ func (do *downloadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("download cancel")
 			return nil
 		default:
-			remain = (curStripe-do.curStripe+1)*stripeSize - segPos - do.dStart - do.sizeReceived
-
-			if remain > do.dLength-do.sizeReceived {
-				remain = do.dLength - do.sizeReceived
+			start := do.start + do.sizeReceived
+			// read at most one stripe
+			length = stripeSize - start%stripeSize
+			// read to end
+			if length > do.length-do.sizeReceived {
+				length = do.length - do.sizeReceived
+			}
+			// read slower due to network
+			if length > readUnit {
+				length = readUnit
 			}
 
-			if remain > readUnit {
-				remain = readUnit
-			}
-
-			data, n, err := do.rangeRead(ctx, curStripe, segStart, dStart, remain)
+			data, n, err := do.rangeRead(ctx, start, length)
 			if err != nil {
 				if err.Error() == role.ErrWrongMoney.Error() {
 					do.group.loadContracts("")
@@ -189,38 +173,31 @@ func (do *downloadTask) Start(ctx context.Context) error {
 				}
 			}
 
+			if n < length {
+				utils.MLogger.Warn("length is not match, got: ", n, ", want: ", length)
+			}
+			offset := start % segStripeSize
+
 			if do.encrypt == 1 {
-				padding := aes.BlockSize - ((dStart+remain-1)%aes.BlockSize + 1)
-				data = data[:dStart+remain+padding]
+				padding := aes.BlockSize - ((offset+length-1)%aes.BlockSize + 1)
+				data = data[:offset+length+padding]
 				decrypted := make([]byte, len(data))
 				bEnc.CryptBlocks(decrypted, data)
 				data = decrypted[:len(data)-int(padding)]
 			}
 
-			wl, err := do.writer.Write(data[dStart : dStart+remain])
+			wl, err := do.writer.Write(data[offset : offset+length])
 			if err != nil {
 				return err
 			}
 
-			if int64(wl) != remain {
+			if int64(wl) != length {
 				utils.MLogger.Warn("write length is not equal")
 			}
 
-			if n != remain {
-				utils.MLogger.Warn("length is not match, got: ", n, ", want: ", remain)
-			}
+			do.sizeReceived += length
 
-			do.sizeReceived += n
-
-			if (do.sizeReceived+segPos+do.dStart)%stripeSize == 0 {
-				curStripe++
-				segStart = 0
-			} else {
-				dStart = 0
-				segStart += (1 + (n-1)/(segStripeSize))
-			}
-
-			if do.sizeReceived >= do.dLength {
+			if do.sizeReceived >= do.length {
 				breakFlag = true
 			}
 		}
@@ -264,24 +241,23 @@ type (
 )
 
 //从一个stripe内指定范围读取数据写入到writer内
-func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offset, remain int64) ([]byte, int64, error) {
+func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]byte, int64, error) {
 	//首先设置一些本次stripe下载的基本参数
 	dataCount := do.decoder.Prefix.Bopts.DataCount
 	parityCount := do.decoder.Prefix.Bopts.ParityCount
 	blockCount := dataCount + parityCount
 	segSize := do.decoder.Prefix.Bopts.SegmentSize
-	bm, err := metainfo.NewBlockMeta(do.group.groupID, strconv.Itoa(int(do.bucketID)), strconv.Itoa(int(stripeID)), "")
-	if err != nil {
-		utils.MLogger.Error("Download failed: ", err)
-		return nil, 0, err
-	}
-
-	segRemains := int(1 + (remain-1)/int64(dataCount*segSize))
-
+	segStripeSize := int64(do.decoder.Prefix.Bopts.SegmentSize * dataCount)
+	stripeSize := int64(do.decoder.Prefix.Bopts.SegmentCount) * segStripeSize
 	tagSize, ok := dataformat.TagMap[int(do.decoder.Prefix.Bopts.TagFlag)]
 	if !ok {
 		tagSize = 48
 	}
+
+	curStripe := start / stripeSize
+	segStart := int(start % stripeSize / segStripeSize)
+	offset := start % segStripeSize
+	segNeed := int(1 + (offset+length-1)/segStripeSize)
 
 	do.decoder.Prefix.Start = int32(segStart)
 	_, preLen, err := bf.PrefixEncode(do.decoder.Prefix)
@@ -289,7 +265,13 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 		return nil, 0, err
 	}
 
-	eachLen := preLen + segRemains*(int(segSize)+int(2+(parityCount-1)/dataCount)*tagSize)
+	eachLen := preLen + segNeed*(int(segSize)+int(2+(parityCount-1)/dataCount)*tagSize)
+
+	bm, err := metainfo.NewBlockMeta(do.group.groupID, strconv.Itoa(int(do.bucketID)), strconv.Itoa(int(curStripe)), "")
+	if err != nil {
+		utils.MLogger.Error("Download failed: ", err)
+		return nil, 0, err
+	}
 
 	needRepair := false //是否需要修复
 	datas := make([][]byte, blockCount)
@@ -317,10 +299,18 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 		go func(inum int, chunkid string) {
 			defer atomic.AddInt32(&parllel, -1)
 			defer atomic.AddInt32(&fail, 1)
-			provider, _, err := do.group.getBlockProviders(chunkid)
-			if err != nil || provider == do.group.groupID {
-				utils.MLogger.Warnf("Get Block %s 's provider from keeper failed: %s", chunkid, err)
-				return
+			var provider string
+			pro, ok := do.cidMaps.Load(chunkid)
+			if ok {
+				provider = pro.(string)
+			} else {
+				providerID, _, err := do.group.getBlockProviders(chunkid)
+				if err != nil || providerID == do.group.groupID {
+					utils.MLogger.Warnf("Get Block %s 's provider from keeper failed: %s", chunkid, err)
+					return
+				}
+				provider = providerID
+				do.cidMaps.Store(chunkid, providerID)
 			}
 
 			pinfo, ok := do.group.providers[provider]
@@ -339,7 +329,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 			}
 
 			//获取数据块
-			bgm, _ := metainfo.NewKey(chunkid, mpb.KeyType_Block, strconv.Itoa(int(segStart)), strconv.Itoa(segRemains))
+			bgm, _ := metainfo.NewKey(chunkid, mpb.KeyType_Block, strconv.Itoa(int(segStart)), strconv.Itoa(segNeed))
 			b, err := do.group.ds.GetBlock(ctx, bgm.ToString(), mes, provider)
 			if err != nil {
 				utils.MLogger.Warnf("Get Block %s from %s failed: %s", ncid, provider, err)
@@ -355,7 +345,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 				return
 			}
 			blkData := b.RawData()
-			ok, err = dataformat.VerifyBlockLength(blkData, int(segStart), segRemains)
+			ok, err = dataformat.VerifyBlockLength(blkData, segStart, segNeed)
 			if !ok || err != nil {
 				utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", chunkid, provider, err)
 				return
@@ -422,13 +412,13 @@ func (do *downloadTask) rangeRead(ctx context.Context, stripeID, segStart, offse
 
 	do.decoder.Repair = needRepair
 	// decode returns bytes of 16B
-	data, err := do.decoder.Decode(datas, 0, int(offset+remain))
+	data, err := do.decoder.Decode(datas, 0, int(length))
 	if err != nil {
 		utils.MLogger.Errorf("Download failed due to decode err: ", err)
 		return nil, 0, err
 	}
 
-	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), offset+remain, segStart*int64(segSize*dataCount)+offset)
+	utils.MLogger.Debugf("Download get length: %d, need %d, from %d", len(data), length, start)
 
 	return data, int64(len(data)), nil
 }
