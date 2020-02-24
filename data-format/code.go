@@ -29,7 +29,7 @@ type DataCoder struct {
 }
 
 // NewDataCoder 构建一个dataformat配置
-func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount int, userID, fsID string) *DataCoder {
+func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount, encrpto int, userID, fsID string) *DataCoder {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
 	}
@@ -51,6 +51,7 @@ func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, t
 		TagFlag:      int32(tagFlag),
 		SegmentSize:  int32(segmentSize),
 		SegmentCount: int32(segCount),
+		Encryption:   int32(encrpto),
 	}
 
 	return NewDataCoderWithBopts(keyset, bo, userID, fsID)
@@ -58,7 +59,7 @@ func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, t
 
 // NewDataCoderWithDefault creates a new datacoder with default
 func NewDataCoderWithDefault(keyset *mcl.KeySet, policy, dataCount, pairtyCount int, userID, fsID string) *DataCoder {
-	return NewDataCoder(keyset, policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, userID, fsID)
+	return NewDataCoder(keyset, policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, DefaultCrypt, userID, fsID)
 }
 
 // NewDataCoderWithBopts contructs a new datacoder with bucketops

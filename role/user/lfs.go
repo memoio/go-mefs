@@ -652,7 +652,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		}
 		pbSuperBlock := mpb.SuperBlockInfo{}
 		SbBuffer := bytes.NewBuffer(data)
-		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, 5*dataformat.BlockSize)
+		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, len(data))
 		err = SbDelimitedReader.ReadMsg(&pbSuperBlock)
 		if err == io.EOF {
 		} else if err != nil {
@@ -724,7 +724,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 			}
 			bucket := mpb.BucketInfo{}
 			BucketBuffer := bytes.NewBuffer(data)
-			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, 5*dataformat.BlockSize)
+			BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, len(data))
 			err = BucketDelimitedReader.ReadMsg(&bucket)
 			if err != nil && err != io.EOF {
 				continue
@@ -823,7 +823,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		objectSlice := make([]*mpb.ObjectInfo, bucket.NextObjectID)
 		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
 		objectsBuffer := bytes.NewBuffer(fullData)
-		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, 2*dataformat.BlockSize)
+		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, len(data))
 		for {
 			object := mpb.ObjectInfo{}
 			err := objectsDelimitedReader.ReadMsg(&object)
