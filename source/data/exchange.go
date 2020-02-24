@@ -263,52 +263,24 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	utils.MLogger.Debug("GetBlock: ", key, " from: ", to)
 	if to == "local" {
 		if len(skey) == 4 {
-			ci, ok := n.aCache.iMap.Load(skey[0])
-			if ok {
-				s, err := strconv.Atoi(skey[2])
+			s, err := strconv.Atoi(skey[2])
+			if err != nil {
+				return nil, err
+			}
+
+			len, err := strconv.Atoi(skey[3])
+			if err != nil {
+				return nil, err
+			}
+			// get from cache
+			res, err := n.aCache.Get(skey[0], s, len)
+			if err == nil {
+				c := cid.NewCidV2([]byte(skey[0]))
+				b, err := blocks.NewBlockWithCid(res, c)
 				if err != nil {
 					return nil, err
 				}
-
-				len, err := strconv.Atoi(skey[3])
-				if err != nil {
-					return nil, err
-				}
-
-				it := ci.(*Item)
-				if s >= it.Start && s+len <= it.Start+it.Length {
-					pre, preLen, err := blocks.PrefixDecode(it.Value)
-					if err != nil {
-						return nil, err
-					}
-
-					tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
-					if !ok {
-						return nil, dataformat.ErrWrongTagFlag
-					}
-
-					tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
-					fieldSize := int(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
-
-					pre.Start = int32(s)
-					prebuf, npreLen, err := blocks.PrefixEncode(pre)
-					if err != nil {
-						return nil, err
-					}
-
-					res := make([]byte, npreLen+fieldSize*len)
-					copy(res, prebuf)
-					copy(res[preLen:], it.Value[preLen+(s-it.Start)*fieldSize:preLen+(s-it.Start+len)*fieldSize])
-
-					c := cid.NewCidV2([]byte(skey[0]))
-					b, err := blocks.NewBlockWithCid(res, c)
-					if err != nil {
-						return nil, err
-					}
-					return b, nil
-				}
-				go n.aCache.Summit(skey[0])
-				return nil, ErrRetry
+				return b, nil
 			}
 		}
 
