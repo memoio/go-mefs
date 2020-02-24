@@ -24,7 +24,7 @@ type seg struct {
 
 type Item struct {
 	sync.RWMutex
-	Segs       []seg
+	Segs       []*seg
 	Key        []byte
 	Expiration int64
 	tries      int
@@ -75,6 +75,7 @@ func (c *Cache) Flush() {
 				val.Expiration = time.Now().Add(defaultExpiration).UnixNano()
 				val.tries++
 			} else {
+				val.tries = 0
 				if len(val.Segs) > 1 {
 					val.Expiration = time.Now().Add(defaultExpiration).UnixNano()
 					val.Segs = val.Segs[1:]
@@ -174,9 +175,9 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 		ni := &Item{
 			Key:        []byte(k),
 			Expiration: e,
-			Segs:       make([]seg, 1),
+			Segs:       make([]*seg, 1),
 		}
-		ns := seg{
+		ns := &seg{
 			Value:  val,
 			Start:  start,
 			Length: length,
@@ -191,7 +192,7 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	ni.Lock()
 	defer ni.Unlock()
 
-	ns := seg{
+	ns := &seg{
 		Start:  start,
 		Length: length,
 		Value:  val,
@@ -212,7 +213,7 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	for i := 1; i < len(ni.Segs); i++ {
 		seAfter := ni.Segs[i]
 		if seAfter.Start == seBefore.Start+seBefore.Length {
-			seBefore.Length = seBefore.Length + seAfter.Length
+			seBefore.Length += seAfter.Length
 			_, preLen, err := bf.PrefixDecode(seAfter.Value)
 			if err != nil {
 				return err

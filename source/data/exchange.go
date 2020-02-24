@@ -383,12 +383,11 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 			return err
 		}
 
-		bcid := cid.NewCidV2([]byte(skey[0]))
-
 		if n.aCache.Has(skey[0]) {
 			return n.aCache.Set(skey[0], data, s, len)
 		}
 
+		bcid := cid.NewCidV2([]byte(skey[0]))
 		err = n.bstore.Append(bcid, data, s, len)
 		if err != nil {
 			return n.aCache.Set(skey[0], data, s, len)
