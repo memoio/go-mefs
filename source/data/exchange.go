@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/memoio/go-mefs/config"
+	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
@@ -37,6 +38,7 @@ type impl struct {
 	netID  string // network address
 	bstore bs.Blockstore
 	dstore ds.Datastore
+	aCache *Cache
 	rt     routing.Routing
 	ph     p2phost.Host
 }
@@ -53,6 +55,7 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 		ph:     host,
 		dstore: d,
 		bstore: b,
+		aCache: NewCache(),
 	}
 }
 
@@ -256,18 +259,72 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		return nil, errNoRouting
 	}
 
+	skey := strings.Split(key, metainfo.DELIMITER)
 	utils.MLogger.Debug("GetBlock: ", key, " from: ", to)
 	if to == "local" {
+		if len(skey) == 4 {
+			ci, ok := n.aCache.iMap.Load(skey[0])
+			if ok {
+				s, err := strconv.Atoi(skey[2])
+				if err != nil {
+					return nil, err
+				}
+
+				len, err := strconv.Atoi(skey[3])
+				if err != nil {
+					return nil, err
+				}
+
+				it := ci.(*Item)
+				if s >= it.Start && s+len <= it.Start+it.Length {
+					pre, preLen, err := blocks.PrefixDecode(it.Value)
+					if err != nil {
+						return nil, err
+					}
+
+					tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
+					if !ok {
+						return nil, dataformat.ErrWrongTagFlag
+					}
+
+					tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
+					fieldSize := int(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
+
+					pre.Start = int32(s)
+					prebuf, npreLen, err := blocks.PrefixEncode(pre)
+					if err != nil {
+						return nil, err
+					}
+
+					res := make([]byte, npreLen+fieldSize*len)
+					copy(res, prebuf)
+					copy(res[preLen:], it.Value[preLen+(s-it.Start)*fieldSize:preLen+(s-it.Start+len)*fieldSize])
+
+					c := cid.NewCidV2([]byte(skey[0]))
+					b, err := blocks.NewBlockWithCid(res, c)
+					if err != nil {
+						return nil, err
+					}
+					return b, nil
+				}
+				go n.aCache.Summit(skey[0])
+				return nil, ErrRetry
+			}
+		}
+
 		block, err := n.bstore.Get(cid.NewCidV2([]byte(key)))
 		if err == nil {
 			return block, nil
 		}
+		if err.Error() == dataformat.ErrDataTooShort.Error() {
+			go n.aCache.Summit(skey[0])
+			return nil, ErrRetry
+		}
 		return nil, err
 	}
 
-	bids := strings.Split(key, metainfo.DELIMITER)
-	if len(bids) == 1 {
-		km, _ := metainfo.NewKey(bids[0], mpb.KeyType_Block)
+	if len(skey) == 1 {
+		km, _ := metainfo.NewKey(skey[0], mpb.KeyType_Block)
 		key = km.ToString()
 	}
 
@@ -356,9 +413,13 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 
 		bcid := cid.NewCidV2([]byte(skey[0]))
 
+		if n.aCache.Has(skey[0]) {
+			return n.aCache.Set(skey[0], data, s, len)
+		}
+
 		err = n.bstore.Append(bcid, data, s, len)
 		if err != nil {
-			return err
+			return n.aCache.Set(skey[0], data, s, len)
 		}
 		return nil
 	}
