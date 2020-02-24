@@ -25,7 +25,7 @@ type seg struct {
 type Item struct {
 	sync.RWMutex
 	Segs       []seg
-	Key        string
+	Key        []byte
 	Expiration int64
 	tries      int
 }
@@ -70,7 +70,7 @@ func (c *Cache) Flush() {
 		deletion = false
 		val.Lock()
 		if val.Expiration < now && len(val.Segs) > 0 {
-			err := c.bstore.Append(cid.NewCidV2([]byte(val.Key)), val.Segs[0].Value, val.Segs[0].Start, val.Segs[0].Length)
+			err := c.bstore.Append(cid.NewCidV2(val.Key), val.Segs[0].Value, val.Segs[0].Start, val.Segs[0].Length)
 			if err != nil {
 				val.Expiration = time.Now().Add(defaultExpiration).UnixNano()
 				val.tries++
@@ -103,7 +103,7 @@ func (c *Cache) Summit(key string) {
 	val := ci.(*Item)
 	val.Lock()
 	if len(val.Segs) > 0 {
-		err := c.bstore.Append(cid.NewCidV2([]byte(val.Key)), val.Segs[0].Value, val.Segs[0].Start, val.Segs[0].Length)
+		err := c.bstore.Append(cid.NewCidV2(val.Key), val.Segs[0].Value, val.Segs[0].Start, val.Segs[0].Length)
 		if err != nil {
 			val.Expiration = time.Now().Add(defaultExpiration).UnixNano()
 			val.tries++
@@ -172,6 +172,7 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	it, found := c.iMap.Load(k)
 	if !found {
 		ni := &Item{
+			Key:        []byte(k),
 			Expiration: e,
 			Segs:       make([]seg, 1),
 		}
