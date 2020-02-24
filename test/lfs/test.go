@@ -84,7 +84,7 @@ func lfsTest() error {
 	log.Println("4. test rs de encrypt bucket")
 	b2 := "de-" + time.Now().Format("2006-01-02")
 	r2 := rand.Int63n(randomDataSize)
-	err = testPut(sh, b2, addr, 2, 3, df.MulPolicy, r2, false)
+	err = testPut(sh, b2, addr, 2, 3, df.RsPolicy, r2, false)
 	if err != nil {
 		return err
 	}
@@ -93,14 +93,14 @@ func lfsTest() error {
 
 	b3 := "mul-enc-" + time.Now().Format("2006-01-02")
 	r3 := rand.Int63n(randomDataSize)
-	err = testPut(sh, b3, addr, 1, 4, df.RsPolicy, r3, true)
+	err = testPut(sh, b3, addr, 1, 4, df.MulPolicy, r3, true)
 	if err != nil {
 		return err
 	}
 
 	b4 := "mul-de-" + time.Now().Format("2006-01-02")
 	r4 := rand.Int63n(randomDataSize)
-	err = testPut(sh, b4, addr, 1, 4, df.RsPolicy, r4, false)
+	err = testPut(sh, b4, addr, 1, 4, df.MulPolicy, r4, false)
 	if err != nil {
 		return err
 	}
