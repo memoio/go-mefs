@@ -23,7 +23,7 @@ const (
 	defaultMetaBackupCount int32 = 3
 	flushLocalBackup             = 1
 
-	DefaultTransNum = 16
+	DefaultTransNum = dataformat.DefaultSegmentCount
 	// DefaultBufSize used for read
 	DefaultBufSize = 1024 * 1024 * 4
 )
