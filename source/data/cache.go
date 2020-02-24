@@ -82,7 +82,7 @@ func (c *Cache) Flush() {
 			}
 		}
 
-		if val.tries > 100 {
+		if val.tries > 10 {
 			deletion = true
 		}
 
@@ -183,6 +183,7 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 
 		ni.Segs[0] = ns
 		c.iMap.Store(k, ni)
+		return nil
 	}
 
 	ni := it.(*Item)
