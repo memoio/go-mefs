@@ -238,10 +238,11 @@ func (c *Cache) StopGc() {
 	c.stopGc <- true
 }
 
-func NewCache() *Cache {
+func NewCache(bstore bs.Blockstore) *Cache {
 	c := &Cache{
 		gcInterval: defaultGCInterval,
 		stopGc:     make(chan bool),
+		bstore:     bstore,
 	}
 
 	go c.gcLoop()

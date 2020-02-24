@@ -20,8 +20,6 @@ import (
 
 //随机文件最大大小
 const randomDataSize = 1024 * 1024 * 10
-const dataCount = 2
-const parityCount = 3
 const moneyTo = 1000000000000000000
 
 var ethEndPoint string
@@ -75,25 +73,68 @@ func lfsTest() error {
 		return err
 	}
 
-	log.Println("3. test rs create bucket")
+	log.Println("3. test rs encrypt bucket")
+	b1 := "enc-" + time.Now().Format("2006-01-02")
+	r1 := rand.Int63n(randomDataSize)
+	err = testPut(sh, b1, addr, 2, 3, df.RsPolicy, r1, true)
+	if err != nil {
+		return err
+	}
 
-	bucketName := time.Now().Format("2006-01-02")
-	var opts []func(*shell.RequestBuilder) error
+	log.Println("4. test rs de encrypt bucket")
+	b2 := "de-" + time.Now().Format("2006-01-02")
+	r2 := rand.Int63n(randomDataSize)
+	err = testPut(sh, b2, addr, 2, 3, df.MulPolicy, r2, false)
+	if err != nil {
+		return err
+	}
+
+	log.Println("5. test mul bucket")
+
+	b3 := "mul-enc-" + time.Now().Format("2006-01-02")
+	r3 := rand.Int63n(randomDataSize)
+	err = testPut(sh, b3, addr, 1, 4, df.RsPolicy, r3, true)
+	if err != nil {
+		return err
+	}
+
+	b4 := "mul-de-" + time.Now().Format("2006-01-02")
+	r4 := rand.Int63n(randomDataSize)
+	err = testPut(sh, b4, addr, 1, 4, df.RsPolicy, r4, false)
+	if err != nil {
+		return err
+	}
+
+	log.Println("6. test showstorage")
+	res, err := sh.ShowStorage(shell.SetAddress(addr))
+	if err != nil {
+		log.Fatal("show storage err : ", err)
+		return err
+	}
+
+	log.Println("upload: ", r1+r2+r3+r4)
+	log.Println("storage: ", res)
+	return nil
+}
+
+func testPut(sh *shell.Shell, bucketName, addr string, dataCount, parityCount, policy int, length int64, crypto bool) error {
+	log.Println("test create bucket")
 	//set option of bucket
+	var opts []func(*shell.RequestBuilder) error
 	opts = append(opts, shell.SetAddress(addr))
 	opts = append(opts, shell.SetDataCount(dataCount))
 	opts = append(opts, shell.SetParityCount(parityCount))
-	opts = append(opts, shell.SetPolicy(df.RsPolicy))
-	opts = append(opts, shell.SetCrypto(false))
-	_, err = sh.CreateBucket(bucketName, opts...)
+	opts = append(opts, shell.SetPolicy(policy))
+	opts = append(opts, shell.SetCrypto(crypto))
+	_, err := sh.CreateBucket(bucketName, opts...)
 	if err != nil {
-		log.Println("create bucket err: ", err)
+		log.Fatal("create bucket err: ", err)
 		return err
 	}
 
 	bk, err := sh.HeadBucket(bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("create bucket err: ", err)
+		log.Fatal("head bucket err: ", err)
 		return err
 	}
 
@@ -103,61 +144,69 @@ func lfsTest() error {
 		log.Fatal("create bucket", bucketName, "fails, but got:", bk.Buckets[0].Name)
 	}
 
-	if bk.Buckets[0].Policy != df.RsPolicy {
-		log.Fatal("create bucket fails Policy")
+	if bk.Buckets[0].Policy != int32(policy) {
+		log.Fatal("create bucket fails policy")
 	}
 
-	if bk.Buckets[0].DataCount != dataCount {
+	if bk.Buckets[0].DataCount != int32(dataCount) {
 		log.Fatal("create bucket fails datacount")
 	}
 
-	if bk.Buckets[0].ParityCount != parityCount {
+	if bk.Buckets[0].ParityCount != int32(parityCount) {
 		log.Fatal("create bucket fails paritycount")
 	}
 
-	log.Println("4. test rs put bucket")
+	if crypto {
+		if bk.Buckets[0].Encryption == 0 {
+			log.Fatal("create bucket fails to encrypt")
+		}
+	} else {
+		if bk.Buckets[0].Encryption == 1 {
+			log.Fatal("create bucket fails to no encrypt")
+		}
+	}
+
+	log.Println("test put object")
 
 	fileNum := 1
 
 	//upload file
-	r := rand.Int63n(randomDataSize)
-	data := make([]byte, r)
+	data := make([]byte, length)
 	fillRandom(data)
 	buf := bytes.NewBuffer(data)
 	objectName := addr + "_" + strconv.Itoa(fileNum)
-	log.Println("Begin to upload file", fileNum, "，Filename is", objectName, "Size is", ToStorageSize(r), "addr", addr)
+	log.Println("Begin to upload file", fileNum, "，Filename is", objectName, "Size is", ToStorageSize(length), "addr", addr)
 	uploadBeginTime := time.Now().Unix()
-	ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
+	_, err = sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("put object fails")
+		log.Fatal("put object fails")
 		return err
 	}
 
-	storagekb := float64(r) / 1024.0
+	storagekb := float64(length) / 1024.0
 	uploadEndTime := time.Now().Unix()
 	speed := fmt.Sprintf("%.2f", storagekb/float64(uploadEndTime-uploadBeginTime))
-	log.Println(" Upload file", fileNum, "success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
-	log.Println(ob.String() + "address: " + addr)
+	log.Println("Upload file", fileNum, "success，Filename is", objectName, "Size is", ToStorageSize(length), "speed is", speed, "KB/s", "addr", addr)
 
+	log.Println("test head object")
 	obj, err := sh.HeadObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("head file ", objectName, " err:", err)
+		log.Fatal("head file ", objectName, " err:", err)
 		return err
 	}
 
 	if obj.Objects[0].Name != objectName {
-		log.Println("head file ", objectName, "but got: ", obj.Objects[0].Name)
+		log.Fatal("head file ", objectName, "but got: ", obj.Objects[0].Name)
 	}
 
-	if int64(obj.Objects[0].Size) != r {
-		log.Println("head file siez: ", r, "but got: ", obj.Objects[0].Size)
+	if obj.Objects[0].Size != int64(length) {
+		log.Fatal("head file size: ", length, "but got: ", obj.Objects[0].Size)
 	}
 
-	log.Println("5. test rs get object")
-
+	log.Println("test get object")
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
 	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
+		log.Fatal("download file ", objectName, " err:", err)
 		return err
 	}
 
@@ -171,109 +220,6 @@ func lfsTest() error {
 	if hex.EncodeToString(gotTag[:]) != obj.Objects[0].MD5 {
 		log.Fatal("download file ", objectName, "failed, got md5: ", hex.EncodeToString(gotTag[:]), "expected: ", obj.Objects[0].MD5)
 	}
-
-	log.Println("6. test mul create bucket")
-
-	mbucketName := "mtest" + time.Now().Format("2006-01-02")
-	var mopts []func(*shell.RequestBuilder) error
-	mopts = append(mopts, shell.SetAddress(addr))
-	mopts = append(mopts, shell.SetDataCount(dataCount))
-	mopts = append(mopts, shell.SetParityCount(parityCount))
-	mopts = append(mopts, shell.SetPolicy(df.MulPolicy))
-
-	_, errBucket := sh.CreateBucket(mbucketName, mopts...)
-	if errBucket != nil {
-		log.Println("create mbucket err: ", err)
-	}
-
-	bk, err = sh.HeadBucket(mbucketName, shell.SetAddress(addr))
-	if err != nil {
-		log.Fatal("create mbucket err: ", err)
-	}
-
-	log.Println(bk.Buckets)
-
-	if bk.Buckets[0].Name != mbucketName {
-		log.Fatal("create mbucket", mbucketName, "fails")
-	}
-
-	if bk.Buckets[0].Policy != df.MulPolicy {
-		log.Fatal("create mbucket fails Policy")
-	}
-
-	if bk.Buckets[0].DataCount != 1 {
-		log.Fatal("create mbucket fails datacount")
-	}
-
-	if bk.Buckets[0].ParityCount != parityCount+dataCount-1 {
-		log.Fatal("create mbucket fails paritycount")
-	}
-
-	log.Println("7. test mul put object")
-
-	fileNum = 20
-
-	r1 := rand.Int63n(randomDataSize)
-	data = make([]byte, r1)
-	fillRandom(data)
-	buf = bytes.NewBuffer(data)
-	objectName = addr + "_" + strconv.Itoa(fileNum)
-	log.Println("Begin to upload file", fileNum, "，Filename is", objectName, "Size is", ToStorageSize(r1), "addr", addr)
-	uploadBeginTime = time.Now().Unix()
-	ob, err = sh.PutObject(buf, objectName, mbucketName, shell.SetAddress(addr))
-	if err != nil {
-		log.Println("put object fails")
-	} else {
-		storagekb := float64(r1) / 1024.0
-		uploadEndTime := time.Now().Unix()
-		speed := fmt.Sprintf("%.2f", storagekb/float64(uploadEndTime-uploadBeginTime))
-		log.Println(" Upload file", fileNum, "success，Filename is", objectName, "Size is", ToStorageSize(r1), "speed is", speed, "KB/s", "addr", addr)
-		log.Println(ob.String() + "address: " + addr)
-	}
-
-	obj, err = sh.HeadObject(objectName, mbucketName, shell.SetAddress(addr))
-	if err != nil {
-		log.Println("head file ", objectName, " err:", err)
-		return err
-	}
-
-	if obj.Objects[0].Name != objectName {
-		log.Fatal("head file ", objectName, "but got: ", obj.Objects[0].Name)
-	}
-
-	if int64(obj.Objects[0].Size) != r1 {
-		log.Fatal("head file siez: ", r1, "but got: ", obj.Objects[0].Size)
-	}
-
-	log.Println("8. test mul get object")
-
-	outer, err = sh.GetObject(objectName, mbucketName, shell.SetAddress(addr))
-	if err != nil {
-		log.Println("download file ", objectName, " err:", err)
-		return err
-	}
-
-	obuf = new(bytes.Buffer)
-	obuf.ReadFrom(outer)
-	if obuf.Len() != int(obj.Objects[0].Size) {
-		log.Println("download file ", objectName, "failed, got: ", obuf.Len(), "expected: ", obj.Objects[0].Size)
-	}
-
-	gotTag = md5.Sum(obuf.Bytes())
-	if hex.EncodeToString(gotTag[:]) != obj.Objects[0].MD5 {
-		log.Fatal("download mul file ", objectName, "failed, got md5: ", hex.EncodeToString(gotTag[:]), "expected: ", obj.Objects[0].MD5)
-	}
-
-	log.Println("9. test showstorage")
-
-	res, err := sh.ShowStorage(shell.SetAddress(addr))
-	if err != nil {
-		log.Println("show storage err : ", err)
-		return err
-	}
-
-	log.Println("storage: ", res)
-	log.Println("upload: ", r+r1)
 	return nil
 }
 

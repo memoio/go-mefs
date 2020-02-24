@@ -55,7 +55,7 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 		ph:     host,
 		dstore: d,
 		bstore: b,
-		aCache: NewCache(),
+		aCache: NewCache(b),
 	}
 }
 
