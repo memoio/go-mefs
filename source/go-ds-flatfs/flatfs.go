@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	logging "github.com/ipfs/go-log"
@@ -569,6 +570,13 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 		return err
 	}
 	defer f.Close()
+
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	if err != nil {
+		return err
+	}
+	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+
 	fReader := bufio.NewReader(f)
 
 	prefix := make([]byte, 4096)
