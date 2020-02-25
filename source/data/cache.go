@@ -156,7 +156,7 @@ func (c *Cache) Get(k string, start, length int) ([]byte, error) {
 
 				res := make([]byte, npreLen+fieldSize*length)
 				copy(res, prebuf)
-				copy(res[preLen:], val.Segs[i].Value[preLen+(start-val.Segs[i].Start)*fieldSize:preLen+(start-val.Segs[i].Start+length)*fieldSize])
+				copy(res[npreLen:], val.Segs[i].Value[preLen+(start-val.Segs[i].Start)*fieldSize:preLen+(start-val.Segs[i].Start+length)*fieldSize])
 				return res, nil
 			}
 			if start < val.Segs[i].Start {

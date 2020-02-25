@@ -73,6 +73,8 @@ func lfsTest() error {
 		return err
 	}
 
+	rand.Seed(time.Now().Unix())
+
 	log.Println("3. test rs encrypt bucket")
 	b1 := "enc-" + time.Now().Format("2006-01-02")
 	r1 := rand.Int63n(randomDataSize)

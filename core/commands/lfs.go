@@ -1088,6 +1088,8 @@ var lfsCreateBucketCmd = &cmds.Command{
 		bucketOptions.ParityCount = int32(parityCount)
 		if encrytion {
 			bucketOptions.Encryption = 1
+		} else {
+			bucketOptions.Encryption = 0
 		}
 
 		bucket, err := lfs.CreateBucket(req.Context, req.Arguments[0], bucketOptions)

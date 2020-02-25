@@ -69,6 +69,7 @@ func uploadTest(count int) error {
 
 	log.Println(addr, "started, begin to upload")
 
+	rand.Seed(time.Now().Unix())
 	bucketName := time.Now().Format("2006-01-02")
 	_, err = sh.ShowStorage(shell.SetAddress(addr))
 	if err != nil {
