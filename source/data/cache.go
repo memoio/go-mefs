@@ -170,6 +170,7 @@ func (c *Cache) Get(k string, start, length int) ([]byte, error) {
 }
 
 func (c *Cache) Set(k string, val []byte, start, length int) error {
+	utils.MLogger.Infof("add to cache %s has seg start at %d, length %d", k, start, length)
 	e := time.Now().Add(defaultExpiration).UnixNano()
 	it, found := c.iMap.Load(k)
 	if !found {
@@ -232,7 +233,7 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	})
 
 	ni.Segs = ni.Segs[:has]
-	for i := 1; i < len(ni.Segs); i++ {
+	for i := 0; i < len(ni.Segs); i++ {
 		seAfter := ni.Segs[i]
 		utils.MLogger.Debugf("%s has seg start at %d, length %d", string(ni.Key), seAfter.Start, seAfter.Length)
 	}
