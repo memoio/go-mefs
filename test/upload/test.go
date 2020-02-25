@@ -174,6 +174,7 @@ func uploadTest(count int) error {
 			return true
 		}
 
+		log.Println("download file ", objectName, "success, got: ", buf.Len())
 		fileDownloadSuccessNum++
 		return true
 	})
