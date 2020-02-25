@@ -213,7 +213,6 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	has := 1
 	for i := 1; i < len(ni.Segs); i++ {
 		seAfter := ni.Segs[i]
-		utils.MLogger.Debugf("%s has seg start at %d, length %d", string(ni.Key), seAfter.Start, seAfter.Length)
 		if seAfter.Start == seBefore.Start+seBefore.Length {
 			seBefore.Length += seAfter.Length
 			_, preLen, err := bf.PrefixDecode(seAfter.Value)
@@ -233,10 +232,6 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	})
 
 	ni.Segs = ni.Segs[:has]
-	for i := 0; i < len(ni.Segs); i++ {
-		seAfter := ni.Segs[i]
-		utils.MLogger.Debugf("%s has seg start at %d, length %d", string(ni.Key), seAfter.Start, seAfter.Length)
-	}
 
 	return nil
 }

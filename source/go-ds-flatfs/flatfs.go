@@ -205,7 +205,6 @@ func (o *opResult) Finish(ok bool) {
 }
 
 func Create(path string, fun *ShardIdV1) error {
-
 	err := os.Mkdir(path, 0755)
 	if err != nil && !os.IsExist(err) {
 		return err
@@ -471,6 +470,11 @@ func (fs *Datastore) doOp(oper *op) error {
 func (fs *Datastore) doWriteOp(oper *op) error {
 	keyStr := oper.key.String()
 
+	if oper.typ == opAppend {
+		// in case append too quick and ignored
+		keyStr += strconv.Itoa(oper.begin)
+	}
+
 	opRes := fs.opMap.Begin(keyStr)
 	if opRes == nil { // nothing to do, a concurrent op succeeded
 		return nil
@@ -603,14 +607,14 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length in
 
 	segStart := ((int(fsize)-oldpreLen)-1)/int(fieldSize) + 1
 	if segStart > int(pre.Start) {
-		fmt.Printf("need length %d, but got %d", pre.Start, segStart)
+		fmt.Printf("need length %d, but got %d\n", pre.Start, segStart)
 		writeStart = int64(oldpreLen + int(pre.Start*fieldSize))
 		err = f.Truncate(writeStart)
 		if err != nil {
 			return err
 		}
 	} else if segStart < int(pre.Start) {
-		fmt.Printf("need length %d, but got %d", pre.Start, segStart)
+		fmt.Printf("need length %d, but got %d\n", pre.Start, segStart)
 		return errUnmatchOffset
 	}
 
