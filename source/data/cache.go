@@ -9,6 +9,7 @@ import (
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
@@ -199,19 +200,19 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	}
 
 	ni.Segs = append(ni.Segs, ns)
+	if len(ni.Segs) <= 1 {
+		return nil
+	}
 
 	sort.Slice(ni.Segs, func(i, j int) bool {
 		return ni.Segs[i].Start < ni.Segs[j].Start
 	})
 
-	if len(ni.Segs) <= 1 {
-		return nil
-	}
-
 	seBefore := ni.Segs[0]
 	has := 1
 	for i := 1; i < len(ni.Segs); i++ {
 		seAfter := ni.Segs[i]
+		utils.MLogger.Debugf("%s has seg start at %d, length %d", string(ni.Key), seAfter.Start, seAfter.Length)
 		if seAfter.Start == seBefore.Start+seBefore.Length {
 			seBefore.Length += seAfter.Length
 			_, preLen, err := bf.PrefixDecode(seAfter.Value)
@@ -231,6 +232,10 @@ func (c *Cache) Set(k string, val []byte, start, length int) error {
 	})
 
 	ni.Segs = ni.Segs[:has]
+	for i := 1; i < len(ni.Segs); i++ {
+		seAfter := ni.Segs[i]
+		utils.MLogger.Debugf("%s has seg start at %d, length %d", string(ni.Key), seAfter.Start, seAfter.Length)
+	}
 
 	return nil
 }
