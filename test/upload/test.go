@@ -93,6 +93,7 @@ func uploadTest(count int) error {
 	fileNum := 1
 	fileUploadSuccessNum := 0
 
+	//rand.Seed(time.Now().Unix())
 	//upload file
 	for {
 		r := rand.Int63n(randomDataSize)

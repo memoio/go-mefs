@@ -23,13 +23,14 @@ type Buckets struct {
 
 func (bk BucketStat) String() string {
 	return fmt.Sprintf(
-		"Name: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n",
+		"Name: %s\n--BucketID: %d\n--Ctime: %s\n--Policy: %d\n--DataCount: %d\n--ParityCount: %d\n--Encryption: %d\n",
 		bk.Name,
 		bk.BucketID,
 		bk.Ctime,
 		bk.Policy,
 		bk.DataCount,
 		bk.ParityCount,
+		bk.Encryption,
 	)
 }
 

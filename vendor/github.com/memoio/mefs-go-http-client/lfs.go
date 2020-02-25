@@ -90,7 +90,7 @@ func SetParityCount(parityCount int) LfsOpts {
 
 func SetCrypto(crypto bool) LfsOpts {
 	return func(rb *RequestBuilder) error {
-		rb.Option("Encryption", crypto)
+		rb.Option("encryption", crypto)
 		return nil
 	}
 }
