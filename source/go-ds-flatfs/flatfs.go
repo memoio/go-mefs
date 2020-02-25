@@ -411,6 +411,9 @@ func (fs *Datastore) Put(key datastore.Key, value []byte) error {
 func (fs *Datastore) Append(key datastore.Key, value []byte, begin, length int) error {
 	fs.shutdownLock.RLock()
 	defer fs.shutdownLock.RUnlock()
+	if fs.shutdown {
+		return ErrClosed
+	}
 	var err error
 	for i := 1; i <= putMaxRetries; i++ {
 		err = fs.doWriteOp(&op{
@@ -537,8 +540,8 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 	dir, path := fs.encode(key)
 	fi, err := os.Lstat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return ErrNotExist
+	if err != nil {
+		return err
 	}
 	if fi == nil {
 		return ErrNotExist
@@ -607,13 +610,9 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 		return errUnmatchOffset
 	}
 
-	n, err := f.WriteAt(fields[preLen:], writeStart)
+	_, err = f.WriteAt(fields[preLen:], writeStart)
 	if err != nil {
 		return err
-	}
-
-	if n != len(fields)-preLen {
-		log.Error("append file fails")
 	}
 
 	if fs.sync {

@@ -390,6 +390,7 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 		bcid := cid.NewCidV2([]byte(skey[0]))
 		err = n.bstore.Append(bcid, data, s, len)
 		if err != nil {
+			utils.MLogger.Infof("AppendBlock %s to local fails %s", key, err)
 			return n.aCache.Set(skey[0], data, s, len)
 		}
 		return nil
