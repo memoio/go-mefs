@@ -456,7 +456,7 @@ func (fs *Datastore) doOp(oper *op) error {
 	case opRename:
 		return fs.renameAndUpdateDiskUsage(oper.tmp, oper.path)
 	case opAppend:
-		return fs.doAppend(oper.key, oper.v)
+		return fs.doAppend(oper.key, oper.v, oper.begin, oper.length)
 	default:
 		panic("bad operation, this is a bug")
 	}
@@ -537,7 +537,7 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 	return nil
 }
 
-func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
+func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length int) error {
 	dir, path := fs.encode(key)
 	fi, err := os.Lstat(path)
 	if err != nil {
@@ -564,7 +564,11 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte) error {
 	}
 
 	fieldSize := pre.Bopts.SegmentSize + tagCount*int32(tagSize)
-	if (len(fields)-preLen)%int(fieldSize) != 0 {
+	if len(fields)-preLen != int(fieldSize)*length {
+		return dataformat.ErrWrongField
+	}
+
+	if int(pre.Start) != begin {
 		return dataformat.ErrWrongField
 	}
 
