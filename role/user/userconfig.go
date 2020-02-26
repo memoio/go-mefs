@@ -30,7 +30,7 @@ func parseBLS12ConfigMeta(privKey, userBLS12config []byte) (*mcl.KeySet, error) 
 }
 
 func (l *LfsInfo) putUserConfig(ctx context.Context) {
-	kmBls, err := metainfo.NewKey(l.fsID, mpb.KeyType_Config, l.userID)
+	kmBls, err := metainfo.NewKey(l.fsID, mpb.KeyType_Config, l.gInfo.shareToID)
 	if err != nil {
 		return
 	}

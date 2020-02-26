@@ -96,16 +96,23 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 			utils.MLogger.Warn("Load bls config fail: ", err)
 		}
 
-		if l.keySet.Sk == nil {
-			seed := sha256.Sum256([]byte(l.privateKey + l.fsID))
-			mkey, err := initBLS12Config(seed[:])
-			if err != nil {
-				utils.MLogger.Info("Init bls config fail: ", err)
-				return err
+		if l.gInfo.userID == l.gInfo.shareToID {
+			if l.keySet == nil || l.keySet.Sk == nil {
+				seed := sha256.Sum256([]byte(l.privateKey + l.fsID))
+				mkey, err := initBLS12Config(seed[:])
+				if err != nil {
+					utils.MLogger.Info("Init bls config fail: ", err)
+					return err
+				}
+				l.keySet = mkey
+				l.putUserConfig(l.context)
 			}
-			l.keySet = mkey
-			l.putUserConfig(l.context)
+		} else {
+			if l.keySet == nil {
+				return role.ErrEmptyBlsKey
+			}
 		}
+
 	}
 
 	if !has || err != nil {
