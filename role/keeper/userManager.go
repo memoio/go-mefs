@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -142,7 +143,9 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 	thisIb, ok := g.buckets.Load(bucketID)
 	if !ok {
 		if mode {
-			tempInfo := &bucketInfo{}
+			tempInfo := &bucketInfo{
+				bops: df.DefaultBucketOptions(),
+			}
 			g.buckets.Store(bucketID, tempInfo)
 			return tempInfo
 		}
@@ -150,6 +153,17 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 	}
 
 	return thisIb.(*bucketInfo)
+}
+
+func (g *groupInfo) addBucket(bucketID string, binfo *mpb.BucketOptions) error {
+	thisBucket := g.getBucketInfo(bucketID, true)
+	if thisBucket == nil {
+		return nil
+	}
+
+	thisBucket.bops = binfo
+
+	return nil
 }
 
 // bid is bucketID_stripeID_chunkID
@@ -184,8 +198,6 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 		thisLinfo.blockMap.Store(bid, newcidinfo)
 	}
 
-	thisLinfo.maxlength += (int64(offset-oldOffset) * df.DefaultSegmentSize)
-
 	// store in buckets
 	bucketID, stripeID, chunkID, err := metainfo.GetIDsFromBlock(bid)
 	if err != nil {
@@ -196,6 +208,8 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	if thisBucket == nil {
 		return nil
 	}
+
+	thisLinfo.maxlength += int64((offset - oldOffset) * int(thisBucket.bops.GetSegmentSize()))
 
 	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 	// key: stripeID_chunkID
@@ -223,6 +237,16 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 }
 
 func (g *groupInfo) deleteBlockMeta(bid, pid string) {
+	segSize := df.DefaultSegmentSize
+	// delete from buckets
+	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
+
+	bui, ok := g.buckets.Load(bids[0])
+	if ok {
+		bui.(*bucketInfo).stripes.Delete(bids[1])
+		segSize = int(bui.(*bucketInfo).bops.GetSegmentSize())
+	}
+
 	thisLinfo := g.getLInfo(pid, false)
 	if thisLinfo == nil {
 		return
@@ -232,16 +256,8 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 	thisICid, ok := thisLinfo.blockMap.Load(bid)
 	if ok {
 		thisCid := thisICid.(*blockInfo)
-		thisLinfo.maxlength -= (int64(thisCid.offset) * df.DefaultSegmentSize)
+		thisLinfo.maxlength -= int64(thisCid.offset * segSize)
 		thisLinfo.blockMap.Delete(bid)
-	}
-
-	// delete from buckets
-	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
-
-	bui, ok := g.buckets.Load(bids[0])
-	if ok {
-		bui.(*bucketInfo).stripes.Delete(bids[1])
 	}
 
 	return
@@ -277,12 +293,10 @@ func (g *groupInfo) getBlockAvail(bid string) (int64, error) {
 }
 
 type bucketInfo struct {
-	bucketID    int
-	dataCount   int
-	parityCount int
-	chunkNum    int      // = dataCount+parityCount; which is largest chunkID
-	curStripes  int      // largest stripeID
-	stripes     sync.Map // key is stripeID_chunkID, value is *cidInfo
+	bops       *mpb.BucketOptions
+	chunkNum   int      // = dataCount+parityCount; which is largest chunkID
+	curStripes int      // largest stripeID
+	stripes    sync.Map // key is stripeID_chunkID, value is *cidInfo
 }
 
 //lInfo

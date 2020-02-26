@@ -23,6 +23,7 @@ enum KeyType {
 	  BlockPos = 11; // keeper handle block pos
     ChalTime = 12;
     Pos = 13;
+    Bucket = 14;
 	
     HeartBeat = 20;
     UserInit = 21;

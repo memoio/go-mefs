@@ -333,8 +333,37 @@ func (k *Info) loadUser(ctx context.Context) error {
 }
 
 func (k *Info) loadUserBlock(qid string) error {
-	prefix := qid + metainfo.BlockDelimiter
+	prefix := qid + metainfo.DELIMITER + strconv.Itoa(int(mpb.KeyType_Bucket))
+
 	es, _ := k.ds.Itererate(prefix)
+	for _, e := range es {
+		rec := new(recpb.Record)
+		err := proto.Unmarshal(e.Value, rec)
+		if err != nil {
+			continue
+		}
+
+		utils.MLogger.Debug("Load bucket: ", string(rec.GetKey()))
+		km, err := metainfo.NewKeyFromString(string(rec.GetKey()))
+		if err != nil {
+			continue
+		}
+
+		ops := km.GetOptions()
+		if len(ops) != 2 {
+			continue
+		}
+
+		binfo := new(mpb.BucketOptions)
+		err = proto.Unmarshal(rec.GetValue(), binfo)
+		if err != nil {
+			continue
+		}
+		k.addBucket(km.GetMid(), ops[1], binfo)
+	}
+
+	prefix = qid + metainfo.BlockDelimiter
+	es, _ = k.ds.Itererate(prefix)
 	for _, e := range es {
 		rec := new(recpb.Record)
 		err := proto.Unmarshal(e.Value, rec)
@@ -730,6 +759,17 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 	}
 
 	return gp.getBlockAvail(bid)
+}
+
+func (k *Info) addBucket(qid, bid string, binfo *mpb.BucketOptions) error {
+	utils.MLogger.Info("add bucket: ", bid, " for query: ", qid)
+
+	gp := k.getGroupInfo(qid, qid, false)
+	if gp != nil {
+		return gp.addBucket(bid, binfo)
+	}
+
+	return role.ErrNotMyUser
 }
 
 func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {

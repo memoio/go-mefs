@@ -3,8 +3,6 @@ package user
 import (
 	"errors"
 
-	dataformat "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/minio/minio-go/v6/pkg/s3utils"
 )
 
@@ -54,20 +52,6 @@ var (
 	ErrObjectNameInvalid    = errors.New("object name is invalid")
 	ErrObjectOptionsInvalid = errors.New("object option is invalid")
 )
-
-// DefaultBucketOptions is default bucket option
-func DefaultBucketOptions() *mpb.BucketOptions {
-	return &mpb.BucketOptions{
-		Version:      1,
-		Policy:       dataformat.RsPolicy,
-		DataCount:    3,
-		ParityCount:  2,
-		SegmentSize:  dataformat.DefaultSegmentSize,
-		TagFlag:      dataformat.BLS12,
-		SegmentCount: dataformat.DefaultSegmentCount,
-		Encryption:   1,
-	}
-}
 
 //检查文件名合法性
 func checkBucketName(bucketName string) error {

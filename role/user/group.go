@@ -911,6 +911,12 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 		return ErrLfsServiceNotReady
 	}
 
+	sig, err := utils.SignForKey(g.privKey, key, value)
+	if err != nil {
+		utils.MLogger.Error("sign for key %s fails: %s", key, err)
+		return err
+	}
+
 	var wg sync.WaitGroup
 
 	ctx := context.Background()
@@ -921,7 +927,7 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 			defer wg.Done()
 			i := 0
 			for {
-				_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, value, nil, pid)
+				_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, value, sig, pid)
 				if err != nil {
 					i++
 					if i == 5 {
@@ -937,10 +943,6 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 	}
 
 	wg.Wait()
-
-	if int(count) == len(g.tempKeepers) {
-		return ErrNoKeepers
-	}
 
 	return nil
 }

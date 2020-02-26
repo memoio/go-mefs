@@ -1082,7 +1082,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		bucketOptions := user.DefaultBucketOptions()
+		bucketOptions := dataformat.DefaultBucketOptions()
 		bucketOptions.Policy = int32(policy)
 		bucketOptions.DataCount = int32(dataCount)
 		bucketOptions.ParityCount = int32(parityCount)

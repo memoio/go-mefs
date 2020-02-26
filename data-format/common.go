@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	mcl "github.com/memoio/go-mefs/bls12"
+	mpb "github.com/memoio/go-mefs/proto"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -32,6 +33,20 @@ var (
 	ErrRepairCrash      = errors.New("repair crash")
 	ErrRecoverData      = errors.New("The recovered data is incorrect")
 )
+
+// DefaultBucketOptions is default bucket option
+func DefaultBucketOptions() *mpb.BucketOptions {
+	return &mpb.BucketOptions{
+		Version:      1,
+		Policy:       RsPolicy,
+		DataCount:    3,
+		ParityCount:  2,
+		SegmentSize:  DefaultSegmentSize,
+		TagFlag:      BLS12,
+		SegmentCount: DefaultSegmentCount,
+		Encryption:   1,
+	}
+}
 
 //VerifyBlockLength verify blocks length
 func VerifyBlockLength(data []byte, start, length int) (bool, error) {

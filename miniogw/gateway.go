@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/core"
+	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role/user"
@@ -140,8 +141,7 @@ func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options
 	bucketOptions := &mpb.BucketOptions{}
 	err := json.Unmarshal([]byte(options), bucketOptions)
 	if err != nil {
-		log.Println("bucketOptions Unmarshal err", err)
-		bucketOptions = user.DefaultBucketOptions()
+		bucketOptions = df.DefaultBucketOptions()
 	}
 	_, err = lfs.CreateBucket(ctx, bucket, bucketOptions)
 

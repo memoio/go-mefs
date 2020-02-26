@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/protobuf/proto"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
@@ -30,6 +31,8 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		go k.handleUserStop(km, metaValue, from)
 	case mpb.KeyType_HeartBeat:
 		go k.handleHeartBeat(km, metaValue, from)
+	case mpb.KeyType_Bucket:
+		go k.handleAddBucket(km, metaValue, sig, from)
 	case mpb.KeyType_BlockPos:
 		switch opType {
 		case mpb.OpType_Put:
@@ -91,6 +94,29 @@ func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string
 	ctx := context.Background()
 
 	return k.ds.GetKey(ctx, km.ToString(), "local")
+}
+
+func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handleAddBucket: ", km.ToString())
+	ctx := context.Background()
+	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
+	if !ok {
+		return
+	}
+
+	ops := km.GetOptions()
+	if len(ops) != 2 {
+		return
+	}
+
+	binfo := new(mpb.BucketOptions)
+	err := proto.Unmarshal(metaValue, binfo)
+	if err != nil {
+		return
+	}
+
+	k.ds.PutKey(ctx, km.ToString(), metaValue, sig, "local")
+	k.addBucket(km.GetMid(), ops[1], binfo)
 }
 
 func (k *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from string) {

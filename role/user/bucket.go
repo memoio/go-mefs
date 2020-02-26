@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/metainfo"
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
@@ -31,9 +33,9 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	}
 
 	l.meta.sb.Lock()
-	defer l.meta.sb.Unlock()
 
 	if _, ok := l.meta.buckets[bucketName]; ok {
+		l.meta.sb.Unlock()
 		return nil, ErrBucketAlreadyExist
 	}
 
@@ -47,26 +49,27 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		options.ParityCount = Sum - 1
 	case dataformat.RsPolicy:
 	default:
+		l.meta.sb.Unlock()
 		return nil, dataformat.ErrWrongPolicy
 	}
 
 	bucketID := l.meta.sb.NextBucketID
-
+	binfo := mpb.BucketInfo{
+		Name:         bucketName,
+		BucketID:     bucketID,
+		BOpts:        options,
+		CurStripe:    0,
+		NextSeg:      0,
+		Ctime:        time.Now().Unix(),
+		Deletion:     false,
+		NextObjectID: 0,
+	}
 	objects := make(map[string]*objectInfo)
 	bucket := &superBucket{
-		BucketInfo: mpb.BucketInfo{
-			Name:         bucketName,
-			BucketID:     bucketID,
-			BOpts:        options,
-			CurStripe:    0,
-			NextSeg:      0,
-			Ctime:        time.Now().Unix(),
-			Deletion:     false,
-			NextObjectID: 0,
-		},
-		dirty:   true,
-		objects: objects,
-		mtree:   mt.New(sha256.New()),
+		BucketInfo: binfo,
+		dirty:      true,
+		objects:    objects,
+		mtree:      mt.New(sha256.New()),
 	}
 
 	bucket.mtree.SetIndex(0)
@@ -78,6 +81,15 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 	l.meta.buckets[bucket.Name] = bucket
 	l.meta.bucketIDToName[bucketID] = bucketName
+	l.meta.sb.Unlock()
+
+	bk, _ := metainfo.NewKey(l.fsID, mpb.KeyType_Bucket, l.userID, strconv.FormatInt(bucketID, 10))
+
+	val, err := proto.Marshal(&binfo)
+	if err == nil {
+		l.gInfo.putDataToKeepers(bk.ToString(), val)
+	}
+
 	return &bucket.BucketInfo, nil
 }
 

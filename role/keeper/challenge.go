@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
-	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
@@ -34,12 +33,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				}
 
 				for _, proID := range thisGroup.providers {
-					thisLinfo := thisGroup.getLInfo(proID, false)
-					if thisLinfo == nil {
-						continue
-					}
-
-					key, value, err := thisLinfo.genChallengeBLS(k.localID, pu.qid, proID, thisGroup.userID)
+					key, value, err := thisGroup.genChallengeBLS(k.localID, pu.uid, pu.qid, proID)
 					if err != nil {
 						continue
 					}
@@ -54,22 +48,33 @@ func (k *Info) challengeRegular(ctx context.Context) {
 	}
 }
 
-func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []byte, error) {
-	// last chanllenge has not complete
-	if l.inChallenge {
-		l.cleanLastChallenge()
+func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string) (string, []byte, error) {
+	thisLinfo := g.getLInfo(proID, false)
+	if thisLinfo == nil {
+		return "", nil, role.ErrEmptyData
 	}
 
-	l.inChallenge = true
+	// last chanllenge has not complete
+	if thisLinfo.inChallenge {
+		thisLinfo.cleanLastChallenge()
+	}
+
+	thisLinfo.inChallenge = true
 
 	// at most challenge 100 blocks
 	ret := make([]string, 0, 100)
-	psum := 0
 	chalnum := 0
-	l.blockMap.Range(func(key, value interface{}) bool {
+	psum := 0
+	thisLinfo.blockMap.Range(func(key, value interface{}) bool {
 		cInfo := value.(*blockInfo)
+		bids := strings.Split(key.(string), metainfo.BlockDelimiter)
+		bi := g.getBucketInfo(bids[0], false)
+		if bi == nil {
+			return true
+		}
+		bSize := int(bi.bops.GetSegmentSize())
 		ret = append(ret, key.(string)+metainfo.BlockDelimiter+strconv.Itoa(cInfo.offset))
-		psum += cInfo.offset + 1
+		psum += (cInfo.offset * bSize)
 		chalnum++
 		if chalnum >= 100 {
 			return false
@@ -79,7 +84,7 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 
 	// no data
 	if len(ret) == 0 || psum == 0 {
-		l.inChallenge = false
+		thisLinfo.inChallenge = false
 		return "", nil, role.ErrEmptyData
 	}
 
@@ -91,20 +96,20 @@ func (l *lInfo) genChallengeBLS(localID, qid, proID, userID string) (string, []b
 		QueryID:     qid,
 		UserID:      userID,
 		ChalTime:    challengetime,
-		ChalLength:  int64(psum) * df.DefaultSegmentSize,
+		ChalLength:  int64(psum),
 		Blocks:      ret,
-		TotalLength: l.maxlength,
+		TotalLength: thisLinfo.maxlength,
 	}
 
 	hByte, err := proto.Marshal(thischalresult)
 	if err != nil {
-		l.inChallenge = false
+		thisLinfo.inChallenge = false
 		return "", nil, err
 	}
 
-	l.chalMap.Store(challengetime, thischalresult)
-	l.chalCid = ret
-	l.lastChalTime = challengetime
+	thisLinfo.chalMap.Store(challengetime, thischalresult)
+	thisLinfo.chalCid = ret
+	thisLinfo.lastChalTime = challengetime
 
 	// key: qid/"Challenge"/uid/pid/kid/chaltime
 	km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, localID, utils.UnixToString(challengetime))
@@ -219,7 +224,17 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 			continue
 		}
 		buf.Reset()
-		chcid, off, err := utils.SplitIndex(index)
+		bids := strings.Split(index, metainfo.BlockDelimiter)
+		if len(bids) != 4 {
+			continue
+		}
+
+		bi := thisGroup.getBucketInfo(bids[0], false)
+		if bi == nil {
+			continue
+		}
+
+		off, err := strconv.Atoi(bids[3])
 		if err != nil {
 			continue
 		}
@@ -234,15 +249,18 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 		buf.WriteString(qid)
 		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(chcid)
+		buf.WriteString(bids[0])
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(bids[1])
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(bids[2])
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(electedOffset))
 
 		chal.Indices = append(chal.Indices, buf.String())
-		slength += int64(off)
-	}
 
-	slength *= df.DefaultSegmentSize
+		slength += int64(off * int(bi.bops.GetSegmentSize()))
+	}
 
 	// recheck the status again
 	if len(chal.Indices) == 0 {
