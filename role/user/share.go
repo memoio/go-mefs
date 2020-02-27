@@ -95,7 +95,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 		return err
 	}
 
-	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetObjectName(), " from user: ", sl.GetUserID())
+	utils.MLogger.Info("Download Share Object: ", sl.GetObjectName(), " from bucket: ", sl.GetBucketName(), " from user: ", sl.GetUserID())
 
 	if sl.UserID == sl.QueryID {
 		kmUser, err := metainfo.NewKey(sl.QueryID, mpb.KeyType_LFS, sl.UserID)
