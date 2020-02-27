@@ -104,26 +104,24 @@ func main() {
 	}
 	log.Println("share link is ", slink)
 
-	log.Println("======9. begin to create another account======")
+	log.Println("======9. begin to kill user======")
+	res, err := sh.Kill(addr)
+	if err != nil {
+		log.Fatal("kill user ", addr, " fails ", err)
+	}
+	log.Println(res.ChildLists[0])
+
+	log.Println("======10. begin to create another account======")
 	testuser2, err := sh.CreateUser()
 	if err != nil {
 		log.Fatal("Create user failed :", err)
 	}
 	addr2 := testuser2.Address
 
-	log.Println("======10. begin to transfer money======")
+	log.Println("======11. begin to transfer money======")
 	err = test.TransferTo(big.NewInt(moneyTo), addr2, ethEndPoint, ethEndPoint)
 	if err != nil {
 		log.Fatal("transfer failed ", err)
-	}
-
-	log.Println("======11. begin to start lfs======")
-	var startOpts2 []func(*shell.RequestBuilder) error
-	startOpts2 = append(startOpts2, shell.SetOp("ks", "3"))
-	startOpts2 = append(startOpts2, shell.SetOp("ps", "6"))
-	err = sh.StartUser(addr2, startOpts2...)
-	if err != nil {
-		log.Fatal("Start lfs failed :", err)
 	}
 
 	log.Println("======12. begin to get file by shareLink======")

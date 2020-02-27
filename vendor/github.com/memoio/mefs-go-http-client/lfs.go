@@ -269,3 +269,15 @@ func (s *Shell) GetBlockFrom(key, id string, options ...LfsOpts) (string, error)
 	}
 	return res, nil
 }
+
+func (s *Shell) Kill(addr string, options ...LfsOpts) (*StringList, error) {
+	var strlist StringList
+	rb := s.Request("lfs/kill", addr)
+	for _, option := range options {
+		option(rb)
+	}
+	if err := rb.Exec(context.Background(), &strlist); err != nil {
+		return nil, err
+	}
+	return &strlist, nil
+}
