@@ -89,6 +89,30 @@ func (s *Shell) GetObject(ObjectName, BucketName string, options ...LfsOpts) (io
 	return resp.Output, err
 }
 
+func (s *Shell) GenShare(ObjectName, BucketName string, options ...LfsOpts) (string, error) {
+	var slink string
+	rb := s.Request("lfs/gen_share", BucketName, ObjectName)
+	for _, option := range options {
+		option(rb)
+	}
+	if err := rb.Exec(context.Background(), &slink); err != nil {
+		return "", err
+	}
+	return slink, nil
+}
+
+func (s *Shell) GetShare(shareLink, outputName string, options ...LfsOpts) (io.ReadCloser, error) {
+	rb := s.Request("lfs/get_share", shareLink, outputName)
+	for _, option := range options {
+		option(rb)
+	}
+	resp, err := rb.Send(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return resp.Output, err
+}
+
 func (s *Shell) GetObjectToFile(ObjectName, BucketName, outPath string, options ...LfsOpts) error {
 	var err error
 	var p string
