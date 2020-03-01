@@ -221,6 +221,26 @@ lfs_test:
   only:
     - schedules
 
+share_test:
+  stage: long-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - GO111MODULE=off make install
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 shareTest.sh
+    - echo $ETHENDPOINT
+    - echo $NETKEY
+    - ./shareTest.sh $ETHENDPOINT $NETKEY
+  after_script:
+    - cat ~/daemon.stdout
+    - cat ~/.mefs/logs/info.log
+    - cat ~/.mefs/logs/error.log
+  tags:
+    - "47.92.5.51"
+  only:
+    - schedules
+
 challenge_test:
   stage: long-test
   when: always
