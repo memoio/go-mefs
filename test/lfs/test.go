@@ -19,8 +19,10 @@ import (
 )
 
 //随机文件最大大小
-const randomDataSize = 1024 * 1024 * 10
-const moneyTo = 1000000000000000000
+const (
+	randomDataSize = 1024 * 1024 * 10
+	moneyTo        = 1000000000000000000
+)
 
 var ethEndPoint string
 
