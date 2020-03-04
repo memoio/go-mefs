@@ -14,7 +14,7 @@ func main() {
 	bucketName := "mybucket"
 
 	// Initialize minio client object.
-	minioClient, err := minio.New("127.0.0.1:5080", "0x7aD8AA67aFEE05Fd539B938db69957050dDDA1c3", "123456789", ssl)
+	minioClient, err := minio.New("127.0.0.1:5080", "0xe95c4F0eb00256a9Ffac626f135D466CA28586ba", "123456789", ssl)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -45,12 +45,20 @@ func main() {
 
 	found, err = minioClient.BucketExists(bucketName)
 	if err != nil {
-		log.Println(err)
+		log.Println("head bucket fails: ", err)
 		return
 	}
 
 	if found {
 		log.Println("remove fails")
+	}
+
+	log.Println("Successfully remove mybucket.")
+
+	err = minioClient.MakeBucket(bucketName, "us-east-1")
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
 	file, err := os.Open("./test.go")
@@ -66,7 +74,7 @@ func main() {
 		return
 	}
 
-	n, err := minioClient.PutObject("mybucket", "/test/myobject", file, fileStat.Size(), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	n, err := minioClient.PutObject("mybucket", "myobject", file, fileStat.Size(), minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	if err != nil {
 		log.Println(err)
 		return
