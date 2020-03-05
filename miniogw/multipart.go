@@ -55,10 +55,10 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 		upload.complete(minio.ObjectInfo{
 			Bucket:      bucket,
 			Name:        object,
-			IsDir:       obj.Dir,
-			ETag:        obj.OPart.ETag,
-			ContentType: obj.ContentType,
-			Size:        obj.OPart.Length,
+			IsDir:       obj.GetInfo().GetDir(),
+			ETag:        obj.Parts[0].GetETag(),
+			ContentType: obj.GetInfo().GetContentType(),
+			Size:        obj.GetLength(),
 		})
 	}
 

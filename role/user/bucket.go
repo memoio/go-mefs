@@ -63,6 +63,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		Ctime:        time.Now().Unix(),
 		Deletion:     false,
 		NextObjectID: 0,
+		NextOpID:     0,
 	}
 	objects := make(map[string]*objectInfo)
 	bucket := &superBucket{

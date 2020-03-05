@@ -81,20 +81,25 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 
 	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
 
+	//add Object
+	object := &objectInfo{
+		ObjectInfo: mpb.ObjectInfo{
+			Info: &mpb.Object{
+				Name:     objectName,
+				BucketID: bucket.BucketID,
+				Ctime:    time.Now().Unix(),
+				ObjectID: bucket.NextObjectID,
+				Dir:      false,
+			},
+			Parts:    make([]*mpb.ObjectPart, 1),
+			Deletion: false,
+		},
+	}
+
+	//append Object
 	opart := &mpb.ObjectPart{
 		Name:  objectName,
 		Start: start,
-	}
-
-	object := &objectInfo{
-		ObjectInfo: mpb.ObjectInfo{
-			ObjectID: bucket.NextObjectID,
-			OPart:    opart,
-			BucketID: bucket.BucketID,
-			Ctime:    time.Now().Unix(),
-			Deletion: false,
-			Dir:      false,
-		},
 	}
 
 	bopt := &mpb.BlockOptions{
@@ -126,19 +131,21 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		return &object.ObjectInfo, err
 	}
 
-	object.OPart.ETag = ul.etag
-	object.OPart.Length = ul.length
+	object.Parts[0] = opart
+	object.Parts[0].ETag = ul.etag
+	object.Parts[0].Length = ul.length
+	object.Length += ul.length
 	bucket.objects[objectName] = object
 	bucket.NextObjectID++
 	bucket.CurStripe = ul.curStripe
 	bucket.NextSeg = ul.curOffset
 
 	// leaf is objectname + md5
-	bucket.mtree.Push([]byte(objectName + object.OPart.ETag))
+	bucket.mtree.Push([]byte(objectName + object.Parts[0].GetETag()))
 	bucket.Root = bucket.mtree.Root()
 
 	bucket.dirty = true
-	utils.MLogger.Infof("Upload object: %s to bucket: %s end, length is: %d", objectName, bucketName, object.OPart.Length)
+	utils.MLogger.Infof("Upload object: %s to bucket: %s end, length is: %d", objectName, bucketName, object.Parts[0].Length)
 	return &object.ObjectInfo, err
 }
 

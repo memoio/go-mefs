@@ -76,10 +76,10 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	length := opts.Length
 	if opts.Length < 0 {
-		length = object.OPart.GetLength() - opts.Start
+		length = object.Parts[0].GetLength() - opts.Start
 	}
 
-	if opts.Start+length > object.OPart.GetLength() {
+	if opts.Start+length > object.Parts[0].GetLength() {
 		return ErrObjectOptionsInvalid
 	}
 
@@ -99,16 +99,15 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		group:        l.gInfo,
 		decoder:      decoder,
 		startTime:    time.Now(),
-		start:        opts.Start + object.OPart.GetStart(),
+		start:        opts.Start + object.Parts[0].GetStart(),
 		length:       length,
 		writer:       writer,
 		completeFunc: completeFuncs,
 		encrypt:      bo.Encryption,
 	}
-
 	// default AES
 	if bo.Encryption == 1 {
-		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
+		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.Parts[0].GetStart())
 	}
 
 	return dl.Start(ctx)

@@ -212,10 +212,10 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.OPart.ETag
-		loi.Objects[i].Name = v.OPart.Name
-		loi.Objects[i].Size = v.OPart.Length
-		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).UTC()
+		loi.Objects[i].ETag = v.Parts[0].GetETag()
+		loi.Objects[i].Name = v.GetInfo().GetName()
+		loi.Objects[i].Size = v.GetLength()
+		loi.Objects[i].ModTime = time.Unix(v.GetInfo().GetCtime(), 0).UTC()
 	}
 	return loi, nil
 }
@@ -238,10 +238,10 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.OPart.ETag
-		loi.Objects[i].Name = v.OPart.Name
-		loi.Objects[i].Size = v.OPart.Length
-		loi.Objects[i].ModTime = time.Unix(v.Ctime, 0).UTC()
+		loi.Objects[i].ETag = v.Parts[0].GetETag()
+		loi.Objects[i].Name = v.GetInfo().GetName()
+		loi.Objects[i].Size = v.GetLength()
+		loi.Objects[i].ModTime = time.Unix(v.GetInfo().GetCtime(), 0).UTC()
 	}
 	return loi, nil
 }
@@ -325,10 +325,10 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 	objInfo = minio.ObjectInfo{
 		Bucket:      bucket,
 		Name:        object,
-		IsDir:       obj.Dir,
-		ETag:        obj.OPart.ETag,
-		ContentType: obj.ContentType,
-		Size:        obj.OPart.Length,
+		IsDir:       obj.GetInfo().GetDir(),
+		ETag:        obj.Parts[0].GetETag(),
+		ContentType: obj.GetInfo().GetContentType(),
+		Size:        obj.GetLength(),
 	}
 
 	return objInfo, nil
@@ -350,10 +350,10 @@ func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *mi
 	objInfo = minio.ObjectInfo{
 		Bucket:      bucket,
 		Name:        object,
-		IsDir:       obj.Dir,
-		ETag:        obj.OPart.ETag,
-		ContentType: obj.ContentType,
-		Size:        obj.OPart.Length,
+		IsDir:       obj.GetInfo().GetDir(),
+		ETag:        obj.Parts[0].GetETag(),
+		ContentType: obj.GetInfo().GetContentType(),
+		Size:        obj.GetLength(),
 	}
 
 	return objInfo, err
