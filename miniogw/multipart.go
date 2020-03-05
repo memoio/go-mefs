@@ -43,24 +43,23 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	if err != nil {
 		return "", err
 	}
-	obj, err := lfs.PutObject(ctx, bucket, object, upload.Stream)
-	if err != nil {
-		return "", err
-	}
 
-	uploads.RemoveByID(upload.ID)
-	if err != nil {
-		upload.fail(err)
-	} else {
-		upload.complete(minio.ObjectInfo{
-			Bucket:      bucket,
-			Name:        object,
-			IsDir:       obj.Dir,
-			ETag:        obj.OPart.ETag,
-			ContentType: obj.ContentType,
-			Size:        obj.OPart.Length,
-		})
-	}
+	go func() {
+		obj, err := lfs.PutObject(ctx, bucket, object, upload.Stream)
+		uploads.RemoveByID(upload.ID)
+		if err != nil {
+			upload.fail(err)
+		} else {
+			upload.complete(minio.ObjectInfo{
+				Bucket:      bucket,
+				Name:        object,
+				IsDir:       obj.Dir,
+				ETag:        obj.OPart.ETag,
+				ContentType: obj.ContentType,
+				Size:        obj.OPart.Length,
+			})
+		}
+	}()
 
 	return upload.ID, nil
 }
