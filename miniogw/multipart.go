@@ -1,6 +1,7 @@
 package miniogw
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -31,7 +32,7 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 		return "", errLfsServiceNotReady
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	_, err = lfs.HeadBucket(ctx, bucket)
 	if err != nil {
 		cancel()
@@ -45,7 +46,8 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	}
 
 	go func() {
-		obj, err := lfs.PutObject(ctx, bucket, object, upload.Stream)
+		reader := bufio.NewReaderSize(upload.Stream, user.DefaultBufSize)
+		obj, err := lfs.PutObject(ctx, bucket, object, reader)
 		uploads.RemoveByID(upload.ID)
 		if err != nil {
 			upload.fail(err)
@@ -59,6 +61,7 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 				Size:        obj.OPart.Length,
 			})
 		}
+
 	}()
 
 	return upload.ID, nil
@@ -233,7 +236,7 @@ func (uploads *MultipartUploads) Remove(bucket, object, uploadID string) (*Multi
 
 	upload, ok := uploads.pending[uploadID]
 	if !ok {
-		return nil, errUploadMissing
+		return nil, nil
 	}
 	if upload.Bucket != bucket || upload.Object != object {
 		return nil, errMismatch
