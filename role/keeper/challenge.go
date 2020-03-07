@@ -65,7 +65,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string) (string,
 	ret := make([]string, 100)
 	chalnum := 0
 	thisLinfo.blockMap.Range(func(key, value interface{}) bool {
-		if chalnum > 100 {
+		if chalnum >= 100 {
 			return false
 		}
 		ret[chalnum] = key.(string)
