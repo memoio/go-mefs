@@ -145,7 +145,8 @@ func challengeTest() error {
 	if flag {
 		qItem, err := role.GetLatestQuery(uid)
 		if err != nil {
-			log.Println("got query fails: ", err)
+			log.Fatal("got query fails: ", err)
+			return err
 		}
 		qid = qItem.QueryID
 	}
