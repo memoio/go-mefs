@@ -28,6 +28,7 @@ func main() {
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
+
 	contracts.EndPoint = ethEndPoint
 
 	var (
@@ -65,10 +66,16 @@ func main() {
 	}
 
 	contracts.EndPoint = qethEndPoint
+
+	queryGot, _, err := contracts.GetLatestQuery(localAddr, localAddr)
+	if queryGot.String() != queryAddr.String() {
+		log.Fatal(queryAddr.String(), " set different from got:", queryGot.String())
+	}
+
 	log.Println("start get 'completed' params")
 	localID, _ := address.GetIDFromAddress(localAddr.String())
 	queryID, _ := address.GetIDFromAddress(queryAddr.String())
-	qItem, err := role.GetQueryInfo(localID, queryID)
+	qItem, err := role.GetLatestQuery(localID)
 	if err != nil {
 		log.Fatal("get query fails:", err)
 	}

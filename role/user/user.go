@@ -98,8 +98,8 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 				return nil, err
 			}
 
-			if qItem.QueryID != queryID {
-				utils.MLogger.Infof("get latest query %s for user %s from chain failed: %s", qItem.QueryID, userID, err)
+			if qItem.QueryID != qid {
+				utils.MLogger.Infof("get latest query %s for user %s from chain failed", qItem.QueryID, userID)
 			}
 
 			queryID = qid
