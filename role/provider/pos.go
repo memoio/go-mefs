@@ -86,7 +86,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		}
 
 		for _, keeper := range gp.keepers {
-			p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Get), km.ToString(), []byte(p.localID), nil, keeper)
+			p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), []byte(p.localID), nil, keeper)
 		}
 
 		time.Sleep(10 * time.Minute)

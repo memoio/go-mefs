@@ -117,7 +117,12 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
 	if enablePos {
-		go m.PosService(ctx, gc)
+		go func() {
+			err := m.PosService(ctx, gc)
+			if err != nil {
+				utils.MLogger.Errorf("start pos err: %s ", err)
+			}
+		}()
 	}
 
 	go m.getKpMapRegular(ctx)
