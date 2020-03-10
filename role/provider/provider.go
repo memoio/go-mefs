@@ -88,7 +88,7 @@ type kInfo struct {
 }
 
 //New start provider service
-func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price int64, reDeployOffer bool) (instance.Service, error) {
+func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price int64, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
 	m := &Info{
 		localID: id,
 		sk:      sk,
@@ -116,6 +116,9 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}()
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
+	if enablePos {
+		go m.PosService(ctx, gc)
+	}
 
 	go m.getKpMapRegular(ctx)
 	go m.sendStorageRegular(ctx)
@@ -148,7 +151,7 @@ func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo 
 		sessionID: uuid.Nil,
 	}
 
-	g.loadContracts(localID)
+	g.loadContracts(localID, true)
 
 	return g
 }

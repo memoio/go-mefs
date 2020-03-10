@@ -54,6 +54,7 @@ var opt = &df.DataCoder{
 func (p *Info) PosService(ctx context.Context, gc bool) error {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
+	utils.MLogger.Info("Start Pos Service")
 	posID = pos.GetPosId()
 	posAddr = pos.GetPosAddr()
 
@@ -89,6 +90,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		}
 
 		time.Sleep(10 * time.Minute)
+		gp.loadContracts(p.localID, true)
 	}
 
 	//填充opt.KeySet

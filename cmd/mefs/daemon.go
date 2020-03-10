@@ -355,7 +355,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.MefsNodeCollector{Node: node})
 
-	fmt.Printf("Daemon is ready\n")
+	fmt.Printf("Network daemon is ready\n")
 
 	err = mcl.Init(mcl.BLS12_381)
 	if err != nil {
@@ -389,15 +389,17 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	switch cfg.Role {
 	case metainfo.RoleKeeper:
+		fmt.Println("Starting as a keeper")
 		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start keeper service fails; please restart")
 		}
 		node.Inst = ins
 
-		fmt.Println("Keeper daemon is ready")
+		fmt.Println("Keeper service is ready")
 
 	case metainfo.RoleUser:
+		fmt.Println("Starting as a user")
 		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start user daemon fails; please restart")
@@ -405,26 +407,22 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		node.Inst = ins
 
-		fmt.Println("User daemon is ready; run `mefs lfs start` to start lfs service")
+		fmt.Println("User service is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样
-		fmt.Println("started as a provider")
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration, price, rdo)
+		fmt.Println("Starting as a provider")
+
+		pos, _ := req.Options[posKwd].(bool)
+		gc, _ := req.Options[gcKwd].(bool)
+
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration, price, rdo, pos, gc)
 		if err != nil {
-			fmt.Println("Start providerService failed:", err)
+			fmt.Println("Start provider Service failed:", err)
 			return err
 		}
 
 		node.Inst = ins
 
-		fmt.Println("Provider daemon is ready")
-
-		pos, _ := req.Options[posKwd].(bool)
-		gc, _ := req.Options[gcKwd].(bool)
-
-		if pos {
-			utils.MLogger.Info("Start pos Service")
-			go ins.(*provider.Info).PosService(req.Context, gc)
-		}
+		fmt.Println("Provider service is ready")
 	default:
 	}
 

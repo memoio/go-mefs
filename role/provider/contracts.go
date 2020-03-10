@@ -150,12 +150,12 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 	return nil
 }
 
-func (g *groupInfo) loadContracts(proID string) error {
+func (g *groupInfo) loadContracts(proID string, mode bool) error {
 	if g.userID == g.groupID {
 		return nil
 	}
 
-	if g.query == nil {
+	if g.query == nil || mode {
 		qItem, err := role.GetQueryInfo(g.userID, g.groupID)
 		if err != nil {
 			return err
@@ -163,7 +163,7 @@ func (g *groupInfo) loadContracts(proID string) error {
 		g.query = &qItem
 	}
 
-	if g.upkeeping == nil {
+	if g.upkeeping == nil || mode {
 		uItem, err := role.GetUpKeeping(g.userID, g.groupID)
 		if err != nil {
 			return err
