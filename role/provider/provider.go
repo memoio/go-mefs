@@ -116,6 +116,12 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}()
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
+
+	go m.getKpMapRegular(ctx)
+	go m.sendStorageRegular(ctx)
+	go m.saveRegular(ctx)
+
+	m.state = true
 	if enablePos {
 		go func() {
 			err := m.PosService(ctx, gc)
@@ -124,12 +130,6 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 			}
 		}()
 	}
-
-	go m.getKpMapRegular(ctx)
-	go m.sendStorageRegular(ctx)
-	go m.saveRegular(ctx)
-
-	m.state = true
 
 	utils.MLogger.Info("Provider Service is ready")
 	return m, nil

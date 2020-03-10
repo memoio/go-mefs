@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
@@ -80,26 +79,6 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	if !found {
 		if g.userID != pos.GetPosId() {
 			return nil
-		}
-		providerAddr, err := address.GetAddressFromID(proID)
-		if err != nil {
-			return err
-		}
-
-		userAddr, err := address.GetAddressFromID(pos.GetPosId())
-		if err != nil {
-			return err
-		}
-
-		queryAddr, err := address.GetAddressFromID(pos.GetPosGID())
-		if err != nil {
-			return err
-		}
-
-		err = contracts.AddProvider(pos.PosSkStr, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
-		if err != nil {
-			utils.MLogger.Info("st AddProvider() error: ", err)
-			return err
 		}
 
 		price = pos.GetPosPrice()

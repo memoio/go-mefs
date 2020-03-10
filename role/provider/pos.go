@@ -71,6 +71,9 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	}
 
 	km, err := metainfo.NewKey(groupID, mpb.KeyType_Pos, posID)
+	if err != nil {
+		return err
+	}
 
 	has := false
 	for {
@@ -86,6 +89,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		}
 
 		for _, keeper := range gp.keepers {
+			utils.MLogger.Info("Send Pos add to keepers:", keeper)
 			p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), []byte(p.localID), nil, keeper)
 		}
 
@@ -94,7 +98,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	}
 
 	//填充opt.KeySet
-	mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(groupID))
+	mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed())
 	if err != nil {
 		utils.MLogger.Info("Init bls config for pos user fail: ", err)
 		return err

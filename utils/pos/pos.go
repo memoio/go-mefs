@@ -1,34 +1,20 @@
 package pos
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
-const (
-	// addr: 0x164C1f79B17f2e5854690186770B214dd231Ed81
-	PosSkStr = "724c1e75ba94dd0305cf532cd6db95df0721c33dcdc323502eba067409e4842b"
-)
-
-func GetPosSkByte() []byte {
-	SkByte, _ := hex.DecodeString(PosSkStr)
-	return SkByte
-}
-
 func GetPosAddr() string {
-	addr, _ := address.GetAdressFromSk(PosSkStr)
-	return addr
+	// sk:7a81e548e9f62f01e7eadb5af37d3ea15689602b470be9812752177464661c5c
+	// groupID: 8MG5oUXz9vMgpuG8fvHGWu37rG1vqF
+	return "0x6C93F7D1437CF44048849657853f10F9802f3364"
 }
 
 func GetPosId() string {
-	id, _ := address.GetIDFromAddress(GetPosAddr())
-	return id
-}
-
-func GetPosGID() string {
 	id, _ := address.GetIDFromAddress(GetPosAddr())
 	return id
 }
@@ -37,7 +23,11 @@ func GetPosPrice() int64 {
 	return utils.STOREPRICEPEDOLLAR / 10
 }
 
-func GetPosSeed(groupID string) []byte {
-	seed := sha256.Sum256([]byte(PosSkStr + groupID))
-	return seed[:]
+func GetPosSeed() []byte {
+	seed, err := hex.DecodeString("adcd3318b3a31e74bf5f42fc837a1874155a396b9df04736ab19b23dcb7e2fd5")
+	if err != nil {
+		return nil
+	}
+	fmt.Println("pos seed is: ", hex.EncodeToString(seed[:]))
+	return seed
 }
