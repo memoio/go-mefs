@@ -62,6 +62,8 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 			go k.handlePosAdd(km, metaValue, from)
 		case mpb.OpType_Delete:
 			go k.handlePosDelete(km, metaValue, from)
+		case mpb.OpType_Get:
+			go k.handlePosGet(km, metaValue, from)
 		}
 	default:
 		switch opType {

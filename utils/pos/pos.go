@@ -1,6 +1,7 @@
 package pos
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 
 	"github.com/memoio/go-mefs/utils"
@@ -34,4 +35,9 @@ func GetPosGID() string {
 
 func GetPosPrice() int64 {
 	return utils.STOREPRICEPEDOLLAR / 10
+}
+
+func GetPosSeed(groupID string) []byte {
+	seed := sha256.Sum256([]byte(PosSkStr + groupID))
+	return seed[:]
 }
