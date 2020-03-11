@@ -180,7 +180,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		return err
 	}
 
-	err = contracts.AddProvider(userSk, localAddr, localAddr, []common.Address{providerAddr}, localAddr.String())
+	err = contracts.AddProvider(userSk, localAddr, localAddr, ukaddr, []common.Address{providerAddr})
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
