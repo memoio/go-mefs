@@ -255,7 +255,7 @@ func getDefaultSoftSettings() soft {
 		MaxDrummerClientMsgSize:                 256 * 1024 * 1024,
 		MaxDrummerServerMsgSize:                 256 * 1024 * 1024,
 		StreamConnections:                       4,
-		PerConnectionBufferSize:                 64 * 1024 * 1024,
+		PerConnectionBufferSize:                 8 * 1024 * 1024,
 		PerCpnnectionRecvBufSize:                64 * 1024,
 		SnapshotGCTick:                          30,
 		SnapshotChunkTimeoutTick:                900,

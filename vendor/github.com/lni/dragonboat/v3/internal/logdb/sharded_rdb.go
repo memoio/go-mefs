@@ -31,7 +31,7 @@ var (
 	numOfStepEngineWorker = settings.Hard.StepEngineWorkerCount
 	numOfRocksDBInstance  = settings.Hard.LogDBPoolSize
 	// RDBContextValueSize defines the size of byte array managed in RDB context.
-	RDBContextValueSize uint64 = 1024 * 1024 * 64
+	RDBContextValueSize uint64 = 1024 * 1024 * 32
 )
 
 // ShardedRDB is a LogDB implementation using sharded rocksdb instances.
