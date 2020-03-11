@@ -73,7 +73,12 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 		}
 	}
 
-	userAddr, err := address.GetAddressFromID(k.localID)
+	localAddr, err := address.GetAddressFromID(k.localID)
+	if err != nil {
+		return err
+	}
+
+	userAddr, err := address.GetAddressFromID(uid)
 	if err != nil {
 		return err
 	}
@@ -85,7 +90,7 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 
 	if gp.isMaster(pid) {
 		utils.MLogger.Info("add provider to: ", userAddr)
-		err = contracts.AddProvider(k.sk, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
+		err = contracts.AddProvider(k.sk, localAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
 		if err != nil {
 			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err
