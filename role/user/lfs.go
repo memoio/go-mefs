@@ -250,9 +250,9 @@ func (l *LfsInfo) genRoot() {
 		}
 
 		lr.BRoots[i] = &mpb.BucketRoot{
-			BucketID:    bucket.BucketID,
-			Root:        bucket.Root,
-			ObjectCount: bucket.NextObjectID,
+			BucketID: bucket.BucketID,
+			Root:     bucket.Root,
+			OpCount:  bucket.NextOpID, // opID as count
 		}
 		bucket.RUnlock()
 	}
@@ -270,21 +270,17 @@ func (l *LfsInfo) genRoot() {
 		if lr.BRoots[i] == nil {
 			continue
 		}
-		bbuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(buf, uint64(lr.BRoots[i].ObjectCount))
-		bbuf = append(bbuf, lr.BRoots[i].Root...)
-		mtree.Push(bbuf)
+		mtree.Push(lr.BRoots[i].Root)
 	}
 
 	lr.Root = mtree.Root()
-
-	// add root to contract
 
 	l.meta.sb.Lock()
 	l.meta.sb.LRoot = append(l.meta.sb.LRoot, lr)
 	l.meta.sb.dirty = true
 	l.meta.sb.Unlock()
 
+	// add root to contract
 	if l.gInfo.userID != l.gInfo.rootID {
 		var val [32]byte
 		copy(val[:], lr.Root[:32])

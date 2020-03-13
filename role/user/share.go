@@ -30,7 +30,6 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	if !ok || object.Deletion {
 		return "", ErrObjectNotExist
 	}
-	partCount := object.GetPartCount()
 	sl := &mpb.ShareLink{
 		UserID:     l.userID,
 		QueryID:    l.fsID,
@@ -38,15 +37,15 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		ObjectName: objectName,
 		BOpts:      bucket.BOpts,
 		BucketID:   bucket.BucketID,
-		OParts:     make([]*mpb.ObjectPart, partCount),
+		OParts:     make([]*mpb.ObjectPart, object.GetPartCount()),
 	}
 
-	for i := 0; i < int(partCount); i++ {
+	for i := 0; i < int(object.GetPartCount()); i++ {
 		sl.OParts[i] = object.Parts[i]
 	}
 
 	if bucket.BOpts.Encryption == 1 {
-		decKey := aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.Parts[0].GetStart())
+		decKey := aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.GetInfo().GetObjectID())
 		sl.DecKey = decKey[:]
 	}
 
@@ -72,7 +71,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 }
 
 // GetShareObject constructs lfs download process
-func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string) error {
+func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string, opts *DownloadOptions) error {
 	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {
@@ -128,27 +127,37 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 
 	decoder := dataformat.NewDataCoderWithPrefix(sul.keySet, bopt)
 
+	dl := &downloadTask{
+		bucketID:     sl.BucketID,
+		group:        su.(*LfsInfo).gInfo,
+		decoder:      decoder,
+		startTime:    time.Now(),
+		encrypt:      bo.Encryption,
+		writer:       writer,
+		completeFunc: completeFuncs,
+	}
+
+	if bo.Encryption == 1 {
+		copy(dl.sKey[:], sl.DecKey[:32])
+	}
+
+	readLen := int64(0)
+	pStart := opts.Start
+	length := opts.Length
 	for i := 0; i < len(sl.GetOParts()); i++ {
-		opart := sl.GetOParts()[i]
-		dl := &downloadTask{
-			bucketID:     sl.BucketID,
-			group:        su.(*LfsInfo).gInfo,
-			decoder:      decoder,
-			startTime:    time.Now(),
-			start:        opart.Start,
-			length:       opart.Length,
-			encrypt:      bo.Encryption,
-			writer:       writer,
-			completeFunc: completeFuncs,
+		dl.start = sl.OParts[i].GetStart() + pStart
+		dl.length = sl.OParts[i].GetLength() - pStart
+		if length > 0 && length-readLen < dl.length {
+			dl.length = length - readLen
 		}
-
-		if bo.Encryption == 1 {
-			copy(dl.sKey[:], sl.DecKey[:32])
-		}
-
 		err := dl.Start(ctx)
 		if err != nil {
 			return err
+		}
+		pStart = 0
+		readLen += dl.length
+		if length > 0 && length >= readLen {
+			break
 		}
 	}
 

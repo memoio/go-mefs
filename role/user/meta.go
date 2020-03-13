@@ -318,12 +318,13 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		}
 		bucket.objects[info.GetName()] = &objectInfo{
 			ObjectInfo: mpb.ObjectInfo{
-				Info:         &info,
-				Deletion:     false,
-				Length:       0,
-				LastModified: info.Ctime,
-				PartCount:    0,
-				Parts:        make([]*mpb.ObjectPart, 0, 1),
+				Info:      &info,
+				Deletion:  false,
+				Length:    0,
+				CTime:     info.GetCTime(),
+				MTime:     info.GetCTime(),
+				PartCount: 0,
+				Parts:     make([]*mpb.ObjectPart, 0, 1),
 			},
 		}
 		utils.MLogger.Info("Add Object-", info.GetName(), " in bucket: ", bucket.Name)
@@ -347,7 +348,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		ob.Parts = append(ob.Parts, &part)
 		ob.PartCount++
 		ob.Length += part.Length
-		ob.LastModified = part.GetTime()
+		ob.MTime = part.GetCTime()
 		ob.Unlock()
 	case mpb.LfsOp_OpDelete:
 		mes := mpb.DeleteObject{}

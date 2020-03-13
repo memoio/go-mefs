@@ -65,27 +65,29 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	}
 
 	payload, _ := proto.Marshal(&deleteObject)
-	op := mpb.OpRecord{
+	op := &mpb.OpRecord{
 		OpType:  mpb.LfsOp_OpDelete,
 		OpID:    bucket.GetNextOpID(),
 		Payload: payload,
 	}
 
 	// leaf is OpID + PayLoad
-	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
+	tag, err := proto.Marshal(op)
+	if err != nil {
+		return nil, err
+	}
 	bucket.mtree.Push(tag)
+	bucket.Root = bucket.mtree.Root()
 
-	l.flushObjectMeta(bucket, false, &op)
+	l.flushObjectMeta(bucket, false, op)
 	bucket.NextOpID++
 
 	object.Deletion = true
 	bucket.dirty = true
-	oName := object.Parts[0].GetName() + "." + strconv.Itoa(int(object.GetInfo().ObjectID))
-	delete(bucket.objects, object.Parts[0].GetName())
+	oName := object.GetInfo().GetName() + "." + strconv.Itoa(int(object.GetInfo().ObjectID))
+	delete(bucket.objects, object.GetInfo().GetName())
 	bucket.objects[oName] = object
 
-	//gen_root
-	bucket.Root = bucket.mtree.Root()
 	return &object.ObjectInfo, nil
 }
 
@@ -237,6 +239,10 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 // GetObjectAvailTime get available time of objects
 func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
+	if len(object.Parts) == 0 {
+		return latestTime.Format(utils.BASETIME), ErrBucketNotExist
+	}
+
 	bucketName, ok := l.meta.bucketIDToName[object.GetInfo().GetBucketID()]
 	if !ok {
 		return latestTime.Format(utils.BASETIME), ErrBucketNotExist

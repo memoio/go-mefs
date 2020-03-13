@@ -88,10 +88,10 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 
 	length := opts.Length
 	if opts.Length < 0 {
-		length = object.Parts[0].GetLength() - opts.Start
+		length = object.GetLength() - opts.Start
 	}
 
-	if opts.Start+length > object.Parts[0].GetLength() {
+	if opts.Start+length > object.GetLength() {
 		for _, f := range completeFuncs {
 			f(ErrObjectOptionsInvalid)
 		}
@@ -114,7 +114,6 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		group:        l.gInfo,
 		decoder:      decoder,
 		startTime:    time.Now(),
-		start:        opts.Start + object.Parts[0].GetStart(),
 		length:       length,
 		writer:       writer,
 		completeFunc: completeFuncs,
@@ -122,10 +121,31 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	}
 	// default AES
 	if bo.Encryption == 1 {
-		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.Parts[0].GetStart())
+		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.GetInfo().GetObjectID())
 	}
 
-	return dl.Start(ctx)
+	i := 0
+	pStart := opts.Start
+	readLen := int64(0)
+	for readLen < length {
+		if len(object.GetParts()) <= i+1 {
+			return ErrObjectOptionsInvalid
+		}
+		dl.start = pStart + object.Parts[i].GetStart()
+		dl.length = object.Parts[i].GetLength() - pStart
+		if length-readLen < dl.length {
+			dl.length = length - readLen
+		}
+		err := dl.Start(ctx)
+		if err != nil {
+			return err
+		}
+		pStart = 0
+		readLen += dl.length
+		i++
+	}
+
+	return nil
 }
 
 func (do *downloadTask) Start(ctx context.Context) error {

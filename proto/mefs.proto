@@ -63,7 +63,7 @@ message UserBLS12Config{
 
 message BucketRoot {
   int64 BucketID = 1;
-  int64 ObjectCount = 2;
+  int64 OpCount = 2;
   bytes Root = 3; //merkle root
 }
 
@@ -95,11 +95,10 @@ message BucketOptions {
 message BucketInfo {
   string Name = 1;
   int64 BucketID = 2;
-  int64 Ctime = 3;          //本Bucket的创建时间
+  int64 CTime = 3;          //本Bucket的创建时间
   BucketOptions BOpts = 4;
-  int64 CurStripe = 5;      //当前写到哪一个Stripe
-  int64 NextSeg = 6;        //当前写到哪一个Offset
-  int64 MTime = 7;   //本Bucket内数据上次修改时间
+  int64 Length  = 5;
+  int64 MTime = 7;          //本Bucket内数据上次修改时间
   int64 ObjectsBlockSize = 8; //本Bucket的ObjectsBlock序列化后占多少字节
   bool Deletion = 9;        //Bucket是否已删除
   int64 NextObjectID = 10;
@@ -111,21 +110,23 @@ message BucketInfo {
 message ObjectInfo{
   Object Info = 1;
   int64 Length = 2;
-  bool Deletion = 3;
-  int64 LastModified = 4;
+  int64 CTime = 3; 
+  int64 MTime = 4;
   int64 PartCount = 5;
-  repeated ObjectPart Parts = 6; //构造出来的Part序列
+  string ETag = 6;
+  bool Deletion = 7;
+  repeated ObjectPart Parts = 10; //构造出来的Part序列
 }
 
 //在add object的时候加入，
 message Object {
   string Name = 1;                  //对象名称
   int64 BucketID = 2;               //本对象所属的Bucket
-  int64 Ctime = 3;                  //对象创建时间
-  string ContentType = 4;           //对象的类型，如文本、图片
+  int64 CTime = 3;                  //对象创建时间
+  int64 ObjectID = 4; 
   bool Dir = 5;                     //是否为目录
-  map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
-  int64 ObjectID = 7;                         
+  string ContentType = 9;           //对象的类型，如文本、图片
+  map<string, string> Metadata = 10; // User可以对文件自定义一些元信息                        
 }
 
 //在add object及append object的时候会加入
@@ -135,7 +136,7 @@ message ObjectPart {
   int64 PartID = 3;              //此分块的ID
   int64 Start = 4;               //本对象的起始
   int64 Length = 5;              //对象长度
-  int64 Time = 6;                //append此Part的时间
+  int64 CTime = 6;               //append此Part的时间
   string ETag = 7;               //MD5
 }
 
@@ -147,7 +148,7 @@ message DeleteObject {
 }
 
 message CancelOp {
-  LfsOp OpType = 1; //撤销的操作类型
+  LfsOp OpType = 1;     //撤销的操作类型
   int64 OpID = 2;       //撤销的操作ID
 }
 
@@ -164,14 +165,6 @@ message OpRecord {
   LfsOp OpType = 1;     //操作类型
   int64 OpID = 2;       //操作ID，从1往上增
   bytes Payload = 3;    //根据操作类型解析Payload
-}
-
-//MetaSync 序列号后存在本地，用于处理本地Meta文件
-message MetaSync {
-  int64 MagicNum = 1;
-  int64 ID = 2;            //任意指定的识别码
-  int64 Length = 3;        //这个meta文件的长度
-  int64 SyncIndex = 4;     //上一次同步到什么位置
 }
 
 message BlockOptions {

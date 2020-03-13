@@ -513,11 +513,11 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if err != nil {
 			availTim = time.Unix(0, 0)
 		}
-		ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:           object.GetInfo().Name,
-			Size:           object.Length,
-			MD5:            object.Parts[0].GetETag(), //需要检查Parts是否为空
+			Name:           object.GetInfo().GetName(),
+			Size:           object.GetLength(),
+			MD5:            object.GetETag(), //需要检查Parts是否为空
 			Ctime:          ctime.Format(utils.SHOWTIME),
 			Dir:            false,
 			LatestChalTime: availTim.Format(utils.SHOWTIME),
@@ -609,11 +609,11 @@ var lfsPutObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetInfo().GetName(),
 			Size:  object.GetLength(),
-			MD5:   object.Parts[0].GetETag(),
+			MD5:   object.GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}
@@ -825,7 +825,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			Method: "List Objects",
 		}
 		for _, object := range objects {
-			ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
+			ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
@@ -839,8 +839,8 @@ var lfsListObjectsCmd = &cmds.Command{
 			}
 			tempObState := ObjectStat{
 				Name:           object.GetInfo().GetName(),
-				Size:           object.Parts[0].GetLength(),
-				MD5:            object.Parts[0].GetETag(),
+				Size:           object.GetLength(),
+				MD5:            object.GetETag(),
 				Ctime:          ctime.Format(utils.SHOWTIME),
 				Dir:            false,
 				LatestChalTime: avaTime,
@@ -911,11 +911,11 @@ var lfsDeleteObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetInfo().GetName(),
 			Size:  object.GetLength(),
-			MD5:   object.Parts[0].GetETag(),
+			MD5:   object.GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}
@@ -985,7 +985,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1097,7 +1097,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1172,7 +1172,7 @@ It outputs the following to stdout:
 			Method: "List Buckets",
 		}
 		for _, bucket := range buckets {
-			ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
+			ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 			bucketStat := BucketStat{
 				Name:        bucket.Name,
 				BucketID:    bucket.BucketID,
@@ -1249,7 +1249,7 @@ It outputs the following to stdout:
 			return err
 		}
 
-		ctime := time.Unix(bucket.GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1638,7 +1638,7 @@ var lfsGetShareCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0])
+		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0],user.DefaultDownloadOptions())
 
 		return res.Emit(piper)
 	},

@@ -160,7 +160,7 @@ func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio
 		return bi, convertToMinioError(err, bucket, "")
 	}
 	bi.Name = bucket
-	bi.Created = time.Unix(bucketInfo.Ctime, 0).UTC()
+	bi.Created = time.Unix(bucketInfo.CTime, 0).UTC()
 	return bi, nil
 }
 
@@ -179,7 +179,7 @@ func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 	buckets = make([]minio.BucketInfo, len(bucketsInfo))
 	for i, v := range bucketsInfo {
 		buckets[i].Name = v.Name
-		buckets[i].Created = time.Unix(v.Ctime, 0).UTC()
+		buckets[i].Created = time.Unix(v.CTime, 0).UTC()
 	}
 	return buckets, nil
 }
@@ -212,10 +212,10 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.Parts[0].GetETag()
+		loi.Objects[i].ETag = v.GetETag()
 		loi.Objects[i].Name = v.GetInfo().GetName()
 		loi.Objects[i].Size = v.GetLength()
-		loi.Objects[i].ModTime = time.Unix(v.GetInfo().GetCtime(), 0).UTC()
+		loi.Objects[i].ModTime = time.Unix(v.GetCTime(), 0).UTC()
 	}
 	return loi, nil
 }
@@ -238,10 +238,10 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 	loi.Objects = make([]minio.ObjectInfo, len(objs))
 	for i, v := range objs {
 		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.Parts[0].GetETag()
+		loi.Objects[i].ETag = v.GetETag()
 		loi.Objects[i].Name = v.GetInfo().GetName()
 		loi.Objects[i].Size = v.GetLength()
-		loi.Objects[i].ModTime = time.Unix(v.GetInfo().GetCtime(), 0).UTC()
+		loi.Objects[i].ModTime = time.Unix(v.GetCTime(), 0).UTC()
 	}
 	return loi, nil
 }
@@ -327,7 +327,7 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 		Bucket:      bucket,
 		Name:        object,
 		IsDir:       obj.GetInfo().GetDir(),
-		ETag:        obj.Parts[0].GetETag(),
+		ETag:        obj.GetETag(),
 		ContentType: obj.GetInfo().GetContentType(),
 		Size:        obj.GetLength(),
 	}
@@ -352,7 +352,7 @@ func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *mi
 		Bucket:      bucket,
 		Name:        object,
 		IsDir:       obj.GetInfo().GetDir(),
-		ETag:        obj.Parts[0].GetETag(),
+		ETag:        obj.GetETag(),
 		ContentType: obj.GetInfo().GetContentType(),
 		Size:        obj.GetLength(),
 	}

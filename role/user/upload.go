@@ -33,9 +33,9 @@ type uploadTask struct { //一个上传任务实例
 	encrypt   int32
 	sKey      [32]byte
 	bucketID  int64
-	curStripe int64
-	curOffset int64
-	length    int64
+	begin     int
+	length    int
+	rawLen    int
 	etag      string
 	gInfo     *groupInfo
 	reader    io.Reader
@@ -43,48 +43,117 @@ type uploadTask struct { //一个上传任务实例
 	encoder   *dataformat.DataCoder
 }
 
-//想想怎么把AppendObject和PutObject代码复用，这里会有可重入锁的问题
+// PutObject constructs upload process
+func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
 
-// AppendObject constructs upload process
-func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
-	if !l.online || l.meta.buckets == nil {
-		return nil, ErrLfsServiceNotReady
-	}
-
-	if !l.writable {
-		return nil, ErrLfsReadOnly
-	}
-	bucket, ok := l.meta.buckets[bucketName]
-	if !ok || bucket == nil || bucket.Deletion {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket.Lock()
-	defer bucket.Unlock()
-	object, ok := bucket.objects[objectName]
-	if !ok || object == nil || object.Deletion {
-		return nil, ErrObjectNotExist
-	}
-	bo := bucket.BOpts
-	if bo.Policy != dataformat.RsPolicy && bo.Policy != dataformat.MulPolicy {
-		return nil, ErrPolicy
+	bucket, object, err := l.getObject(bucketName, objectName, true)
+	if err != nil {
+		return nil, err
 	}
 
 	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
 
-	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
-	stripeSize := int64(bo.SegmentCount) * segStripeSize
+	return l.addObjectData(ctx, bucket, object, reader)
+}
 
-	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
-
-	//append Object
-	opart := &mpb.ObjectPart{
-		Name:     objectName,
-		ObjectID: object.GetInfo().GetObjectID(),
-		PartID:   object.GetPartCount(),
-		Start:    start,
-		Time:     time.Now().Unix(),
+// AppendObject constructs upload process
+func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
+	utils.MLogger.Infof("Upload append object: %s to bucket: %s begin", objectName, bucketName)
+	bucket, object, err := l.getObject(bucketName, objectName, false)
+	if err != nil {
+		return nil, err
 	}
+
+	return l.addObjectData(ctx, bucket, object, reader)
+}
+
+func (l *LfsInfo) getObject(bucketName, objectName string, creation bool) (*superBucket, *objectInfo, error) {
+	if !l.online || l.meta.buckets == nil {
+		return nil, nil, ErrLfsServiceNotReady
+	}
+
+	if !l.writable {
+		return nil, nil, ErrLfsReadOnly
+	}
+
+	err := checkObjectName(objectName)
+	if err != nil {
+		return nil, nil, ErrObjectNameInvalid
+	}
+
+	bucket, ok := l.meta.buckets[bucketName]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, nil, ErrBucketNotExist
+	}
+
+	bucket.Lock()
+	defer bucket.Unlock()
+	objectElement, ok := bucket.objects[objectName]
+	if ok || objectElement != nil {
+		if creation {
+			return nil, nil, ErrObjectAlreadyExist
+		}
+		return bucket, objectElement, nil
+	}
+
+	if creation {
+		//add Object
+		ct := time.Now().Unix()
+		oInfo := &mpb.Object{
+			Name:     objectName,
+			BucketID: bucket.BucketID,
+			CTime:    ct,
+			ObjectID: bucket.NextObjectID,
+			Dir:      false,
+		}
+
+		object := &objectInfo{
+			ObjectInfo: mpb.ObjectInfo{
+				Info:      oInfo,
+				PartCount: 0,
+				Parts:     make([]*mpb.ObjectPart, 0, 1),
+				Deletion:  false,
+				CTime:     ct,
+				MTime:     ct,
+			},
+		}
+
+		bucket.objects[objectName] = object
+		bucket.NextObjectID++
+
+		payload, err := proto.Marshal(oInfo)
+		if err != nil {
+			return nil, nil, err
+		}
+		op := &mpb.OpRecord{
+			OpType:  mpb.LfsOp_OpAdd,
+			OpID:    bucket.GetNextOpID(),
+			Payload: payload,
+		}
+
+		l.flushObjectMeta(bucket, false, op)
+		bucket.NextOpID++
+
+		//gen_root
+		tag, err := proto.Marshal(op)
+		if err != nil {
+			return nil, nil, err
+		}
+		bucket.mtree.Push(tag)
+		bucket.Root = bucket.mtree.Root()
+		bucket.dirty = true
+		utils.MLogger.Infof("Upload create object: %s in bucket: %s", objectName, bucketName)
+		return bucket, object, nil
+	}
+	return nil, nil, ErrObjectNotExist
+}
+
+// make sure bucket and object is ont empty
+func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object *objectInfo, reader io.Reader) (*mpb.ObjectInfo, error) {
+	bucket.Lock()
+	object.Lock()
+	defer object.Unlock()
+	defer bucket.Unlock()
 
 	bopt := &mpb.BlockOptions{
 		Bopts:   bucket.BOpts,
@@ -95,188 +164,69 @@ func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName strin
 
 	encoder := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
 
+	//append Object
+	opart := &mpb.ObjectPart{
+		Name:     object.GetInfo().GetName(),
+		ObjectID: object.GetInfo().GetObjectID(),
+		PartID:   object.GetPartCount(),
+		Start:    bucket.GetLength(),
+		CTime:    time.Now().Unix(),
+	}
+
 	ul := &uploadTask{
 		startTime: time.Now(), // for queue?
 		reader:    reader,
 		gInfo:     l.gInfo,
 		bucketID:  bucket.BucketID,
-		curStripe: bucket.CurStripe,
-		curOffset: bucket.NextSeg,
+		begin:     int(bucket.GetLength()),
 		encoder:   encoder,
-		encrypt:   bo.Encryption,
+		encrypt:   bucket.BOpts.Encryption,
 	}
 
-	if bo.Encryption == 1 {
-		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, start)
+	if bucket.BOpts.Encryption == 1 {
+		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.GetInfo().GetObjectID())
 	}
 
 	err := ul.Start(ctx)
 	if err != nil && ul.length == 0 {
 		return &object.ObjectInfo, err
 	}
+	// opart
 	opart.ETag = ul.etag
-	opart.Length = ul.length
+	opart.Length = int64(ul.length)
 
-	payload, _ := proto.Marshal(opart)
-	op := mpb.OpRecord{
-		OpType:  mpb.LfsOp_OpAppend,
-		OpID:    bucket.GetNextOpID(),
-		Payload: payload,
-	}
-	l.flushObjectMeta(bucket, false, &op)
-	bucket.NextOpID++
-	// leaf is OpID + PayLoad
-	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
-	bucket.mtree.Push(tag)
-
+	// object
 	object.Parts = append(object.Parts, opart)
 	object.PartCount++
-	object.Length += ul.length
-	bucket.CurStripe = ul.curStripe
-	bucket.NextSeg = ul.curOffset
+	object.Length += int64(ul.length)
+	object.ETag = calulateETag(object)
+	object.MTime = opart.CTime
 
-	bucket.Root = bucket.mtree.Root()
-
-	bucket.dirty = true
-	utils.MLogger.Infof("Append object: %s to bucket: %s end, length is: %d", objectName, bucketName, opart.Length)
-	return &object.ObjectInfo, err
-}
-
-// PutObject constructs upload process
-func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
-	if !l.online || l.meta.buckets == nil {
-		return nil, ErrLfsServiceNotReady
-	}
-
-	if !l.writable {
-		return nil, ErrLfsReadOnly
-	}
-
-	err := checkObjectName(objectName)
+	// bucket
+	bucket.Length += int64(ul.rawLen)
+	payload, err := proto.Marshal(opart)
 	if err != nil {
-		return nil, ErrObjectNameInvalid
+		return nil, err
 	}
-
-	bucket, ok := l.meta.buckets[bucketName]
-	if !ok || bucket == nil || bucket.Deletion {
-		return nil, ErrBucketNotExist
-	}
-
-	bucket.Lock()
-	defer bucket.Unlock()
-
-	if objectElement, ok := bucket.objects[objectName]; ok || objectElement != nil {
-		return nil, ErrObjectAlreadyExist
-	}
-
-	bo := bucket.BOpts
-	if bo.Policy != dataformat.RsPolicy && bo.Policy != dataformat.MulPolicy {
-		return nil, ErrPolicy
-	}
-
-	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
-
-	segStripeSize := int64(bo.SegmentSize * bo.DataCount)
-	stripeSize := int64(bo.SegmentCount) * segStripeSize
-
-	start := bucket.CurStripe*stripeSize + bucket.NextSeg*segStripeSize
-
-	//add Object
-	object := &objectInfo{
-		ObjectInfo: mpb.ObjectInfo{
-			Info: &mpb.Object{
-				Name:     objectName,
-				BucketID: bucket.BucketID,
-				Ctime:    time.Now().Unix(),
-				ObjectID: bucket.NextObjectID,
-				Dir:      false,
-			},
-			PartCount: 0,
-			Parts:     make([]*mpb.ObjectPart, 0, 1),
-			Deletion:  false,
-		},
-	}
-	payload, _ := proto.Marshal(object.Info)
-	op := mpb.OpRecord{
-		OpType:  mpb.LfsOp_OpAdd,
-		OpID:    bucket.GetNextOpID(),
-		Payload: payload,
-	}
-
-	l.flushObjectMeta(bucket, false, &op)
-	bucket.NextOpID++
-
-	// leaf is OpID + PayLoad
-	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
-	bucket.mtree.Push(tag)
-
-	//append Object
-	opart := &mpb.ObjectPart{
-		Name:     objectName,
-		ObjectID: object.GetInfo().GetObjectID(),
-		PartID:   object.GetPartCount(),
-		Start:    start,
-		Time:     time.Now().Unix(),
-	}
-
-	bopt := &mpb.BlockOptions{
-		Bopts:   bucket.BOpts,
-		Start:   0,
-		UserID:  l.userID,
-		QueryID: l.fsID,
-	}
-
-	encoder := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
-
-	ul := &uploadTask{
-		startTime: time.Now(), // for queue?
-		reader:    reader,
-		gInfo:     l.gInfo,
-		bucketID:  bucket.BucketID,
-		curStripe: bucket.CurStripe,
-		curOffset: bucket.NextSeg,
-		encoder:   encoder,
-		encrypt:   bo.Encryption,
-	}
-
-	if bo.Encryption == 1 {
-		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, start)
-	}
-
-	err = ul.Start(ctx)
-	if err != nil && ul.length == 0 {
-		return &object.ObjectInfo, err
-	}
-
-	opart.ETag = ul.etag
-	opart.Length = ul.length
-
-	payload, _ = proto.Marshal(opart)
-	op = mpb.OpRecord{
+	op := &mpb.OpRecord{
 		OpType:  mpb.LfsOp_OpAppend,
 		OpID:    bucket.GetNextOpID(),
 		Payload: payload,
 	}
-	l.flushObjectMeta(bucket, false, &op)
+
+	l.flushObjectMeta(bucket, false, op)
 	bucket.NextOpID++
 
 	// leaf is OpID + PayLoad
-	tag = append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
+	tag, err := proto.Marshal(op)
+	if err != nil {
+		return nil, err
+	}
 	bucket.mtree.Push(tag)
-
-	object.Parts = append(object.Parts, opart)
-	object.PartCount++
-	object.Length += ul.length
-	bucket.objects[objectName] = object
-	bucket.NextObjectID++
-	bucket.CurStripe = ul.curStripe
-	bucket.NextSeg = ul.curOffset
-
-	//gen_root
 	bucket.Root = bucket.mtree.Root()
 
 	bucket.dirty = true
-	utils.MLogger.Infof("Upload object: %s to bucket: %s end, length is: %d", objectName, bucketName, object.Parts[0].Length)
+	utils.MLogger.Infof("Add data to object: %s in bucket: %s end, length is: %d", object.GetInfo().GetName(), bucket.GetName(), opart.Length)
 	return &object.ObjectInfo, err
 }
 
@@ -318,11 +268,15 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	bc := int(dc + pc)
 	least := int(dc + pc/2)
 	segSize := enc.Prefix.Bopts.SegmentSize
-	readUnit := int(segSize) * int(dc) //每一次读取的数据，尽量读一个整的
-	readByte := int(enc.Prefix.Bopts.SegmentCount) * readUnit
 
-	rdata := make([]byte, readByte)
-	extra := make([]byte, 0, readByte)
+	segStripeSize := int(segSize * dc)
+	stripeSize := int(enc.Prefix.Bopts.SegmentCount) * segStripeSize
+
+	curStripe := u.begin / stripeSize
+	curOffset := ((u.begin%stripeSize)-1)/segStripeSize + 1
+
+	rdata := make([]byte, stripeSize)
+	extra := make([]byte, 0, stripeSize)
 
 	h := md5.New()
 	parllel := int32(0)
@@ -375,9 +329,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			return nil
 		default:
 			// clear itself
-			data := make([]byte, 0, readByte)
+			data := make([]byte, 0, stripeSize)
 			extraLen := len(extra)
-			readLen := readByte - int(u.curOffset)*readUnit - extraLen
+			readLen := stripeSize - int(curOffset)*segStripeSize - extraLen
 			if extraLen > 0 {
 				data = append(data, extra...)
 				extra = extra[:0]
@@ -405,9 +359,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
 
-			endOffset := int(u.curOffset) + (n-1)/int(u.encoder.Prefix.Bopts.SegmentSize*u.encoder.Prefix.Bopts.DataCount) + 1
+			endOffset := curOffset + (n-1)/segStripeSize + 1
 
-			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, length: %d", u.curStripe, u.curOffset, n)
+			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, length: %d", curStripe, curOffset, n)
 
 			// handle it before
 			if endOffset > int(u.encoder.Prefix.Bopts.GetSegmentCount()) {
@@ -415,7 +369,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				return role.ErrRead
 			}
 
-			u.length += int64(n)
+			u.rawLen += (curOffset - endOffset) * segStripeSize
+			u.length += n
 
 			// encrypt
 			if u.encrypt == 1 {
@@ -461,13 +416,13 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					}
 				}
 				count := int32(0)
-				for be := 0; be*readUnit < len(data); be += transNum {
+				for be := 0; be*segStripeSize < len(data); be += transNum {
 					var transData []byte
-					if len(data) > (be+transNum)*readUnit {
-						transData = data[be*readUnit : (be+transNum)*readUnit]
+					if len(data) > (be+transNum)*segStripeSize {
+						transData = data[be*segStripeSize : (be+transNum)*segStripeSize]
 					} else {
 						// last one
-						transData = data[be*readUnit:]
+						transData = data[be*segStripeSize:]
 					}
 
 					encodedData, offset, err := enc.Encode(transData, bm.ToString(3), start)
@@ -536,13 +491,13 @@ func (u *uploadTask) Start(ctx context.Context) error {
 						u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.end)
 					}
 				}
-			}(data, int(u.curStripe), int(u.curOffset))
+			}(data, curStripe, curOffset)
 
 			if endOffset == int(u.encoder.Prefix.Bopts.GetSegmentCount()) { //如果写满了一个stripe
-				u.curStripe++
-				u.curOffset = 0
+				curStripe++
+				curOffset = 0
 			} else {
-				u.curOffset = int64(endOffset)
+				curOffset = endOffset
 			}
 		}
 	}
@@ -552,4 +507,22 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	wg.Wait()
 
 	return nil
+}
+
+func calulateETag(ob *objectInfo) string {
+	if len(ob.GetParts()) == 1 {
+		return ob.GetParts()[0].ETag
+	}
+
+	var hashes []byte
+	for i := 0; i < len(ob.GetParts()); i++ {
+		md5, err := hex.DecodeString(ob.GetParts()[i].ETag)
+		if err != nil {
+			continue
+		}
+		hashes = append(hashes, md5...)
+	}
+
+	sum := md5.Sum(hashes)
+	return hex.EncodeToString(sum[:])
 }

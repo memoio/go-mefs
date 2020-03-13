@@ -57,7 +57,7 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 				Bucket:      bucket,
 				Name:        object,
 				IsDir:       obj.GetInfo().GetDir(),
-				ETag:        obj.Parts[0].GetETag(),
+				ETag:        obj.GetETag(),
 				ContentType: obj.GetInfo().GetContentType(),
 				Size:        obj.GetLength(),
 			})
