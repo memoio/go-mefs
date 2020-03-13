@@ -46,7 +46,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		auth.Value = moneyToChannel //放进合约里的钱
 		cAddr, tx, _, err := channel.DeployChannel(auth, client, providerAddress, timeOut)
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Channel Err:", err)
 				return channelAddr, err
 			}
@@ -56,7 +56,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("deploy channel transaction fails", err)
 				return channelAddr, err
 			}
@@ -124,15 +124,20 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+
 		tx, err := channelInstance.ChannelTimeout(auth)
 		if err != nil {
-			log.Println("channelTimeOutErr:", err)
-			return err
+			if retryCount > sendTransactionRetryCount {
+				log.Println("channelTimeOutErr:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > checkTxRetryCount {
 				log.Println("close channel fails", err)
 				return err
 			}
@@ -168,13 +173,17 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 		auth.GasLimit = 8000000
 		tx, err := channelInstance.CloseChannel(auth, hashNew, value, sig)
 		if err != nil {
-			log.Println("closeChannelErr:", err)
-			return err
+			if retryCount > sendTransactionRetryCount {
+				log.Println("closeChannelErr:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > checkTxRetryCount {
 				log.Println("close channel fails", err)
 				return err
 			}

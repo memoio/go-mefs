@@ -16,6 +16,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	log.Println("begin to deploy query-contract...")
 
 	var queryAddr common.Address
+	t := duration * 24 * 60 * 60
 
 	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "query", hexKey, true)
 	if err != nil {
@@ -41,9 +42,9 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(t), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deployQueryErr:", err)
 				return queryAddr, err
 			}
@@ -53,7 +54,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("deploy query transaction fails", err)
 				return queryAddr, err
 			}
@@ -127,7 +128,7 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		tx, err := query.SetCompleted(auth)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("set query Completed fails: ", err)
 				return err
 			}
@@ -137,7 +138,7 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("set query completed transaction fails", err)
 				return err
 			}

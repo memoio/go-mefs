@@ -26,10 +26,12 @@ const (
 	//indexerHex indexerAddress, it is well known
 	indexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
 	//InvalidAddr implements invalid contracts-address
-	InvalidAddr          = "0x0000000000000000000000000000000000000000"
-	spaceTimePayGasLimit = uint64(400000)
-	spaceTimePayGasPrice = 100
-	defaultGasPrice      = 100
+	InvalidAddr               = "0x0000000000000000000000000000000000000000"
+	spaceTimePayGasLimit      = uint64(8000000)
+	spaceTimePayGasPrice      = 100
+	defaultGasPrice           = 100
+	sendTransactionRetryCount = 5
+	checkTxRetryCount         = 10
 )
 
 var (
@@ -105,20 +107,21 @@ func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		indexerAddr, tx, indexerInstance, err := indexer.DeployIndexer(auth, client)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Indexer Err:", err)
 				return indexerAddr, indexerInstance, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
 			log.Println("deploy user indexer transaction fails:", err)
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				return indexerAddr, indexerInstance, err
 			}
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -141,26 +144,27 @@ func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, admi
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		tx, err := adminIndexer.Add(auth, key, addAddr)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("add role indexer err:", err)
 				return err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("add usroleer indexer transaction fails: ", err)
 				return err
 			}
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
 		if err != nil {
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -189,20 +193,21 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		tx, err := adminIndexer.AlterResolver(auth, key, addAddr)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("add role indexer err:", err)
 				return err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("add usroleer indexer transaction fails: ", err)
 				return err
 			}
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -212,7 +217,7 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 
 		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
 		if err != nil {
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -265,20 +270,21 @@ func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		resAddr, tx, resolverInstance, err := resolver.DeployResolver(auth, client)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Resolver Err:", err)
 				return resolverAddr, resolverInstance, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
-			log.Println("deploy Resolver transaction fails:", err)
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
+				log.Println("deploy Resolver transaction fails:", err)
 				return resolverAddr, resolverInstance, err
 			}
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -302,17 +308,17 @@ func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolver
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		tx, err := resolverInstance.Add(auth, addAddr)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("add to resolver err:", err)
 				return err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("add to resolver transaction fails: ", err)
 				return err
 			}
@@ -321,7 +327,7 @@ func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolver
 
 		addrGetted, err := GetAddrFromResolver(ownerAddress, ownerAddress, resolverInstance)
 		if err != nil {
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
@@ -378,7 +384,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		mapperAddr, tx, mapperInstance, err := mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Mapper to indexer Err:", err)
 				return mapperAddr, mapperInstance, err
 			}
@@ -390,7 +396,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 		err = CheckTx(tx)
 		if err != nil {
 			log.Println("DeployMapper transaction fails:", err)
-			if retryCount > 10 {
+			if retryCount > checkTxRetryCount {
 				return mapperAddr, mapperInstance, err
 			}
 			continue
@@ -410,7 +416,7 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		tx, err := mapperInstance.Add(auth, addr)
 		if err != nil {
-			if retryCount > 10 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("add addr to Mapper Err:", err)
 				return err
 			}
@@ -420,7 +426,7 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("add to mapper fails", err)
 				return err
 			}
@@ -707,7 +713,7 @@ func GetMapperFromAdminV1(localAddr, userAddr common.Address, key, hexKey string
 	return mapperAddr, mapperInstance, nil
 }
 
-//CheckTx 通过交易详情检查交易是否触发了errorEvent
+//CheckTx 通过交易详情检查交易是否成功
 func CheckTx(tx *types.Transaction) error {
 	log.Println("Check Tx hash:", tx.Hash().Hex())
 
@@ -727,18 +733,11 @@ func CheckTx(tx *types.Transaction) error {
 		return ErrTxFail
 	}
 
-	if receipt.Logs == nil || len(receipt.Logs) == 0 {
-		log.Println("the transaction didn't trigger an event")
-		return nil
+	if receipt.Status == 0 { //等于0表示交易失败，等于1表示成功
+		log.Println("Transaction mined but execution failed")
+		return ErrTxFail
 	}
-	topics := receipt.Logs[0].Topics[0].Hex()
-	//log.Println("topics:", topics)
 
-	if topics == "0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa" {
-		str := string(receipt.Logs[0].Data)
-		log.Println("err in log is: ", str)
-		return errors.New(str)
-	}
 	return nil
 }
 

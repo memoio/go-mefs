@@ -1,6 +1,7 @@
 package role
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
+	"golang.org/x/crypto/sha3"
 )
 
 // ProviderItem has provider's info
@@ -42,11 +44,13 @@ type UpKeepingItem struct {
 	ProviderIDs []string
 	KeeperSLA   int32
 	ProviderSLA int32
-	Duration    int64
+	Duration    int64 //存储时间，单位s(部署合约时的单位是天，获得的参数单位是s)
 	Capacity    int64
 	Price       int64 // 部署的价格
 	StartTime   int64 // 部署的时间
 	Money       *big.Int
+	StEnd       int64
+	Proofs      []upKeeping.UpKeepingProof
 }
 
 // OfferItem has offer information
@@ -56,6 +60,7 @@ type OfferItem struct {
 	Capacity   int64
 	Duration   int64
 	Price      int64 // 合约给出的单价
+	CreateDate int64 //合约创建时间
 }
 
 // ChannelItem has channel information
@@ -255,7 +260,7 @@ func GetOfferInfo(localID, offerID string) (OfferItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		capacity, duration, price, err := offerInstance.Get(&bind.CallOpts{
+		capacity, duration, price, createDate, err := offerInstance.Get(&bind.CallOpts{
 			From: localAddress,
 		})
 		if err != nil {
@@ -267,10 +272,11 @@ func GetOfferInfo(localID, offerID string) (OfferItem, error) {
 		}
 
 		item = OfferItem{
-			Capacity: capacity.Int64(),
-			Duration: duration.Int64(),
-			Price:    price.Int64(),
-			OfferID:  offerID,
+			Capacity:   capacity.Int64(),
+			Duration:   duration.Int64(),
+			Price:      price.Int64(),
+			OfferID:    offerID,
+			CreateDate: createDate.Int64(),
 		}
 		break
 	}
@@ -506,7 +512,7 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, err := ukInstance.GetOrder(&bind.CallOpts{
+		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, proofs, stEnd, err := ukInstance.GetOrder(&bind.CallOpts{
 			From: localAddr,
 		})
 		if err != nil {
@@ -550,6 +556,8 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 			Capacity:    capacity.Int64(),
 			Price:       price.Int64(),
 			StartTime:   startTime.Int64(),
+			StEnd:       stEnd.Int64(),
+			Proofs:      proofs,
 		}
 		return item, nil
 	}
@@ -575,7 +583,7 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, err := ukInstance.GetOrder(&bind.CallOpts{
+		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, proofs, stEnd, err := ukInstance.GetOrder(&bind.CallOpts{
 			From: userAddr,
 		})
 		if err != nil {
@@ -625,6 +633,8 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			Capacity:    capacity.Int64(),
 			Price:       price.Int64(),
 			StartTime:   startTime.Int64(),
+			StEnd:       stEnd.Int64(),
+			Proofs:      proofs,
 		}
 		return item, nil
 	}
@@ -1029,4 +1039,47 @@ func BuildSignMessage() ([]byte, error) {
 		return nil, err
 	}
 	return mes, nil
+}
+
+//SignForStPay keeper signature
+func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int) ([]byte, error) {
+	var sig []byte
+	//(upKeepingAddr, providerAddr, stStart, stLength, stValue, merkleRoot, share)的哈希值
+	stStartNew := common.LeftPadBytes(stStart.Bytes(), 32)
+	stLengthNew := common.LeftPadBytes(stLength.Bytes(), 32)
+	stValueNew := common.LeftPadBytes(stValue.Bytes(), 32)
+	var merkleRootNew = merkleRoot[:]
+	//hash := crypto.Keccak256(upKeepingAddr.Bytes(), providerAddr.Bytes(), stStartNew, stLengthNew, stValueNew, merkleRootNew, share) //32Byte
+	data := [][]byte{}
+	for i := 0; i < len(share); i++ {
+		data = append(data, common.LeftPadBytes(big.NewInt(int64(share[i])).Bytes(), 32))
+	}
+	//keccak256内部实现
+	d := sha3.NewLegacyKeccak256()
+	d.Write(upKeepingAddr.Bytes())
+	d.Write(providerAddr.Bytes())
+	d.Write(stStartNew)
+	d.Write(stLengthNew)
+	d.Write(stValueNew)
+	d.Write(merkleRootNew)
+	for _, b := range data {
+		d.Write(b)
+	}
+	hash := d.Sum(nil)
+
+	fmt.Println("hash:", common.ToHex(hash))
+	//私钥格式转换
+	skECDSA, err := utils.EthskToECDSAsk(hexKey)
+	if err != nil {
+		return sig, err
+	}
+
+	//私钥对上述哈希值签名
+	sig, err = crypto.Sign(hash, skECDSA)
+	if err != nil {
+		return sig, err
+	}
+	fmt.Println("signatureHex:", common.ToHex(sig))
+
+	return sig, nil
 }

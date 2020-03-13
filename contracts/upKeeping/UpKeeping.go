@@ -27,19 +27,30 @@ var (
 	_ = event.NewSubscription
 )
 
+// UpKeepingProof is an auto generated low-level Go binding around an user-defined struct.
+type UpKeepingProof struct {
+	StStart    *big.Int
+	StLength   *big.Int
+	StValue    *big.Int
+	Keeper     common.Address
+	Provider   common.Address
+	MerkleRoot [32]byte
+}
+
 // UpKeepingABI is the input ABI used to generate the binding from.
-const UpKeepingABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"name\":\"user\",\"type\":\"address\"},{\"name\":\"keeper\",\"type\":\"address[]\"},{\"name\":\"provider\",\"type\":\"address[]\"},{\"name\":\"time\",\"type\":\"uint256\"},{\"name\":\"size\",\"type\":\"uint256\"},{\"name\":\"price\",\"type\":\"uint256\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"fallback\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"AddOrder\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"user\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"provider\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"ReadPay\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"to\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"PayKeeper\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"to\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"PayProvider\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"name\":\"provider\",\"type\":\"address[]\"}],\"name\":\"addProvider\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"provider\",\"type\":\"address\"},{\"name\":\"money\",\"type\":\"uint256\"}],\"name\":\"spaceTimePay\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"provider\",\"type\":\"address\"}],\"name\":\"readPay\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getOrder\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"address[]\"},{\"name\":\"\",\"type\":\"address[]\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
+const UpKeepingABI = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_query\",\"type\":\"address\"},{\"internalType\":\"addresspayable[]\",\"name\":\"_keepers\",\"type\":\"address[]\"},{\"internalType\":\"addresspayable[]\",\"name\":\"_providers\",\"type\":\"address[]\"},{\"internalType\":\"uint256\",\"name\":\"_time\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_size\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_price\",\"type\":\"uint256\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"AddOrder\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"provider\",\"type\":\"address\"}],\"name\":\"AddProvider\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"PayKeeper\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"PayProvider\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"addresspayable[]\",\"name\":\"_providers\",\"type\":\"address[]\"}],\"name\":\"addProvider\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"destruct\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"addTime\",\"type\":\"uint256\"}],\"name\":\"extendTime\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOrder\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"addresspayable[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"addresspayable[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"stStart\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stLength\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stValue\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"keeper\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"provider\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"merkle_root\",\"type\":\"bytes32\"}],\"internalType\":\"structUpKeeping.Proof[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"addresspayable\",\"name\":\"_provider\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_stValue\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_stStart\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_stLength\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_merkle_root\",\"type\":\"bytes32\"},{\"internalType\":\"uint256[]\",\"name\":\"share\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes[]\",\"name\":\"sign\",\"type\":\"bytes[]\"}],\"name\":\"spaceTimePay\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]"
 
 // UpKeepingBin is the compiled bytecode used for deploying new contracts.
-const UpKeepingBin = `0x6080604052604051620011ec380380620011ec833981018060405260c08110156200002957600080fd5b810190808051906020019092919080516401000000008111156200004c57600080fd5b828101905060208101848111156200006357600080fd5b81518560208202830111640100000000821117156200008157600080fd5b505092919060200180516401000000008111156200009e57600080fd5b82810190506020810184811115620000b557600080fd5b8151856020820283011164010000000082111715620000d357600080fd5b5050929190602001805190602001909291908051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060e0604051908101604052808773ffffffffffffffffffffffffffffffffffffffff16815260200186815260200185815260200184815260200183815260200182815260200142815250600160008201518160000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506020820151816001019080519060200190620001ed92919062000270565b5060408201518160020190805190602001906200020c92919062000270565b50606082015181600301556080820151816004015560a0820151816005015560c082015181600601559050507f0905316f7faca135c292b6e6f8d91c19128d372722215fe029e74e75ef84c08760405160405180910390a150505050505062000345565b828054828255906000526020600020908101928215620002ec579160200282015b82811115620002eb5782518260006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055509160200191906001019062000291565b5b509050620002fb9190620002ff565b5090565b6200034291905b808211156200033e57600081816101000a81549073ffffffffffffffffffffffffffffffffffffffff02191690555060010162000306565b5090565b90565b610e9780620003556000396000f3fe608060405260043610610078576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680630ca05f9f1461007a5780631e042234146100e35780632eb0346f14610156578063893d20e8146101b2578063c080810314610209578063d36dedd2146102e6575b005b34801561008657600080fd5b506100c96004803603602081101561009d57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506103e9565b604051808215151515815260200191505060405180910390f35b3480156100ef57600080fd5b5061013c6004803603604081101561010657600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803590602001909291905050506105ba565b604051808215151515815260200191505060405180910390f35b6101986004803603602081101561016c57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506109ff565b604051808215151515815260200191505060405180910390f35b3480156101be57600080fd5b506101c7610aac565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b34801561021557600080fd5b506102cc6004803603602081101561022c57600080fd5b810190808035906020019064010000000081111561024957600080fd5b82018360208201111561025b57600080fd5b8035906020019184602083028401116401000000008311171561027d57600080fd5b919080806020026020016040519081016040528093929190818152602001838360200280828437600081840152601f19601f820116905080830192505050505050509192919290505050610ad5565b604051808215151515815260200191505060405180910390f35b3480156102f257600080fd5b506102fb610c45565b604051808873ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018060200180602001878152602001868152602001858152602001848152602001838103835289818151815260200191508051906020019060200280838360005b8381101561038c578082015181840152602081019050610371565b50505050905001838103825288818151815260200191508051906020019060200280838360005b838110156103ce5780820151818401526020810190506103b3565b50505050905001995050505050505050505060405180910390f35b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614156105475760008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a160019150506105b4565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a16105b5565b5b919050565b6000806000905060008090505b60018001805490508110156106575760018001818154811015156105e757fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561064a57600191505b80806001019150506105c7565b508015610989573073ffffffffffffffffffffffffffffffffffffffff16318311156106ee577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa6040518080602001828103825260188152602001807fe59088e7baa6e4b8ade79a84e4bd99e9a29de4b88de8b6b3000000000000000081525060200191505060405180910390a160009150610984565b6106f784610dbe565b151561076e577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa6040518080602001828103825260208152602001807fe8a681e8bdace8b4a6e79a84e59cb0e59d80e4b88de698af70726f766964657281525060200191505060405180910390a160009150610984565b6000600a8481151561077c57fe5b0490508473ffffffffffffffffffffffffffffffffffffffff166108fc600983029081150290604051600060405180830381858888f193505050501580156107c8573d6000803e3d6000fd5b50600981028573ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f1569130f5bdbde161a213db1c477e4f2670f09e2a9c1c08ca9bafe749b80cb4160405160405180910390a460006001800180549050905060008090505b8181101561097c57600180018181548110151561085257fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166108fc83858115156108a157fe5b049081150290604051600060405180830381858888f193505050501580156108cd573d6000803e3d6000fd5b5081838115156108d957fe5b0460018001828154811015156108eb57fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167faa4c66f6ddfadc835acfabab55148a78bc3e6867ed1cdb36461a10685af4c0c360405160405180910390a48080600101915050610839565b506001935050505b6109f7565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600f8152602001807fe4bda0e4b88de698af6b6565706572000000000000000000000000000000000081525060200191505060405180910390a1506109f9565b505b92915050565b60008173ffffffffffffffffffffffffffffffffffffffff166108fc349081150290604051600060405180830381858888f19350505050158015610a47573d6000803e3d6000fd5b50348273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f412887bd474e56e243eb289e55bd2cc3fb5023d072e45e9541a3963107e3fe7c60405160405180910390a460019050919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161415610bd25760008090505b8251811015610bc85760016002018382815181101515610b4e57fe5b9060200190602002015190806001815401808255809150509060018203906000526020600020016000909192909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550508080600101915050610b32565b5060019050610c3f565b7f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600e8152602001807fe4bda0e4b88de698af6f776e657200000000000000000000000000000000000081525060200191505060405180910390a1610c40565b5b919050565b6000606080600080600080600160000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1660018001600160020160016003015460016004015460016005015460016006015485805480602002602001604051908101604052809291908181526020018280548015610d1857602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019060010190808311610cce575b5050505050955084805480602002602001604051908101604052809291908181526020018280548015610da057602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019060010190808311610d56575b50505050509450965096509650965096509650965090919293949596565b6000806000905060008090505b600160020180549050811015610e6157600160020181815481101515610ded57fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff161415610e545760019150610e61565b8080600101915050610dcb565b508091505091905056fea165627a7a7230582005288cf7cb440a58047bf896e488c1c075ff70756a15fa54f9198a1198e41dc00029`
+var UpKeepingBin = "0x60806040819052600a80546001600160a01b03191673e0f6a00fb23458731a5c73a02a36f1df2305090b17905562001591388190039081908339810160408190526200004b9162000236565b60008054336001600160a01b031991821617909155600180549091166001600160a01b038816179055845162000089906002906020880190620000ed565b5083516200009f906003906020870190620000ed565b506004839055600582905560068190554260078190556008556040517f0905316f7faca135c292b6e6f8d91c19128d372722215fe029e74e75ef84c08790600090a1505050505050620002e7565b82805482825590600052602060002090810192821562000145579160200282015b828111156200014557825182546001600160a01b0319166001600160a01b039091161782556020909201916001909101906200010e565b506200015392915062000157565b5090565b6200017e91905b80821115620001535780546001600160a01b03191681556001016200015e565b90565b80516200018e81620002ce565b92915050565b600082601f830112620001a5578081fd5b81516001600160401b0380821115620001bc578283fd5b602080830260405182828201018181108582111715620001da578687fd5b604052848152945081850192508582018187018301881015620001fc57600080fd5b600091505b848210156200022b5762000216888262000181565b84529282019260019190910190820162000201565b505050505092915050565b60008060008060008060c087890312156200024f578182fd5b86516200025c81620002ce565b60208801519096506001600160401b038082111562000279578384fd5b620002878a838b0162000194565b965060408901519150808211156200029d578384fd5b50620002ac89828a0162000194565b945050606087015192506080870151915060a087015190509295509295509295565b6001600160a01b0381168114620002e457600080fd5b50565b61129a80620002f76000396000f3fe6080604052600436106100745760003560e01c8063a27aebbc1161004e578063a27aebbc146100ef578063c08081031461010f578063d063e7331461012f578063d36dedd2146101425761007b565b80630ca05f9f146100805780632b68b9c6146100b6578063893d20e8146100cd5761007b565b3661007b57005b600080fd5b34801561008c57600080fd5b506100a061009b366004610c3c565b61016c565b6040516100ad9190611005565b60405180910390f35b3480156100c257600080fd5b506100cb610204565b005b3480156100d957600080fd5b506100e2610245565b6040516100ad9190610f27565b3480156100fb57600080fd5b506100cb61010a366004610e0a565b610254565b34801561011b57600080fd5b506100a061012a366004610d6f565b610289565b6100cb61013d366004610c7b565b6103b2565b34801561014e57600080fd5b506101576108e2565b6040516100ad99989796959493929190610f55565b600080546001600160a01b031633146101a05760405162461bcd60e51b8152600401610197906110be565b60405180910390fd5b600080546001600160a01b038481166001600160a01b03198316179092556040519116907f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90906101f39083908690610f3b565b60405180910390a150600192915050565b600061020e610245565b6004546007549192506002020142116102395760405162461bcd60e51b8152600401610197906110eb565b806001600160a01b0316ff5b6000546001600160a01b031690565b6000546001600160a01b0316331461027e5760405162461bcd60e51b8152600401610197906110be565b600480549091019055565b600080610294610245565b9050336001600160a01b038216148015906102b557506102b333610a92565b155b156102d25760405162461bcd60e51b815260040161019790611113565b60005b83518110156103a8576102fa8482815181106102ed57fe5b6020026020010151610ae6565b15610304576103a0565b600160020184828151811061031557fe5b60209081029190910181015182546001810184556000938452919092200180546001600160a01b0319166001600160a01b03909216919091179055835133907fa35ad2ad5abe8a31481d418a51abda97be91ba2616927300d0b75a0c340e33079086908490811061038257fe5b60200260200101516040516103979190610f27565b60405180910390a25b6001016102d5565b5060019392505050565b6103bb33610a92565b6103d75760405162461bcd60e51b815260040161019790611172565b854710156103f75760405162461bcd60e51b8152600401610197906111a0565b60085485146104185760405162461bcd60e51b815260040161019790611095565b61042187610ae6565b61043d5760405162461bcd60e51b81526004016101979061106b565b6004546007540185850111156104655760405162461bcd60e51b8152600401610197906111ce565b6000308887878a88886040516020016104849796959493929190610ead565b60408051601f198184030181529190528051602090910120600254835191925060009182805b8281101561058b57600a5487516001600160a01b03909116906319045a259088908a90859081106104d757fe5b60200260200101516040518363ffffffff1660e01b81526004016104fc929190611010565b60206040518083038186803b15801561051457600080fd5b505afa158015610528573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525061054c9190810190610c5f565b915060018001818154811061055d57fe5b6000918252602090912001546001600160a01b0383811691161415610583576001909401935b6001016104aa565b50600360028402048410156105b25760405162461bcd60e51b81526004016101979061113b565b898901600855604051600a8c04906001600160a01b038e16906009830280156108fc02916000818181858888f193505050501580156105f5573d6000803e3d6000fd5b508c6001600160a01b0316336001600160a01b03167f1569130f5bdbde161a213db1c477e4f2670f09e2a9c1c08ca9bafe749b80cb418360090260405161063c91906111fc565b60405180910390a360005b8481101561077457600280548290811061065d57fe5b60009182526020909120015489516001600160a01b03909116906108fc908b908890811061068757fe5b60200260200101518b848151811061069b57fe5b60200260200101518502816106ac57fe5b049081150290604051600060405180830381858888f193505050501580156106d8573d6000803e3d6000fd5b5060028054829081106106e757fe5b60009182526020909120015489516001600160a01b039091169033907faa4c66f6ddfadc835acfabab55148a78bc3e6867ed1cdb36461a10685af4c0c3908c908990811061073157fe5b60200260200101518c858151811061074557fe5b602002602001015186028161075657fe5b0460405161076491906111fc565b60405180910390a3600101610647565b5061077d610b33565b50506040805160c0810182529a8b5260208b01998a528a019a8b52505033606089019081526001600160a01b039a8b1660808a0190815260a08a019788526009805460018101825560009190915299516006909a027f6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7af81019a909a5597517f6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7b08a015598517f6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7b1890155505095517f6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7b2860180549189166001600160a01b031992831617905593517f6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7b38601805491909816941693909317909555517f6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7b490920191909155505050565b60015460045460055460065460075460085460028054604080516020808402820181019092528281526000996060998a998c998a998a998a998e998b996001600160a01b0390981698919760039796959493600993909290918a919083018282801561097757602002820191906000526020600020905b81546001600160a01b03168152600190910190602001808311610959575b50505050509750868054806020026020016040519081016040528092919081815260200182805480156109d357602002820191906000526020600020905b81546001600160a01b031681526001909101906020018083116109b5575b5050505050965081805480602002602001604051908101604052809291908181526020016000905b82821015610a6f5760008481526020908190206040805160c08101825260068602909201805483526001808201548486015260028201549284019290925260038101546001600160a01b03908116606085015260048201541660808401526005015460a083015290835290920191016109fb565b505050509150985098509850985098509850985098509850909192939495969798565b600080805b600254811015610adf576002805482908110610aaf57fe5b6000918252602090912001546001600160a01b0385811691161415610ad75760019150610adf565b600101610a97565b5092915050565b600080805b600354811015610adf576003805482908110610b0357fe5b6000918252602090912001546001600160a01b0385811691161415610b2b5760019150610adf565b600101610aeb565b6040805160c081018252600080825260208201819052918101829052606081018290526080810182905260a081019190915290565b8035610b738161124c565b92915050565b6000601f8381840112610b8a578182fd5b8235610b9d610b988261122c565b611205565b818152925060208084019085810160005b84811015610c30578135880189603f820112610bc957600080fd5b8381013567ffffffffffffffff811115610be257600080fd5b610bf3818901601f19168601611205565b81815260408c81848601011115610c0957600080fd5b82818501888401375060009181018601919091528552509282019290820190600101610bae565b50505050505092915050565b600060208284031215610c4d578081fd5b8135610c588161124c565b9392505050565b600060208284031215610c70578081fd5b8151610c588161124c565b600080600080600080600060e0888a031215610c95578283fd5b8735610ca08161124c565b9650602088810135965060408901359550606089013594506080890135935060a089013567ffffffffffffffff80821115610cd9578485fd5b818b018c601f820112610cea578586fd5b80359250610cfa610b988461122c565b8084825285820191508583018f878888028601011115610d18578889fd5b8893505b85841015610d3a578035835260019390930192918601918601610d1c565b509650505060c08b0135925080831115610d52578384fd5b5050610d608a828b01610b79565b91505092959891949750929550565b60006020808385031215610d81578182fd5b823567ffffffffffffffff811115610d97578283fd5b80840185601f820112610da8578384fd5b80359150610db8610b988361122c565b8281528381019082850185850284018601891015610dd4578687fd5b8693505b84841015610dfe57610dea8982610b68565b835260019390930192918501918501610dd8565b50979650505050505050565b600060208284031215610e1b578081fd5b5035919050565b6000815180845260208085019450808401835b83811015610e5a5781516001600160a01b031687529582019590820190600101610e35565b509495945050505050565b805182526020810151602083015260408101516040830152606081015160018060a01b038082166060850152806080840151166080850152505060a081015160a08301525050565b60006bffffffffffffffffffffffff19808a60601b168352808960601b1660148401525086602883015285604883015284606883015283608883015260a8820183518191506020808601845b83811015610f1557815185529382019390820190600101610ef9565b50929c9b505050505050505050505050565b6001600160a01b0391909116815260200190565b6001600160a01b0392831681529116602082015260400190565b6001600160a01b038a168152610120602080830182905260009190610f7c8483018d610e22565b8481036040860152610f8e818d610e22565b9250508960608501528860808501528760a085015260c0878186015284830360e086015282875180855283850191508389019450855b81811015610fe757610fd7838751610e65565b9484019491830191600101610fc4565b505080945050505050826101008301529a9950505050505050505050565b901515815260200190565b600083825260206040818401528351806040850152825b8181101561104357858101830151858201606001528201611027565b818111156110545783606083870101525b50601f01601f191692909201606001949350505050565b60208082526010908201526f34b63632b3b0b610383937bb34b232b960811b604082015260600190565b6020808252600f908201526e1a5b1b1959d85b081cdd14dd185c9d608a1b604082015260600190565b6020808252601390820152721bdb9b1e481bdddb995c8818d85b8818d85b1b606a1b604082015260600190565b6020808252600e908201526d054696d65206973206e6f742075760941b604082015260600190565b6020808252600e908201526d34b63632b3b0b61031b0b63632b960911b604082015260600190565b6020808252601c908201527f696e73756666696369656e74206c6567616c207369676e617475726500000000604082015260600190565b6020808252601490820152731bdb9b1e481ad9595c195c8818d85b8818d85b1b60621b604082015260600190565b602080825260149082015273696e73756666696369656e742062616c616e636560601b604082015260600190565b60208082526014908201527373744c656e677468206578636565642074696d6560601b604082015260600190565b90815260200190565b60405181810167ffffffffffffffff8111828210171561122457600080fd5b604052919050565b600067ffffffffffffffff821115611242578081fd5b5060209081020190565b6001600160a01b038116811461126157600080fd5b5056fea26469706673582212208ea767ba6986854f2186bf2dd9bb60ec85aa932fc8c540f3e06d2b9b7cd50f3564736f6c63430006030033"
 
 // DeployUpKeeping deploys a new Ethereum contract, binding an instance of UpKeeping to it.
-func DeployUpKeeping(auth *bind.TransactOpts, backend bind.ContractBackend, user common.Address, keeper []common.Address, provider []common.Address, time *big.Int, size *big.Int, price *big.Int) (common.Address, *types.Transaction, *UpKeeping, error) {
+func DeployUpKeeping(auth *bind.TransactOpts, backend bind.ContractBackend, _query common.Address, _keepers []common.Address, _providers []common.Address, _time *big.Int, _size *big.Int, _price *big.Int) (common.Address, *types.Transaction, *UpKeeping, error) {
 	parsed, err := abi.JSON(strings.NewReader(UpKeepingABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(UpKeepingBin), backend, user, keeper, provider, time, size, price)
+
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(UpKeepingBin), backend, _query, _keepers, _providers, _time, _size, _price)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -190,8 +201,8 @@ func (_UpKeeping *UpKeepingTransactorRaw) Transact(opts *bind.TransactOpts, meth
 
 // GetOrder is a free data retrieval call binding the contract method 0xd36dedd2.
 //
-// Solidity: function getOrder() constant returns(address, address[], address[], uint256, uint256, uint256, uint256)
-func (_UpKeeping *UpKeepingCaller) GetOrder(opts *bind.CallOpts) (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, error) {
+// Solidity: function getOrder() constant returns(address, address[], address[], uint256, uint256, uint256, uint256, []UpKeepingProof, uint256)
+func (_UpKeeping *UpKeepingCaller) GetOrder(opts *bind.CallOpts) (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, []UpKeepingProof, *big.Int, error) {
 	var (
 		ret0 = new(common.Address)
 		ret1 = new([]common.Address)
@@ -200,6 +211,8 @@ func (_UpKeeping *UpKeepingCaller) GetOrder(opts *bind.CallOpts) (common.Address
 		ret4 = new(*big.Int)
 		ret5 = new(*big.Int)
 		ret6 = new(*big.Int)
+		ret7 = new([]UpKeepingProof)
+		ret8 = new(*big.Int)
 	)
 	out := &[]interface{}{
 		ret0,
@@ -209,22 +222,24 @@ func (_UpKeeping *UpKeepingCaller) GetOrder(opts *bind.CallOpts) (common.Address
 		ret4,
 		ret5,
 		ret6,
+		ret7,
+		ret8,
 	}
 	err := _UpKeeping.contract.Call(opts, out, "getOrder")
-	return *ret0, *ret1, *ret2, *ret3, *ret4, *ret5, *ret6, err
+	return *ret0, *ret1, *ret2, *ret3, *ret4, *ret5, *ret6, *ret7, *ret8, err
 }
 
 // GetOrder is a free data retrieval call binding the contract method 0xd36dedd2.
 //
-// Solidity: function getOrder() constant returns(address, address[], address[], uint256, uint256, uint256, uint256)
-func (_UpKeeping *UpKeepingSession) GetOrder() (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, error) {
+// Solidity: function getOrder() constant returns(address, address[], address[], uint256, uint256, uint256, uint256, []UpKeepingProof, uint256)
+func (_UpKeeping *UpKeepingSession) GetOrder() (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, []UpKeepingProof, *big.Int, error) {
 	return _UpKeeping.Contract.GetOrder(&_UpKeeping.CallOpts)
 }
 
 // GetOrder is a free data retrieval call binding the contract method 0xd36dedd2.
 //
-// Solidity: function getOrder() constant returns(address, address[], address[], uint256, uint256, uint256, uint256)
-func (_UpKeeping *UpKeepingCallerSession) GetOrder() (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, error) {
+// Solidity: function getOrder() constant returns(address, address[], address[], uint256, uint256, uint256, uint256, []UpKeepingProof, uint256)
+func (_UpKeeping *UpKeepingCallerSession) GetOrder() (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, []UpKeepingProof, *big.Int, error) {
 	return _UpKeeping.Contract.GetOrder(&_UpKeeping.CallOpts)
 }
 
@@ -256,23 +271,23 @@ func (_UpKeeping *UpKeepingCallerSession) GetOwner() (common.Address, error) {
 
 // AddProvider is a paid mutator transaction binding the contract method 0xc0808103.
 //
-// Solidity: function addProvider(address[] provider) returns(bool)
-func (_UpKeeping *UpKeepingTransactor) AddProvider(opts *bind.TransactOpts, provider []common.Address) (*types.Transaction, error) {
-	return _UpKeeping.contract.Transact(opts, "addProvider", provider)
+// Solidity: function addProvider(address[] _providers) returns(bool)
+func (_UpKeeping *UpKeepingTransactor) AddProvider(opts *bind.TransactOpts, _providers []common.Address) (*types.Transaction, error) {
+	return _UpKeeping.contract.Transact(opts, "addProvider", _providers)
 }
 
 // AddProvider is a paid mutator transaction binding the contract method 0xc0808103.
 //
-// Solidity: function addProvider(address[] provider) returns(bool)
-func (_UpKeeping *UpKeepingSession) AddProvider(provider []common.Address) (*types.Transaction, error) {
-	return _UpKeeping.Contract.AddProvider(&_UpKeeping.TransactOpts, provider)
+// Solidity: function addProvider(address[] _providers) returns(bool)
+func (_UpKeeping *UpKeepingSession) AddProvider(_providers []common.Address) (*types.Transaction, error) {
+	return _UpKeeping.Contract.AddProvider(&_UpKeeping.TransactOpts, _providers)
 }
 
 // AddProvider is a paid mutator transaction binding the contract method 0xc0808103.
 //
-// Solidity: function addProvider(address[] provider) returns(bool)
-func (_UpKeeping *UpKeepingTransactorSession) AddProvider(provider []common.Address) (*types.Transaction, error) {
-	return _UpKeeping.Contract.AddProvider(&_UpKeeping.TransactOpts, provider)
+// Solidity: function addProvider(address[] _providers) returns(bool)
+func (_UpKeeping *UpKeepingTransactorSession) AddProvider(_providers []common.Address) (*types.Transaction, error) {
+	return _UpKeeping.Contract.AddProvider(&_UpKeeping.TransactOpts, _providers)
 }
 
 // AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
@@ -296,46 +311,67 @@ func (_UpKeeping *UpKeepingTransactorSession) AlterOwner(newOwner common.Address
 	return _UpKeeping.Contract.AlterOwner(&_UpKeeping.TransactOpts, newOwner)
 }
 
-// ReadPay is a paid mutator transaction binding the contract method 0x2eb0346f.
+// Destruct is a paid mutator transaction binding the contract method 0x2b68b9c6.
 //
-// Solidity: function readPay(address provider) returns(bool)
-func (_UpKeeping *UpKeepingTransactor) ReadPay(opts *bind.TransactOpts, provider common.Address) (*types.Transaction, error) {
-	return _UpKeeping.contract.Transact(opts, "readPay", provider)
+// Solidity: function destruct() returns()
+func (_UpKeeping *UpKeepingTransactor) Destruct(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _UpKeeping.contract.Transact(opts, "destruct")
 }
 
-// ReadPay is a paid mutator transaction binding the contract method 0x2eb0346f.
+// Destruct is a paid mutator transaction binding the contract method 0x2b68b9c6.
 //
-// Solidity: function readPay(address provider) returns(bool)
-func (_UpKeeping *UpKeepingSession) ReadPay(provider common.Address) (*types.Transaction, error) {
-	return _UpKeeping.Contract.ReadPay(&_UpKeeping.TransactOpts, provider)
+// Solidity: function destruct() returns()
+func (_UpKeeping *UpKeepingSession) Destruct() (*types.Transaction, error) {
+	return _UpKeeping.Contract.Destruct(&_UpKeeping.TransactOpts)
 }
 
-// ReadPay is a paid mutator transaction binding the contract method 0x2eb0346f.
+// Destruct is a paid mutator transaction binding the contract method 0x2b68b9c6.
 //
-// Solidity: function readPay(address provider) returns(bool)
-func (_UpKeeping *UpKeepingTransactorSession) ReadPay(provider common.Address) (*types.Transaction, error) {
-	return _UpKeeping.Contract.ReadPay(&_UpKeeping.TransactOpts, provider)
+// Solidity: function destruct() returns()
+func (_UpKeeping *UpKeepingTransactorSession) Destruct() (*types.Transaction, error) {
+	return _UpKeeping.Contract.Destruct(&_UpKeeping.TransactOpts)
 }
 
-// SpaceTimePay is a paid mutator transaction binding the contract method 0x1e042234.
+// ExtendTime is a paid mutator transaction binding the contract method 0xa27aebbc.
 //
-// Solidity: function spaceTimePay(address provider, uint256 money) returns(bool)
-func (_UpKeeping *UpKeepingTransactor) SpaceTimePay(opts *bind.TransactOpts, provider common.Address, money *big.Int) (*types.Transaction, error) {
-	return _UpKeeping.contract.Transact(opts, "spaceTimePay", provider, money)
+// Solidity: function extendTime(uint256 addTime) returns()
+func (_UpKeeping *UpKeepingTransactor) ExtendTime(opts *bind.TransactOpts, addTime *big.Int) (*types.Transaction, error) {
+	return _UpKeeping.contract.Transact(opts, "extendTime", addTime)
 }
 
-// SpaceTimePay is a paid mutator transaction binding the contract method 0x1e042234.
+// ExtendTime is a paid mutator transaction binding the contract method 0xa27aebbc.
 //
-// Solidity: function spaceTimePay(address provider, uint256 money) returns(bool)
-func (_UpKeeping *UpKeepingSession) SpaceTimePay(provider common.Address, money *big.Int) (*types.Transaction, error) {
-	return _UpKeeping.Contract.SpaceTimePay(&_UpKeeping.TransactOpts, provider, money)
+// Solidity: function extendTime(uint256 addTime) returns()
+func (_UpKeeping *UpKeepingSession) ExtendTime(addTime *big.Int) (*types.Transaction, error) {
+	return _UpKeeping.Contract.ExtendTime(&_UpKeeping.TransactOpts, addTime)
 }
 
-// SpaceTimePay is a paid mutator transaction binding the contract method 0x1e042234.
+// ExtendTime is a paid mutator transaction binding the contract method 0xa27aebbc.
 //
-// Solidity: function spaceTimePay(address provider, uint256 money) returns(bool)
-func (_UpKeeping *UpKeepingTransactorSession) SpaceTimePay(provider common.Address, money *big.Int) (*types.Transaction, error) {
-	return _UpKeeping.Contract.SpaceTimePay(&_UpKeeping.TransactOpts, provider, money)
+// Solidity: function extendTime(uint256 addTime) returns()
+func (_UpKeeping *UpKeepingTransactorSession) ExtendTime(addTime *big.Int) (*types.Transaction, error) {
+	return _UpKeeping.Contract.ExtendTime(&_UpKeeping.TransactOpts, addTime)
+}
+
+// SpaceTimePay is a paid mutator transaction binding the contract method 0xd063e733.
+//
+// Solidity: function spaceTimePay(address _provider, uint256 _stValue, uint256 _stStart, uint256 _stLength, bytes32 _merkle_root, uint256[] share, bytes[] sign) returns()
+func (_UpKeeping *UpKeepingTransactor) SpaceTimePay(opts *bind.TransactOpts, _provider common.Address, _stValue *big.Int, _stStart *big.Int, _stLength *big.Int, _merkle_root [32]byte, share []*big.Int, sign [][]byte) (*types.Transaction, error) {
+	return _UpKeeping.contract.Transact(opts, "spaceTimePay", _provider, _stValue, _stStart, _stLength, _merkle_root, share, sign)
+}
+
+// SpaceTimePay is a paid mutator transaction binding the contract method 0xd063e733.
+//
+// Solidity: function spaceTimePay(address _provider, uint256 _stValue, uint256 _stStart, uint256 _stLength, bytes32 _merkle_root, uint256[] share, bytes[] sign) returns()
+func (_UpKeeping *UpKeepingSession) SpaceTimePay(_provider common.Address, _stValue *big.Int, _stStart *big.Int, _stLength *big.Int, _merkle_root [32]byte, share []*big.Int, sign [][]byte) (*types.Transaction, error) {
+	return _UpKeeping.Contract.SpaceTimePay(&_UpKeeping.TransactOpts, _provider, _stValue, _stStart, _stLength, _merkle_root, share, sign)
+}
+
+// SpaceTimePay is a paid mutator transaction binding the contract method 0xd063e733.
+//
+// Solidity: function spaceTimePay(address _provider, uint256 _stValue, uint256 _stStart, uint256 _stLength, bytes32 _merkle_root, uint256[] share, bytes[] sign) returns()
+func (_UpKeeping *UpKeepingTransactorSession) SpaceTimePay(_provider common.Address, _stValue *big.Int, _stStart *big.Int, _stLength *big.Int, _merkle_root [32]byte, share []*big.Int, sign [][]byte) (*types.Transaction, error) {
+	return _UpKeeping.Contract.SpaceTimePay(&_UpKeeping.TransactOpts, _provider, _stValue, _stStart, _stLength, _merkle_root, share, sign)
 }
 
 // UpKeepingAddOrderIterator is returned from FilterAddOrder and is used to iterate over the raw logs and unpacked data for AddOrder events raised by the UpKeeping contract.
@@ -457,6 +493,161 @@ func (_UpKeeping *UpKeepingFilterer) WatchAddOrder(opts *bind.WatchOpts, sink ch
 			}
 		}
 	}), nil
+}
+
+// ParseAddOrder is a log parse operation binding the contract event 0x0905316f7faca135c292b6e6f8d91c19128d372722215fe029e74e75ef84c087.
+//
+// Solidity: event AddOrder()
+func (_UpKeeping *UpKeepingFilterer) ParseAddOrder(log types.Log) (*UpKeepingAddOrder, error) {
+	event := new(UpKeepingAddOrder)
+	if err := _UpKeeping.contract.UnpackLog(event, "AddOrder", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
+// UpKeepingAddProviderIterator is returned from FilterAddProvider and is used to iterate over the raw logs and unpacked data for AddProvider events raised by the UpKeeping contract.
+type UpKeepingAddProviderIterator struct {
+	Event *UpKeepingAddProvider // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *UpKeepingAddProviderIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(UpKeepingAddProvider)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(UpKeepingAddProvider)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *UpKeepingAddProviderIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *UpKeepingAddProviderIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// UpKeepingAddProvider represents a AddProvider event raised by the UpKeeping contract.
+type UpKeepingAddProvider struct {
+	From     common.Address
+	Provider common.Address
+	Raw      types.Log // Blockchain specific contextual infos
+}
+
+// FilterAddProvider is a free log retrieval operation binding the contract event 0xa35ad2ad5abe8a31481d418a51abda97be91ba2616927300d0b75a0c340e3307.
+//
+// Solidity: event AddProvider(address indexed from, address provider)
+func (_UpKeeping *UpKeepingFilterer) FilterAddProvider(opts *bind.FilterOpts, from []common.Address) (*UpKeepingAddProviderIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+
+	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "AddProvider", fromRule)
+	if err != nil {
+		return nil, err
+	}
+	return &UpKeepingAddProviderIterator{contract: _UpKeeping.contract, event: "AddProvider", logs: logs, sub: sub}, nil
+}
+
+// WatchAddProvider is a free log subscription operation binding the contract event 0xa35ad2ad5abe8a31481d418a51abda97be91ba2616927300d0b75a0c340e3307.
+//
+// Solidity: event AddProvider(address indexed from, address provider)
+func (_UpKeeping *UpKeepingFilterer) WatchAddProvider(opts *bind.WatchOpts, sink chan<- *UpKeepingAddProvider, from []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+
+	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "AddProvider", fromRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(UpKeepingAddProvider)
+				if err := _UpKeeping.contract.UnpackLog(event, "AddProvider", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseAddProvider is a log parse operation binding the contract event 0xa35ad2ad5abe8a31481d418a51abda97be91ba2616927300d0b75a0c340e3307.
+//
+// Solidity: event AddProvider(address indexed from, address provider)
+func (_UpKeeping *UpKeepingFilterer) ParseAddProvider(log types.Log) (*UpKeepingAddProvider, error) {
+	event := new(UpKeepingAddProvider)
+	if err := _UpKeeping.contract.UnpackLog(event, "AddProvider", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 // UpKeepingAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the UpKeeping contract.
@@ -582,126 +773,15 @@ func (_UpKeeping *UpKeepingFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink 
 	}), nil
 }
 
-// UpKeepingErrorIterator is returned from FilterError and is used to iterate over the raw logs and unpacked data for Error events raised by the UpKeeping contract.
-type UpKeepingErrorIterator struct {
-	Event *UpKeepingError // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *UpKeepingErrorIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(UpKeepingError)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(UpKeepingError)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *UpKeepingErrorIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *UpKeepingErrorIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// UpKeepingError represents a Error event raised by the UpKeeping contract.
-type UpKeepingError struct {
-	Data string
-	Raw  types.Log // Blockchain specific contextual infos
-}
-
-// FilterError is a free log retrieval operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+// ParseAlterOwner is a log parse operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event Error(string data)
-func (_UpKeeping *UpKeepingFilterer) FilterError(opts *bind.FilterOpts) (*UpKeepingErrorIterator, error) {
-
-	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "Error")
-	if err != nil {
+// Solidity: event AlterOwner(address from, address to)
+func (_UpKeeping *UpKeepingFilterer) ParseAlterOwner(log types.Log) (*UpKeepingAlterOwner, error) {
+	event := new(UpKeepingAlterOwner)
+	if err := _UpKeeping.contract.UnpackLog(event, "AlterOwner", log); err != nil {
 		return nil, err
 	}
-	return &UpKeepingErrorIterator{contract: _UpKeeping.contract, event: "Error", logs: logs, sub: sub}, nil
-}
-
-// WatchError is a free log subscription operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
-//
-// Solidity: event Error(string data)
-func (_UpKeeping *UpKeepingFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *UpKeepingError) (event.Subscription, error) {
-
-	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "Error")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(UpKeepingError)
-				if err := _UpKeeping.contract.UnpackLog(event, "Error", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
+	return event, nil
 }
 
 // UpKeepingPayKeeperIterator is returned from FilterPayKeeper and is used to iterate over the raw logs and unpacked data for PayKeeper events raised by the UpKeeping contract.
@@ -781,8 +861,8 @@ type UpKeepingPayKeeper struct {
 
 // FilterPayKeeper is a free log retrieval operation binding the contract event 0xaa4c66f6ddfadc835acfabab55148a78bc3e6867ed1cdb36461a10685af4c0c3.
 //
-// Solidity: event PayKeeper(address indexed from, address indexed to, uint256 indexed value)
-func (_UpKeeping *UpKeepingFilterer) FilterPayKeeper(opts *bind.FilterOpts, from []common.Address, to []common.Address, value []*big.Int) (*UpKeepingPayKeeperIterator, error) {
+// Solidity: event PayKeeper(address indexed from, address indexed to, uint256 value)
+func (_UpKeeping *UpKeepingFilterer) FilterPayKeeper(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*UpKeepingPayKeeperIterator, error) {
 
 	var fromRule []interface{}
 	for _, fromItem := range from {
@@ -792,12 +872,8 @@ func (_UpKeeping *UpKeepingFilterer) FilterPayKeeper(opts *bind.FilterOpts, from
 	for _, toItem := range to {
 		toRule = append(toRule, toItem)
 	}
-	var valueRule []interface{}
-	for _, valueItem := range value {
-		valueRule = append(valueRule, valueItem)
-	}
 
-	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "PayKeeper", fromRule, toRule, valueRule)
+	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "PayKeeper", fromRule, toRule)
 	if err != nil {
 		return nil, err
 	}
@@ -806,8 +882,8 @@ func (_UpKeeping *UpKeepingFilterer) FilterPayKeeper(opts *bind.FilterOpts, from
 
 // WatchPayKeeper is a free log subscription operation binding the contract event 0xaa4c66f6ddfadc835acfabab55148a78bc3e6867ed1cdb36461a10685af4c0c3.
 //
-// Solidity: event PayKeeper(address indexed from, address indexed to, uint256 indexed value)
-func (_UpKeeping *UpKeepingFilterer) WatchPayKeeper(opts *bind.WatchOpts, sink chan<- *UpKeepingPayKeeper, from []common.Address, to []common.Address, value []*big.Int) (event.Subscription, error) {
+// Solidity: event PayKeeper(address indexed from, address indexed to, uint256 value)
+func (_UpKeeping *UpKeepingFilterer) WatchPayKeeper(opts *bind.WatchOpts, sink chan<- *UpKeepingPayKeeper, from []common.Address, to []common.Address) (event.Subscription, error) {
 
 	var fromRule []interface{}
 	for _, fromItem := range from {
@@ -817,12 +893,8 @@ func (_UpKeeping *UpKeepingFilterer) WatchPayKeeper(opts *bind.WatchOpts, sink c
 	for _, toItem := range to {
 		toRule = append(toRule, toItem)
 	}
-	var valueRule []interface{}
-	for _, valueItem := range value {
-		valueRule = append(valueRule, valueItem)
-	}
 
-	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "PayKeeper", fromRule, toRule, valueRule)
+	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "PayKeeper", fromRule, toRule)
 	if err != nil {
 		return nil, err
 	}
@@ -852,6 +924,17 @@ func (_UpKeeping *UpKeepingFilterer) WatchPayKeeper(opts *bind.WatchOpts, sink c
 			}
 		}
 	}), nil
+}
+
+// ParsePayKeeper is a log parse operation binding the contract event 0xaa4c66f6ddfadc835acfabab55148a78bc3e6867ed1cdb36461a10685af4c0c3.
+//
+// Solidity: event PayKeeper(address indexed from, address indexed to, uint256 value)
+func (_UpKeeping *UpKeepingFilterer) ParsePayKeeper(log types.Log) (*UpKeepingPayKeeper, error) {
+	event := new(UpKeepingPayKeeper)
+	if err := _UpKeeping.contract.UnpackLog(event, "PayKeeper", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 // UpKeepingPayProviderIterator is returned from FilterPayProvider and is used to iterate over the raw logs and unpacked data for PayProvider events raised by the UpKeeping contract.
@@ -931,8 +1014,8 @@ type UpKeepingPayProvider struct {
 
 // FilterPayProvider is a free log retrieval operation binding the contract event 0x1569130f5bdbde161a213db1c477e4f2670f09e2a9c1c08ca9bafe749b80cb41.
 //
-// Solidity: event PayProvider(address indexed from, address indexed to, uint256 indexed value)
-func (_UpKeeping *UpKeepingFilterer) FilterPayProvider(opts *bind.FilterOpts, from []common.Address, to []common.Address, value []*big.Int) (*UpKeepingPayProviderIterator, error) {
+// Solidity: event PayProvider(address indexed from, address indexed to, uint256 value)
+func (_UpKeeping *UpKeepingFilterer) FilterPayProvider(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*UpKeepingPayProviderIterator, error) {
 
 	var fromRule []interface{}
 	for _, fromItem := range from {
@@ -942,12 +1025,8 @@ func (_UpKeeping *UpKeepingFilterer) FilterPayProvider(opts *bind.FilterOpts, fr
 	for _, toItem := range to {
 		toRule = append(toRule, toItem)
 	}
-	var valueRule []interface{}
-	for _, valueItem := range value {
-		valueRule = append(valueRule, valueItem)
-	}
 
-	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "PayProvider", fromRule, toRule, valueRule)
+	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "PayProvider", fromRule, toRule)
 	if err != nil {
 		return nil, err
 	}
@@ -956,8 +1035,8 @@ func (_UpKeeping *UpKeepingFilterer) FilterPayProvider(opts *bind.FilterOpts, fr
 
 // WatchPayProvider is a free log subscription operation binding the contract event 0x1569130f5bdbde161a213db1c477e4f2670f09e2a9c1c08ca9bafe749b80cb41.
 //
-// Solidity: event PayProvider(address indexed from, address indexed to, uint256 indexed value)
-func (_UpKeeping *UpKeepingFilterer) WatchPayProvider(opts *bind.WatchOpts, sink chan<- *UpKeepingPayProvider, from []common.Address, to []common.Address, value []*big.Int) (event.Subscription, error) {
+// Solidity: event PayProvider(address indexed from, address indexed to, uint256 value)
+func (_UpKeeping *UpKeepingFilterer) WatchPayProvider(opts *bind.WatchOpts, sink chan<- *UpKeepingPayProvider, from []common.Address, to []common.Address) (event.Subscription, error) {
 
 	var fromRule []interface{}
 	for _, fromItem := range from {
@@ -967,12 +1046,8 @@ func (_UpKeeping *UpKeepingFilterer) WatchPayProvider(opts *bind.WatchOpts, sink
 	for _, toItem := range to {
 		toRule = append(toRule, toItem)
 	}
-	var valueRule []interface{}
-	for _, valueItem := range value {
-		valueRule = append(valueRule, valueItem)
-	}
 
-	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "PayProvider", fromRule, toRule, valueRule)
+	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "PayProvider", fromRule, toRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1004,152 +1079,13 @@ func (_UpKeeping *UpKeepingFilterer) WatchPayProvider(opts *bind.WatchOpts, sink
 	}), nil
 }
 
-// UpKeepingReadPayIterator is returned from FilterReadPay and is used to iterate over the raw logs and unpacked data for ReadPay events raised by the UpKeeping contract.
-type UpKeepingReadPayIterator struct {
-	Event *UpKeepingReadPay // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *UpKeepingReadPayIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(UpKeepingReadPay)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(UpKeepingReadPay)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *UpKeepingReadPayIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *UpKeepingReadPayIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// UpKeepingReadPay represents a ReadPay event raised by the UpKeeping contract.
-type UpKeepingReadPay struct {
-	User     common.Address
-	Provider common.Address
-	Value    *big.Int
-	Raw      types.Log // Blockchain specific contextual infos
-}
-
-// FilterReadPay is a free log retrieval operation binding the contract event 0x412887bd474e56e243eb289e55bd2cc3fb5023d072e45e9541a3963107e3fe7c.
+// ParsePayProvider is a log parse operation binding the contract event 0x1569130f5bdbde161a213db1c477e4f2670f09e2a9c1c08ca9bafe749b80cb41.
 //
-// Solidity: event ReadPay(address indexed user, address indexed provider, uint256 indexed value)
-func (_UpKeeping *UpKeepingFilterer) FilterReadPay(opts *bind.FilterOpts, user []common.Address, provider []common.Address, value []*big.Int) (*UpKeepingReadPayIterator, error) {
-
-	var userRule []interface{}
-	for _, userItem := range user {
-		userRule = append(userRule, userItem)
-	}
-	var providerRule []interface{}
-	for _, providerItem := range provider {
-		providerRule = append(providerRule, providerItem)
-	}
-	var valueRule []interface{}
-	for _, valueItem := range value {
-		valueRule = append(valueRule, valueItem)
-	}
-
-	logs, sub, err := _UpKeeping.contract.FilterLogs(opts, "ReadPay", userRule, providerRule, valueRule)
-	if err != nil {
+// Solidity: event PayProvider(address indexed from, address indexed to, uint256 value)
+func (_UpKeeping *UpKeepingFilterer) ParsePayProvider(log types.Log) (*UpKeepingPayProvider, error) {
+	event := new(UpKeepingPayProvider)
+	if err := _UpKeeping.contract.UnpackLog(event, "PayProvider", log); err != nil {
 		return nil, err
 	}
-	return &UpKeepingReadPayIterator{contract: _UpKeeping.contract, event: "ReadPay", logs: logs, sub: sub}, nil
-}
-
-// WatchReadPay is a free log subscription operation binding the contract event 0x412887bd474e56e243eb289e55bd2cc3fb5023d072e45e9541a3963107e3fe7c.
-//
-// Solidity: event ReadPay(address indexed user, address indexed provider, uint256 indexed value)
-func (_UpKeeping *UpKeepingFilterer) WatchReadPay(opts *bind.WatchOpts, sink chan<- *UpKeepingReadPay, user []common.Address, provider []common.Address, value []*big.Int) (event.Subscription, error) {
-
-	var userRule []interface{}
-	for _, userItem := range user {
-		userRule = append(userRule, userItem)
-	}
-	var providerRule []interface{}
-	for _, providerItem := range provider {
-		providerRule = append(providerRule, providerItem)
-	}
-	var valueRule []interface{}
-	for _, valueItem := range value {
-		valueRule = append(valueRule, valueItem)
-	}
-
-	logs, sub, err := _UpKeeping.contract.WatchLogs(opts, "ReadPay", userRule, providerRule, valueRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(UpKeepingReadPay)
-				if err := _UpKeeping.contract.UnpackLog(event, "ReadPay", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
+	return event, nil
 }
