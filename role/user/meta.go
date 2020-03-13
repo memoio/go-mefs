@@ -205,9 +205,9 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 					}
 				}
 				if has {
-					utils.MLogger.Info("local fs has contract root")
+					utils.MLogger.Info("local fs has contract merkle root")
 				} else {
-					utils.MLogger.Info("local fs has not contract root")
+					utils.MLogger.Info("local fs has not contract merkle root")
 				}
 			}
 		}
@@ -290,7 +290,13 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 	}
 
 	lroot := l.meta.sb.GetLRoot()[len(l.meta.sb.GetLRoot())-1]
-	broot := lroot.GetBRoots()[bucket.BucketID-1]
+	broot := new(mpb.BucketRoot)
+	if len(lroot.GetBRoots()) < int(bucket.BucketID) {
+		utils.MLogger.Error("Objects in bucket: ", bucket.BucketID, " has inconsistent objects")
+	} else {
+		broot = lroot.GetBRoots()[bucket.BucketID-1]
+	}
+
 	if int64(len(data)) >= objectsBlockSize {
 		data = data[:objectsBlockSize]
 		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
@@ -375,6 +381,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		}
 		ob.Parts = append(ob.Parts, &part)
 		ob.PartCount++
+		ob.ETag = calulateETag(ob)
 		ob.Length += part.Length
 		ob.MTime = part.GetCTime()
 		ob.Unlock()

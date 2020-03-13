@@ -285,20 +285,20 @@ func (l *LfsInfo) genRoot() {
 		var val [32]byte
 		copy(val[:], lr.Root[:32])
 		role.SetMerkleRoot(l.privateKey, l.gInfo.rootID, ctime, val)
-		utils.MLogger.Debugf("set root %d for %s", ctime, l.gInfo.groupID)
+
 		keyTime, res, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
 		if err != nil {
 			return
 		}
 		if keyTime != ctime {
-			utils.MLogger.Debugf("get root expected: %d, but got %d", ctime, keyTime)
+			utils.MLogger.Errorf("get merkle root expected: %d, but got %d", ctime, keyTime)
 		}
 
 		if bytes.Compare(res[:], val[:]) != 0 {
-			utils.MLogger.Debugf("get root expected: %s, but got %d", val, res)
+			utils.MLogger.Errorf("get merkle root expected: %s, but got %d", val, res)
 		}
 
-		utils.MLogger.Infof("ser root: %s success", val)
+		utils.MLogger.Infof("set merkle root %d for %s success", ctime, l.fsID)
 	}
 }
 

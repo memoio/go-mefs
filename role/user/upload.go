@@ -46,7 +46,7 @@ type uploadTask struct { //一个上传任务实例
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
 
-	bucket, object, err := l.getObject(bucketName, objectName, true)
+	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, true)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 // AppendObject constructs upload process
 func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
 	utils.MLogger.Infof("Upload append object: %s to bucket: %s begin", objectName, bucketName)
-	bucket, object, err := l.getObject(bucketName, objectName, false)
+	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName strin
 	return l.addObjectData(ctx, bucket, object, reader)
 }
 
-func (l *LfsInfo) getObject(bucketName, objectName string, creation bool) (*superBucket, *objectInfo, error) {
+func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation bool) (*superBucket, *objectInfo, error) {
 	if !l.online || l.meta.buckets == nil {
 		return nil, nil, ErrLfsServiceNotReady
 	}
