@@ -513,11 +513,11 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if err != nil {
 			availTim = time.Unix(0, 0)
 		}
-		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:           object.OPart.GetName(),
-			Size:           object.OPart.GetLength(),
-			MD5:            object.OPart.GetETag(),
+			Name:           object.GetInfo().Name,
+			Size:           object.Length,
+			MD5:            object.Parts[0].GetETag(), //需要检查Parts是否为空
 			Ctime:          ctime.Format(utils.SHOWTIME),
 			Dir:            false,
 			LatestChalTime: availTim.Format(utils.SHOWTIME),
@@ -609,11 +609,11 @@ var lfsPutObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:  object.OPart.GetName(),
-			Size:  object.OPart.GetLength(),
-			MD5:   object.OPart.GetETag(),
+			Name:  object.GetInfo().GetName(),
+			Size:  object.GetLength(),
+			MD5:   object.Parts[0].GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}
@@ -825,7 +825,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			Method: "List Objects",
 		}
 		for _, object := range objects {
-			ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
+			ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
@@ -838,9 +838,9 @@ var lfsListObjectsCmd = &cmds.Command{
 				}
 			}
 			tempObState := ObjectStat{
-				Name:           object.OPart.GetName(),
-				Size:           object.OPart.GetLength(),
-				MD5:            object.OPart.GetETag(),
+				Name:           object.GetInfo().GetName(),
+				Size:           object.Parts[0].GetLength(),
+				MD5:            object.Parts[0].GetETag(),
 				Ctime:          ctime.Format(utils.SHOWTIME),
 				Dir:            false,
 				LatestChalTime: avaTime,
@@ -911,11 +911,11 @@ var lfsDeleteObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(object.GetCtime(), 0).In(time.Local)
+		ctime := time.Unix(object.GetInfo().GetCtime(), 0).In(time.Local)
 		objectStat := ObjectStat{
-			Name:  object.OPart.GetName(),
-			Size:  object.OPart.GetLength(),
-			MD5:   object.OPart.GetETag(),
+			Name:  object.GetInfo().GetName(),
+			Size:  object.GetLength(),
+			MD5:   object.Parts[0].GetETag(),
 			Ctime: ctime.Format(utils.SHOWTIME),
 			Dir:   false,
 		}

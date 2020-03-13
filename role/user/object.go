@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -57,11 +58,34 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	object.Lock()
 	defer object.Unlock()
 
+	deleteObject := mpb.DeleteObject{
+		Name:     object.GetInfo().GetName(),
+		ObjectID: object.GetInfo().GetObjectID(),
+		Time:     time.Now().Unix(),
+	}
+
+	payload, _ := proto.Marshal(&deleteObject)
+	op := mpb.OpRecord{
+		OpType:  mpb.LfsOp_OpDelete,
+		OpID:    bucket.GetNextOpID(),
+		Payload: payload,
+	}
+
+	// leaf is OpID + PayLoad
+	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
+	bucket.mtree.Push(tag)
+
+	l.FlushObjectMeta(bucket, false, &op)
+	bucket.NextOpID++
+
 	object.Deletion = true
 	bucket.dirty = true
-	oName := object.GetOPart().Name + "." + strconv.Itoa(int(object.ObjectID))
-	delete(bucket.objects, object.GetOPart().Name)
+	oName := object.Parts[0].GetName() + "." + strconv.Itoa(int(object.GetInfo().ObjectID))
+	delete(bucket.objects, object.Parts[0].GetName())
 	bucket.objects[oName] = object
+
+	//gen_root
+	bucket.Root = bucket.mtree.Root()
 	return &object.ObjectInfo, nil
 }
 
@@ -120,12 +144,12 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 			continue
 		}
 
-		if strings.HasPrefix(object.OPart.Name, prefix) {
+		if strings.HasPrefix(object.GetInfo().GetName(), prefix) {
 			objects = append(objects, &object.ObjectInfo)
 		}
 	}
 	sort.Slice(objects, func(i, j int) bool {
-		return objects[i].OPart.Name < objects[j].OPart.Name
+		return objects[i].GetInfo().GetName() < objects[j].GetInfo().GetName()
 	})
 	return objects, nil
 }
@@ -144,7 +168,7 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 				continue
 			}
 
-			storageSpace += uint64(object.OPart.GetLength())
+			storageSpace += uint64(object.GetLength())
 		}
 		bucket.RUnlock()
 	}
@@ -173,7 +197,7 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 		if object.Deletion {
 			continue
 		}
-		storageSpace += uint64(object.OPart.GetLength())
+		storageSpace += uint64(object.GetLength())
 	}
 	return storageSpace, nil
 }
@@ -213,7 +237,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 // GetObjectAvailTime get available time of objects
 func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
 	latestTime := time.Unix(0, 0)
-	bucketName, ok := l.meta.bucketIDToName[object.BucketID]
+	bucketName, ok := l.meta.bucketIDToName[object.GetInfo().GetBucketID()]
 	if !ok {
 		return latestTime.Format(utils.BASETIME), ErrBucketNotExist
 	}
@@ -227,9 +251,9 @@ func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
 
 	bo := bucket.BOpts
 
-	stripeID := object.OPart.Start / int64(bo.SegmentCount*bo.SegmentSize*bo.DataCount)
+	stripeID := object.Parts[0].GetStart() / int64(bo.SegmentCount*bo.SegmentSize*bo.DataCount)
 
-	bm, err := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(object.BucketID)), strconv.Itoa(int(stripeID)), "")
+	bm, err := metainfo.NewBlockMeta(l.fsID, strconv.Itoa(int(object.GetInfo().GetBucketID())), strconv.Itoa(int(stripeID)), "")
 	if err != nil {
 		return "", err
 	}

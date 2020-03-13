@@ -54,16 +54,25 @@ type downloadTask struct {
 func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.buckets == nil {
+		for _, f := range completeFuncs {
+			f(ErrLfsServiceNotReady)
+		}
 		return ErrLfsServiceNotReady
 	}
 
 	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
+		for _, f := range completeFuncs {
+			f(ErrBucketNotExist)
+		}
 		return ErrBucketNotExist
 	}
 
 	object, ok := bucket.objects[objectName]
 	if !ok {
+		for _, f := range completeFuncs {
+			f(ErrObjectNotExist)
+		}
 		return ErrObjectNotExist
 	}
 
@@ -71,15 +80,21 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	defer object.RUnlock()
 
 	if object.Deletion {
+		for _, f := range completeFuncs {
+			f(ErrObjectNotExist)
+		}
 		return ErrObjectNotExist
 	}
 
 	length := opts.Length
 	if opts.Length < 0 {
-		length = object.OPart.GetLength() - opts.Start
+		length = object.Parts[0].GetLength() - opts.Start
 	}
 
-	if opts.Start+length > object.OPart.GetLength() {
+	if opts.Start+length > object.Parts[0].GetLength() {
+		for _, f := range completeFuncs {
+			f(ErrObjectOptionsInvalid)
+		}
 		return ErrObjectOptionsInvalid
 	}
 
@@ -99,16 +114,15 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		group:        l.gInfo,
 		decoder:      decoder,
 		startTime:    time.Now(),
-		start:        opts.Start + object.OPart.GetStart(),
+		start:        opts.Start + object.Parts[0].GetStart(),
 		length:       length,
 		writer:       writer,
 		completeFunc: completeFuncs,
 		encrypt:      bo.Encryption,
 	}
-
 	// default AES
 	if bo.Encryption == 1 {
-		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
+		dl.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.Parts[0].GetStart())
 	}
 
 	return dl.Start(ctx)

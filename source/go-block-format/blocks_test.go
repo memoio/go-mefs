@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	u "github.com/ipfs/go-ipfs-util"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 

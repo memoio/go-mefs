@@ -2,9 +2,11 @@ package mount_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/memoio/go-mefs/source/go-datastore"
+	"github.com/memoio/go-mefs/source/go-datastore/autobatch"
 	mount "github.com/memoio/go-mefs/source/go-datastore/mount"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
 	dstest "github.com/memoio/go-mefs/source/go-datastore/test"

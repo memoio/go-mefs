@@ -103,26 +103,75 @@ message BucketInfo {
   int64 ObjectsBlockSize = 8; //本Bucket的ObjectsBlock序列化后占多少字节
   bool Deletion = 9;        //Bucket是否已删除
   int64 NextObjectID = 10;
-  bytes Root = 11;  // merkle root
+  int64 NextOpID = 11;
+  bytes Root = 12;  // merkle root
 }
 
-message ObjectInfo {
-  int64 BucketID = 1;               //本对象所属的Bucket
-  int64 Ctime = 2;                  //对象创建时间
-  string ContentType = 3;           //对象的类型，如文本、图片
-  bool Dir = 4;                     //是否为目录
-  bool Deletion = 5;                //对象是否已删除
-  map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
-  int64 ObjectID = 7;               // increase from 0
-  ObjectPart OPart = 8;             
+//总共构建出ObjectInfo
+message ObjectInfo{
+  Object Info = 1;
+  int64 Length = 2;
+  bool Deletion = 3;
+  int64 LastModified = 4;
+  int64 PartCount = 5;
+  repeated ObjectPart Parts = 6; //构造出来的Part序列
 }
 
-message ObjectPart {
+//在add object的时候加入，
+message Object {
   string Name = 1;                  //对象名称
-  int64 Start = 2;                  //本对象的起始
-  int64 Length = 3;                 //对象长度
-  string ETag = 4;                  //MD5
-  string NextPart = 5;              //userd for append
+  int64 BucketID = 2;               //本对象所属的Bucket
+  int64 Ctime = 3;                  //对象创建时间
+  string ContentType = 4;           //对象的类型，如文本、图片
+  bool Dir = 5;                     //是否为目录
+  map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
+  int64 ObjectID = 7;               // increase from 0           
+}
+
+//在add object及append object的时候会加入
+message ObjectPart {
+  string Name = 1;               //此分块所属的Object
+  int64 ObjectID = 2;            //此分块所属的ObjectID
+  int64 PartID = 3;              //此分块的ID
+  int64 Start = 4;               //本对象的起始
+  int64 Length = 5;              //对象长度
+  int64 Time = 6;                //append此Part的时间
+  string ETag = 7;               //MD5
+}
+
+
+message DeleteObject {
+  string Name     = 1;               //删除的objectName
+  int64  ObjectID = 2;
+  int64  Time     = 3;                //删除时间
+}
+
+message CancelOp {
+  LfsOp OpType = 1; //撤销的操作类型
+  int64 OpID = 2;       //撤销的操作ID
+}
+
+enum LfsOp {
+  OpErr = 0;     
+  OpAdd = 1;     //添加一个Object
+  OpAppend = 2;  //给object追加Part
+  OpDelete = 3;  //删除某个Object
+  OpCancel = 4;  //撤销前面的某个Operation，尚未实现（是否应支持撤销前面的一个撤销命令）
+}
+
+//OpRecord 元数据最终存储的格式是一串可压缩的操作记录
+message OpRecord {
+  LfsOp OpType = 1;     //操作类型
+  int64 OpID = 2;       //操作ID，从1往上增
+  bytes Payload = 3;    //根据操作类型解析Payload
+}
+
+//MetaSync 序列号后存在本地，用于处理本地Meta文件
+message MetaSync {
+  int64 MagicNum = 1;
+  int64 ID = 2;            //任意指定的识别码
+  int64 Length = 3;        //这个meta文件的长度
+  int64 LastSyncIndex = 4; //上一次同步到什么位置
 }
 
 message BlockOptions {

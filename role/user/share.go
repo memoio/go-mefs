@@ -30,7 +30,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 	if !ok || object.Deletion {
 		return "", ErrObjectNotExist
 	}
-
+	partCount := object.GetPartCount()
 	sl := &mpb.ShareLink{
 		UserID:     l.userID,
 		QueryID:    l.fsID,
@@ -38,23 +38,15 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		ObjectName: objectName,
 		BOpts:      bucket.BOpts,
 		BucketID:   bucket.BucketID,
-		OParts:     make([]*mpb.ObjectPart, 1),
+		OParts:     make([]*mpb.ObjectPart, partCount),
 	}
 
-	opart := object.GetOPart()
-	sl.OParts[0] = opart
-	for opart.GetNextPart() != "" {
-		object, ok := bucket.objects[opart.GetNextPart()]
-		if !ok {
-			break
-		}
-
-		opart = object.GetOPart()
-		sl.OParts = append(sl.OParts, opart)
+	for i := 0; i < int(partCount); i++ {
+		sl.OParts[i] = object.Parts[i]
 	}
 
 	if bucket.BOpts.Encryption == 1 {
-		decKey := aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.OPart.Start)
+		decKey := aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.Parts[0].GetStart())
 		sl.DecKey = decKey[:]
 	}
 

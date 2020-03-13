@@ -3,6 +3,8 @@
 package delayed
 
 import (
+	"io"
+
 	delay "github.com/ipfs/go-ipfs-delay"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
