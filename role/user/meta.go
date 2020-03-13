@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -185,14 +186,33 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 			return nil, err
 		}
 
-		return &lfsMeta{
+		lm := &lfsMeta{
 			sb: &superBlock{
 				SuperBlockInfo: pbSuperBlock,
 				dirty:          false,
 			},
 			buckets:        make(map[string]*superBucket),
 			bucketIDToName: make(map[int64]string),
-		}, nil
+		}
+
+		if l.userID != l.gInfo.rootID {
+			gotTime, gotRoot, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
+			if err == nil {
+				has := false
+				for _, lr := range lm.sb.LRoot {
+					if lr.CTime == gotTime && bytes.Compare(lr.Root, gotRoot[:]) == 0 {
+						has = true
+					}
+				}
+				if has {
+					utils.MLogger.Info("local fs has contract root")
+				} else {
+					utils.MLogger.Info("local fs has not contract root")
+				}
+			}
+		}
+
+		return lm, nil
 	}
 	utils.MLogger.Warn("Cannot load Lfs superblock.")
 	return nil, ErrCannotLoadSuperBlock
@@ -269,6 +289,8 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		}
 	}
 
+	lroot := l.meta.sb.GetLRoot()[len(l.meta.sb.GetLRoot())-1]
+	broot := lroot.GetBRoots()[bucket.BucketID-1]
 	if int64(len(data)) >= objectsBlockSize {
 		data = data[:objectsBlockSize]
 		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
@@ -288,8 +310,14 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			opNum++
 			tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), op.GetPayload()...)
 			bucket.mtree.Push(tag)
+			if opNum == broot.GetOpCount() {
+				if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) != 0 {
+					utils.MLogger.Errorf("bucket %s expect root %s, but got %s", bucket.Name, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(broot.GetRoot()))
+				}
+			}
 		}
 
+		bucket.Root = bucket.mtree.Root()
 		// verify root
 		// verify ops
 		if opNum != bucket.GetNextOpID() {
