@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -57,11 +58,34 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	object.Lock()
 	defer object.Unlock()
 
+	deleteObject := mpb.DeleteObject{
+		Name:     object.GetInfo().GetName(),
+		ObjectID: object.GetInfo().GetObjectID(),
+		Time:     time.Now().Unix(),
+	}
+
+	payload, _ := proto.Marshal(&deleteObject)
+	op := mpb.OpRecord{
+		OpType:  mpb.LfsOp_OpDelete,
+		OpID:    bucket.GetNextOpID(),
+		Payload: payload,
+	}
+
+	// leaf is OpID + PayLoad
+	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
+	bucket.mtree.Push(tag)
+
+	l.FlushObjectMeta(bucket, false, &op)
+	bucket.NextOpID++
+
 	object.Deletion = true
 	bucket.dirty = true
 	oName := object.Parts[0].GetName() + "." + strconv.Itoa(int(object.GetInfo().ObjectID))
 	delete(bucket.objects, object.Parts[0].GetName())
 	bucket.objects[oName] = object
+
+	//gen_root
+	bucket.Root = bucket.mtree.Root()
 	return &object.ObjectInfo, nil
 }
 

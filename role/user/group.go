@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -20,12 +20,13 @@ import (
 )
 
 const (
-	starting     int8 = iota
-	collecting        // broadcast UserInit
-	collectDone       // notify keeper
-	deploying         // deploy contracts
-	depoyDone         // connect
-	groupStarted      // done
+	stoped       int8 = iota //stoped
+	starting                 //begin to start
+	collecting               // broadcast UserInit
+	collectDone              // notify keeper
+	deploying                // deploy contracts
+	depoyDone                // connect
+	groupStarted             // done
 )
 
 type keeperInfo struct {
@@ -79,7 +80,7 @@ func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps i
 		shareToID:   shareTo,
 		privKey:     sk,
 		ds:          d,
-		state:       starting,
+		state:       stoped,
 		storeDays:   duration,
 		storeSize:   capacity,
 		storePrice:  price,
@@ -728,7 +729,7 @@ func (g *groupInfo) stop(ctx context.Context) error {
 
 	utils.MLogger.Info("Group Service is stop for: ", g.userID)
 
-	g.state = starting
+	g.state = stoped
 	return nil
 }
 

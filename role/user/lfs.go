@@ -32,11 +32,17 @@ type LfsInfo struct {
 
 // Start starts user's info
 func (l *LfsInfo) Start(ctx context.Context) error {
+	if l.gInfo == nil {
+		return ErrLfsServiceNotReady
+	}
 	// 证明该user已经启动
-	if l.online || (l.gInfo != nil && l.gInfo.state > starting) {
+	if l.online || (l.gInfo.state == groupStarted) {
 		return nil
 	}
-
+	if l.gInfo.state >= starting && l.gInfo.state < groupStarted {
+		return ErrLfsStarting
+	}
+	l.gInfo.state = starting
 	l.online = false
 	l.writable = true
 
@@ -106,7 +112,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 //填充顺序：超级块-Bucket数据-Bucket中Object数据
 func (l *LfsInfo) startLfs(ctx context.Context) error {
 	var err error
-	err = checkMetaPath()
+	_, err = checkMetaPath(l.fsID)
 	if err != nil {
 		return err
 	}
@@ -125,7 +131,9 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 			return err
 		}
 		for _, bucket := range l.meta.buckets {
+			bucket.Lock()
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
+			bucket.Unlock()
 			if err != nil {
 				utils.MLogger.Error("Load objects in bucket", bucket.Name, " fail: ", err)
 				continue

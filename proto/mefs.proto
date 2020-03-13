@@ -166,6 +166,14 @@ message OpRecord {
   bytes Payload = 3;    //根据操作类型解析Payload
 }
 
+//MetaSync 序列号后存在本地，用于处理本地Meta文件
+message MetaSync {
+  int64 MagicNum = 1;
+  int64 ID = 2;            //任意指定的识别码
+  int64 Length = 3;        //这个meta文件的长度
+  int64 LastSyncIndex = 4; //上一次同步到什么位置
+}
+
 message BlockOptions {
   BucketOptions Bopts = 1;
   int32 Start = 2;

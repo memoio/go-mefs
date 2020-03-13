@@ -54,16 +54,25 @@ type downloadTask struct {
 func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.buckets == nil {
+		for _, f := range completeFuncs {
+			f(ErrLfsServiceNotReady)
+		}
 		return ErrLfsServiceNotReady
 	}
 
 	bucket, ok := l.meta.buckets[bucketName]
 	if !ok || bucket == nil || bucket.Deletion {
+		for _, f := range completeFuncs {
+			f(ErrBucketNotExist)
+		}
 		return ErrBucketNotExist
 	}
 
 	object, ok := bucket.objects[objectName]
 	if !ok {
+		for _, f := range completeFuncs {
+			f(ErrObjectNotExist)
+		}
 		return ErrObjectNotExist
 	}
 
@@ -71,6 +80,9 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	defer object.RUnlock()
 
 	if object.Deletion {
+		for _, f := range completeFuncs {
+			f(ErrObjectNotExist)
+		}
 		return ErrObjectNotExist
 	}
 
@@ -80,6 +92,9 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	if opts.Start+length > object.Parts[0].GetLength() {
+		for _, f := range completeFuncs {
+			f(ErrObjectOptionsInvalid)
+		}
 		return ErrObjectOptionsInvalid
 	}
 

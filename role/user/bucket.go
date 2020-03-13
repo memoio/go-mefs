@@ -3,18 +3,31 @@ package user
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
+
+func newSuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
+	return &superBucket{
+		BucketInfo:  binfo,
+		dirty:       true,
+		objects:     make(map[string]*objectInfo),
+		obMetaCache: make([]byte, MaxCacheSize),
+		obCacheSize: 0,
+		lenBuf:      make([]byte, binary.MaxVarintLen64),
+		mtree:       mt.New(sha256.New()),
+	}
+}
 
 // CreateBucket create a bucket for a specified LFSservice
 func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *mpb.BucketOptions) (*mpb.BucketInfo, error) {
@@ -65,13 +78,8 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		NextObjectID: 0,
 		NextOpID:     0,
 	}
-	objects := make(map[string]*objectInfo)
-	bucket := &superBucket{
-		BucketInfo: binfo,
-		dirty:      true,
-		objects:    objects,
-		mtree:      mt.New(sha256.New()),
-	}
+
+	bucket := newSuperBucket(binfo, true)
 
 	bucket.mtree.SetIndex(0)
 	bucket.mtree.Push([]byte(l.fsID + bucketName))
