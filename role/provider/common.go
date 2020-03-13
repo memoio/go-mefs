@@ -6,6 +6,7 @@ import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
+	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -59,55 +60,9 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	return nil, role.ErrEmptyBlsKey
 }
 
-func (p *Info) getUserPrivateKey(userID, groupID string) (*mcl.SecretKey, error) {
-	gp := p.getGroupInfo(userID, groupID, true)
-	if gp == nil {
-		return nil, role.ErrNotMyUser
-	}
-
-	if gp.blsKey != nil && gp.blsKey.Sk != nil {
-		return gp.blsKey.Sk, nil
-	}
-
-	kmBls12, err := metainfo.NewKey(groupID, mpb.KeyType_Role, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx := context.Background()
-	userconfigkey := kmBls12.ToString()
-	userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, "local")
-	if err != nil {
-		return nil, err
-	}
-
-	mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
-	if err == nil && mkey != nil {
-		gp.blsKey = mkey
-		return mkey.Sk, nil
-	}
-
-	for _, kid := range gp.keepers {
-		userconfigbyte, err := p.ds.GetKey(ctx, userconfigkey, kid)
-		if err != nil {
-			return nil, err
-		}
-		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, posSkByte)
-		if err != nil {
-			return nil, err
-		}
-
-		p.ds.PutKey(ctx, userconfigkey, userconfigbyte, nil, "local")
-
-		return mkey.Sk, nil
-	}
-
-	return nil, role.ErrEmptyBlsKey
-}
-
 // getDiskUsage gets the disk usage
 func (p *Info) getDiskUsage() (uint64, error) {
-	return 0, nil
+	return datastore.DiskUsage(p.ds.DataStore())
 }
 
 // getDiskTotal gets the disk total space which is set in config

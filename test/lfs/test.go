@@ -55,6 +55,8 @@ func lfsTest() error {
 		return err
 	}
 
+	log.Println("create user sk: ", testuser.Sk, ",addr: ", testuser.Address)
+
 	flag := true
 	if flag {
 		err := test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, ethEndPoint)

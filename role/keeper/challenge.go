@@ -62,25 +62,34 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string) (string,
 	thisLinfo.inChallenge = true
 
 	// at most challenge 100 blocks
-	ret := make([]string, 0, 100)
+	ret := make([]string, 100)
 	chalnum := 0
-	psum := 0
 	thisLinfo.blockMap.Range(func(key, value interface{}) bool {
-		cInfo := value.(*blockInfo)
-		bids := strings.Split(key.(string), metainfo.BlockDelimiter)
-		bi := g.getBucketInfo(bids[0], false)
-		if bi == nil {
-			return true
-		}
-		bSize := int(bi.bops.GetSegmentSize())
-		ret = append(ret, key.(string)+metainfo.BlockDelimiter+strconv.Itoa(cInfo.offset))
-		psum += (cInfo.offset * bSize)
-		chalnum++
 		if chalnum >= 100 {
 			return false
 		}
+		ret[chalnum] = key.(string)
+		chalnum++
 		return true
 	})
+
+	psum := 0
+	for i := 0; i < len(ret); i++ {
+		cInfo, ok := thisLinfo.blockMap.Load(ret[i])
+		if !ok {
+			continue
+		}
+
+		bids := strings.Split(ret[i], metainfo.BlockDelimiter)
+		bi := g.getBucketInfo(bids[0], false)
+		if bi == nil {
+			continue
+		}
+
+		bSize := int(bi.bops.GetSegmentSize())
+		ret[i] = ret[i] + metainfo.BlockDelimiter + strconv.Itoa(cInfo.(*blockInfo).offset)
+		psum += (cInfo.(*blockInfo).offset * bSize)
+	}
 
 	// no data
 	if len(ret) == 0 || psum == 0 {

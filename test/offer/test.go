@@ -88,7 +88,7 @@ func main() {
 	}
 
 	if offerGot.String() != offerAddr.String() {
-		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
+		log.Fatal(offerAddr.String(), " set different from got:", offerGot.String())
 	}
 
 	log.Println("*****test pass*****")

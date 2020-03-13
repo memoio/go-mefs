@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
@@ -37,6 +38,8 @@ func main() {
 	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
 	flag.Parse()
 	ethEndPoint = *eth
+
+	contracts.EndPoint = ethEndPoint
 
 	if err := challengeTest(); err != nil {
 		log.Fatal(err)
@@ -143,9 +146,11 @@ func challengeTest() error {
 
 	qid := uid
 	if flag {
+		log.Println("conatracts has endpoint: ")
 		qItem, err := role.GetLatestQuery(uid)
 		if err != nil {
-			log.Println("got query fails: ", err)
+			log.Println("got query from", uid, "fails: ", err)
+			return err
 		}
 		qid = qItem.QueryID
 	}

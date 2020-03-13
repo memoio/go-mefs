@@ -55,8 +55,8 @@ func (g *groupInfo) loadContracts(mode bool) error {
 }
 
 // addProvider 将传入pid加入posuser的upkeeping合约
-func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
-	gp := k.getGroupInfo(uid, gid, false)
+func (k *Info) ukAddProvider(uid, gid, pid string) error {
+	gp := k.getGroupInfo(uid, gid, true)
 	if gp == nil || gp.upkeeping == nil {
 		return role.ErrNoContract
 	}
@@ -73,19 +73,24 @@ func (k *Info) ukAddProvider(uid, gid, pid, sk string) error {
 		}
 	}
 
+	localAddr, err := address.GetAddressFromID(k.localID)
+	if err != nil {
+		return err
+	}
+
 	userAddr, err := address.GetAddressFromID(uid)
 	if err != nil {
 		return err
 	}
 
-	queryAddr, err := address.GetAddressFromID(gid)
+	ukAddr, err := address.GetAddressFromID(gp.upkeeping.UpKeepingID)
 	if err != nil {
 		return err
 	}
 
 	if gp.isMaster(pid) {
 		utils.MLogger.Info("add provider to: ", userAddr)
-		err = contracts.AddProvider(sk, userAddr, userAddr, []common.Address{providerAddr}, queryAddr.String())
+		err = contracts.AddProvider(k.sk, localAddr, userAddr, ukAddr, []common.Address{providerAddr})
 		if err != nil {
 			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err

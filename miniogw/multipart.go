@@ -1,6 +1,7 @@
 package miniogw
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -31,7 +32,7 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 		return "", errLfsServiceNotReady
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	_, err = lfs.HeadBucket(ctx, bucket)
 	if err != nil {
 		cancel()
@@ -43,24 +44,26 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 	if err != nil {
 		return "", err
 	}
-	obj, err := lfs.PutObject(ctx, bucket, object, upload.Stream)
-	if err != nil {
-		return "", err
-	}
 
-	uploads.RemoveByID(upload.ID)
-	if err != nil {
-		upload.fail(err)
-	} else {
-		upload.complete(minio.ObjectInfo{
-			Bucket:      bucket,
-			Name:        object,
-			IsDir:       obj.GetInfo().GetDir(),
-			ETag:        obj.Parts[0].GetETag(),
-			ContentType: obj.GetInfo().GetContentType(),
-			Size:        obj.GetLength(),
-		})
-	}
+	go func() {
+		reader := bufio.NewReaderSize(upload.Stream, user.DefaultBufSize)
+		obj, err := lfs.PutObject(ctx, bucket, object, reader)
+		uploads.RemoveByID(upload.ID)
+		if err != nil {
+			upload.fail(err)
+		} else {
+
+			upload.complete(minio.ObjectInfo{
+				Bucket:      bucket,
+				Name:        object,
+				IsDir:       obj.GetInfo().GetDir(),
+				ETag:        obj.Parts[0].GetETag(),
+				ContentType: obj.GetInfo().GetContentType(),
+				Size:        obj.GetLength(),
+			})
+		}
+
+	}()
 
 	return upload.ID, nil
 }
@@ -234,7 +237,7 @@ func (uploads *MultipartUploads) Remove(bucket, object, uploadID string) (*Multi
 
 	upload, ok := uploads.pending[uploadID]
 	if !ok {
-		return nil, errUploadMissing
+		return nil, nil
 	}
 	if upload.Bucket != bucket || upload.Object != object {
 		return nil, errMismatch

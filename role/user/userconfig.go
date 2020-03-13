@@ -20,15 +20,6 @@ func initBLS12Config(seed []byte) (*mcl.KeySet, error) {
 	return kset, nil
 }
 
-func parseBLS12ConfigMeta(privKey, userBLS12config []byte) (*mcl.KeySet, error) {
-	mkey, err := role.BLS12ByteToKeyset(userBLS12config, privKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return mkey, nil
-}
-
 func (l *LfsInfo) putUserConfig(ctx context.Context) {
 	kmBls, err := metainfo.NewKey(l.fsID, mpb.KeyType_Config, l.gInfo.shareToID)
 	if err != nil {
@@ -57,7 +48,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	has := false
 	userBLS12config, err := l.ds.GetKey(ctx, blskey, "local")
 	if err == nil && len(userBLS12config) > 0 { //先从本地找，如果有就解析一下
-		mkey, err := parseBLS12ConfigMeta([]byte(l.privateKey), userBLS12config)
+		mkey, err := role.BLS12ByteToKeyset(userBLS12config, []byte(l.privateKey))
 		if err == nil && mkey != nil {
 			l.keySet = mkey
 			has = true
@@ -68,7 +59,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	for _, kid := range l.gInfo.tempKeepers {
 		res, err := l.ds.GetKey(ctx, blskey, kid)
 		if err == nil && len(res) > 0 {
-			mkey, err := parseBLS12ConfigMeta([]byte(l.privateKey), res)
+			mkey, err := role.BLS12ByteToKeyset(res, []byte(l.privateKey))
 			if err == nil && mkey != nil {
 				if l.keySet == nil {
 					userBLS12config = res

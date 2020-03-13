@@ -108,7 +108,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	uid := ops[0]
 	_, ok := p.fsGroup.Load(gid)
 	if !ok {
-		gp := p.newGroupWithFS(uid, gid, string(metaValue), false)
+		gp := p.newGroupWithFS(uid, gid, string(metaValue))
 		if gp == nil {
 			return nil, role.ErrNotMyUser
 		}

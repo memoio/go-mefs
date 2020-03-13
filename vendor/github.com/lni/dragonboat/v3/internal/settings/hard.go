@@ -32,8 +32,8 @@ var (
 )
 
 const (
-	defaultStepEngineWorkerCount uint64 = 16
-	defaultLogDBPoolSize         uint64 = 16
+	defaultStepEngineWorkerCount uint64 = 4
+	defaultLogDBPoolSize         uint64 = 4
 )
 
 //
@@ -102,7 +102,7 @@ const (
 	//
 
 	// MaxProposalPayloadSize is the max size allowed for a proposal payload.
-	MaxProposalPayloadSize uint64 = 32 * 1024 * 1024
+	MaxProposalPayloadSize uint64 = 1024 * 1024
 	// MaxMessageSize is the max size for a single gRPC message sent between
 	// raft nodes. It must be greater than MaxProposalPayloadSize and smaller
 	// than the current default of max gRPC send/receive size (4MBytes).

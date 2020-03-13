@@ -92,11 +92,16 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 			if err != nil {
 				return nil, err
 			}
-			qItem, err := role.GetQueryInfo(userID, qid)
+			qItem, err := role.GetLatestQuery(userID)
 			if err != nil {
 				utils.MLogger.Infof("get query %s for user %s from chain failed: %s, please restart", qid, userID, err)
 				return nil, err
 			}
+
+			if qItem.QueryID != qid {
+				utils.MLogger.Infof("get latest query %s for user %s from chain failed", qItem.QueryID, userID)
+			}
+
 			queryID = qid
 			ginfo.queryItem = &qItem
 		}

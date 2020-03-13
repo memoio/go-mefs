@@ -88,7 +88,7 @@ type kInfo struct {
 }
 
 //New start provider service
-func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price int64, reDeployOffer bool) (instance.Service, error) {
+func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price int64, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
 	m := &Info{
 		localID: id,
 		sk:      sk,
@@ -122,6 +122,14 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	go m.saveRegular(ctx)
 
 	m.state = true
+	if enablePos {
+		go func() {
+			err := m.PosService(ctx, gc)
+			if err != nil {
+				utils.MLogger.Errorf("start pos err: %s ", err)
+			}
+		}()
+	}
 
 	utils.MLogger.Info("Provider Service is ready")
 	return m, nil
@@ -148,72 +156,64 @@ func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo 
 		sessionID: uuid.Nil,
 	}
 
-	g.loadContracts(localID)
+	g.loadContracts(localID, true)
 
 	return g
 }
 
-func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *groupInfo {
-	if kpids == "" {
-		if !flag {
-			return nil
-		}
+func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
+	var tmpKps []string
+	var tmpPros []string
+
+	if kpids == "" && userID == groupID {
 		ctx := context.Background()
 		kmkps, err := metainfo.NewKey(groupID, mpb.KeyType_LFS, userID)
 		if err != nil {
 			return nil
 		}
 
-		res, err := p.ds.GetKey(ctx, kmkps.ToString(), "local")
-		if err != nil {
+		res, _ := p.ds.GetKey(ctx, kmkps.ToString(), "local")
+		kpids = string(res)
+
+		splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
+
+		has := false
+		if len(splitedMeta) == 2 {
+			kps := splitedMeta[0]
+			for i := 0; i < len(kps)/utils.IDLength; i++ {
+				kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+				_, err := peer.IDB58Decode(kid)
+				if err != nil {
+					continue
+				}
+				tmpKps = append(tmpKps, kid)
+			}
+
+			kps = splitedMeta[1]
+			for i := 0; i < len(kps)/utils.IDLength; i++ {
+				pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+				_, err := peer.IDB58Decode(pid)
+				if err != nil {
+					continue
+				}
+
+				if pid == p.localID {
+					has = true
+				}
+
+				tmpPros = append(tmpPros, pid)
+			}
+		}
+
+		if len(tmpKps) == 0 || len(tmpPros) == 0 {
+			utils.MLogger.Warn(groupID, " has no keeper or providers")
 			return nil
 		}
-		kpids = string(res)
-	}
 
-	splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
-	var tmpKps []string
-	var tmpPros []string
-	has := false
-	if len(splitedMeta) == 2 {
-		kps := splitedMeta[0]
-		for i := 0; i < len(kps)/utils.IDLength; i++ {
-			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-			_, err := peer.IDB58Decode(kid)
-			if err != nil {
-				continue
-			}
-			tmpKps = append(tmpKps, kid)
+		if !has {
+			utils.MLogger.Warn(groupID, " is not my user")
+			return nil
 		}
-
-		kps = splitedMeta[1]
-		for i := 0; i < len(kps)/utils.IDLength; i++ {
-			pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-			_, err := peer.IDB58Decode(pid)
-			if err != nil {
-				continue
-			}
-
-			if pid == p.localID {
-				has = true
-			}
-
-			tmpPros = append(tmpPros, pid)
-		}
-	}
-
-	if userID == groupID && (len(tmpKps) == 0 || len(tmpPros) == 0) {
-		utils.MLogger.Warn(groupID, " has no keeper or providers")
-		return nil
-	}
-
-	if !has {
-		utils.MLogger.Warn(groupID, " is not my user")
-		return nil
-	}
-
-	if len(tmpPros) == 0 {
-		tmpPros = append(tmpPros, groupID)
 	}
 
 	gp := newGroup(p.localID, userID, groupID, tmpKps, tmpPros)
@@ -228,7 +228,10 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) *
 func (p *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 	groupI, ok := p.fsGroup.Load(groupID)
 	if !ok {
-		return p.newGroupWithFS(userID, groupID, "", mode)
+		if mode {
+			return p.newGroupWithFS(userID, groupID, "")
+		}
+		return nil
 	}
 
 	return groupI.(*groupInfo)
