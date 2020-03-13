@@ -301,6 +301,8 @@ func (l *LfsInfo) genRoot() {
 		if bytes.Compare(res[:], val[:]) != 0 {
 			utils.MLogger.Debugf("get root expected: %s, but got %d", val, res)
 		}
+
+		utils.MLogger.Infof("ser root: %s success", val)
 	}
 }
 

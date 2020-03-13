@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"

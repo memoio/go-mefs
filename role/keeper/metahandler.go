@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"

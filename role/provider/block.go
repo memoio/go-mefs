@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"

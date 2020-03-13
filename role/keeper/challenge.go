@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"

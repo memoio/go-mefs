@@ -322,6 +322,7 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 	if err != nil {
 		return minio.ObjectInfo{}, convertToMinioError(err, bucket, object)
 	}
+	// need handle ETag
 	objInfo = minio.ObjectInfo{
 		Bucket:      bucket,
 		Name:        object,

@@ -75,7 +75,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
 	bucket.mtree.Push(tag)
 
-	l.FlushObjectMeta(bucket, false, &op)
+	l.flushObjectMeta(bucket, false, &op)
 	bucket.NextOpID++
 
 	object.Deletion = true

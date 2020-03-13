@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"

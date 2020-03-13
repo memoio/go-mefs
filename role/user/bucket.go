@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,9 +21,8 @@ func newSuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
 		BucketInfo:  binfo,
 		dirty:       true,
 		objects:     make(map[string]*objectInfo),
-		obMetaCache: make([]byte, MaxCacheSize),
+		obMetaCache: make([]byte, maxCacheSize),
 		obCacheSize: 0,
-		lenBuf:      make([]byte, binary.MaxVarintLen64),
 		mtree:       mt.New(sha256.New()),
 	}
 }

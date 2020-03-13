@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"

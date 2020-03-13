@@ -123,7 +123,7 @@ func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName strin
 		OpID:    bucket.GetNextOpID(),
 		Payload: payload,
 	}
-	l.FlushObjectMeta(bucket, false, &op)
+	l.flushObjectMeta(bucket, false, &op)
 	bucket.NextOpID++
 	// leaf is OpID + PayLoad
 	tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), payload...)
@@ -203,7 +203,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		Payload: payload,
 	}
 
-	l.FlushObjectMeta(bucket, false, &op)
+	l.flushObjectMeta(bucket, false, &op)
 	bucket.NextOpID++
 
 	// leaf is OpID + PayLoad
@@ -257,7 +257,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 		OpID:    bucket.GetNextOpID(),
 		Payload: payload,
 	}
-	l.FlushObjectMeta(bucket, false, &op)
+	l.flushObjectMeta(bucket, false, &op)
 	bucket.NextOpID++
 
 	// leaf is OpID + PayLoad

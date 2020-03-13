@@ -125,7 +125,7 @@ message Object {
   string ContentType = 4;           //对象的类型，如文本、图片
   bool Dir = 5;                     //是否为目录
   map<string, string> Metadata = 6; // User可以对文件自定义一些元信息
-  int64 ObjectID = 7;               // increase from 0           
+  int64 ObjectID = 7;                         
 }
 
 //在add object及append object的时候会加入
@@ -171,7 +171,7 @@ message MetaSync {
   int64 MagicNum = 1;
   int64 ID = 2;            //任意指定的识别码
   int64 Length = 3;        //这个meta文件的长度
-  int64 LastSyncIndex = 4; //上一次同步到什么位置
+  int64 SyncIndex = 4;     //上一次同步到什么位置
 }
 
 message BlockOptions {
