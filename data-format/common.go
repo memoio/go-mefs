@@ -112,7 +112,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, b
 
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
 	if !ok || err != nil {
-		utils.MLogger.Error("Tag is wrong: ", err)
+		//utils.MLogger.Error("Tag is wrong: ", err)
 		return nil, nil, false
 	}
 	return segments, tags, true

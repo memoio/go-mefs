@@ -352,8 +352,8 @@ func (d *DataCoder) recoverField(stripe [][]byte) ([][]byte, error) {
 
 // 将传入的数据冗余块组恢复，返回想要恢复的块，若index为-1则返回个块组
 func (d *DataCoder) recoverData(data [][]byte, dc, pc int) ([][]byte, error) {
-	switch d.Prefix.Bopts.Policy {
-	case RsPolicy:
+	switch {
+	case dc > 1:
 		enc, err := reedsolomon.New(dc, pc)
 		if err != nil {
 			return nil, err
@@ -376,7 +376,7 @@ func (d *DataCoder) recoverData(data [][]byte, dc, pc int) ([][]byte, error) {
 			}
 		}
 		return data, nil
-	case MulPolicy:
+	case dc == 1:
 		var i int
 		for i = 0; i < d.blockCount; i++ {
 			if data[i] != nil {

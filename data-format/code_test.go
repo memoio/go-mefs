@@ -114,7 +114,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 		bid := "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0_" + strconv.Itoa(i)
 		_, _, ok := opt.VerifyBlock(datas[i], bid)
 		if !ok {
-			log.Fatal("tag is wrong")
+			log.Fatal("tag is wrong for: ", bid)
 		}
 	}
 
@@ -147,7 +147,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 		bid := "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0_" + strconv.Itoa(i)
 		ok := VerifyBlock(datas[i], bid, keyset)
 		if !ok {
-			log.Fatal("tag is wrong")
+			log.Fatal("tag is wrong for: ", bid)
 		}
 	}
 
