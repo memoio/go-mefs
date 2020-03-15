@@ -66,9 +66,16 @@ type pInfo struct {
 	proItem    *role.ProviderItem
 }
 
-func (p *pInfo) setOffer() {
-	p.Lock()
-	defer p.Unlock()
+func (p *pInfo) setOffer(flag bool) {
+	if p.offerItem != nil || flag {
+		oItem, err := role.GetLatestOffer(p.providerID, p.providerID)
+		if err != nil {
+			return
+		}
+		p.Lock()
+		defer p.Unlock()
+		p.offerItem = &oItem
+	}
 }
 
 func (k *Info) getUInfo(pid string) (*uInfo, error) {
@@ -107,6 +114,7 @@ func (k *Info) getPInfo(pid string) (*pInfo, error) {
 		tempInfo := &pInfo{
 			providerID: pid,
 		}
+		tempInfo.setOffer(false)
 		k.providers.Store(pid, tempInfo)
 		return tempInfo, nil
 	}

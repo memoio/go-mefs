@@ -108,6 +108,11 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 			key := k.(string)
 			thisinfo := v.(*pInfo)
 			if thisinfo.online == true && thisinfo.credit > 0 {
+				if thisinfo.offerItem != nil {
+					if thisinfo.offerItem.Price > price {
+						return true
+					}
+				}
 				newResponse.WriteString(key)
 				pc--
 			}

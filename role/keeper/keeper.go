@@ -82,6 +82,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.stPayRegular(ctx)
 	go m.checkPeers(ctx)
 	go m.getKpMapRegular(ctx)
+	go m.getOfferRegular(ctx)
 	m.state = true
 	utils.MLogger.Info("Keeper Service is ready")
 	return m, nil

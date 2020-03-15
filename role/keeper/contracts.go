@@ -103,6 +103,35 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 	return nil
 }
 
+func (k *Info) getOfferRegular(ctx context.Context) {
+	utils.MLogger.Info("Get kpMap from chain start!")
+
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			go func() {
+				pros := make([]string, 0, 1)
+				k.providers.Range(func(key, value interface{}) bool {
+					pros = append(pros, key.(string))
+					return true
+				})
+				for _, pro := range pros {
+					proInfo, ok := k.providers.Load(pro)
+					if !ok {
+						continue
+					}
+					proInfo.(*pInfo).setOffer(true)
+				}
+
+			}()
+		}
+	}
+}
+
 func (k *Info) getKpMapRegular(ctx context.Context) {
 	utils.MLogger.Info("Get kpMap from chain start!")
 
