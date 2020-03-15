@@ -45,20 +45,18 @@ type uploadTask struct { //一个上传任务实例
 }
 
 // PutObject constructs upload process
-func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
-
+func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error) {
+	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
 	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, true)
 	if err != nil {
 		return nil, err
 	}
 
-	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
-
 	return l.addObjectData(ctx, bucket, object, reader)
 }
 
 // AppendObject constructs upload process
-func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error) {
+func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts *ObjectOptions) (*mpb.ObjectInfo, error) {
 	utils.MLogger.Infof("Upload append object: %s to bucket: %s begin", objectName, bucketName)
 	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, false)
 	if err != nil {
@@ -89,9 +87,6 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 
 	objectElement, ok := bucket.objects[objectName]
 	if ok || objectElement != nil {
-		if creation {
-			return nil, nil, ErrObjectAlreadyExist
-		}
 		return bucket, objectElement, nil
 	}
 
@@ -158,6 +153,10 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	object.Lock()
 	defer object.Unlock()
 
+	if object.Info.Dir {
+		return &object.ObjectInfo, ErrObjectIsDir
+	}
+
 	bopt := &mpb.BlockOptions{
 		Bopts:   bucket.BOpts,
 		Start:   0,
@@ -191,10 +190,13 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	}
 
 	err := ul.Start(ctx)
-	if err != nil && ul.length == 0 {
+	if err != nil {
+		utils.MLogger.Infof("Add data to object: %s in bucket: %s fails %s", object.GetInfo().GetName(), bucket.GetName(), err)
 		return &object.ObjectInfo, err
 	}
 
+	// upload success length is less than expected,
+	// treated as error
 	padding := int64(0)
 	if ul.encrypt == 1 {
 		if ul.length%aes.BlockSize != 0 {
@@ -243,7 +245,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 
 	bucket.dirty = true
 	utils.MLogger.Infof("Add data to object: %s in bucket: %s end, length is: %d", object.GetInfo().GetName(), bucket.GetName(), opart.Length)
-	return &object.ObjectInfo, err
+	return &object.ObjectInfo, nil
 }
 
 // Stop is
@@ -291,13 +293,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	curStripe := int(u.begin) / stripeSize
 	curOffset := (int(u.begin) % stripeSize) / segStripeSize
 
-	rdata := make([]byte, stripeSize)
-	extra := make([]byte, 0, stripeSize)
-
-	h := md5.New()
-	parllel := int32(0)
-	var wg sync.WaitGroup
-
 	var pros []string
 	breakFlag := false
 	for !breakFlag {
@@ -337,6 +332,12 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		transNum = DefaultTransNum
 	}
 
+	h := md5.New()
+	parllel := int32(0)
+	var wg sync.WaitGroup
+	rdata := make([]byte, stripeSize)
+	extra := make([]byte, 0, stripeSize)
+
 	breakFlag = false
 	for !breakFlag {
 		select {
@@ -352,6 +353,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				data = append(data, extra...)
 				extra = extra[:0]
 			}
+
+			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, expected length: %d", curStripe, curOffset, readLen)
 
 			n, err := io.ReadAtLeast(u.reader, rdata, readLen)
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -385,7 +388,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				return role.ErrRead
 			}
 
-			u.rawLen += int64((curOffset - endOffset) * segStripeSize)
+			u.rawLen += int64((endOffset - curOffset) * segStripeSize)
 			u.length += int64(n)
 
 			// encrypt

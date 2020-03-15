@@ -499,7 +499,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		object, err := lfs.HeadObject(req.Context, req.Arguments[0], req.Arguments[1], user.ObjectOptions{})
+		object, err := lfs.HeadObject(req.Context, req.Arguments[0], req.Arguments[1], user.DefaultOption())
 		if err != nil {
 			return err
 		}
@@ -549,7 +549,6 @@ var lfsPutObjectCmd = &cmds.Command{
  	ObjectSize	The Object Size(not include tag data)
  	Ctime       The Create time
  	Dir         Directory or Not
-
 `,
 	},
 
@@ -604,7 +603,7 @@ var lfsPutObjectCmd = &cmds.Command{
 		case files.File:
 			fileNext = fileType
 		}
-		object, err := lfs.PutObject(req.Context, bucketName, objectName, fileNext)
+		object, err := lfs.PutObject(req.Context, bucketName, objectName, fileNext, user.DefaultOption())
 		if err != nil {
 			return err
 		}
@@ -697,8 +696,7 @@ var lfsGetObjectCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		options := user.DefaultDownloadOptions()
-		go lfs.GetObject(req.Context, req.Arguments[0], req.Arguments[1], bufw, complete, options)
+		go lfs.GetObject(req.Context, req.Arguments[0], req.Arguments[1], bufw, complete, user.DefaultOption())
 
 		return res.Emit(piper)
 	},
@@ -816,7 +814,7 @@ var lfsListObjectsCmd = &cmds.Command{
 		}
 
 		bucketName := req.Arguments[0]
-		objects, err := lfs.ListObjects(req.Context, bucketName, prefix, user.ObjectOptions{})
+		objects, err := lfs.ListObjects(req.Context, bucketName, prefix, user.DefaultOption())
 		if err != nil {
 			return err
 		}
@@ -1638,7 +1636,7 @@ var lfsGetShareCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0],user.DefaultDownloadOptions())
+		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0], user.DefaultOption())
 
 		return res.Emit(piper)
 	},
@@ -1736,7 +1734,7 @@ var lfsGenShareCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		slink, err := lfs.(*user.LfsInfo).GenShareObject(req.Context, req.Arguments[0], req.Arguments[1])
+		slink, err := lfs.(*user.LfsInfo).GenShareObject(req.Context, req.Arguments[0], req.Arguments[1], user.DefaultOption())
 		if err != nil {
 			return err
 		}

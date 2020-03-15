@@ -53,6 +53,7 @@ var (
 	ErrObjectNameToolong    = errors.New("object name is too long")
 	ErrObjectNameInvalid    = errors.New("object name is invalid")
 	ErrObjectOptionsInvalid = errors.New("object option is invalid")
+	ErrObjectIsDir          = errors.New("object is directory")
 )
 
 //检查文件名合法性

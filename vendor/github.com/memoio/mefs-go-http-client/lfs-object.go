@@ -178,7 +178,7 @@ func (s *Shell) PutObject(r io.Reader, ObjectName, BucketName string, options ..
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
 	fileReader := files.NewMultiFileReader(slf, true)
 	var objs Objects
-	rb := s.Request("lfs/put_object", BucketName, ObjectName)
+	rb := s.Request("lfs/put_object", BucketName)
 	for _, option := range options {
 		option(rb)
 	}

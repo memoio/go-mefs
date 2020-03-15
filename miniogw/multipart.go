@@ -45,14 +45,16 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 		return "", err
 	}
 
+	ops := user.DefaultOption()
+	ops.UserDefined = options.UserDefined
+
 	go func() {
 		reader := bufio.NewReaderSize(upload.Stream, user.DefaultBufSize)
-		obj, err := lfs.PutObject(ctx, bucket, object, reader)
+		obj, err := lfs.PutObject(ctx, bucket, object, reader, ops)
 		uploads.RemoveByID(upload.ID)
 		if err != nil {
 			upload.fail(err)
 		} else {
-
 			upload.complete(minio.ObjectInfo{
 				Bucket:      bucket,
 				Name:        object,

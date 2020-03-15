@@ -21,20 +21,6 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-//DownloadOptions 下载时的一些参数
-type DownloadOptions struct {
-	// Start and end length
-	Start, Length int64
-}
-
-// DefaultDownloadOptions returns
-func DefaultDownloadOptions() *DownloadOptions {
-	return &DownloadOptions{
-		Start:  0,
-		Length: -1,
-	}
-}
-
 type downloadTask struct {
 	bucketID     int64
 	start        int64
@@ -51,7 +37,7 @@ type downloadTask struct {
 }
 
 // GetObject constructs lfs download process
-func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error {
+func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts ObjectOptions) error {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.buckets == nil {
 		for _, f := range completeFuncs {
@@ -86,12 +72,23 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		return ErrObjectNotExist
 	}
 
-	length := opts.Length
-	if opts.Length < 0 {
-		length = object.GetLength() - opts.Start
+	opStart := int64(0)
+	pst, ok := opts.UserDefined["start"]
+	if ok {
+		opStart, _ = strconv.ParseInt(pst, 10, 0)
 	}
 
-	if opts.Start+length > object.GetLength() {
+	length := int64(-1)
+	ple, ok := opts.UserDefined["length"]
+	if ok {
+		length, _ = strconv.ParseInt(ple, 10, 0)
+	}
+
+	if length <= 0 {
+		length = object.GetLength() - opStart
+	}
+
+	if opStart+length > object.GetLength() || length <= 0 {
 		for _, f := range completeFuncs {
 			f(ErrObjectOptionsInvalid)
 		}
@@ -125,7 +122,6 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	}
 
 	i := 0
-	pStart := opts.Start
 	readLen := int64(0)
 	for readLen < length {
 		if len(object.GetParts()) <= i {
@@ -134,8 +130,8 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 			}
 			return ErrObjectOptionsInvalid
 		}
-		dl.start = pStart + object.Parts[i].GetStart()
-		dl.length = object.Parts[i].GetLength() - pStart
+		dl.start = opStart + object.Parts[i].GetStart()
+		dl.length = object.Parts[i].GetLength() - opStart
 		if length-readLen < dl.length {
 			dl.length = length - readLen
 		}
@@ -146,7 +142,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 			}
 			return err
 		}
-		pStart = 0
+		opStart = 0
 		readLen += dl.length
 		i++
 	}

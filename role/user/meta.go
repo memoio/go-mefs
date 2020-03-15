@@ -150,12 +150,7 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 
 	bucket.ObjectsBlockSize = int64(len(data))
 
-	err = l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
 }
 
 //--------------------Load superBlock--------------------------

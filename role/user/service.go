@@ -7,6 +7,16 @@ import (
 	mpb "github.com/memoio/go-mefs/proto"
 )
 
+type ObjectOptions struct {
+	UserDefined map[string]string
+}
+
+func DefaultOption() ObjectOptions {
+	return ObjectOptions{
+		UserDefined: make(map[string]string),
+	}
+}
+
 // FileSyetem defines user's function
 type FileSyetem interface {
 	Start(ctx context.Context) error
@@ -21,8 +31,8 @@ type FileSyetem interface {
 
 	ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*mpb.ObjectInfo, error)
 
-	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader) (*mpb.ObjectInfo, error)
-	GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts *DownloadOptions) error
+	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error)
+	GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts ObjectOptions) error
 	HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*mpb.ObjectInfo, error)
 	DeleteObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error)
 

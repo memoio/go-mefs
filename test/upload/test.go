@@ -89,14 +89,13 @@ func uploadTest(count int) error {
 	}
 	log.Println(bk, "addr:", addr)
 
-	bucketNum := 0
-	errNum := 0
-	fileNum := 1
+	fileNum := 0
 	fileUploadSuccessNum := 0
 
-	//rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().Unix())
 	//upload file
-	for {
+	for fileNum < count {
+		fileNum++
 		r := rand.Int63n(randomDataSize)
 		data := make([]byte, r)
 		fillRandom(data)
@@ -106,44 +105,22 @@ func uploadTest(count int) error {
 		uploadBeginTime := time.Now().Unix()
 		ob, err := sh.PutObject(buf, objectName, bucketName, shell.SetAddress(addr))
 		if err != nil {
-			errNum++
-			log.Println("Upload file ", fileNum, " fails,", err)
-			if errNum < 2 {
-				bucketNum++
-				var opts []func(*shell.RequestBuilder) error
-				opts = append(opts, shell.SetAddress(addr))
-				opts = append(opts, shell.SetDataCount(dataCount))
-				opts = append(opts, shell.SetParityCount(parityCount))
-				opts = append(opts, shell.SetPolicy(df.RsPolicy))
-				bucketName = "Bucket" + string(bucketNum)
-				_, errBucket := sh.CreateBucket(bucketName, opts...)
-				if errBucket != nil {
-					log.Println("create bucket err: ", err)
-					time.Sleep(2 * time.Minute)
-					continue
-				}
-			} else {
-				log.Println("upload ", fileNum, " files,", fileUploadSuccessNum, " files uploaded success.fileUploadSuccess rate is", fileUploadSuccessNum/fileNum)
-				break
-			}
-		} else {
-			errNum = 0
-			objsInBucket.Store(objectName, bucketName)
-
-			storagekb := float64(r) / 1024.0
-			uploadEndTime := time.Now().Unix()
-			speed := fmt.Sprintf("%.2f", storagekb/float64(uploadEndTime-uploadBeginTime))
-			log.Println(" Upload file: ", fileNum, "success，Filename is", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", "addr", addr)
-			log.Println(ob.String() + "address: " + addr)
-			fileUploadSuccessNum++
-			if fileNum == count {
-				log.Println("upload test complete")
-				log.Println("upload ", fileNum, " files,", fileUploadSuccessNum, " files success.fileUploadSuccess rate is", fileUploadSuccessNum/count)
-				break
-			}
+			log.Println("put object fails:", err)
+			continue
 		}
-		fileNum++
+		objsInBucket.Store(objectName, bucketName)
+
+		storagekb := float64(r) / 1024.0
+		uploadEndTime := time.Now().Unix()
+		speed := fmt.Sprintf("%.2f", storagekb/float64(uploadEndTime-uploadBeginTime))
+		log.Println("Upload file: ", fileNum, "success，name is:", objectName, "size is:", ToStorageSize(r), "speed is:", speed, " KB/s")
+		log.Println(ob.String())
+		fileUploadSuccessNum++
 	}
+
+	log.Println("Upload test complete")
+	log.Println("uUpload ", fileNum, " files, ", fileUploadSuccessNum, " files success; rate is: ", fileUploadSuccessNum/count)
+
 	//download file
 	fileDownloadSuccessNum := 0
 
@@ -185,6 +162,7 @@ func uploadTest(count int) error {
 
 	log.Println("upload: ", fileNum, "; success:", fileUploadSuccessNum, " rate is", 100*fileUploadSuccessNum/count)
 	log.Println("downlaod: ", fileNum, "; success:", fileDownloadSuccessNum, " rate is", 100*fileDownloadSuccessNum/count)
+
 	if 100*fileUploadSuccessNum/count < 90 {
 		log.Fatal("upload rate is too low")
 	}

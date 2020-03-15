@@ -13,11 +13,6 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-// ObjectOptions is
-type ObjectOptions struct {
-	UserDefined map[string]string
-}
-
 // DeleteObject deletes a object in lfs
 func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error) {
 	if !l.online || l.meta.buckets == nil {

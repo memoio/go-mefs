@@ -15,7 +15,7 @@ import (
 )
 
 // GenShareObject constructs sharelink
-func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) (string, error) {
+func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (string, error) {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.buckets == nil {
 		return "", ErrLfsServiceNotReady
@@ -71,7 +71,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 }
 
 // GetShareObject constructs lfs download process
-func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string, opts *DownloadOptions) error {
+func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string, opts ObjectOptions) error {
 	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {
@@ -142,8 +142,8 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 	}
 
 	readLen := int64(0)
-	pStart := opts.Start
-	length := opts.Length
+	pStart := int64(0)
+	length := int64(0)
 	for i := 0; i < len(sl.GetOParts()); i++ {
 		dl.start = sl.OParts[i].GetStart() + pStart
 		dl.length = sl.OParts[i].GetLength() - pStart

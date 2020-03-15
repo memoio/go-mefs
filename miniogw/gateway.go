@@ -202,9 +202,7 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 		return loi, errLfsServiceNotReady
 	}
 
-	var ops user.ObjectOptions
-
-	objs, err := lfs.ListObjects(ctx, bucket, prefix, ops)
+	objs, err := lfs.ListObjects(ctx, bucket, prefix, user.DefaultOption())
 	if err != nil {
 		return loi, convertToMinioError(err, bucket, "")
 	}
@@ -229,9 +227,7 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 		return loi, errLfsServiceNotReady
 	}
 
-	var ops user.ObjectOptions
-
-	objs, err := lfs.ListObjects(ctx, bucket, prefix, ops)
+	objs, err := lfs.ListObjects(ctx, bucket, prefix, user.DefaultOption())
 	if err != nil {
 		return loi, convertToMinioError(err, bucket, "")
 	}
@@ -270,7 +266,7 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	go lfs.GetObject(ctx, bucket, object, bufw, complete, user.DefaultDownloadOptions())
+	go lfs.GetObject(ctx, bucket, object, bufw, complete, user.DefaultOption())
 
 	// Setup cleanup function to cause the above go-routine to
 	// exit in case of partial read
@@ -298,10 +294,7 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	err := lfs.GetObject(ctx, bucket, key, bufw, complete, &user.DownloadOptions{
-		Start:  startOffset,
-		Length: length,
-	})
+	err := lfs.GetObject(ctx, bucket, key, bufw, complete, user.DefaultOption())
 
 	if err != nil {
 		return convertToMinioError(err, bucket, "")
@@ -317,8 +310,7 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 		return minio.ObjectInfo{}, errLfsServiceNotReady
 	}
 
-	var ops user.ObjectOptions
-	obj, err := lfs.HeadObject(ctx, bucket, object, ops)
+	obj, err := lfs.HeadObject(ctx, bucket, object, user.DefaultOption())
 	if err != nil {
 		return minio.ObjectInfo{}, convertToMinioError(err, bucket, object)
 	}
@@ -342,8 +334,10 @@ func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *mi
 		return minio.ObjectInfo{}, errLfsServiceNotReady
 	}
 
+	ops := user.DefaultOption()
+	ops.UserDefined = opts.UserDefined
 	reader := bufio.NewReaderSize(r.Reader, user.DefaultBufSize)
-	obj, err := lfs.PutObject(ctx, bucket, object, reader)
+	obj, err := lfs.PutObject(ctx, bucket, object, reader, ops)
 	if err != nil {
 		return objInfo, convertToMinioError(err, bucket, object)
 	}
@@ -438,6 +432,8 @@ func convertToMinioError(err error, bucket, object string) error {
 		return minio.ObjectAlreadyExists{Bucket: bucket, Object: object}
 	case user.ErrObjectNotExist:
 		return minio.ObjectNotFound{Bucket: bucket, Object: object}
+	case user.ErrObjectIsDir:
+		return minio.ObjectExistsAsDirectory{Bucket: bucket, Object: object}
 	default:
 		return err
 	}
