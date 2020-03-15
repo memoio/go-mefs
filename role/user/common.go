@@ -36,6 +36,7 @@ var (
 	ErrCannotGetEnoughBlock = errors.New("cannot get enough block")
 	ErrCannotLoadMetaBlock  = errors.New("cannot load metaBlock")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
+	ErrUpload               = errors.New("upload fails")
 
 	ErrNoProviders      = errors.New("there is no providers")
 	ErrNoKeepers        = errors.New("there is no keepers")

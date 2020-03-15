@@ -33,9 +33,10 @@ type uploadTask struct { //一个上传任务实例
 	encrypt   int32
 	sKey      [32]byte
 	bucketID  int64
-	begin     int
-	length    int
-	rawLen    int
+	begin     int64
+	length    int64
+	rawLen    int64
+	sucLen    int64
 	etag      string
 	gInfo     *groupInfo
 	reader    io.Reader
@@ -86,8 +87,6 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		return nil, nil, ErrBucketNotExist
 	}
 
-	bucket.Lock()
-	defer bucket.Unlock()
 	objectElement, ok := bucket.objects[objectName]
 	if ok || objectElement != nil {
 		if creation {
@@ -95,6 +94,9 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		}
 		return bucket, objectElement, nil
 	}
+
+	bucket.Lock()
+	defer bucket.Unlock()
 
 	if creation {
 		//add Object
@@ -151,9 +153,10 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 // make sure bucket and object is ont empty
 func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object *objectInfo, reader io.Reader) (*mpb.ObjectInfo, error) {
 	bucket.Lock()
+	defer bucket.Unlock()
+
 	object.Lock()
 	defer object.Unlock()
-	defer bucket.Unlock()
 
 	bopt := &mpb.BlockOptions{
 		Bopts:   bucket.BOpts,
@@ -178,7 +181,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		reader:    reader,
 		gInfo:     l.gInfo,
 		bucketID:  bucket.BucketID,
-		begin:     int(bucket.GetLength()),
+		begin:     bucket.GetLength(),
 		encoder:   encoder,
 		encrypt:   bucket.BOpts.Encryption,
 	}
@@ -191,6 +194,12 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	if err != nil && ul.length == 0 {
 		return &object.ObjectInfo, err
 	}
+
+	if ul.length != ul.sucLen {
+		utils.MLogger.Info("upload %d, but success %d", ul.length, ul.sucLen)
+		return &object.ObjectInfo, ErrUpload
+	}
+
 	// opart
 	opart.ETag = ul.etag
 	opart.Length = int64(ul.length)
@@ -272,8 +281,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	segStripeSize := int(segSize * dc)
 	stripeSize := int(enc.Prefix.Bopts.SegmentCount) * segStripeSize
 
-	curStripe := u.begin / stripeSize
-	curOffset := ((u.begin%stripeSize)-1)/segStripeSize + 1
+	curStripe := int(u.begin) / stripeSize
+	curOffset := (int(u.begin) % stripeSize) / segStripeSize
 
 	rdata := make([]byte, stripeSize)
 	extra := make([]byte, 0, stripeSize)
@@ -369,8 +378,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				return role.ErrRead
 			}
 
-			u.rawLen += (curOffset - endOffset) * segStripeSize
-			u.length += n
+			u.rawLen += int64((curOffset - endOffset) * segStripeSize)
+			u.length += int64(n)
 
 			// encrypt
 			if u.encrypt == 1 {
@@ -456,6 +465,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 										break
 									} else {
 										atomic.AddInt32(&count, 1)
+										atomic.AddInt64(&u.sucLen, int64(len(data)))
 										break
 									}
 								}
@@ -476,6 +486,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 										break
 									} else {
 										atomic.AddInt32(&count, 1)
+										atomic.AddInt64(&u.sucLen, int64(len(data)))
 										break
 									}
 								}

@@ -128,7 +128,10 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	pStart := opts.Start
 	readLen := int64(0)
 	for readLen < length {
-		if len(object.GetParts()) <= i+1 {
+		if len(object.GetParts()) <= i {
+			for _, f := range completeFuncs {
+				f(ErrObjectOptionsInvalid)
+			}
 			return ErrObjectOptionsInvalid
 		}
 		dl.start = pStart + object.Parts[i].GetStart()
@@ -138,6 +141,9 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		}
 		err := dl.Start(ctx)
 		if err != nil {
+			for _, f := range completeFuncs {
+				f(err)
+			}
 			return err
 		}
 		pStart = 0

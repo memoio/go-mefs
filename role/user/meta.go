@@ -377,6 +377,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 
 		ob.Lock()
 		if part.PartID < ob.PartCount {
+			ob.Unlock()
 			return ErrObjectAlreadyExist
 		}
 		ob.Parts = append(ob.Parts, &part)
