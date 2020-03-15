@@ -59,7 +59,7 @@ type pInfo struct {
 	providerID string
 	maxSpace   uint64 //Bytes from contract
 	usedSpace  uint64 //Bytes
-	credit     int
+	credit     int    // faults
 	online     bool
 	availTime  int64
 	offerItem  *role.OfferItem // "latest"
@@ -69,7 +69,6 @@ type pInfo struct {
 func (p *pInfo) setOffer() {
 	p.Lock()
 	defer p.Unlock()
-
 }
 
 func (k *Info) getUInfo(pid string) (*uInfo, error) {

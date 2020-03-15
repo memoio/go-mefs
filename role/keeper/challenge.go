@@ -159,10 +159,15 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	proID := ops[1]
 	kid := ops[2]
 	chaltime := ops[3]
-
 	if kid != k.localID {
 		return
 	}
+
+	proInfo, ok := k.providers.Load(proID)
+	if !ok {
+		return
+	}
+	proInfo.(*pInfo).credit--
 
 	thisGroup := k.getGroupInfo(userID, qid, false)
 	if thisGroup == nil {
@@ -320,11 +325,14 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 		chalResult.Res = true
 		chalResult.SuccessLength = int64((float64(slength) / float64(chalResult.ChalLength)) * float64(chalResult.TotalLength))
+		proInfo.(*pInfo).credit++
+		if proInfo.(*pInfo).credit > 100 {
+			proInfo.(*pInfo).credit = 100
+		}
 	} else {
 		chalResult.Res = false
 		chalResult.SuccessLength = 0
 		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
-
 	}
 
 	//update thischalinfo.chalMap
