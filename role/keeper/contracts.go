@@ -126,7 +126,6 @@ func (k *Info) getOfferRegular(ctx context.Context) {
 					}
 					proInfo.(*pInfo).setOffer(true)
 				}
-
 			}()
 		}
 	}

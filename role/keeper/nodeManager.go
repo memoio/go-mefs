@@ -53,29 +53,42 @@ type kInfo struct {
 	keepItem  *role.KeeperItem
 }
 
+// todo node queue: accodring to credit, storage used
+
 // store provider information
 type pInfo struct {
 	sync.RWMutex
-	providerID string
-	maxSpace   uint64 //Bytes from contract
-	usedSpace  uint64 //Bytes
-	credit     int    // faults
-	online     bool
-	availTime  int64
-	offerItem  *role.OfferItem // "latest"
-	proItem    *role.ProviderItem
+	providerID   string
+	maxSpace     uint64 // Bytes from contract
+	usedSpace    uint64 // Bytes reported by provider
+	managedSpace uint64 // Bytes managed by this keeper
+	credit       int    // faults
+	online       bool
+	availTime    int64
+	offerItem    *role.OfferItem // "latest"
+	proItem      *role.ProviderItem
 }
 
-func (p *pInfo) setOffer(flag bool) {
-	if p.offerItem != nil || flag {
+func (p *pInfo) setOffer(flag bool) error {
+	if p.proItem == nil || flag {
+		proItem, err := role.GetProviderInfo(p.providerID, p.providerID)
+		if err != nil {
+			utils.MLogger.Infof("%s is not a provider", p.providerID)
+			return err
+		}
+		p.proItem = &proItem
+	}
+	if p.offerItem == nil || flag {
 		oItem, err := role.GetLatestOffer(p.providerID, p.providerID)
 		if err != nil {
-			return
+			return err
 		}
 		p.Lock()
 		defer p.Unlock()
 		p.offerItem = &oItem
 	}
+
+	return nil
 }
 
 func (k *Info) getUInfo(pid string) (*uInfo, error) {
@@ -114,7 +127,10 @@ func (k *Info) getPInfo(pid string) (*pInfo, error) {
 		tempInfo := &pInfo{
 			providerID: pid,
 		}
-		tempInfo.setOffer(false)
+		err := tempInfo.setOffer(false)
+		if err != nil {
+			return nil, err
+		}
 		k.providers.Store(pid, tempInfo)
 		return tempInfo, nil
 	}
