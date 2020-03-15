@@ -47,6 +47,7 @@ type uploadTask struct { //一个上传任务实例
 // PutObject constructs upload process
 func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error) {
 	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
+
 	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, true)
 	if err != nil {
 		return nil, err

@@ -114,11 +114,8 @@ func (k *Info) getOfferRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go func() {
-				pros := make([]string, 0, 1)
-				k.providers.Range(func(key, value interface{}) bool {
-					pros = append(pros, key.(string))
-					return true
-				})
+				pros, _ := k.GetProviders()
+
 				for _, pro := range pros {
 					proInfo, ok := k.providers.Load(pro)
 					if !ok {

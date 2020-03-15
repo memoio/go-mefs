@@ -40,6 +40,7 @@ type Info struct {
 	providers  sync.Map // value: *pInfo
 	users      sync.Map // value: *uInfo
 	ukpGroup   sync.Map // manage user-keeper-provider group, value: *group
+	netIDs     map[string]struct{}
 }
 
 // New is
@@ -51,6 +52,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		state:   false,
 		ds:      d,
 		repch:   make(chan string, 1024),
+		netIDs:  make(map[string]struct{}),
 	}
 
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
@@ -294,11 +296,10 @@ func (k *Info) loadUser(ctx context.Context) error {
 					return
 				}
 
-				ui := &uInfo{
-					userID: userID,
+				ui, err := k.getUInfo(userID)
+				if err != nil {
+					return
 				}
-
-				k.users.Store(userID, ui)
 
 				qs, err := k.ds.GetKey(ctx, kmfs.ToString(), "local")
 				if err != nil {

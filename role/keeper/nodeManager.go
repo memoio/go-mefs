@@ -210,7 +210,12 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 	for _, pid := range connPeers {
 		id := pid.Pretty() //连接结点id的base58编码
 
-		_, exist := k.users.Load(id)
+		_, exist := k.netIDs[id]
+		if exist {
+			continue
+		}
+
+		_, exist = k.users.Load(id)
 		if exist {
 			continue
 		}
@@ -267,6 +272,8 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 
 			thispInfo.online = true
 			thispInfo.availTime = time.Now().Unix()
+		} else {
+			k.netIDs[id] = struct{}{}
 		}
 	}
 	return nil
