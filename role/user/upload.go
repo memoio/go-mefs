@@ -195,7 +195,14 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		return &object.ObjectInfo, err
 	}
 
-	if ul.rawLen != ul.sucLen {
+	padding := int64(0)
+	if ul.encrypt == 1 {
+		if ul.length%aes.BlockSize != 0 {
+			padding = int64(aes.BlockSize) - ul.length%int64(aes.BlockSize)
+		}
+	}
+
+	if ul.length+padding != ul.sucLen {
 		utils.MLogger.Info("upload %d, but success %d", ul.length, ul.sucLen)
 		return &object.ObjectInfo, ErrUpload
 	}

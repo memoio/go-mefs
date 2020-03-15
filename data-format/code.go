@@ -219,21 +219,14 @@ func (d *DataCoder) Decode(stripe [][]byte, start, length int) ([]byte, error) {
 		return nil, err
 	}
 
-	switch d.Prefix.Bopts.Policy {
-	case RsPolicy:
-		if d.Repair {
-			d.RLength = minLen
-			data, _, err = d.recover(stripe)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			data = stripe
+	if d.Repair {
+		d.RLength = minLen
+		data, _, err = d.recover(stripe)
+		if err != nil {
+			return nil, err
 		}
-	case MulPolicy:
+	} else {
 		data = stripe
-	default:
-		return nil, ErrWrongPolicy
 	}
 
 	segStart := start
@@ -359,7 +352,31 @@ func (d *DataCoder) recoverField(stripe [][]byte) ([][]byte, error) {
 
 // 将传入的数据冗余块组恢复，返回想要恢复的块，若index为-1则返回个块组
 func (d *DataCoder) recoverData(data [][]byte, dc, pc int) ([][]byte, error) {
-	if dc == 1 {
+	switch d.Prefix.Bopts.Policy {
+	case RsPolicy:
+		enc, err := reedsolomon.New(dc, pc)
+		if err != nil {
+			return nil, err
+		}
+		ok, err := enc.Verify(data)
+		if err == reedsolomon.ErrShardNoData || err == reedsolomon.ErrTooFewShards {
+			return nil, err
+		}
+		if !ok {
+			err = enc.Reconstruct(data)
+			if err != nil {
+				return nil, err
+			}
+			ok, err = enc.Verify(data)
+			if !ok {
+				return nil, err
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		return data, nil
+	case MulPolicy:
 		var i int
 		for i = 0; i < d.blockCount; i++ {
 			if data[i] != nil {
@@ -378,31 +395,9 @@ func (d *DataCoder) recoverData(data [][]byte, dc, pc int) ([][]byte, error) {
 			}
 		}
 		return data, nil
+	default:
+		return nil, ErrWrongPolicy
 	}
-
-	enc, err := reedsolomon.New(dc, pc)
-	if err != nil {
-		return nil, err
-	}
-	ok, err := enc.Verify(data)
-	if err == reedsolomon.ErrShardNoData || err == reedsolomon.ErrTooFewShards {
-		return nil, err
-	}
-	if !ok {
-		err = enc.Reconstruct(data)
-		if err != nil {
-			return nil, err
-		}
-		ok, err = enc.Verify(data)
-		if !ok {
-			return nil, err
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return data, nil
 }
 
 func (d *DataCoder) decodeField(data []byte, tagNum int) ([]byte, [][]byte) {
