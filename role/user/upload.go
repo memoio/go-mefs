@@ -203,7 +203,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	}
 
 	if ul.length+padding != ul.sucLen {
-		utils.MLogger.Info("upload %d, but success %d", ul.length, ul.sucLen)
+		utils.MLogger.Infof("upload %d, but success %d", ul.length, ul.sucLen)
 		return &object.ObjectInfo, ErrUpload
 	}
 
@@ -463,7 +463,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 								for k := 0; k < 10; k++ {
 									err := u.gInfo.ds.PutBlock(ctx, km.ToString(), edata, proID)
 									if err != nil {
-										utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", proID, " failed: ", err)
+										utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", proID, "  failed: ", err)
 										if u.gInfo.ds.Connect(ctx, proID) {
 											tdelay := rand.Int63n(int64(k+1) * 60000000000)
 											time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
