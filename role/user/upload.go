@@ -56,7 +56,7 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 }
 
 // AppendObject constructs upload process
-func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts *ObjectOptions) (*mpb.ObjectInfo, error) {
+func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error) {
 	utils.MLogger.Infof("Upload append object: %s to bucket: %s begin", objectName, bucketName)
 	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, false)
 	if err != nil {
