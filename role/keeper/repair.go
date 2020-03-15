@@ -188,7 +188,13 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 		}
 	}
 
-	if len(response) == 0 || response == "" {
+	credit := 0
+	proInfo, ok := k.providers.Load(response)
+	if ok {
+		credit = proInfo.(*pInfo).credit
+	}
+
+	if credit < 0 || len(response) == 0 || response == "" {
 		response = k.searchNewProvider(ctx, qid, ugid)
 		if response == "" {
 			utils.MLogger.Info("Repair failed, no available provider")
@@ -273,6 +279,12 @@ func (k *Info) searchNewProvider(ctx context.Context, gid string, ugid []string)
 
 		if flag == len(ugid) {
 			if k.ds.Connect(ctx, tmpPro) {
+				proInfo, ok := k.providers.Load(tmpPro)
+				if ok {
+					if proInfo.(*pInfo).credit < 0 {
+						continue
+					}
+				}
 				response = tmpPro
 				break
 			}
