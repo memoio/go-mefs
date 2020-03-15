@@ -195,7 +195,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		return &object.ObjectInfo, err
 	}
 
-	if ul.length != ul.sucLen {
+	if ul.rawLen != ul.sucLen {
 		utils.MLogger.Info("upload %d, but success %d", ul.length, ul.sucLen)
 		return &object.ObjectInfo, ErrUpload
 	}
@@ -465,7 +465,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 										break
 									} else {
 										atomic.AddInt32(&count, 1)
-										atomic.AddInt64(&u.sucLen, int64(len(data)))
 										break
 									}
 								}
@@ -486,7 +485,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 										break
 									} else {
 										atomic.AddInt32(&count, 1)
-										atomic.AddInt64(&u.sucLen, int64(len(data)))
 										break
 									}
 								}
@@ -496,6 +494,9 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 					pwg.Wait()
 					start = offset
+					if count >= dc {
+						atomic.AddInt64(&u.sucLen, int64(len(transData)))
+					}
 				}
 				if count >= dc {
 					for _, v := range blockMetas {
