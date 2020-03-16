@@ -325,7 +325,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 		chalResult.Res = true
 		chalResult.SuccessLength = int64((float64(slength) / float64(chalResult.ChalLength)) * float64(chalResult.TotalLength))
-		proInfo.(*pInfo).credit++
+		proInfo.(*pInfo).credit += 2
 		if proInfo.(*pInfo).credit > 100 {
 			proInfo.(*pInfo).credit = 100
 		}

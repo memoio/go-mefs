@@ -110,6 +110,7 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 			if thisinfo.online == true && thisinfo.credit > 0 {
 				if thisinfo.offerItem != nil {
 					if thisinfo.offerItem.Price > price {
+						utils.MLogger.Debugf("provider %s has price %d, need %d; has credit: %d", key, thisinfo.offerItem.Price, price, thisinfo.credit)
 						return true
 					}
 				}
