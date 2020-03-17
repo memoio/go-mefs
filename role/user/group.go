@@ -792,6 +792,9 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 }
 
 func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
+	if g == nil {
+		return nil, nil, ErrLfsServiceNotReady
+	}
 	num := count
 	if count < 0 {
 		num = len(g.tempKeepers)

@@ -44,7 +44,12 @@ var KeeperListUsersCmd = &cmds.Command{
 			return ErrNotOnline
 		}
 
-		users, err := node.Inst.(*keeper.Info).GetUsers()
+		keeperIns, ok := node.Inst.(*keeper.Info)
+		if !ok {
+			return errWrongInput
+		}
+
+		users, err := keeperIns.GetUsers()
 		if err != nil {
 			return err
 		}
@@ -79,8 +84,11 @@ var KeeperListProvidersCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
-		providers, err := node.Inst.(*keeper.Info).GetProviders()
+		keeperIns, ok := node.Inst.(*keeper.Info)
+		if !ok {
+			return errWrongInput
+		}
+		providers, err := keeperIns.GetProviders()
 
 		if err != nil {
 			return err
@@ -117,7 +125,12 @@ var KeeperListKeepersCmd = &cmds.Command{
 			return ErrNotOnline
 		}
 
-		keepers, err := node.Inst.(*keeper.Info).GetKeepers()
+		keeperIns, ok := node.Inst.(*keeper.Info)
+		if !ok {
+			return errWrongInput
+		}
+
+		keepers, err := keeperIns.GetKeepers()
 		if err != nil {
 			return err
 		}
@@ -152,7 +165,10 @@ var KeeperFlushCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
-		return node.Inst.(*keeper.Info).FlushPeers(context.Background())
+		keeperIns, ok := node.Inst.(*keeper.Info)
+		if !ok {
+			return errWrongInput
+		}
+		return keeperIns.FlushPeers(context.Background())
 	},
 }
