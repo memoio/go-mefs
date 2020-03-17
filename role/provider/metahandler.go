@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,7 +70,7 @@ func (p *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 }
 
 func (p *Info) handlePutKey(km *metainfo.Key, metaValue, sig []byte, from string) {
-	ctx := context.Background()
+	ctx := p.context
 	ok := p.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return
@@ -81,13 +80,13 @@ func (p *Info) handlePutKey(km *metainfo.Key, metaValue, sig []byte, from string
 }
 
 func (p *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
-	ctx := context.Background()
+	ctx := p.context
 
 	return p.ds.GetKey(ctx, km.ToString(), "local")
 }
 
 func (p *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from string) {
-	ctx := context.Background()
+	ctx := p.context
 	ok := p.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return
@@ -126,14 +125,14 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	}
 
 	kmkps, _ := metainfo.NewKey(gid, mpb.KeyType_LFS, uid)
-	p.ds.PutKey(context.Background(), kmkps.ToString(), metaValue, nil, "local")
+	p.ds.PutKey(p.context, kmkps.ToString(), metaValue, nil, "local")
 
 	gp := p.getGroupInfo(uid, gid, false)
 	if gp != nil {
 		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < expireTime {
 			return []byte(gp.sessionID.String()), nil
 		}
-		ok := p.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
+		ok := p.ds.VerifyKey(p.context, km.ToString(), metaValue, sig)
 		if !ok {
 			utils.MLogger.Info("key signature is wrong for: ", km.ToString())
 			return []byte(uuid.Nil.String()), nil

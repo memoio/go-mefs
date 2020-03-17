@@ -312,11 +312,11 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		km, err := metainfo.NewKey(groupID, mpb.KeyType_Pos, posID)
 
 		for _, keeper := range gp.keepers {
-			p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(metaValue), nil, keeper)
+			p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(metaValue), nil, keeper)
 		}
 
 		// 本地更新
-		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posCidPrefix), nil, "local")
+		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(posCidPrefix), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
@@ -372,7 +372,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 
 		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 
-		err = p.ds.PutKey(context.Background(), posKM.ToString(), []byte(posCidPrefix), nil, "local")
+		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(posCidPrefix), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
@@ -393,7 +393,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		}
 		metavalue := strings.Join(deleteBlocks, metainfo.DELIMITER)
 		for _, keeper := range gp.keepers {
-			p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Delete), km.ToString(), []byte(metavalue), nil, keeper)
+			p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Delete), km.ToString(), []byte(metavalue), nil, keeper)
 		}
 	}
 }

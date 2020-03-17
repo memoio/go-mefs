@@ -146,7 +146,7 @@ func (p *Info) GetRole() string {
 }
 
 func (p *Info) Stop() error {
-	return p.save(context.Background())
+	return p.save(p.context)
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
@@ -168,7 +168,7 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 	var tmpPros []string
 
 	if kpids == "" && userID == groupID {
-		ctx := context.Background()
+		ctx := p.context
 		kmkps, err := metainfo.NewKey(groupID, mpb.KeyType_LFS, userID)
 		if err != nil {
 			return nil
