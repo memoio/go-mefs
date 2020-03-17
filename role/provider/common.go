@@ -1,8 +1,6 @@
 package provider
 
 import (
-	"context"
-
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
@@ -31,7 +29,7 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx := p.context
 	userconfigkey := kmBls12.ToString()
 	userconfigbyte, _ := p.ds.GetKey(ctx, userconfigkey, "local")
 	if len(userconfigbyte) > 0 {

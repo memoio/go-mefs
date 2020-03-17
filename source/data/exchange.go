@@ -68,6 +68,9 @@ func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data,
 		return errNoRouting
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	utils.MLogger.Debug("SendMetaMessage: ", key, " to: ", to)
 
 	p, err := peer.IDB58Decode(to)
@@ -84,6 +87,9 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 	if n.ph == nil || n.rt == nil {
 		return nil, errNoRouting
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	utils.MLogger.Debug("SendMetaRequest: ", key, " to: ", to)
 

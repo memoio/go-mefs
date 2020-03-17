@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
@@ -51,7 +50,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	var faultBlocks []string
 	var electedOffset int
 	var buf, cbuf strings.Builder
-	ctx := context.Background()
+	ctx := p.context
 	for _, index := range hProto.Blocks {
 		if len(index) == 0 {
 			continue
@@ -97,7 +96,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		if !isTrue {
 			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
 			//验证失败，则在本地删除此块
-			err := p.ds.DeleteBlock(context.Background(), blockID, "local")
+			err := p.ds.DeleteBlock(p.context, blockID, "local")
 			if err != nil {
 				utils.MLogger.Info("Delete block", blockID, "error:", err)
 			}
@@ -146,7 +145,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
+	_, err = p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		utils.MLogger.Info("send proof err: ", err)
 	}

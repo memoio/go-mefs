@@ -19,6 +19,7 @@ type Info struct {
 	ds      data.Service
 	fsMap   sync.Map // now key is queryID, value is *lfsInfo
 	qMap    sync.Map // key is userID, value is *userInfo
+	context context.Context
 }
 
 type queryInfo struct {
@@ -48,10 +49,11 @@ func (q *queryInfo) getQuery() string {
 }
 
 // New constructs a new user service
-func New(nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
+func New(ctx context.Context, nid string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	us := &Info{
 		localID: nid,
 		ds:      d,
+		context: ctx,
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(us)
 	if err != nil {
@@ -125,7 +127,7 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 		u.qMap.Store(userID, uq)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(u.context)
 
 	lInfo := &LfsInfo{
 		userID:     userID,

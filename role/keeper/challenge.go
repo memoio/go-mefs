@@ -343,7 +343,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
-	k.putKey(context.Background(), km.ToString(), hByte, nil, "local", thisGroup.clusterID, thisGroup.bft)
+	k.putKey(k.context, km.ToString(), hByte, nil, "local", thisGroup.clusterID, thisGroup.bft)
 
 	return
 }

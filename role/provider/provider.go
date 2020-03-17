@@ -28,6 +28,7 @@ type Info struct {
 	ds           data.Service
 	storageUsed  uint64
 	storageTotal uint64
+	context      context.Context
 	fsGroup      sync.Map // key: queryID, value: *groupInfo
 	users        sync.Map // key: userID, value: *uInfo
 	keepers      sync.Map // key: keeperID, value: *kInfo
@@ -93,6 +94,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		localID: id,
 		sk:      sk,
 		ds:      ds,
+		context: ctx,
 		offers:  make([]*role.OfferItem, 0, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)

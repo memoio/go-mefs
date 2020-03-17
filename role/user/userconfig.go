@@ -43,7 +43,7 @@ func (l *LfsInfo) loadBLS12Config() error {
 	}
 
 	blskey := kmBls.ToString()
-	ctx := context.Background()
+	ctx := l.context
 
 	has := false
 	userBLS12config, err := l.ds.GetKey(ctx, blskey, "local")

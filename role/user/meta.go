@@ -2,7 +2,6 @@ package user
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -501,13 +500,13 @@ func (l *LfsInfo) putDataToBlocks(data []byte, metaBackupCount int, buc, stripe 
 		return err
 	}
 
-	ctx := context.Background()
+	ctx := l.context
 	err = l.ds.PutBlock(ctx, bm.ToString(), dataEncoded[0], "local")
 	if err != nil {
 		utils.MLogger.Errorf("user %s lfs %s bucket %s info persist to local failed. ", l.userID, l.fsID, buc)
 		return err
 	}
-	providers, _, err := l.gInfo.GetProviders(metaBackupCount)
+	providers, _, err := l.gInfo.GetProviders(ctx, metaBackupCount)
 	if err != nil && len(providers) == 0 {
 		return err
 	}
@@ -521,7 +520,7 @@ func (l *LfsInfo) putDataToBlocks(data []byte, metaBackupCount int, buc, stripe 
 			continue
 		}
 
-		err = l.gInfo.putDataMetaToKeepers(ncid, providers[j], int(offset))
+		err = l.gInfo.putDataMetaToKeepers(ctx, ncid, providers[j], int(offset))
 		if err != nil {
 			continue
 		}
@@ -544,7 +543,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 	}
 	ncidlocal := bm.ToString()
 	km, _ := metainfo.NewKey(ncidlocal, mpb.KeyType_Block)
-	ctx := context.Background()
+	ctx := l.context
 	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
 	if err == nil && b != nil {
 		_, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
@@ -562,7 +561,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 		for j := 0; j < metaBackupCount; j++ {
 			bm.SetCid(strconv.Itoa(j))
 			ncid := bm.ToString()
-			provider, _, err := l.gInfo.getBlockProviders(ncid) //获取数据块的保存位置
+			provider, _, err := l.gInfo.getBlockProviders(ctx, ncid) //获取数据块的保存位置
 			if err != nil || provider == "" {
 				continue
 			}

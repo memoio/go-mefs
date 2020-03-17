@@ -400,7 +400,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	case metainfo.RoleUser:
 		fmt.Println("Starting as a user")
-		ins, err := user.New(node.Identity.Pretty(), node.Data, node.Routing)
+		ins, err := user.New(node.Context(), node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
 			fmt.Println("Start user daemon fails; please restart")
 		}

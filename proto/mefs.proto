@@ -43,6 +43,7 @@ enum KeyType {
     ChalPay = 40; // each pay
     LastPay = 41;
     PosMeta = 42;
+    Sign    = 43;
 }
 
 message KeyMeta{

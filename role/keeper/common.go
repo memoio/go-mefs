@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
@@ -63,8 +62,7 @@ func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := k.context
 
 	userconfigkey := kmBls12.ToString()
 	userconfigbyte, err := k.ds.GetKey(ctx, userconfigkey, "local")

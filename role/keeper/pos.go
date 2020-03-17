@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"strings"
 
 	mpb "github.com/memoio/go-mefs/proto"
@@ -91,7 +90,7 @@ func (k *Info) handlePosDelete(km *metainfo.Key, metaValue []byte, from string) 
 		if err != nil {
 			continue
 		}
-		err = k.ds.DeleteKey(context.Background(), kmBlock.ToString(), "local")
+		err = k.ds.DeleteKey(k.context, kmBlock.ToString(), "local")
 		if err != nil && err != ds.ErrNotFound {
 			continue
 		}

@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
@@ -82,7 +81,7 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 
 func (k *Info) handlePutKey(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handlePutKey: ", km.ToString())
-	ctx := context.Background()
+	ctx := k.context
 	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return
@@ -93,14 +92,13 @@ func (k *Info) handlePutKey(km *metainfo.Key, metaValue, sig []byte, from string
 
 func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleGetKey: ", km.ToString())
-	ctx := context.Background()
 
-	return k.ds.GetKey(ctx, km.ToString(), "local")
+	return k.ds.GetKey(k.context, km.ToString(), "local")
 }
 
 func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleAddBucket: ", km.ToString())
-	ctx := context.Background()
+	ctx := k.context
 	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return
@@ -123,7 +121,7 @@ func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from str
 
 func (k *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleDeleteKey: ", km.ToString())
-	ctx := context.Background()
+	ctx := k.context
 	ok := k.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return
@@ -163,7 +161,7 @@ func (k *Info) handleDeleteBlockPos(km *metainfo.Key) {
 	blockID := km.GetMid()
 
 	// delete from local
-	k.ds.DeleteKey(context.Background(), km.ToString(), "local")
+	k.ds.DeleteKey(k.context, km.ToString(), "local")
 
 	// delete from mem
 	bids := strings.SplitN(blockID, metainfo.BlockDelimiter, 2)

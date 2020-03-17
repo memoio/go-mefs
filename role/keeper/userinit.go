@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -66,7 +65,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 	}
 	utils.MLogger.Info("New fs: ", qid, " for user: ", uid, " keeperCount: ", kc, " providerCount: ", pc, " price: ", price)
 
-	k.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(response), nil, from)
+	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), []byte(response), nil, from)
 }
 
 //response: kid1kid2../pid1pid2..
@@ -255,7 +254,7 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < expireTime {
 			return []byte(gp.sessionID.String()), nil
 		}
-		ok := k.ds.VerifyKey(context.Background(), km.ToString(), metaValue, sig)
+		ok := k.ds.VerifyKey(k.context, km.ToString(), metaValue, sig)
 		if !ok {
 			utils.MLogger.Infof("key signature is wrong for %s", km.ToString())
 			return []byte(uuid.Nil.String()), nil
@@ -319,6 +318,6 @@ func (k *Info) fillPinfo(userID, groupID string, kc, pc int, metaValue []byte, f
 		return nil, err
 	}
 
-	k.putKey(context.Background(), kmkps.ToString(), metaValue, nil, "local", gp.clusterID, gp.bft)
+	k.putKey(k.context, kmkps.ToString(), metaValue, nil, "local", gp.clusterID, gp.bft)
 	return gp, nil
 }

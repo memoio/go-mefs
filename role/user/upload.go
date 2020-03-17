@@ -302,7 +302,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("upload cancel")
 			return nil
 		default:
-			pros, _, _ = u.gInfo.GetProviders(bc)
+			pros, _, _ = u.gInfo.GetProviders(ctx, bc)
 			if len(pros) >= least {
 				breakFlag = true
 			} else {
@@ -428,7 +428,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					}
 
 					if start != 0 {
-						provider, _, err := u.gInfo.getBlockProviders(ncid)
+						provider, _, err := u.gInfo.getBlockProviders(ctx, ncid)
 						if err != nil {
 							continue
 						}
@@ -511,7 +511,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				}
 				if count >= dc {
 					for _, v := range blockMetas {
-						u.gInfo.putDataMetaToKeepers(v.cid, v.provider, v.end)
+						u.gInfo.putDataMetaToKeepers(ctx, v.cid, v.provider, v.end)
 					}
 				}
 			}(data, curStripe, curOffset)

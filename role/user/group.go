@@ -368,7 +368,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 	utils.MLogger.Info("Group Service is ready for: ", g.userID)
 
-	g.loadContracts("")
+	g.loadContracts(ctx, "")
 
 	g.state = groupStarted
 	return nil
@@ -423,7 +423,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 // handleUserInit handle replys from keepers
 // key: queryID/"UserInit"/userID/keepercount/providercount,
 // value: kid1kid2..../pid1pid2
-func (g *groupInfo) handleUserInit(km *metainfo.Key, metaValue []byte, from string) {
+func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaValue []byte, from string) {
 	g.Lock()
 	defer g.Unlock()
 
@@ -437,7 +437,6 @@ func (g *groupInfo) handleUserInit(km *metainfo.Key, metaValue []byte, from stri
 		return
 	}
 
-	ctx := context.Background()
 	kcount := 0
 	pcount := 0
 	keepers := splitedMeta[0]
@@ -760,7 +759,7 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	return nil
 }
 
-func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
+func (g *groupInfo) getBlockProviders(ctx context.Context, blockID string) (string, int, error) {
 	var pidstr string
 	var offset int
 
@@ -769,7 +768,6 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 		return "", 0, err
 	}
 	blockMeta := kmBlock.ToString()
-	ctx := context.Background()
 	for _, kp := range g.tempKeepers {
 		pidAndOffset, err := g.ds.GetKey(ctx, blockMeta, kp)
 		if err != nil || pidAndOffset == nil {
@@ -791,7 +789,7 @@ func (g *groupInfo) getBlockProviders(blockID string) (string, int, error) {
 	return "", 0, ErrNoProviders
 }
 
-func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
+func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []string, error) {
 	if g == nil {
 		return nil, nil, ErrLfsServiceNotReady
 	}
@@ -802,8 +800,6 @@ func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
 
 	unconKeepers := make([]string, 0, num)
 	conKeepers := make([]string, 0, num)
-
-	ctx := context.Background()
 
 	i := 0
 	for _, kp := range g.tempKeepers {
@@ -826,7 +822,7 @@ func (g *groupInfo) GetKeepers(count int) ([]string, []string, error) {
 	return conKeepers, unconKeepers, nil
 }
 
-func (g *groupInfo) GetProviders(count int) ([]string, []string, error) {
+func (g *groupInfo) GetProviders(ctx context.Context, count int) ([]string, []string, error) {
 	num := count
 	if count < 0 {
 		num = len(g.tempProviders)
@@ -836,7 +832,6 @@ func (g *groupInfo) GetProviders(count int) ([]string, []string, error) {
 
 	unconPro := make([]string, 0, num)
 	conPro := make([]string, 0, num)
-	ctx := context.Background()
 	for _, pro := range g.tempProviders {
 		if i >= num {
 			break
@@ -910,7 +905,7 @@ func (g *groupInfo) putToAll(ctx context.Context, key string, value []byte) {
 	return
 }
 
-func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
+func (g *groupInfo) putDataToKeepers(ctx context.Context, key string, value []byte) error {
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
@@ -923,7 +918,6 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 
 	var wg sync.WaitGroup
 
-	ctx := context.Background()
 	count := int32(0)
 	for _, keeper := range g.tempKeepers {
 		wg.Add(1)
@@ -951,7 +945,7 @@ func (g *groupInfo) putDataToKeepers(key string, value []byte) error {
 	return nil
 }
 
-func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset int) error {
+func (g *groupInfo) putDataMetaToKeepers(ctx context.Context, blockID string, provider string, offset int) error {
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
@@ -960,15 +954,15 @@ func (g *groupInfo) putDataMetaToKeepers(blockID string, provider string, offset
 		return err
 	}
 	metaValue := provider + metainfo.DELIMITER + strconv.Itoa(offset)
-	return g.putDataToKeepers(kmBlock.ToString(), []byte(metaValue))
+	return g.putDataToKeepers(ctx, kmBlock.ToString(), []byte(metaValue))
 }
 
 //删除块
-func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) error {
+func (g *groupInfo) deleteBlocksFromProvider(ctx context.Context, blockID string, updateMeta bool) error {
 	if g.state < groupStarted {
 		return ErrLfsServiceNotReady
 	}
-	provider, _, err := g.getBlockProviders(blockID)
+	provider, _, err := g.getBlockProviders(ctx, blockID)
 	if err == ErrNoProviders { //Noprovider说明此块还不存在，不用删除
 		utils.MLogger.Warnf("Get block: %s's location error, no exist or keepers lost it.", blockID)
 		return nil
@@ -980,8 +974,6 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	if err != nil {
 		return err
 	}
-
-	ctx := context.Background()
 
 	if updateMeta { //这个需要等待返回
 		g.ds.DeleteBlock(ctx, km.ToString(), provider)
@@ -998,7 +990,7 @@ func (g *groupInfo) deleteBlocksFromProvider(blockID string, updateMeta bool) er
 	return nil
 }
 
-func (g *groupInfo) loadContracts(pid string) error {
+func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 	if g.groupID == g.userID {
 		return nil
 	}
@@ -1038,8 +1030,6 @@ func (g *groupInfo) loadContracts(pid string) error {
 			proInfo.offerItem = &oItem
 		}
 	}
-
-	ctx := context.Background()
 
 	var wg sync.WaitGroup
 	for _, pInfo := range g.providers {
@@ -1133,12 +1123,11 @@ func (g *groupInfo) loadContracts(pid string) error {
 	return nil
 }
 
-func (g *groupInfo) loadChannelValue() error {
+func (g *groupInfo) loadChannelValue(ctx context.Context) error {
 	if g.groupID == g.userID {
 		return nil
 	}
 
-	ctx := context.Background()
 	var wg sync.WaitGroup
 	for _, pInfo := range g.providers {
 		wg.Add(1)
@@ -1192,12 +1181,11 @@ func (g *groupInfo) loadChannelValue() error {
 	return nil
 }
 
-func (g *groupInfo) saveChannelValue() error {
+func (g *groupInfo) saveChannelValue(ctx context.Context) error {
 	if g.groupID == g.userID {
 		return nil
 	}
 
-	ctx := context.Background()
 	for _, proInfo := range g.providers {
 		if proInfo.chanItem != nil && proInfo.chanItem.Sig != nil && proInfo.chanItem.Dirty {
 			km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, mpb.KeyType_Channel)

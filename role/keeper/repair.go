@@ -212,7 +212,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	}
 
 	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
-	k.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Get), km.ToString(), []byte(metaValue), nil, response)
+	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Get), km.ToString(), []byte(metaValue), nil, response)
 }
 
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid

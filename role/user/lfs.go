@@ -76,7 +76,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 					return err
 				}
 				l.keySet = mkey
-				l.putUserConfig(l.context)
+				l.putUserConfig(ctx)
 			}
 		} else {
 			if l.keySet == nil {
@@ -95,11 +95,11 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		}
 
 		l.keySet = mkey
-		l.putUserConfig(l.context)
+		l.putUserConfig(ctx)
 	}
 
 	// in case persist is cancel
-	err = l.startLfs(l.context)
+	err = l.startLfs()
 	if err != nil {
 		utils.MLogger.Error("Start lfs: ", l.fsID, " for: ", l.userID, " fail: ", err)
 		return err
@@ -110,7 +110,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 
 // lfs启动，从本地或者本节点provider处获取LfsMeta信息进行填充，填充不了才进行LfsMeta的初始化操作
 //填充顺序：超级块-Bucket数据-Bucket中Object数据
-func (l *LfsInfo) startLfs(ctx context.Context) error {
+func (l *LfsInfo) startLfs() error {
 	var err error
 	_, err = checkMetaPath(l.fsID)
 	if err != nil {
@@ -142,9 +142,9 @@ func (l *LfsInfo) startLfs(ctx context.Context) error {
 		}
 	}
 	utils.MLogger.Infof("Lfs Service %s is ready for: %s", l.fsID, l.userID)
-	go l.persistMetaBlock(ctx)
-	go l.persistRoot(ctx)
-	go l.sendHeartBeat(ctx)
+	go l.persistMetaBlock(l.context)
+	go l.persistRoot(l.context)
+	go l.sendHeartBeat(l.context)
 	return nil
 }
 
@@ -354,7 +354,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	}
 
 	if isForce {
-		l.gInfo.saveChannelValue()
+		l.gInfo.saveChannelValue(l.context)
 	}
 
 	return nil

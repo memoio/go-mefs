@@ -93,7 +93,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 	val, err := proto.Marshal(&binfo)
 	if err == nil {
-		l.gInfo.putDataToKeepers(bk.ToString(), val)
+		l.gInfo.putDataToKeepers(ctx, bk.ToString(), val)
 	}
 
 	return &bucket.BucketInfo, nil

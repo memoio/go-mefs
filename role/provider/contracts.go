@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"math/big"
 	"time"
 
@@ -65,7 +64,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 
 	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.userID != gp.groupID {
-		ctx := context.Background()
+		ctx := p.context
 
 		gp.channel.Range(func(key, value interface{}) bool {
 			cItem, ok := value.(*role.ChannelItem)
@@ -90,7 +89,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 	}
 	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.userID != gp.groupID {
-		ctx := context.Background()
+		ctx := p.context
 		gp.channel.Range(func(key, v interface{}) bool {
 			cItem, ok := v.(*role.ChannelItem)
 			if !ok {

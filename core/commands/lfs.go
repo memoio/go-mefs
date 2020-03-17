@@ -1347,7 +1347,7 @@ var lfsListKeepersCmd = &cmds.Command{
 		if !ok {
 			return errWrongInput
 		}
-		conkeepers, unconkeepers, _ := lfsIns.GetGroup().GetKeepers(-1)
+		conkeepers, unconkeepers, _ := lfsIns.GetGroup().GetKeepers(req.Context, -1)
 		keepers := make([]PeerState, len(unconkeepers)+len(conkeepers))
 		for i := 0; i < len(conkeepers); i++ {
 			keepers[i].PeerID = conkeepers[i]
@@ -1411,7 +1411,7 @@ var lfsListProviderrsCmd = &cmds.Command{
 		if !ok {
 			return errWrongInput
 		}
-		conpro, unconpro, _ := lfsIns.GetGroup().GetProviders(-1)
+		conpro, unconpro, _ := lfsIns.GetGroup().GetProviders(req.Context, -1)
 		providers := make([]PeerState, len(unconpro)+len(conpro))
 		for i := 0; i < len(conpro); i++ {
 			providers[i].PeerID = conpro[i]

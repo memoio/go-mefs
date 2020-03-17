@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"math/big"
 	"strings"
 
@@ -32,7 +31,7 @@ func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error
 	}
 
 	go func() {
-		ctx := context.Background()
+		ctx := p.context
 		err := p.ds.PutBlock(ctx, splitedNcid[0], value, "local")
 		if err != nil {
 			utils.MLogger.Info("Error writing block to datastore: %s", err)
@@ -70,7 +69,7 @@ func (p *Info) handleAppendBlock(km *metainfo.Key, value []byte, from string) er
 		return role.ErrNotMyUser
 	}
 
-	ctx := context.Background()
+	ctx := p.context
 	go func() {
 		err := p.ds.AppendBlock(ctx, km.ToString(), value, "local")
 		if err != nil {
@@ -97,7 +96,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 		return nil, role.ErrNotMyUser
 	}
 
-	ctx := context.Background()
+	ctx := p.context
 
 	if gp.userID != gp.groupID {
 		res, chanGot, value, err := verifyChanSign(sig)
@@ -207,7 +206,7 @@ func verifyChanValue(oldValue, newValue *big.Int, readLen int) bool {
 
 func (p *Info) handleDeleteBlock(km *metainfo.Key, from string) error {
 	utils.MLogger.Info("handleDeleteBlock: ", km.ToString(), "from: ", from)
-	err := p.ds.DeleteBlock(context.Background(), km.ToString(), "local")
+	err := p.ds.DeleteBlock(p.context, km.ToString(), "local")
 	if err != nil && err != bs.ErrNotFound {
 		return err
 	}

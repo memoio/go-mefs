@@ -202,7 +202,7 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
 	gp := l.gInfo
-	conkeepers, _, err := gp.GetKeepers(-1)
+	conkeepers, _, err := gp.GetKeepers(l.context, -1)
 	if err != nil {
 		return latestTime, err
 	}
@@ -216,7 +216,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	}
 
 	var tempTime time.Time
-	ctx := context.Background()
+	ctx := l.context
 	for _, keeper := range conkeepers {
 		res, err := l.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), nil, nil, keeper)
 		if err != nil {

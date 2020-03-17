@@ -32,6 +32,7 @@ type Info struct {
 	sk         string
 	state      bool
 	enableBft  bool
+	context    context.Context
 	dnh        *dragonboat.NodeHost
 	raftNodeID uint64
 	repch      chan string
@@ -53,6 +54,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		ds:      d,
 		repch:   make(chan string, 1024),
 		netIDs:  make(map[string]struct{}),
+		context: ctx,
 	}
 
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
@@ -102,7 +104,7 @@ func (k *Info) GetRole() string {
 
 // Stop is
 func (k *Info) Stop() error {
-	k.save(context.Background())
+	k.save(k.context)
 	if k.dnh != nil {
 		k.dnh.Stop()
 	}
@@ -232,7 +234,7 @@ func (k *Info) savePay(qid, pid string) error {
 		beginTime := thisLinfo.lastPay.beginTime
 		endTime := thisLinfo.lastPay.endTime
 		spaceTime := thisLinfo.lastPay.spacetime
-		ctx := context.Background()
+		ctx := k.context
 
 		//key: qid/`lastpay"/pid`
 		//value: `beginTime/endTime/spacetime/signature/proof`
@@ -610,7 +612,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		}
 
 		k.ukpGroup.Store(qid, gInfo)
-		ctx := context.Background()
+		ctx := k.context
 		for _, pid := range gInfo.providers {
 			lin := &lInfo{
 				inChallenge:  false,
@@ -642,7 +644,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 
 func (k *Info) newGroupWithFS(userID, groupID string, kpids string, flag bool) error {
 	if kpids == "" && flag {
-		ctx := context.Background()
+		ctx := k.context
 		kmkps, err := metainfo.NewKey(groupID, mpb.KeyType_LFS, userID)
 		if err != nil {
 			return err
@@ -786,7 +788,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 			if err == nil {
 				pidAndOffset := pid + metainfo.DELIMITER + strconv.Itoa(offset)
 
-				err = k.putKey(context.Background(), km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID, gp.bft)
+				err = k.putKey(k.context, km.ToString(), []byte(pidAndOffset), nil, "local", gp.clusterID, gp.bft)
 				if err != nil {
 					utils.MLogger.Info("Add block: ", blockID, " error:", err)
 				}
@@ -803,7 +805,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 	utils.MLogger.Info("delete block: ", bid, "for query: ", qid)
 
-	ctx := context.Background()
+	ctx := k.context
 
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {

@@ -201,7 +201,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 			data, n, err := do.rangeRead(ctx, start, length)
 			if err != nil {
 				if err.Error() == role.ErrWrongMoney.Error() {
-					do.group.loadContracts("")
+					do.group.loadContracts(ctx, "")
 					continue
 				} else {
 					do.Complete(err)
@@ -340,7 +340,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			if ok {
 				provider = pro.(string)
 			} else {
-				providerID, _, err := do.group.getBlockProviders(chunkid)
+				providerID, _, err := do.group.getBlockProviders(ctx, chunkid)
 				if err != nil || providerID == do.group.groupID {
 					utils.MLogger.Warnf("Get Block %s 's provider from keeper failed: %s", chunkid, err)
 					return
@@ -376,7 +376,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 
 				if err.Error() == role.ErrNotEnoughMoney.Error() {
 					atomic.AddInt32(&wrongMoney, 1)
-					do.group.loadContracts(provider)
+					do.group.loadContracts(ctx, provider)
 				}
 				return
 			}

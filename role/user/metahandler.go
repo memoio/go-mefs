@@ -1,8 +1,6 @@
 package user
 
 import (
-	"context"
-
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
@@ -26,7 +24,7 @@ func (u *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 			if !ok {
 				utils.MLogger.Warn("no lfs for: ", km.GetMid())
 			}
-			go fs.(*LfsInfo).gInfo.handleUserInit(km, metaValue, from)
+			go fs.(*LfsInfo).gInfo.handleUserInit(u.context, km, metaValue, from)
 		default:
 			return nil, metainfo.ErrWrongType
 		}
@@ -48,7 +46,7 @@ func (u *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 }
 
 func (u *Info) handlePutKey(km *metainfo.Key, metaValue, sig []byte, from string) {
-	ctx := context.Background()
+	ctx := u.context
 	ok := u.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return
@@ -58,13 +56,11 @@ func (u *Info) handlePutKey(km *metainfo.Key, metaValue, sig []byte, from string
 }
 
 func (u *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
-	ctx := context.Background()
-
-	return u.ds.GetKey(ctx, km.ToString(), "local")
+	return u.ds.GetKey(u.context, km.ToString(), "local")
 }
 
 func (u *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from string) {
-	ctx := context.Background()
+	ctx := u.context
 	ok := u.ds.VerifyKey(ctx, km.ToString(), metaValue, sig)
 	if !ok {
 		return

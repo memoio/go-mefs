@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
@@ -43,7 +42,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 		return err
 	}
 
-	ctx := context.Background()
+	ctx := p.context
 
 	cpids := strings.Split(string(rpids), metainfo.DELIMITER)
 	stripe := make([][]byte, len(cpids)+1)
@@ -123,7 +122,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	utils.MLogger.Info("repair success: ", blockID)
 
 	retMetaValue := "ok" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off-1)
-	_, err = p.ds.SendMetaRequest(context.Background(), int32(mpb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
+	_, err = p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
 		utils.MLogger.Error("repair response err :", err)
 		return err
