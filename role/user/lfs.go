@@ -190,6 +190,9 @@ func (l *LfsInfo) Online() bool {
 }
 
 func (l *LfsInfo) GetGroup() *groupInfo {
+	if l == nil {
+		return nil
+	}
 	return l.gInfo
 }
 

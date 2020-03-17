@@ -484,6 +484,11 @@ var lfsHeadObjectCmd = &cmds.Command{
 			return ErrNotOnline
 		}
 
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
+
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -494,8 +499,8 @@ var lfsHeadObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
-		if lfs == nil || !lfs.Online() {
+		lfs := userIns.GetUser(userid)
+		if lfs == nil {
 			return errLfsServiceNotReady
 		}
 
@@ -503,8 +508,11 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-
-		avail, err := lfs.(*user.LfsInfo).GetObjectAvailTime(object)
+		lfsInfo, ok := lfs.(*user.LfsInfo)
+		if !ok {
+			return errLfsServiceNotReady
+		}
+		avail, err := lfsInfo.GetObjectAvailTime(object)
 		if err != nil {
 			return err
 		}
@@ -569,6 +577,12 @@ var lfsPutObjectCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
+
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
+
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -579,7 +593,7 @@ var lfsPutObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -667,7 +681,10 @@ var lfsGetObjectCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -679,7 +696,7 @@ var lfsGetObjectCmd = &cmds.Command{
 			}
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -734,6 +751,7 @@ var lfsGetObjectCmd = &cmds.Command{
 			if _, err := os.Stat(fpath); err != nil && os.IsNotExist(err) {
 				file, err = os.Create(fpath)
 				if err != nil {
+					file.Close()
 					return err
 				}
 			} else {
@@ -788,7 +806,10 @@ var lfsListObjectsCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -808,7 +829,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			avail = true
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -888,7 +909,10 @@ var lfsDeleteObjectCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -899,7 +923,7 @@ var lfsDeleteObjectCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -962,7 +986,10 @@ var lfsHeadBucketCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -973,7 +1000,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1043,7 +1070,10 @@ var lfsCreateBucketCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1075,7 +1105,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1144,7 +1174,10 @@ It outputs the following to stdout:
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1156,7 +1189,7 @@ It outputs the following to stdout:
 			}
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1225,7 +1258,10 @@ It outputs the following to stdout:
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1237,7 +1273,7 @@ It outputs the following to stdout:
 			}
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1291,7 +1327,10 @@ var lfsListKeepersCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1303,9 +1342,12 @@ var lfsListKeepersCmd = &cmds.Command{
 			}
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
-
-		conkeepers, unconkeepers, _ := lfs.(*user.LfsInfo).GetGroup().GetKeepers(-1)
+		lfs := userIns.GetUser(userid)
+		lfsIns, ok := lfs.(*user.LfsInfo)
+		if !ok {
+			return errWrongInput
+		}
+		conkeepers, unconkeepers, _ := lfsIns.GetGroup().GetKeepers(-1)
 		keepers := make([]PeerState, len(unconkeepers)+len(conkeepers))
 		for i := 0; i < len(conkeepers); i++ {
 			keepers[i].PeerID = conkeepers[i]
@@ -1349,7 +1391,10 @@ var lfsListProviderrsCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1361,9 +1406,12 @@ var lfsListProviderrsCmd = &cmds.Command{
 			}
 		}
 
-		lfs := node.Inst.(*user.Info).GetUser(userid)
-
-		conpro, unconpro, _ := lfs.(*user.LfsInfo).GetGroup().GetProviders(-1)
+		lfs := userIns.GetUser(userid)
+		lfsIns, ok := lfs.(*user.LfsInfo)
+		if !ok {
+			return errWrongInput
+		}
+		conpro, unconpro, _ := lfsIns.GetGroup().GetProviders(-1)
 		providers := make([]PeerState, len(unconpro)+len(conpro))
 		for i := 0; i < len(conpro); i++ {
 			providers[i].PeerID = conpro[i]
@@ -1408,8 +1456,11 @@ var lfsListUsersCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
-		users := node.Inst.(*user.Info).GetAllUser()
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
+		users := userIns.GetAllUser()
 		userAddrs := make([]string, len(users))
 		for i, user := range users {
 			addr, err := address.GetAddressFromID(user)
@@ -1460,7 +1511,10 @@ var lfsFsyncCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1471,7 +1525,7 @@ var lfsFsyncCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1520,6 +1574,10 @@ mefs lfs show_storage show the storage space used(kb)
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1534,7 +1592,7 @@ mefs lfs show_storage show the storage space used(kb)
 		if !found {
 			prefix = ""
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
@@ -1605,6 +1663,10 @@ var lfsGetShareCmd = &cmds.Command{
 			return ErrNotOnline
 		}
 
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1622,8 +1684,6 @@ var lfsGetShareCmd = &cmds.Command{
 			return err
 		}
 
-		us := node.Inst.(*user.Info)
-
 		piper, pipew := io.Pipe()
 		bufw := bufio.NewWriterSize(pipew, user.DefaultBufSize)
 		checkErrAndClosePipe := func(err error) error {
@@ -1636,7 +1696,7 @@ var lfsGetShareCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		go us.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0], user.DefaultOption())
+		go userIns.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0], user.DefaultOption())
 
 		return res.Emit(piper)
 	},
@@ -1718,7 +1778,10 @@ var lfsGenShareCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return errLfsServiceNotReady
+		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
 		if addressid == "" || !found {
@@ -1729,7 +1792,7 @@ var lfsGenShareCmd = &cmds.Command{
 				return err
 			}
 		}
-		lfs := node.Inst.(*user.Info).GetUser(userid)
+		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
