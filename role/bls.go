@@ -9,11 +9,15 @@ import (
 )
 
 func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
+	if mkey == nil || mkey.Pk == nil || mkey.Sk == nil {
+		return nil, ErrEmptyBlsKey
+	}
+
 	pubkey := mkey.Pk
 	pubkeyBls := pubkey.BlsPk.Serialize()
 	pubkeyG := pubkey.SignG2.Serialize()
-	pubkeyU := make([][]byte, mcl.PDPCount)
-	pubkeyW := make([][]byte, mcl.PDPCount)
+	pubkeyU := make([][]byte, mkey.Pk.Count)
+	pubkeyW := make([][]byte, mkey.Pk.Count)
 
 	for i, u := range pubkey.ElemG1s {
 		pubkeyU[i] = u.Serialize()
@@ -78,7 +82,21 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 	if err != nil {
 		return mkey, err
 	}
-	pk.ElemG1s = make([]mcl.G1, mcl.PDPCount)
+
+	// version is user for different default
+	if userBLS12ConfigProto.GetCount() == 0 {
+		pk.Count = mcl.PDPCount
+	} else {
+		pk.Count = int(userBLS12ConfigProto.GetCount())
+	}
+
+	if userBLS12ConfigProto.GetTagCount() == 0 {
+		pk.TagCount = mcl.TagAtomNum
+	} else {
+		pk.TagCount = int(userBLS12ConfigProto.GetTagCount())
+	}
+
+	pk.ElemG1s = make([]mcl.G1, pk.TagCount)
 	for i, u := range userBLS12ConfigProto.PubkeyU {
 		var temp mcl.G1
 		err = temp.Deserialize(u)
@@ -87,7 +105,8 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		}
 		pk.ElemG1s[i] = temp
 	}
-	pk.ElemG2s = make([]mcl.G2, mcl.PDPCount)
+
+	pk.ElemG2s = make([]mcl.G2, pk.Count)
 	for i, w := range userBLS12ConfigProto.PubkeyW {
 		var temp mcl.G2
 		err = temp.Deserialize(w)

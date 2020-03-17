@@ -14,12 +14,14 @@ import (
 
 // customized errors
 var (
-	ErrSplitSegmentToAtoms   = errors.New("invalid segment")
-	ErrKeyIsNil              = errors.New("the key is nil")
-	ErrSetHashOf             = errors.New("SetHashOf is not true")
-	ErrSetString             = errors.New("SetString is not true")
-	ErrSetBigInt             = errors.New("SetBigInt is not true")
-	ErrSetToBigInt           = errors.New("SetString (for big.Int) is not true")
+	ErrSplitSegmentToAtoms = errors.New("invalid segment")
+	ErrKeyIsNil            = errors.New("the key is nil")
+	ErrSetHashOf           = errors.New("SetHashOf is not true")
+	ErrSetString           = errors.New("SetString is not true")
+	ErrSetBigInt           = errors.New("SetBigInt is not true")
+	ErrSetToBigInt         = errors.New("SetString (for big.Int) is not true")
+
+	ErrInvalidSettings       = errors.New("setting is invalid")
 	ErrNumOutOfRange         = errors.New("numOfAtoms is out of range")
 	ErrSegmentSize           = errors.New("the size of the segment is wrong")
 	ErrGenTag                = errors.New("GenTag failed")
@@ -31,22 +33,28 @@ var (
 
 // 自/data-format/common.go，目前segment的default size为4KB
 const (
-	// (PDPCount - TagAtomNum) * (48 + 96) >> len(segment)
+	// (PDPCount - TagAtomNum) * 96 >> len(segment)
 	PDPCount    = 1024
-	TagAtomSize = 32
+	PDPCountV1  = 2048
+	AtomSize    = 32
+	AtomTagSize = 24 // tag of tags
+	TagG1Size   = 48
+	TagG2Size   = 96
 	// (DefaultSegmentSize-1) / TagAtomSize + 1
 	TagAtomNum   = 128
-	TTagAtomSize = 24
+	TagAtomNumV1 = 1024
 )
 
 // the data structures for the proof of data possession
 
 // PublicKey is bls public key
 type PublicKey struct {
-	BlsPk   G2
-	SignG2  G2
-	ElemG1s []G1
-	ElemG2s []G2
+	Count    int
+	TagCount int
+	BlsPk    G2
+	SignG2   G2
+	ElemG1s  []G1
+	ElemG2s  []G2
 }
 
 // SecretKey is bls secret key
@@ -76,10 +84,17 @@ type Proof struct {
 }
 
 // GenKeySetWithSeed create instance
-func GenKeySetWithSeed(seed []byte) (*KeySet, error) {
+func GenKeySetWithSeed(seed []byte, tagCount, count int) (*KeySet, error) {
+	// preStored data should large than segmentSize
+	if (count-tagCount)*TagG2Size <= tagCount*AtomSize {
+		return nil, ErrInvalidSettings
+	}
+
 	pk := &PublicKey{
-		ElemG1s: make([]G1, PDPCount),
-		ElemG2s: make([]G2, PDPCount),
+		Count:    count,
+		TagCount: tagCount,
+		ElemG1s:  make([]G1, tagCount),
+		ElemG2s:  make([]G2, count),
 	}
 	sk := new(SecretKey)
 	ks := &KeySet{pk, sk}
@@ -123,8 +138,10 @@ func GenKeySetWithSeed(seed []byte) (*KeySet, error) {
 // GenKeySet create instance
 func GenKeySet() (*KeySet, error) {
 	pk := &PublicKey{
-		ElemG1s: make([]G1, PDPCount),
-		ElemG2s: make([]G2, PDPCount),
+		Count:    PDPCount,
+		TagCount: TagAtomNum,
+		ElemG1s:  make([]G1, TagAtomNum),
+		ElemG2s:  make([]G2, PDPCount),
 	}
 	sk := new(SecretKey)
 	ks := &KeySet{pk, sk}
@@ -161,29 +178,32 @@ func GenKeySet() (*KeySet, error) {
 
 // Calculate cals Xi = x^i, Ui and Wi i = 0, 1, ..., N
 func (k *KeySet) Calculate() {
-	if len(k.Sk.ElemPowerSk) != PDPCount {
-		k.Sk.ElemPowerSk = make([]Fr, PDPCount)
+	if len(k.Sk.ElemPowerSk) != k.Pk.Count {
+		k.Sk.ElemPowerSk = make([]Fr, k.Pk.Count)
 	}
 
 	k.Sk.ElemPowerSk[1] = k.Sk.ElemSk
 
-	for i := 2; i < PDPCount; i++ {
+	for i := 2; i < k.Pk.Count; i++ {
 		FrMul(&k.Sk.ElemPowerSk[i], &k.Sk.ElemPowerSk[i-1], &k.Sk.ElemSk)
 	}
 
 	G2Mul(&k.Pk.BlsPk, &k.Pk.SignG2, &k.Sk.BlsSk)
-	// U = u^(x^i), i = 0, 1, ..., N-1
-	// W = w^(x^i), i = 0, 1, ..., N-1
-	k.Pk.ElemG1s = make([]G1, PDPCount)
-	k.Pk.ElemG2s = make([]G2, PDPCount)
-	for i := 1; i < PDPCount; i++ {
+	// U = u^(x^i), i = 0, 1, ..., tagCount-1
+	k.Pk.ElemG1s = make([]G1, k.Pk.TagCount)
+	for i := 1; i < k.Pk.TagCount; i++ {
 		G1Mul(&k.Pk.ElemG1s[i], &k.Pk.ElemG1s[0], &k.Sk.ElemPowerSk[i])
+	}
+
+	// W = w^(x^i), i = 0, 1, ..., count-1
+	k.Pk.ElemG2s = make([]G2, k.Pk.Count)
+	for i := 1; i < k.Pk.Count; i++ {
 		G2Mul(&k.Pk.ElemG2s[i], &k.Pk.ElemG2s[0], &k.Sk.ElemPowerSk[i])
 	}
 	return
 }
 
-// -------------------- proof related routines ------------------------ //
+// -------------------- proof related routines ------------------- //
 func splitSegmentToAtoms(data []byte, typ int) ([][]byte, error) {
 	if len(data) == 0 {
 		return nil, ErrSplitSegmentToAtoms
@@ -222,7 +242,7 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 		return nil, err
 	}
 
-	if len(atoms)+start > PDPCount {
+	if len(atoms)+start > k.Pk.Count {
 		return nil, ErrGenTag
 	}
 
@@ -270,6 +290,7 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 		G1Add(&uMiDel, &HWi, &uMiDel)
 	}
 
+	// sign
 	if mode {
 		// tag = (HWi * (u^Sgima(Xi*Mi))) ^ blsSK
 		G1Mul(&uMiDel, &uMiDel, &(k.Sk.BlsSk))
@@ -307,7 +328,7 @@ func GenChallenge(chal *mpb.ChalInfo) int {
 }
 
 // VerifyTag check segment和tag是否对应
-func (k *KeySet) VerifyTag(segment, tag []byte, index string) bool {
+func (k *KeySet) VerifyTag(index, segment, tag []byte) bool {
 	if k == nil || k.Pk == nil {
 		return false
 	}
@@ -316,7 +337,7 @@ func (k *KeySet) VerifyTag(segment, tag []byte, index string) bool {
 	var left, right GT
 	formula.Clear()
 
-	err := HWi.HashAndMapTo([]byte(index))
+	err := HWi.HashAndMapTo(index)
 	if err != nil {
 		return false
 	}
@@ -350,48 +371,55 @@ func (k *KeySet) VerifyTag(segment, tag []byte, index string) bool {
 
 // GenProof gens
 func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Proof, error) {
-	if k == nil || k.Pk == nil {
+	if k == nil || k.Pk == nil || typ <= 0 {
 		return nil, ErrKeyIsNil
 	}
 	var m Fr
 	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
-	sums := make([]Fr, TagAtomNum)
-	for _, segment := range segments {
-		if len(segment) > 0 {
-			atoms, err := splitSegmentToAtoms(segment, typ)
-			if err != nil {
-				return nil, ErrSplitSegmentToAtoms
-			}
+	if len(segments) == 0 {
+		return nil, ErrSegmentSize
+	}
 
-			for j, atom := range atoms { // 扫描各segment
-				if len(atoms) < TagAtomNum {
-					return nil, ErrNumOutOfRange
-				}
-				judge := m.SetHashOf(atom)
-				if !judge {
-					return nil, ErrSetHashOf
-				}
-				FrAdd(&sums[j], &sums[j], &m)
-			}
+	tagNum := len(segments[0])
+	for _, segment := range segments {
+		if len(segment) > tagNum {
+			tagNum = len(segment)
 		}
 	}
 
-	c := chal.Seed % (PDPCount - TagAtomNum)
+	tagNum = tagNum / typ
+	sums := make([]Fr, tagNum)
+	for _, segment := range segments {
+		atoms, err := splitSegmentToAtoms(segment, typ)
+		if err != nil {
+			return nil, ErrSplitSegmentToAtoms
+		}
 
-	if len(k.Pk.ElemG2s) < TagAtomNum+c || len(k.Pk.ElemG1s) < TagAtomNum {
+		for j, atom := range atoms { // 扫描各segment
+			judge := m.SetHashOf(atom)
+			if !judge {
+				return nil, ErrSetHashOf
+			}
+			FrAdd(&sums[j], &sums[j], &m)
+		}
+	}
+
+	c := chal.Seed % (k.Pk.Count - k.Pk.TagCount)
+
+	if len(k.Pk.ElemG2s) < tagNum+c || len(k.Pk.ElemG1s) < tagNum {
 		return nil, ErrNumOutOfRange
 	}
 	// 计算h_j = u_(c+j), j = 0, 1, ..., k-1
 	// 对于BLS12_381,h_j = w_(c+j)
 
-	h := make([]G2, TagAtomNum)
-	for j := 0; j < TagAtomNum; j++ {
+	h := make([]G2, tagNum)
+	for j := 0; j < tagNum; j++ {
 		h[j] = k.Pk.ElemG2s[c+j]
 	}
 	// muProd = Prod(u_j^sums_j)
 	// nuProd = Prod(h_j^sums_j)
-	mu := make([]G1, TagAtomNum)
-	nu := make([]G2, TagAtomNum)
+	mu := make([]G1, tagNum)
+	nu := make([]G2, tagNum)
 	var muProd G1
 	var nuProd G2
 	muProd.Clear()
@@ -423,7 +451,7 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 }
 
 // VerifyProof verify proof
-func (k *KeySet) VerifyProof(chal Challenge, pf *Proof) (bool, error) {
+func (k *KeySet) VerifyProof(chal Challenge, pf *Proof, mode bool) (bool, error) {
 	if k == nil || k.Pk == nil {
 		return false, ErrKeyIsNil
 	}
@@ -467,15 +495,17 @@ func (k *KeySet) VerifyProof(chal Challenge, pf *Proof) (bool, error) {
 		return false, ErrVerifyStepOne
 	}
 
-	// 第二步：验证mu与nu是对应的
-	// lhs = e(mu, h0)
-	c := chal.Seed % (PDPCount - TagAtomNum)
-	Pairing(&lhs2, &mu, &k.Pk.ElemG2s[c])
-	// rhs = e(u, nu)
-	Pairing(&rhs2, &k.Pk.ElemG1s[0], &nu)
-	// check
-	if !lhs2.IsEqual(&rhs2) {
-		return false, ErrVerifyStepTwo
+	if mode {
+		// 第二步：验证mu与nu是对应的
+		// lhs = e(mu, h0)
+		c := chal.Seed % (k.Pk.Count - k.Pk.TagCount)
+		Pairing(&lhs2, &mu, &k.Pk.ElemG2s[c])
+		// rhs = e(u, nu)
+		Pairing(&rhs2, &k.Pk.ElemG1s[0], &nu)
+		// check
+		if !lhs2.IsEqual(&rhs2) {
+			return false, ErrVerifyStepTwo
+		}
 	}
 
 	return true, nil
@@ -490,35 +520,39 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 		return false, ErrKeyIsNil
 	}
 	var m Fr
-	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
-	sums := make([]Fr, TagAtomNum)
-	for _, segment := range segments {
-		if len(segment) > 0 {
-			atoms, err := splitSegmentToAtoms(segment, typ)
-			if err != nil {
-				return false, ErrSplitSegmentToAtoms
-			}
 
-			for j, atom := range atoms { // 扫描各segment
-				if len(atoms) < TagAtomNum {
-					return false, ErrNumOutOfRange
-				}
-				judge := m.SetHashOf(atom)
-				if !judge {
-					return false, ErrSetHashOf
-				}
-				FrAdd(&sums[j], &sums[j], &m)
+	if len(segments) == 0 {
+		return false, ErrSegmentSize
+	}
+
+	tagNum := len(segments[0]) / typ
+	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
+	sums := make([]Fr, tagNum)
+	for _, segment := range segments {
+		atoms, err := splitSegmentToAtoms(segment, typ)
+		if err != nil {
+			return false, ErrSplitSegmentToAtoms
+		}
+
+		for j, atom := range atoms { // 扫描各segment
+			if len(atoms) < tagNum {
+				return false, ErrNumOutOfRange
 			}
+			judge := m.SetHashOf(atom)
+			if !judge {
+				return false, ErrSetHashOf
+			}
+			FrAdd(&sums[j], &sums[j], &m)
 		}
 	}
 
-	if len(k.Pk.ElemG1s) < TagAtomNum {
+	if len(k.Pk.ElemG1s) < tagNum {
 		return false, ErrNumOutOfRange
 	}
 
 	// muProd = Prod(u_j^sums_j)
 	// nuProd = Prod(h_j^sums_j)
-	mu := make([]G1, TagAtomNum)
+	mu := make([]G1, tagNum)
 	var muProd G1
 	muProd.Clear()
 	for j, sum := range sums {

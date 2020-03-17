@@ -120,7 +120,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	// 在发送之前检查生成的proof
-	boo, err := blskey.VerifyProof(chal, proof)
+	boo, err := blskey.VerifyProof(chal, proof, true)
 	if err != nil {
 		utils.MLogger.Error("verify proof failed, err is: ", err)
 		utils.MLogger.Error("gen proof for blocks: ", chal.Indices)

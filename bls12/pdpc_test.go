@@ -1,54 +1,34 @@
 package mcl
 
 import (
-	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
-	"path"
 	"strconv"
 	"testing"
+	"time"
 )
 
 const SegSize = 4 * 1024
 const FileSize = 10 * 1024 * 1024
 const SegNum = FileSize / SegSize
 
-func TestGenFile(t *testing.T) {
-	testpath := path.Join(os.Getenv("HOME"), "test.data")
-	data := make([]byte, FileSize)
-	fillRandom(data)
-	f, err := os.Create(testpath)
-	if err != nil {
-		t.Error(err)
-	}
-	defer f.Close()
-	_, err = f.Write(data)
-	if err != nil {
-		t.Error(err)
-	}
-}
-
 // 测试tag的形成
 func BenchmarkGenTag(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
-		fmt.Println("Initialization panic.")
+		panic(err)
 	}
 	// generate the key set for proof of data possession
 	keySet, err := GenKeySet()
 	if err != nil {
-		println(err.Error())
+		panic(err)
 	}
 
 	// sample data
 	// 10MB
-	sampleFile := path.Join(os.Getenv("HOME"), "test.data")
+	data := make([]byte, FileSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
 
-	data, err := ioutil.ReadFile(sampleFile)
-	if err != nil {
-		b.Fatalf("Can't read the file.")
-	}
 	segmentCount := (len(data) - 1) / SegSize
 	segments := make([][]byte, segmentCount)
 	for i := 0; i < segmentCount; i++ {
@@ -74,22 +54,19 @@ func BenchmarkGenTag(b *testing.B) {
 func BenchmarkGenChallenge(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
-		fmt.Println("Initialization panic.")
+		panic(err)
 	}
 
 	// generate the key set for proof of data possession
 	keySet, err := GenKeySet()
 	if err != nil {
-		panic("Error")
+		panic(err)
 	}
 
 	// sample data
-	sampleFile := path.Join(os.Getenv("HOME"), "test.data")
-
-	data, err := ioutil.ReadFile(sampleFile)
-	if err != nil {
-		b.Fatalf("Can't read the file.")
-	}
+	data := make([]byte, FileSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
 
 	segments := make([][]byte, SegNum)
 	blocks := make([]string, SegNum)
@@ -119,22 +96,18 @@ func BenchmarkGenChallenge(b *testing.B) {
 func BenchmarkGenProof(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
-		fmt.Println("Initialization panic.")
+		panic(err)
 	}
 
 	// generate the key set for proof of data possession
 	keySet, err := GenKeySet()
 	if err != nil {
-		panic("Error")
+		panic(err)
 	}
 
-	// sample data
-	sampleFile := path.Join(os.Getenv("HOME"), "test.data")
-
-	data, err := ioutil.ReadFile(sampleFile)
-	if err != nil {
-		b.Fatalf("Can't read the file.")
-	}
+	data := make([]byte, FileSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
 
 	segments := make([][]byte, SegNum)
 	blocks := make([]string, SegNum)
@@ -164,7 +137,7 @@ func BenchmarkGenProof(b *testing.B) {
 	// fetch the tag & challenge
 	for j, segment := range segments {
 		index := strconv.Itoa(j) + "_" + "0"
-		boo := keySet.VerifyTag(segment, tags[j], index)
+		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
 		if boo == false {
 			println("VerifyTag: ", boo)
 		}
@@ -182,21 +155,18 @@ func BenchmarkGenProof(b *testing.B) {
 func BenchmarkVerifyProof(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
-		fmt.Println("Initialization panic.")
-	}
-
-	// generate the key set for proof of data possession
-	keySet, err := GenKeySet()
-	if err != nil {
-		panic("Error")
+		panic(err)
 	}
 
 	// sample data
-	sampleFile := path.Join(os.Getenv("HOME"), "test.data")
+	data := make([]byte, FileSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
 
-	data, err := ioutil.ReadFile(sampleFile)
+	// generate the key set for proof of data possession
+	keySet, err := GenKeySetWithSeed(data[:32], 1024, 2048)
 	if err != nil {
-		b.Fatalf("Can't read the file.")
+		panic(err)
 	}
 
 	segments := make([][]byte, SegNum)
@@ -212,14 +182,14 @@ func BenchmarkVerifyProof(b *testing.B) {
 		// generate the data tag
 		tags[j], err = keySet.GenTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, 0, 32, true)
 		if err != nil {
-			panic("Error")
+			panic(err)
 		}
 	}
 
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
 	chal := Challenge{
-		Seed:    0,
+		Seed:    int(time.Now().UnixNano()),
 		Indices: blocks,
 	}
 
@@ -227,7 +197,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 	// fetch the tag & challenge
 	for j, segment := range segments {
 		index := strconv.Itoa(j) + "_" + "0"
-		boo := keySet.VerifyTag(segment, tags[j], index)
+		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
 		if boo == false {
 			println("VerifyTag: ", boo)
 		}
@@ -249,13 +219,92 @@ func BenchmarkVerifyProof(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, err := keySet.VerifyProof(h, proof)
+		result, err := keySet.VerifyProof(h, proof, true)
 		if err != nil {
 			panic("Error")
 		}
 		if !result {
 			b.Errorf("Verificaition failed!")
 		}
+	}
+}
+
+func TestVerifyProof(t *testing.T) {
+	err := Init(BLS12_381)
+	if err != nil {
+		panic(err)
+	}
+
+	data := make([]byte, FileSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
+
+	// generate the key set for proof of data possession
+	keySet, err := GenKeySetWithSeed(data[:32], 1024, 2048)
+	if err != nil {
+		panic(err)
+	}
+
+	segments := make([][]byte, SegNum/2)
+	blocks := make([]string, SegNum/2)
+	for i := 0; i < SegNum/4; i++ {
+		segments[i] = data[SegSize*i : SegSize*(i+1)]
+		blocks[i] = strconv.Itoa(i)
+	}
+
+	for i := 0; i < SegNum/4; i++ {
+		segments[SegNum/4+i] = data[SegSize*(SegNum/4+2*i) : SegSize*(SegNum/4+2*i+2)]
+		blocks[SegNum/4+i] = strconv.Itoa(i)
+	}
+
+	// ------------- the data owner --------------- //
+	tags := make([][]byte, SegNum/2)
+	for j, segment := range segments {
+		// generate the data tag
+		tags[j], err = keySet.GenTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, 0, 32, true)
+		if err != nil {
+			panic("Error")
+		}
+	}
+
+	// -------------- TPA --------------- //
+	// generate the challenge for data possession validation
+	chal := Challenge{
+		Seed:    int(time.Now().Unix()),
+		Indices: blocks,
+	}
+
+	// ------------- the storage provider ---------------- //
+	// fetch the tag & challenge
+	for j, segment := range segments {
+		index := strconv.Itoa(j) + "_" + "0"
+		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
+		if boo == false {
+			println("VerifyTag: ", boo)
+		}
+	}
+	// generate the proof
+	proof, err := keySet.GenProof(chal, segments, tags, 32)
+	if err != nil {
+		panic("Error")
+	}
+
+	// -------------- TPA --------------- //
+	// Verify the proof
+	h := Challenge{}
+	h.Seed = chal.Seed
+	h.Indices = make([]string, SegNum/2)
+	for i := range chal.Indices {
+		bid := strconv.Itoa(i)
+		h.Indices[i] = bid + "_" + "0"
+	}
+
+	result, err := keySet.VerifyProof(h, proof, true)
+	if err != nil {
+		panic("Error")
+	}
+	if !result {
+		t.Errorf("Verificaition failed!")
 	}
 }
 

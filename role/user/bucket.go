@@ -38,6 +38,22 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		return nil, ErrLfsReadOnly
 	}
 
+	// 多副本策略
+	switch options.Policy {
+	case dataformat.MulPolicy:
+		Sum := options.DataCount + options.ParityCount
+		options.DataCount = 1
+		options.ParityCount = Sum - 1
+	case dataformat.RsPolicy:
+	default:
+		return nil, ErrPolicy
+	}
+
+	// tagCount决定了最大的segmentSize
+	if int(options.GetSegmentSize()) > 32*l.keySet.Pk.TagCount {
+		return nil, ErrPolicy
+	}
+
 	err := checkBucketName(bucketName)
 	if err != nil {
 		return nil, ErrBucketNameInvalid
@@ -51,18 +67,6 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	}
 
 	utils.MLogger.Infof("create bucket %s in lfs %s", bucketName, l.fsID)
-
-	// 多副本策略
-	switch options.Policy {
-	case dataformat.MulPolicy:
-		Sum := options.DataCount + options.ParityCount
-		options.DataCount = 1
-		options.ParityCount = Sum - 1
-	case dataformat.RsPolicy:
-	default:
-		l.meta.sb.Unlock()
-		return nil, dataformat.ErrWrongPolicy
-	}
 
 	bucketID := l.meta.sb.NextBucketID
 	binfo := mpb.BucketInfo{

@@ -98,7 +98,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	}
 
 	//填充opt.KeySet
-	mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed())
+	mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNum, mcl.PDPCount)
 	if err != nil {
 		utils.MLogger.Info("Init bls config for pos user fail: ", err)
 		return err

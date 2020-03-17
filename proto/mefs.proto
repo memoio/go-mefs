@@ -54,12 +54,15 @@ message KeyMeta{
 }
 
 message UserBLS12Config{
+    int32 version = 1;
     bytes pubkeyBls = 2;
     bytes pubkeyG = 3;
     repeated bytes pubkeyU = 4;
     repeated bytes pubkeyW = 5;
     bytes prikeyBls = 6;
     bytes X = 7;
+    int32 count = 10;
+    int32 tagCount = 11;  
 }
 
 message BucketRoot {

@@ -12,7 +12,7 @@ import (
 
 func initBLS12Config(seed []byte) (*mcl.KeySet, error) {
 	utils.MLogger.Info("Generating BLS12 Sk and Pk")
-	kset, err := mcl.GenKeySetWithSeed(seed)
+	kset, err := mcl.GenKeySetWithSeed(seed, mcl.TagAtomNum, mcl.PDPCount)
 	if err != nil {
 		utils.MLogger.Error("Init BlS12 keyset error: ", err)
 		return nil, err
