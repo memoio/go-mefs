@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	lru "github.com/hashicorp/golang-lru/simplelru"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -35,12 +36,13 @@ var (
 )
 
 type impl struct {
-	netID  string // network address
-	bstore bs.Blockstore
-	dstore ds.Datastore
-	aCache *Cache
-	rt     routing.Routing
-	ph     p2phost.Host
+	netID   string // network address
+	bstore  bs.Blockstore
+	dstore  ds.Datastore
+	aCache  *Cache
+	rt      routing.Routing
+	ph      p2phost.Host
+	pubKeys *lru.LRU
 }
 
 // New returns data.Service
@@ -49,13 +51,21 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 		log.Println("network is not running.")
 	}
 
+	// cache public keys, key is userID
+	pcache, err := lru.NewLRU(2048, nil)
+	if err != nil {
+		utils.MLogger.Error("new lru err:", err)
+		return nil
+	}
+
 	return &impl{
-		netID:  id,
-		rt:     r,
-		ph:     host,
-		dstore: d,
-		bstore: b,
-		aCache: NewCache(b),
+		netID:   id,
+		rt:      r,
+		ph:      host,
+		dstore:  d,
+		bstore:  b,
+		aCache:  NewCache(b),
+		pubKeys: pcache,
 	}
 }
 
@@ -103,6 +113,32 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 	return n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
 }
 
+func (n *impl) getUserPublicKey(key string) ([]byte, error) {
+	pubKey, ok := n.pubKeys.Get(key)
+	if ok {
+		return pubKey.([]byte), nil
+	}
+
+	km, err := metainfo.NewKey(key, mpb.KeyType_PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	pubRecByte, err := n.dstore.Get(ds.NewKey(km.ToString()))
+	if err != nil {
+		return nil, err
+	}
+
+	pubrec := new(recpb.Record)
+	err = proto.Unmarshal(pubRecByte, pubrec)
+	if err != nil {
+		return nil, err
+	}
+
+	n.pubKeys.Add(key, pubrec.GetValue())
+
+	return pubrec.GetValue(), nil
+}
+
 func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) bool {
 	keys := strings.Split(key, metainfo.DELIMITER)
 	if len(keys) < 2 {
@@ -128,19 +164,12 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 		}
 
 		gotID := keys[2]
-		km, _ := metainfo.NewKey(gotID, mpb.KeyType_PublicKey)
-		pubRecByte, err := n.dstore.Get(ds.NewKey(km.ToString()))
+		pubKey, err := n.getUserPublicKey(gotID)
 		if err != nil {
 			return false
 		}
 
-		pubrec := new(recpb.Record)
-		err = proto.Unmarshal(pubRecByte, pubrec)
-		if err != nil {
-			return false
-		}
-
-		return utils.VerifySig(pubrec.GetValue(), gotID, key, value, sig)
+		return utils.VerifySig(pubKey, gotID, key, value, sig)
 	}
 }
 

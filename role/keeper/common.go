@@ -22,13 +22,9 @@ const (
 
 //---config----
 func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
-	thisGroup := k.getGroupInfo(userID, groupID, false)
-	if thisGroup == nil {
-		return nil, role.ErrNotMyUser
-	}
-
-	if thisGroup.blsKey != nil {
-		return thisGroup.blsKey, nil
+	value, ok := k.userConfigs.Get(groupID)
+	if ok {
+		return value.(*mcl.KeySet), nil
 	}
 
 	userconfigbyte, err := k.getUserBLS12ConfigByte(userID, groupID)
@@ -39,8 +35,7 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 				return nil, err
 			}
 
-			thisGroup.blsKey = mkey
-
+			k.userConfigs.Add(groupID, mkey)
 			return mkey, nil
 		}
 		return nil, err
@@ -51,8 +46,7 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 		return nil, err
 	}
 
-	thisGroup.blsKey = mkey
-
+	k.userConfigs.Add(groupID, mkey)
 	return mkey, nil
 }
 

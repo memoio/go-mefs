@@ -64,6 +64,13 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		case mpb.OpType_Get:
 			go k.handlePosGet(km, metaValue, from)
 		}
+	case mpb.KeyType_Sign:
+		switch opType {
+		case mpb.OpType_Put:
+			k.handlePutSign(km, metaValue, sig, from)
+		case mpb.OpType_Get:
+			k.handlePutSign(km, metaValue, sig, from)
+		}
 	default:
 		switch opType {
 		case mpb.OpType_Put:
@@ -94,6 +101,20 @@ func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string
 	utils.MLogger.Info("handleGetKey: ", km.ToString())
 
 	return k.ds.GetKey(k.context, km.ToString(), "local")
+}
+
+func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from string) {
+	// verify sig first
+	k.ds.PutKey(k.context, km.ToString(), metaValue, sig, "local")
+}
+
+func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from string) {
+	// verify sig first
+	nsig, err := utils.SignForKey(k.sk, km.ToString(), metaValue)
+	if err != nil {
+		return
+	}
+	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), metaValue, nsig, from)
 }
 
 func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from string) {

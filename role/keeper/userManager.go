@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	mcl "github.com/memoio/go-mefs/bls12"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
@@ -33,7 +32,6 @@ type groupInfo struct {
 	providers    []string
 	upkeeping    *role.UpKeepingItem
 	query        *role.QueryItem
-	blsKey       *mcl.KeySet
 	buckets      sync.Map // key:bucketID; value: *bucketInfo
 	ledgerMap    sync.Map // key:proID，value:*chalInfo
 }

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru/simplelru"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
@@ -34,6 +34,7 @@ type Info struct {
 	keepers      sync.Map // key: keeperID, value: *kInfo
 	offers       []*role.OfferItem
 	proContract  *role.ProviderItem
+	userConfigs  *lru.LRU
 }
 
 type groupInfo struct {
@@ -45,7 +46,6 @@ type groupInfo struct {
 	storageTotal uint64
 	keepers      []string
 	providers    []string
-	blsKey       *mcl.KeySet
 	upkeeping    *role.UpKeepingItem
 	channel      sync.Map //key is channelID
 	query        *role.QueryItem
@@ -101,6 +101,14 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	if err != nil {
 		return nil, err
 	}
+
+	// cache userconfigs, key is queryID
+	ucache, err := lru.NewLRU(1024, nil)
+	if err != nil {
+		utils.MLogger.Error("new lru err:", err)
+		return nil, err
+	}
+	m.userConfigs = ucache
 
 	go func() {
 		for {

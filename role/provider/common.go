@@ -15,13 +15,9 @@ const (
 )
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
-	gp := p.getGroupInfo(userID, groupID, true)
-	if gp == nil {
-		return nil, role.ErrNotMyUser
-	}
-
-	if gp.blsKey != nil {
-		return gp.blsKey, nil
+	value, ok := p.userConfigs.Get(groupID)
+	if ok {
+		return value.(*mcl.KeySet), nil
 	}
 
 	kmBls12, err := metainfo.NewKey(groupID, mpb.KeyType_Config, userID)
@@ -35,9 +31,14 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	if len(userconfigbyte) > 0 {
 		mkey, err := role.BLS12ByteToKeyset(userconfigbyte, nil)
 		if err == nil && mkey != nil {
-			gp.blsKey = mkey
+			p.userConfigs.Add(groupID, mkey)
 			return mkey, nil
 		}
+	}
+
+	gp := p.getGroupInfo(userID, groupID, true)
+	if gp == nil {
+		return nil, role.ErrNotMyUser
 	}
 
 	for _, kid := range gp.keepers {
@@ -50,7 +51,7 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 
 			p.ds.PutKey(ctx, userconfigkey, userconfigbyte, nil, "local")
 
-			gp.blsKey = mkey
+			p.userConfigs.Add(groupID, mkey)
 			return mkey, nil
 		}
 	}

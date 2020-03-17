@@ -299,7 +299,12 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		Delta: deltaByte,
 	}
 
-	res, err := thisGroup.blsKey.VerifyProof(chal, pf, true)
+	blsKey, err := k.getUserBLS12Config(userID, qid)
+	if err != nil {
+		return
+	}
+
+	res, err := blsKey.VerifyProof(chal, pf, true)
 	if err != nil {
 		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, "verify fails: ", err)
 		utils.MLogger.Warn("verify blocks: ", chal.Indices)

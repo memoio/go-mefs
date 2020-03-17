@@ -16,7 +16,7 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 	pubkey := mkey.Pk
 	pubkeyBls := pubkey.BlsPk.Serialize()
 	pubkeyG := pubkey.SignG2.Serialize()
-	pubkeyU := make([][]byte, mkey.Pk.Count)
+	pubkeyU := make([][]byte, mkey.Pk.TagCount)
 	pubkeyW := make([][]byte, mkey.Pk.Count)
 
 	for i, u := range pubkey.ElemG1s {
@@ -49,6 +49,8 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 		PubkeyW:   pubkeyW,
 		PrikeyBls: blsSKByte,
 		X:         XByte,
+		Count:     int32(mkey.Pk.Count),
+		TagCount:  int32(mkey.Pk.TagCount),
 	}
 
 	userBLS12Config, err := proto.Marshal(userBLS12ConfigProto) //将user公私参数通过protobuf序列化以便存储到本地达到持久化的目的

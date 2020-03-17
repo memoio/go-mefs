@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	lru "github.com/hashicorp/golang-lru/simplelru"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/lni/dragonboat/v3"
@@ -27,21 +28,22 @@ import (
 
 //Info implements user service
 type Info struct {
-	localID    string
-	role       string
-	sk         string
-	state      bool
-	enableBft  bool
-	context    context.Context
-	dnh        *dragonboat.NodeHost
-	raftNodeID uint64
-	repch      chan string
-	ds         data.Service
-	keepers    sync.Map // keepers except self; value: *kInfo
-	providers  sync.Map // value: *pInfo
-	users      sync.Map // value: *uInfo
-	ukpGroup   sync.Map // manage user-keeper-provider group, value: *group
-	netIDs     map[string]struct{}
+	localID     string
+	role        string
+	sk          string
+	state       bool
+	enableBft   bool
+	context     context.Context
+	dnh         *dragonboat.NodeHost
+	raftNodeID  uint64
+	repch       chan string
+	ds          data.Service
+	keepers     sync.Map // keepers except self; value: *kInfo
+	providers   sync.Map // value: *pInfo
+	users       sync.Map // value: *uInfo
+	ukpGroup    sync.Map // manage user-keeper-provider group, value: *group
+	netIDs      map[string]struct{}
+	userConfigs *lru.LRU
 }
 
 // New is
@@ -71,6 +73,14 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		m.enableBft = false
 		utils.MLogger.Info("Use simple mode")
 	}
+
+	// cache userconfigs, key is queryID
+	ucache, err := lru.NewLRU(1024, nil)
+	if err != nil {
+		utils.MLogger.Error("new lru err:", err)
+		return nil, err
+	}
+	m.userConfigs = ucache
 
 	err = m.load(ctx) //连接节点
 	if err != nil {
