@@ -167,6 +167,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 
 	var length int64
 	tn := os.Getenv("MEFS_TRANS")
+	utils.MLogger.Infof("MEFS_TRANS in download is set to %s", tn)
 	if tn != "" {
 		tNum, err := strconv.Atoi(tn)
 		if err != nil {

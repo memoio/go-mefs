@@ -322,6 +322,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	}
 
 	tn := os.Getenv("MEFS_TRANS")
+	utils.MLogger.Infof("MEFS_TRANS in upload is set to %s", tn)
 	if tn != "" {
 		tNum, err := strconv.Atoi(tn)
 		if err != nil {
