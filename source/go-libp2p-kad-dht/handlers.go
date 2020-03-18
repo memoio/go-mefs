@@ -165,7 +165,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 			return nil, err
 		}
 
-		ok := utils.VerifySig(pubrec.GetValue(), gotID, string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
+		ok := utils.VerifySigForKey(pubrec.GetValue(), string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
 		if !ok {
 			log.Println("key signature is wrong for: ", string(rec.GetKey()))
 			return nil, errors.New("key signature is wrong")

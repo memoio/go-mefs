@@ -206,7 +206,7 @@ func TestCode(t *testing.T) {
 }
 
 func fillRandom(p []byte) {
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < len(p); i += 7 {
 		val := rand.Int63()
 		for j := 0; i+j < len(p) && j < 7; j++ {

@@ -212,6 +212,16 @@ message ChannelSign {
   bytes PubKey = 4; //user公钥
 }
 
+message STValue {
+  int32 Status = 1;
+  int64 Start = 2;
+  int64 Length = 3;
+  bytes Value = 4;
+  bytes Root = 5; // merkel root of Proof
+  repeated int64 Share = 6; 
+  repeated bytes Sign = 7;
+} 
+
 message KVData {
   bytes Key = 1;
   bytes Value = 2;

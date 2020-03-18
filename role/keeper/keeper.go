@@ -44,6 +44,7 @@ type Info struct {
 	ukpGroup    sync.Map // manage user-keeper-provider group, value: *group
 	netIDs      map[string]struct{}
 	userConfigs *lru.LRU
+	stPays      *lru.LRU
 }
 
 // New is
@@ -240,19 +241,19 @@ func (k *Info) save(ctx context.Context) error {
 func (k *Info) savePay(qid, pid string) error {
 	thisLinfo := k.getLInfo(qid, qid, pid, false)
 
-	if thisLinfo != nil && thisLinfo.lastPay != nil {
-		beginTime := thisLinfo.lastPay.beginTime
-		endTime := thisLinfo.lastPay.endTime
-		spaceTime := thisLinfo.lastPay.spacetime
+	if thisLinfo != nil && thisLinfo.lastPay != nil && thisLinfo.lastPay.Status == 0 {
 		ctx := k.context
 
 		//key: qid/`lastpay"/pid`
-		//value: `beginTime/endTime/spacetime/signature/proof`
 		kmLast, err := metainfo.NewKey(qid, mpb.KeyType_LastPay, pid)
 		if err != nil {
 			return err
 		}
-		valueLast := strings.Join([]string{utils.UnixToString(beginTime), utils.UnixToString(endTime), spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
+
+		valueLast, err := proto.Marshal(&thisLinfo.lastPay.STValue)
+		if err != nil {
+			return err
+		}
 
 		clusterID, err := address.GetNodeIDFromID(qid)
 		if err != nil {
@@ -261,16 +262,13 @@ func (k *Info) savePay(qid, pid string) error {
 
 		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID, true)
 
-		//key: `qid/"chalpay"/pid/beginTime/endTime`
-		//value: `spacetime/signature/proof`
-		//for storing
-		km, err := metainfo.NewKey(qid, mpb.KeyType_ChalPay, pid, utils.UnixToString(beginTime), utils.UnixToString(endTime))
+		//key: `qid/"chalpay"/pid/beginTime/length`
+		km, err := metainfo.NewKey(qid, mpb.KeyType_ChalPay, pid, utils.UnixToString(thisLinfo.lastPay.GetStart()), utils.UnixToString(thisLinfo.lastPay.GetLength()))
 		if err != nil {
 			return err
 		}
-		metaValue := strings.Join([]string{spaceTime.String(), "signature", "proof"}, metainfo.DELIMITER)
 
-		k.putKey(ctx, km.ToString(), []byte(metaValue), nil, "local", clusterID, true)
+		k.putKey(ctx, km.ToString(), valueLast, nil, "local", clusterID, true)
 	}
 	return nil
 }
@@ -638,9 +636,13 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 
 			res, err := k.ds.GetKey(ctx, kmLast.ToString(), "local")
 			if err == nil && len(res) > 0 {
-				err = lin.parseLastPayKV(res)
+				val := mpb.STValue{}
+				err := proto.Unmarshal(res, &val)
 				if err != nil {
-					utils.MLogger.Error("parseLastPayKV err: ", err)
+					continue
+				}
+				lin.lastPay = &chalpay{
+					STValue: val,
 				}
 			}
 		}

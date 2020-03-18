@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/big"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -12,7 +11,6 @@ import (
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
 
@@ -51,9 +49,8 @@ func (k *Info) stPayRegular(ctx context.Context) {
 }
 
 func (g *groupInfo) spaceTimePay(proID, localSk string) error {
-
-	utils.MLogger.Info(">>>>>>>>>>>>spacetimepay>>>>>>>>>>>>")
-	defer utils.MLogger.Info("========spacetimepay========")
+	// only master triggers,
+	// todo round-robin
 	if !g.isMaster(proID) {
 		return nil
 	}
@@ -91,33 +88,60 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	thisLinfo := thisIlinfo.(*lInfo)
 
-	startTime := g.upkeeping.StartTime
-	if thisLinfo.lastPay != nil {
-		startTime = thisLinfo.lastPay.endTime
+	if thisLinfo.currentPay == nil {
+		startTime := g.upkeeping.StartTime
+		if thisLinfo.lastPay == nil {
+			thisLinfo.lastPay = &chalpay{
+				STValue: mpb.STValue{
+					Start:  startTime,
+					Length: 0,
+					Status: 0,
+				},
+			}
+		}
+
+		// handle last pay
+		if thisLinfo.lastPay.Status != 0 {
+			return nil
+		}
+
+		startTime = thisLinfo.lastPay.Start + thisLinfo.lastPay.Length
+
+		spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().Unix())
+		amount := convertSpacetime(spaceTime, price)
+		if amount.Sign() > 0 {
+			thisLinfo.currentPay = &chalpay{
+				STValue: mpb.STValue{
+					Start:  startTime,
+					Length: lastTime - startTime,
+					Value:  amount.Bytes(),
+					Status: int32(len(g.keepers)),
+				},
+			}
+		}
+		// sync to other keepers？
+		// get enough signs; then
 	}
 
-	spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().Unix())
-	amount := convertSpacetime(spaceTime, price)
-	if amount.Sign() > 0 {
+	if thisLinfo.currentPay != nil {
+		amount := new(big.Int).SetBytes(thisLinfo.currentPay.GetValue())
+
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
 		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
-		utils.MLogger.Infof("amount:%d,beginTime:%s, lastTime:%s", amount, utils.UnixToTime(startTime), utils.UnixToTime(lastTime))
 
-		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount) //进行支付
+		utils.MLogger.Infof("stpay: amount:%d,beginTime:%s, lastTime:%s", amount, utils.UnixToTime(thisLinfo.currentPay.GetStart()), utils.UnixToTime(thisLinfo.currentPay.GetLength()))
+
+		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount)
 		if err != nil {
 			utils.MLogger.Info("contracts.SpaceTimePay() failed: ", err)
 			return err
 		}
 	}
 
-	thisLinfo.lastPay = &chalpay{
-		beginTime: startTime,
-		endTime:   lastTime,
-		proof:     "proof",
-		signature: "signature",
-		spacetime: spaceTime,
-	}
-	// sync to other keepers？
+	thisLinfo.currentPay.Status = 0
+	thisLinfo.lastPay = thisLinfo.currentPay
+	thisLinfo.currentPay = nil
+
 	return nil
 }
 
@@ -137,12 +161,15 @@ func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
 	return amount
 }
 
+type timeValue struct {
+	time  int64
+	space int64
+}
+
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
 func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
-	var timeList []int64  //存放挑战时间序列
-	var lenghList []int64 //存放与挑战时间同序的数据长度序列
-	var tsl timesortlist  //用来对挑战时间排序
+	var tsl []timeValue //用来对挑战时间排序
 	spacetime := big.NewInt(0)
 
 	var deletes []int64
@@ -153,7 +180,12 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 		if key < start {
 			deletes = append(deletes, key)
 		} else if key < end {
-			tsl = append(tsl, key)
+			chalres := value.(*mpb.ChalInfo)
+			tv := timeValue{
+				time:  key,
+				space: chalres.TotalLength,
+			}
+			tsl = append(tsl, tv)
 		}
 
 		return true
@@ -163,67 +195,24 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 		l.chalMap.Delete(d)
 	}
 
-	sort.Sort(tsl) //取出传入的时间区间内的时间数据，进行排序
-	for _, key := range tsl {
-		chalresI, ok := l.chalMap.Load(key)
-		if !ok {
-			utils.MLogger.Info("fetch challenge results err, time:", utils.UnixToTime(key))
-		}
-
-		chalres := chalresI.(*mpb.ChalInfo)
-
-		timeList = append(timeList, key)
-		lenghList = append(lenghList, chalres.TotalLength)
-	}
-
-	if len(timeList) <= 1 || len(lenghList) <= 1 {
+	if len(tsl) <= 1 {
 		utils.MLogger.Info("no enough challenge data")
 		return spacetime, 0
 	}
-	timepre := timeList[0]
-	lengthpre := lenghList[0]
-	//初始化变量
-	for index, timeafter := range timeList[1:] { //循环数组进行计算
-		length := lenghList[index+1]
-		spacetime.Add(spacetime, big.NewInt((timeafter-timepre)*int64(lengthpre+length)/2))
-		timepre = timeafter
-		lengthpre = length
+
+	sort.Slice(tsl, func(i, j int) bool {
+		return tsl[i].time < tsl[j].time
+	})
+
+	timepre := tsl[0].time
+	lengthpre := tsl[0].space
+	for _, tv := range tsl[1:] {
+		spacetime.Add(spacetime, big.NewInt((tv.time-timepre)*int64(lengthpre+tv.space)/2))
+		timepre = tv.time
+		lengthpre = tv.space
 	}
-	if spacetime.Sign() < 0 {
-		utils.MLogger.Info("error spacetime<0!\ntimeList:", timeList, "\nlenghlist:", lenghList)
+	if spacetime.Sign() <= 0 {
+		utils.MLogger.Info("error spacetime<=0")
 	}
 	return spacetime, timepre
-}
-
-type timesortlist []int64                 //该结构用来对挑战结果按时间进行排序，以便计算时空值
-func (p timesortlist) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p timesortlist) Len() int           { return len(p) }
-func (p timesortlist) Less(i, j int) bool { return p[i] < p[j] }
-
-// parseLastPayKV from value to payInfo
-//`qid/"lastpay"/pid` ,`beginTime/endTime/spacetime/signature/proof`
-func (l *lInfo) parseLastPayKV(value []byte) error {
-	splitedValue := strings.Split(string(value), metainfo.DELIMITER)
-	if len(splitedValue) < 5 {
-		return role.ErrWrongValue
-	}
-
-	st, ok := big.NewInt(0).SetString(splitedValue[2], 10)
-	if !ok {
-		utils.MLogger.Info("SetString()err!value: ", splitedValue[2])
-	}
-	begintime := utils.StringToUnix(splitedValue[0])
-	endtime := utils.StringToUnix(splitedValue[1])
-	if begintime == 0 || endtime == 0 {
-		return metainfo.ErrIllegalValue
-	}
-	l.lastPay = &chalpay{
-		beginTime: begintime,
-		endTime:   endtime,
-		spacetime: st,
-		signature: splitedValue[3],
-		proof:     splitedValue[4],
-	}
-
-	return nil
 }

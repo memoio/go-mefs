@@ -33,6 +33,7 @@ import (
 var (
 	errNoRouting = errors.New("routing is not running")
 	ErrRetry     = errors.New("ReTry Later")
+	errKey       = errors.New("Key and value are mismatched")
 )
 
 type impl struct {
@@ -113,7 +114,7 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 	return n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
 }
 
-func (n *impl) getUserPublicKey(key string) ([]byte, error) {
+func (n *impl) GetUserPublicKey(key string) ([]byte, error) {
 	pubKey, ok := n.pubKeys.Get(key)
 	if ok {
 		return pubKey.([]byte), nil
@@ -132,6 +133,15 @@ func (n *impl) getUserPublicKey(key string) ([]byte, error) {
 	err = proto.Unmarshal(pubRecByte, pubrec)
 	if err != nil {
 		return nil, err
+	}
+
+	gotID, err := utils.IDFromPublicKey(pubrec.GetValue())
+	if err != nil {
+		return nil, err
+	}
+
+	if gotID != key {
+		return nil, errKey
 	}
 
 	n.pubKeys.Add(key, pubrec.GetValue())
@@ -164,12 +174,12 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 		}
 
 		gotID := keys[2]
-		pubKey, err := n.getUserPublicKey(gotID)
+		pubKey, err := n.GetUserPublicKey(gotID)
 		if err != nil {
 			return false
 		}
 
-		return utils.VerifySig(pubKey, gotID, key, value, sig)
+		return utils.VerifySigForKey(pubKey, key, value, sig)
 	}
 }
 

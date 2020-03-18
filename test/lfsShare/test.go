@@ -68,7 +68,7 @@ func main() {
 	log.Println(bk.Buckets)
 
 	log.Println("======6. begin to put object======")
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	length := rand.Int63n(randomDataSize)
 	data := make([]byte, length)
 	fillRandom(data)

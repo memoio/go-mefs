@@ -69,7 +69,7 @@ func uploadTest(count int) error {
 
 	log.Println(addr, "started, begin to upload")
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	bucketName := time.Now().Format("2006-01-02")
 	_, err = sh.ShowStorage(shell.SetAddress(addr))
 	if err != nil {
@@ -92,7 +92,7 @@ func uploadTest(count int) error {
 	fileNum := 0
 	fileUploadSuccessNum := 0
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	//upload file
 	for fileNum < count {
 		fileNum++

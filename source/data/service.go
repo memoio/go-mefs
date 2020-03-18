@@ -21,6 +21,7 @@ type Service interface {
 	DeleteKey(ctx context.Context, key, to string) error
 	Itererate(prefix string) ([]dsq.Entry, error)
 
+	GetUserPublicKey(key string) ([]byte, error)
 	VerifyKey(ctx context.Context, key string, value, sig []byte) bool
 
 	GetBlock(ctx context.Context, key string, sig []byte, to string) (blocks.Block, error)

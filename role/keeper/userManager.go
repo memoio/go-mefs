@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -306,6 +305,7 @@ type lInfo struct {
 	maxlength    int64
 	lastChalTime int64
 	lastPay      *chalpay // stores result of last pay
+	currentPay   *chalpay // current
 }
 
 type blockInfo struct {
@@ -317,11 +317,8 @@ type blockInfo struct {
 
 //chalpay: for one pay informations
 type chalpay struct {
-	beginTime int64    // last end
-	endTime   int64    // this end
-	spacetime *big.Int // space time value
-	signature string   // signature of spacetime
-	proof     string
+	sync.RWMutex
+	mpb.STValue
 }
 
 type quKey struct {
