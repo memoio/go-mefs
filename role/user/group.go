@@ -450,8 +450,8 @@ func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaVa
 			continue
 		}
 
-		g.tempKeepers = append(g.tempKeepers, kid)
 		if g.ds.Connect(ctx, kid) {
+			g.tempKeepers = append(g.tempKeepers, kid)
 			kcount++
 		}
 	}
@@ -463,8 +463,8 @@ func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaVa
 			continue
 		}
 
-		g.tempProviders = append(g.tempProviders, pid)
 		if g.ds.Connect(ctx, pid) {
+			g.tempProviders = append(g.tempProviders, pid)
 			pcount++
 		}
 	}
@@ -649,13 +649,6 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		res.WriteString(pid)
 	}
 
-	kmUser, err := metainfo.NewKey(g.groupID, mpb.KeyType_LFS, g.userID)
-	if err != nil {
-		return err
-	}
-
-	g.ds.PutKey(ctx, kmUser.ToString(), []byte(res.String()), nil, "local")
-
 	if g.userID != g.groupID {
 		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
 		if err != nil {
@@ -689,6 +682,13 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 			}(proID)
 		}
 		wg.Wait()
+	} else {
+		kmUser, err := metainfo.NewKey(g.groupID, mpb.KeyType_LFS, g.userID)
+		if err != nil {
+			return err
+		}
+
+		g.ds.PutKey(ctx, kmUser.ToString(), []byte(res.String()), nil, "local")
 	}
 	g.state = depoyDone
 
