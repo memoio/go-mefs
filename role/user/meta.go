@@ -283,12 +283,14 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		}
 	}
 
-	lroot := l.meta.sb.GetLRoot()[len(l.meta.sb.GetLRoot())-1]
 	broot := new(mpb.BucketRoot)
-	if len(lroot.GetBRoots()) < int(bucket.BucketID) {
-		utils.MLogger.Error("Objects in bucket: ", bucket.BucketID, " has inconsistent objects")
-	} else {
-		broot = lroot.GetBRoots()[bucket.BucketID-1]
+	if len(l.meta.sb.GetLRoot()) > 0 {
+		lroot := l.meta.sb.GetLRoot()[len(l.meta.sb.GetLRoot())-1]
+		if len(lroot.GetBRoots()) < int(bucket.BucketID) {
+			utils.MLogger.Error("Objects in bucket: ", bucket.BucketID, " has inconsistent objects")
+		} else {
+			broot = lroot.GetBRoots()[bucket.BucketID-1]
+		}
 	}
 
 	if int64(len(data)) >= objectsBlockSize {
