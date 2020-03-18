@@ -32,8 +32,26 @@ func (g *groupInfo) loadContracts(mode bool) error {
 			return err
 		}
 
+		var keepers []string
+		var providers []string
+		for _, keeper := range uItem.Keepers {
+			kid, err := address.GetIDFromAddress(keeper.Addr.String())
+			if err != nil {
+				return err
+			}
+			keepers = append(keepers, kid)
+		}
+
+		for _, provider := range uItem.Providers {
+			pid, err := address.GetIDFromAddress(provider.Addr.String())
+			if err != nil {
+				return err
+			}
+			providers = append(providers, pid)
+		}
+
 		flag := false
-		for _, keeperID := range uItem.KeeperIDs {
+		for _, keeperID := range keepers {
 			if g.localKeeper == keeperID {
 				flag = true
 			}
@@ -45,8 +63,8 @@ func (g *groupInfo) loadContracts(mode bool) error {
 			return role.ErrNotMyUser
 		}
 
-		g.providers = uItem.ProviderIDs
-		g.keepers = uItem.KeeperIDs
+		g.providers = providers
+		g.keepers = keepers
 
 		g.upkeeping = &uItem
 	}

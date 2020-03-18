@@ -124,6 +124,7 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.GasLimit = defaultGasLimit
 
 		tx, err := channelInstance.ChannelTimeout(auth)
 		if err != nil {
@@ -170,7 +171,7 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = 8000000
+		auth.GasLimit = defaultGasLimit
 		tx, err := channelInstance.CloseChannel(auth, hashNew, value, sig)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
@@ -193,5 +194,49 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 	}
 
 	log.Println("you have called CloseChannel successfully!")
+	return nil
+}
+
+//ExtendChannelTime called by user to extend the time in channel contract
+func ExtendChannelTime(channelAddress common.Address, hexKey string, addTime *big.Int) error {
+	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
+	if err != nil {
+		return err
+	}
+
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HetoECDSA err:", err)
+		return err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.GasLimit = defaultGasLimit
+		tx, err := channelInstance.Extend(auth, addTime)
+		if err != nil {
+			if retryCount > sendTransactionRetryCount {
+				log.Println("extendChannelTimeErr:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				log.Println("extendChannelTime fails", err)
+				return err
+			}
+			continue
+		}
+		break
+	}
+
+	log.Println("you have called extendChannelTime successfully!")
 	return nil
 }

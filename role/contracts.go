@@ -1,7 +1,6 @@
 package role
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -40,8 +39,8 @@ type UpKeepingItem struct {
 	UserID      string // 部署upkeeping的userid
 	QueryID     string // 部署upkeeping的queryID
 	UpKeepingID string // 合约地址
-	KeeperIDs   []string
-	ProviderIDs []string
+	Keepers     []upKeeping.UpKeepingKPInfo
+	Providers   []upKeeping.UpKeepingKPInfo
 	KeeperSLA   int32
 	ProviderSLA int32
 	Duration    int64 //存储时间，单位s(部署合约时的单位是天，获得的参数单位是s)
@@ -49,7 +48,9 @@ type UpKeepingItem struct {
 	Price       int64 // 部署的价格
 	StartTime   int64 // 部署的时间
 	Money       *big.Int
-	StEnd       int64
+	EndDate     int64
+	Cycle       int64
+	NeedPay     int64
 	Proofs      []upKeeping.UpKeepingProof
 }
 
@@ -123,7 +124,7 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		isKeeper, money, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, keeperAddress)
+		isKeeper, isBanned, money, _, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, keeperAddress)
 		if err != nil {
 			if retryCount > 10 {
 				return item, nil
@@ -131,7 +132,7 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		if isKeeper {
+		if isKeeper && !isBanned {
 			keeperID, err := address.GetIDFromAddress(keeperAddress.String())
 			if err != nil {
 				return item, err
@@ -178,7 +179,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		isProvider, money, size, stime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, proAddress)
+		isProvider, isBanned, money, stime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, proAddress)
 		if err != nil {
 			if retryCount > 10 {
 				return item, nil
@@ -186,12 +187,12 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		if isProvider {
+		if isProvider && !isBanned {
 			item = ProviderItem{
 				ProviderID: proID,
 				Money:      money,
 				StartTime:  stime.Int64(),
-				Capacity:   size.Int64(),
+				Capacity:   0,
 			}
 			return item, nil
 		}
@@ -435,7 +436,7 @@ func GetQueryInfo(localID, queryID string) (QueryItem, error) {
 }
 
 // DeployUpKeeping is
-func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, storeSize, storePrice int64, redo bool) (ukID string, err error) {
+func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, storeSize, storePrice, stPayCycle int64, redo bool) (ukID string, err error) {
 	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return ukID, err
@@ -470,7 +471,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 
 	utils.MLogger.Info("Begin to deploy upkeeping contract...")
 
-	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, storeDays, storeSize, storePrice, moneyAccount, redo)
+	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, storeDays, storeSize, storePrice, stPayCycle, moneyAccount, redo)
 	if err != nil {
 		utils.MLogger.Error("Deploy upkeeping contract failed: ", err)
 		return ukID, err
@@ -512,7 +513,7 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, proofs, stEnd, err := ukInstance.GetOrder(&bind.CallOpts{
+		queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := ukInstance.GetOrder(&bind.CallOpts{
 			From: localAddr,
 		})
 		if err != nil {
@@ -522,23 +523,23 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		var keepers []string
-		var providers []string
-		for _, keeper := range keeperAddrs {
-			kid, err := address.GetIDFromAddress(keeper.String())
-			if err != nil {
-				return item, err
-			}
-			keepers = append(keepers, kid)
-		}
+		// var keepers []string
+		// var providers []string
+		// for _, keeper := range keeperAddrs {
+		// 	kid, err := address.GetIDFromAddress(keeper.String())
+		// 	if err != nil {
+		// 		return item, err
+		// 	}
+		// 	keepers = append(keepers, kid)
+		// }
 
-		for _, provider := range providerAddrs {
-			pid, err := address.GetIDFromAddress(provider.String())
-			if err != nil {
-				return item, err
-			}
-			providers = append(providers, pid)
-		}
+		// for _, provider := range providerAddrs {
+		// 	pid, err := address.GetIDFromAddress(provider.String())
+		// 	if err != nil {
+		// 		return item, err
+		// 	}
+		// 	providers = append(providers, pid)
+		// }
 
 		qid, err := address.GetIDFromAddress(queryAddr.String())
 		if err != nil {
@@ -548,15 +549,17 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 		item = UpKeepingItem{
 			QueryID:     qid,
 			UpKeepingID: ukID,
-			KeeperIDs:   keepers,
-			KeeperSLA:   int32(len(keeperAddrs)),
-			ProviderIDs: providers,
-			ProviderSLA: int32(len(providerAddrs)),
+			Keepers:     keepers,
+			KeeperSLA:   int32(len(keepers)),
+			Providers:   providers,
+			ProviderSLA: int32(len(providers)),
 			Duration:    duration.Int64(),
 			Capacity:    capacity.Int64(),
 			Price:       price.Int64(),
 			StartTime:   startTime.Int64(),
-			StEnd:       stEnd.Int64(),
+			EndDate:     endDate.Int64(),
+			Cycle:       cycle.Int64(),
+			NeedPay:     needPay.Int64(),
 			Proofs:      proofs,
 		}
 		return item, nil
@@ -583,7 +586,7 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		queryAddr, keeperAddrs, providerAddrs, duration, capacity, price, startTime, proofs, stEnd, err := ukInstance.GetOrder(&bind.CallOpts{
+		queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := ukInstance.GetOrder(&bind.CallOpts{
 			From: userAddr,
 		})
 		if err != nil {
@@ -593,23 +596,23 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		var keepers []string
-		var providers []string
-		for _, keeper := range keeperAddrs {
-			kid, err := address.GetIDFromAddress(keeper.String())
-			if err != nil {
-				return item, err
-			}
-			keepers = append(keepers, kid)
-		}
+		// var keepers []string
+		// var providers []string
+		// for _, keeper := range keeperAddrs {
+		// 	kid, err := address.GetIDFromAddress(keeper.String())
+		// 	if err != nil {
+		// 		return item, err
+		// 	}
+		// 	keepers = append(keepers, kid)
+		// }
 
-		for _, provider := range providerAddrs {
-			pid, err := address.GetIDFromAddress(provider.String())
-			if err != nil {
-				return item, err
-			}
-			providers = append(providers, pid)
-		}
+		// for _, provider := range providerAddrs {
+		// 	pid, err := address.GetIDFromAddress(provider.String())
+		// 	if err != nil {
+		// 		return item, err
+		// 	}
+		// 	providers = append(providers, pid)
+		// }
 
 		qid, err := address.GetIDFromAddress(queryAddr.String())
 		if err != nil {
@@ -625,15 +628,17 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			UserID:      userID,
 			QueryID:     qid,
 			UpKeepingID: ukID,
-			KeeperIDs:   keepers,
-			KeeperSLA:   int32(len(keeperAddrs)),
-			ProviderIDs: providers,
-			ProviderSLA: int32(len(providerAddrs)),
+			Keepers:     keepers,
+			KeeperSLA:   int32(len(keepers)),
+			Providers:   providers,
+			ProviderSLA: int32(len(providers)),
 			Duration:    duration.Int64(),
 			Capacity:    capacity.Int64(),
 			Price:       price.Int64(),
 			StartTime:   startTime.Int64(),
-			StEnd:       stEnd.Int64(),
+			EndDate:     endDate.Int64(),
+			Cycle:       cycle.Int64(),
+			NeedPay:     needPay.Int64(),
 			Proofs:      proofs,
 		}
 		return item, nil
@@ -1062,12 +1067,11 @@ func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stS
 	d.Write(stLengthNew)
 	d.Write(stValueNew)
 	d.Write(merkleRootNew)
-	for _, b := range data {
-		d.Write(b)
+	for i := 0; i < len(data); i++ {
+		d.Write(data[i])
 	}
 	hash := d.Sum(nil)
 
-	fmt.Println("hash:", common.ToHex(hash))
 	//私钥格式转换
 	skECDSA, err := utils.EthskToECDSAsk(hexKey)
 	if err != nil {
@@ -1079,7 +1083,6 @@ func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stS
 	if err != nil {
 		return sig, err
 	}
-	fmt.Println("signatureHex:", common.ToHex(sig))
 
 	return sig, nil
 }

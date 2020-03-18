@@ -15,11 +15,10 @@ import (
 const ukey = "memoriae"
 
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
-func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
+func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price, cycle int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
 	log.Println("begin deploy upKeeping...")
 
 	var ukAddr common.Address
-	t := days * 24 * 60 * 60
 
 	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, ukey, hexKey, true)
 	if err != nil {
@@ -49,7 +48,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = moneyAccount
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 s,存储大小 单位 MB
-		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(t), big.NewInt(size), big.NewInt(price))
+		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price), big.NewInt(cycle))
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Uk Err:", err)
@@ -133,7 +132,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 			if err != nil {
 				continue
 			}
-			queryAddr, _, _, _, _, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+			queryAddr, _, _, _, _, _, _, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
 				From: localAddress,
 			})
 			if err != nil {
@@ -234,7 +233,7 @@ func AddProvider(hexKey string, localAddress, userAddress, ukAddr common.Address
 	for {
 		retryCount++
 		time.Sleep(30 * time.Second)
-		_, _, proAddr, _, _, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+		_, _, proAddr, _, _, _, _, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
 			From: localAddress,
 		})
 		if err != nil {
@@ -246,7 +245,7 @@ func AddProvider(hexKey string, localAddress, userAddress, ukAddr common.Address
 
 		found := false
 		for _, pro := range proAddr {
-			if pro.String() == providerAddress[0].String() {
+			if pro.Addr.String() == providerAddress[0].String() {
 				found = true
 				break
 			}
@@ -264,32 +263,32 @@ func AddProvider(hexKey string, localAddress, userAddress, ukAddr common.Address
 }
 
 //GetOrder get queryAddr、keepers、providers、time、size、price、createDate、proofs、stEnd
-func GetOrder(hexKey string, localAddress, userAddress common.Address, key string) (common.Address, []common.Address, []common.Address, *big.Int, *big.Int, *big.Int, *big.Int, []upKeeping.UpKeepingProof, *big.Int, error) {
+func GetOrder(hexKey string, localAddress, userAddress common.Address, key string) (common.Address, []upKeeping.UpKeepingKPInfo, []upKeeping.UpKeepingKPInfo, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, []upKeeping.UpKeepingProof, error) {
 	var queryAddr common.Address
-	var keepers, providers []common.Address
-	var t, size, price, createDate, stEnd *big.Int
+	var keepers, providers []upKeeping.UpKeepingKPInfo
+	var t, size, price, createDate, endDate, cycle, needPay *big.Int
 	var proofs []upKeeping.UpKeepingProof
 	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
 	if err != nil {
-		return queryAddr, keepers, providers, t, size, price, createDate, proofs, stEnd, err
+		return queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err
 	}
 
 	retryCount := 0
 	for {
 		retryCount++
-		queryAddr, keepers, providers, t, size, price, createDate, proofs, stEnd, err = uk.GetOrder(&bind.CallOpts{
+		queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err = uk.GetOrder(&bind.CallOpts{
 			From: localAddress,
 		})
 		if err != nil {
 			if retryCount > 5 {
-				return queryAddr, keepers, providers, t, size, price, createDate, proofs, stEnd, err
+				return queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err
 			}
 			time.Sleep(30 * time.Second)
 			continue
 		}
 		break
 	}
-	return queryAddr, keepers, providers, t, size, price, createDate, proofs, stEnd, nil
+	return queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, nil
 }
 
 //ExtendTime user extend storage-time in upKeeping-contract
@@ -357,6 +356,82 @@ func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, 
 		if err != nil {
 			if retryCount > checkTxRetryCount {
 				log.Println("maybe you cannt destruct the contract now")
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		break
+	}
+
+	return nil
+}
+
+//SetKeeperStop keeper call to set keeperAddr stop
+func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.Address, key string, sign [][]byte) error {
+	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
+	if err != nil {
+		return err
+	}
+
+	retryCount := 0
+
+	for {
+		retryCount++
+		sk, _ := crypto.HexToECDSA(hexKey)
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := uk.SetKeeperStop(auth, keeperAddr, sign)
+		if err != nil {
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		break
+	}
+
+	return nil
+}
+
+//SetProviderStop keeper call to set providerAddr stop
+func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr common.Address, key string, sign [][]byte) error {
+	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
+	if err != nil {
+		return err
+	}
+
+	retryCount := 0
+
+	for {
+		retryCount++
+		sk, _ := crypto.HexToECDSA(hexKey)
+		auth := bind.NewKeyedTransactor(sk)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		tx, err := uk.SetKeeperStop(auth, providerAddr, sign)
+		if err != nil {
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
 				return err
 			}
 			time.Sleep(time.Minute)

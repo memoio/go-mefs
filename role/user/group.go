@@ -16,6 +16,7 @@ import (
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -62,7 +63,8 @@ type groupInfo struct {
 	storePrice    int64 //表示部署合约时的存储价格大小，单位是“wei”
 	keeperSLA     int   //表示部署合约时的keeper参数，目前是keeper数量
 	providerSLA   int   //表示部署合约时的provider参数，目前是provider数量
-	reDeploy      bool  // 是否重新部署offer
+	stPayCycle    int64
+	reDeploy      bool // 是否重新部署offer
 	force         bool
 	tempKeepers   []string // for seletcting during init phase
 	tempProviders []string
@@ -103,11 +105,31 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		utils.MLogger.Info("start user: ", g.userID, " and its lfs: ", g.groupID)
 		g.keeperSLA = int(uItem.KeeperSLA)
 		g.providerSLA = int(uItem.ProviderSLA)
-		g.tempKeepers = uItem.KeeperIDs
-		g.tempProviders = uItem.ProviderIDs
+
+		var keepers []string
+		var providers []string
+		for _, keeper := range uItem.Keepers {
+			kid, err := address.GetIDFromAddress(keeper.Addr.String())
+			if err != nil {
+				return false, err
+			}
+			keepers = append(keepers, kid)
+		}
+
+		for _, provider := range uItem.Providers {
+			pid, err := address.GetIDFromAddress(provider.Addr.String())
+			if err != nil {
+				return false, err
+			}
+			providers = append(providers, pid)
+		}
+
+		g.tempKeepers = keepers
+		g.tempProviders = providers
 		g.storeDays = uItem.Duration
 		g.storePrice = uItem.Price
 		g.storeSize = uItem.Capacity
+		g.stPayCycle = uItem.Cycle
 		g.state = depoyDone
 		err := g.connect(ctx)
 		if err != nil {
@@ -650,7 +672,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 	}
 
 	if g.userID != g.groupID {
-		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, true)
+		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, g.stPayCycle, true)
 		if err != nil {
 			utils.MLogger.Error("Deploy UpKeeping failed: ", err)
 		}

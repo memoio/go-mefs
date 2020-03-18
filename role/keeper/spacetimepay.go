@@ -65,9 +65,15 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	// check again
 	found := false
-	for _, pid := range g.upkeeping.ProviderIDs {
+	stEnd := big.NewInt(0)
+	for _, pInfo := range g.upkeeping.Providers {
+		pid, err := address.GetIDFromAddress(pInfo.Addr.String())
+		if err != nil {
+			return err
+		}
 		if pid == proID {
 			found = true
+			stEnd = pInfo.StEnd
 			break
 		}
 	}
@@ -125,9 +131,8 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	}
 
 	//TODO
-	stEnd := g.upkeeping.StEnd
-	stStart := big.NewInt(stEnd)
-	stLength := big.NewInt(time.Now().Unix() - stEnd)
+	stStart := stEnd
+	stLength := big.NewInt(time.Now().Unix() - stEnd.Int64())
 	merkleRoot := [32]byte{0}
 	share := []int{}
 	sign := [][]byte{}
