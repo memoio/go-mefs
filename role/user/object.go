@@ -56,7 +56,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	deleteObject := mpb.DeleteObject{
 		Name:     object.GetInfo().GetName(),
 		ObjectID: object.GetInfo().GetObjectID(),
-		Time:     time.Now().Unix(),
+		Time:     time.Now().UnixNano(),
 	}
 
 	payload, _ := proto.Marshal(&deleteObject)
@@ -223,7 +223,7 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 			continue
 		}
 		unixTime := utils.StringToUnix(string(res))
-		tempTime = utils.UnixToTime(unixTime)
+		tempTime = time.Unix(0, unixTime)
 		if tempTime.After(latestTime) {
 			latestTime = tempTime
 		}

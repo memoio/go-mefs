@@ -96,7 +96,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 
 	if creation {
 		//add Object
-		ct := time.Now().Unix()
+		ct := time.Now().UnixNano()
 		oInfo := &mpb.Object{
 			Name:     objectName,
 			BucketID: bucket.BucketID,
@@ -173,7 +173,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		ObjectID: object.GetInfo().GetObjectID(),
 		PartID:   object.GetPartCount(),
 		Start:    bucket.GetLength(),
-		CTime:    time.Now().Unix(),
+		CTime:    time.Now().UnixNano(),
 	}
 
 	ul := &uploadTask{

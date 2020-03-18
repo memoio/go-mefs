@@ -97,7 +97,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string) (string,
 		return "", nil, role.ErrEmptyData
 	}
 
-	challengetime := time.Now().Unix()
+	challengetime := time.Now().UnixNano()
 
 	thischalresult := &mpb.ChalInfo{
 		KeeperID:    localID,
@@ -316,6 +316,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
+
 		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
 			_, ok := cset[k.(string)]
 			if ok {

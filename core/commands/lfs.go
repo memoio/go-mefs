@@ -521,7 +521,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if err != nil {
 			availTim = time.Unix(0, 0)
 		}
-		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
+		ctime := time.Unix(0, object.GetCTime()).In(time.Local)
 		objectStat := ObjectStat{
 			Name:           object.GetInfo().GetName(),
 			Size:           object.GetLength(),
@@ -622,7 +622,7 @@ var lfsPutObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
+		ctime := time.Unix(0, object.GetCTime()).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetInfo().GetName(),
 			Size:  object.GetLength(),
@@ -844,7 +844,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			Method: "List Objects",
 		}
 		for _, object := range objects {
-			ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
+			ctime := time.Unix(0, object.GetCTime()).In(time.Local)
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
@@ -933,7 +933,7 @@ var lfsDeleteObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
+		ctime := time.Unix(0, object.GetCTime()).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetInfo().GetName(),
 			Size:  object.GetLength(),
@@ -1010,7 +1010,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
+		ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1125,7 +1125,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
+		ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1203,7 +1203,7 @@ It outputs the following to stdout:
 			Method: "List Buckets",
 		}
 		for _, bucket := range buckets {
-			ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
+			ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
 			bucketStat := BucketStat{
 				Name:        bucket.Name,
 				BucketID:    bucket.BucketID,
@@ -1283,7 +1283,7 @@ It outputs the following to stdout:
 			return err
 		}
 
-		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
+		ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,

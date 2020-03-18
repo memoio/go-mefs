@@ -270,7 +270,7 @@ func TestVerifyProof(t *testing.T) {
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
 	chal := Challenge{
-		Seed:    int(time.Now().Unix()),
+		Seed:    int(time.Now().UnixNano()),
 		Indices: blocks,
 	}
 

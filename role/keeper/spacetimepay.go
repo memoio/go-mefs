@@ -107,7 +107,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 		startTime = thisLinfo.lastPay.Start + thisLinfo.lastPay.Length
 
-		spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().Unix())
+		spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().UnixNano())
 		amount := convertSpacetime(spaceTime, price)
 		if amount.Sign() > 0 {
 			thisLinfo.currentPay = &chalpay{
@@ -129,7 +129,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
 		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
 
-		utils.MLogger.Infof("stpay: amount:%d,beginTime:%s, lastTime:%s", amount, utils.UnixToTime(thisLinfo.currentPay.GetStart()), utils.UnixToTime(thisLinfo.currentPay.GetLength()))
+		utils.MLogger.Infof("stpay: amount:%d,beginTime:%d, length:%d", amount, thisLinfo.currentPay.GetStart(), thisLinfo.currentPay.GetLength())
 
 		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount)
 		if err != nil {

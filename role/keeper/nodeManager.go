@@ -126,6 +126,7 @@ func (k *Info) getPInfo(pid string) (*pInfo, error) {
 	if !ok {
 		tempInfo := &pInfo{
 			providerID: pid,
+			credit:     50,
 		}
 		err := tempInfo.setOffer(false)
 		if err != nil {
@@ -316,7 +317,9 @@ func (k *Info) GetProviders() ([]string, error) {
 
 	var res []string
 	k.providers.Range(func(k, v interface{}) bool {
-		res = append(res, k.(string))
+		if v.(*pInfo).online && v.(*pInfo).credit > 0 {
+			res = append(res, k.(string))
+		}
 		return true
 	})
 
