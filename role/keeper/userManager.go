@@ -319,6 +319,7 @@ type blockInfo struct {
 type chalpay struct {
 	sync.RWMutex
 	mpb.STValue
+	hash []byte
 }
 
 type quKey struct {

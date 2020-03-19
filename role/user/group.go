@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -662,12 +663,15 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 	}
 
 	var res strings.Builder
+	// sort for signs
+	sort.Strings(g.tempKeepers)
 	for _, kid := range g.tempKeepers {
 		res.WriteString(kid)
 	}
 
 	res.WriteString(metainfo.DELIMITER)
 
+	sort.Strings(g.tempProviders)
 	for _, pid := range g.tempProviders {
 		res.WriteString(pid)
 	}

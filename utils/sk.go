@@ -181,17 +181,17 @@ func SignForKey(hexKey string, key string, value []byte) (sig []byte, err error)
 	hash := crypto.Keccak256([]byte(key), value)
 
 	//私钥对上述哈希值签名
-	sig, err = crypto.Sign(hash, skECDSA)
+	return crypto.Sign(hash, skECDSA)
+}
+
+func Sign(hexKey string, hash []byte) (sig []byte, err error) {
+	skECDSA, err := EthskToECDSAsk(hexKey)
 	if err != nil {
 		return sig, err
 	}
 
-	_, err = GetPkFromEthSk(hexKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return sig, nil
+	//私钥对上述哈希值签名
+	return crypto.Sign(hash, skECDSA)
 }
 
 // VerifySig verifies

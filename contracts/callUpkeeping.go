@@ -149,10 +149,10 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 }
 
 // SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
-func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int, sign [][]byte) error {
+func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int64, sign [][]byte) error {
 	shareNew := []*big.Int{}
 	for _, b := range share {
-		shareNew = append(shareNew, big.NewInt(int64(b)))
+		shareNew = append(shareNew, big.NewInt(b))
 	}
 
 	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))

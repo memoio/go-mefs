@@ -105,16 +105,53 @@ func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string
 
 func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from string) {
 	// verify sig first
-	k.ds.PutKey(k.context, km.ToString(), metaValue, sig, "local")
+	// putSig
+	ops := km.GetOptions()
+	if len(ops) < 5 {
+		return
+	}
+
+	gp := k.getGroupInfo(ops[0], km.GetMid(), false)
+	if gp == nil {
+		return
+	}
+
+	linfo := gp.getLInfo(ops[1], false)
+	if linfo == nil {
+		return
+	}
+
+	// verify currentPay
+	if linfo.currentPay == nil {
+		return
+	}
+
+	if len(linfo.currentPay.GetSign()) < len(gp.keepers) {
+		return
+	}
+
+	linfo.currentPay.Lock()
+	defer linfo.currentPay.Unlock()
+
+	for i, kid := range gp.keepers {
+		if kid == string(metaValue) {
+			linfo.currentPay.GetSign()[i] = sig
+			linfo.currentPay.Status--
+		}
+	}
 }
 
+// key is /qid/"Sign"/uid/pid/kid/stStart/length
 func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from string) {
 	// verify sig first
-	nsig, err := utils.SignForKey(k.sk, km.ToString(), metaValue)
+	// verify metaValue
+	// sign it
+	nsig, err := utils.Sign(k.sk, metaValue)
 	if err != nil {
 		return
 	}
-	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), metaValue, nsig, from)
+
+	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), []byte(k.localID), nsig, from)
 }
 
 func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from string) {

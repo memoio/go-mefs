@@ -1082,8 +1082,34 @@ func BuildSignMessage() ([]byte, error) {
 	return mes, nil
 }
 
+func GetHashForST(ukID, providerID string, stStart, stLength, stValue *big.Int, merkleRoot []byte, share []int64) ([]byte, error) {
+	upKeepingAddr, err := address.GetAddressFromID(ukID)
+	if err != nil {
+		return nil, err
+	}
+
+	providerAddr, err := address.GetAddressFromID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	//keccak256(upKeepingAddr, providerAddr, stStart, stLength, stValue, merkleRoot, share)
+	d := sha3.NewLegacyKeccak256()
+	d.Write(upKeepingAddr.Bytes())
+	d.Write(providerAddr.Bytes())
+	d.Write(common.LeftPadBytes(stStart.Bytes(), 32))
+	d.Write(common.LeftPadBytes(stLength.Bytes(), 32))
+	d.Write(common.LeftPadBytes(stValue.Bytes(), 32))
+	d.Write(merkleRoot[:])
+	for i := 0; i < len(share); i++ {
+		d.Write(common.LeftPadBytes(big.NewInt(int64(share[i])).Bytes(), 32))
+	}
+
+	return d.Sum(nil), nil
+}
+
 //SignForStPay keeper signature
-func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int) ([]byte, error) {
+func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int64) ([]byte, error) {
 	var sig []byte
 	//(upKeepingAddr, providerAddr, stStart, stLength, stValue, merkleRoot, share)的哈希值
 	stStartNew := common.LeftPadBytes(stStart.Bytes(), 32)

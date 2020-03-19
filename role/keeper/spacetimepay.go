@@ -1,17 +1,25 @@
 package keeper
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/gob"
 	"math/big"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
+	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
 func (k *Info) stPayRegular(ctx context.Context) {
@@ -36,10 +44,11 @@ func (k *Info) stPayRegular(ctx context.Context) {
 				}
 
 				for _, proID := range thisGroup.providers {
-					err := thisGroup.spaceTimePay(proID, k.sk)
+					err := thisGroup.spaceTimePay(k.context, proID, k.sk, k.localID, k.ds)
 					if err != nil {
 						continue
 					}
+
 					k.savePay(qid, proID)
 				}
 
@@ -48,7 +57,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 	}
 }
 
-func (g *groupInfo) spaceTimePay(proID, localSk string) error {
+func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID string, ds data.Service) error {
 	// only master triggers,
 	// todo round-robin
 	if !g.isMaster(proID) {
@@ -62,10 +71,13 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 	// TODO: exit when balance is too low
 
 	price := g.upkeeping.Price
+	if g.userID == pos.GetPosId() {
+		price = pos.GetPosPrice()
+	}
 
 	// check again
 	found := false
-	stEnd := big.NewInt(0)
+	startTime := g.upkeeping.StartTime
 	for _, pInfo := range g.upkeeping.Providers {
 		pid, err := address.GetIDFromAddress(pInfo.Addr.String())
 		if err != nil {
@@ -73,18 +85,14 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 		}
 		if pid == proID {
 			found = true
-			stEnd = pInfo.StEnd
+			startTime = pInfo.StEnd.Int64()
 			break
 		}
 	}
 
 	// PosAdd
 	if !found {
-		if g.userID != pos.GetPosId() {
-			return nil
-		}
-
-		price = pos.GetPosPrice()
+		return nil
 	}
 
 	thisIlinfo, ok := g.ledgerMap.Load(proID)
@@ -94,83 +102,99 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	thisLinfo := thisIlinfo.(*lInfo)
 
-	var startTime int64
 	if thisLinfo.currentPay == nil {
-		startTime = g.upkeeping.StartTime
-		if thisLinfo.lastPay == nil {
-			thisLinfo.lastPay = &chalpay{
-				STValue: mpb.STValue{
-					Start:  startTime,
-					Length: 0,
-					Status: 0,
-				},
-			}
-		}
-
-		// handle last pay
-		if thisLinfo.lastPay.Status != 0 {
-			return nil
-		}
-
-		startTime = thisLinfo.lastPay.Start + thisLinfo.lastPay.Length
-
-		spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().Unix())
-		amount := convertSpacetime(spaceTime, price)
+		amount, lastTime, mroot := thisLinfo.resultSummary(price, startTime, time.Now().Unix())
 		if amount.Sign() > 0 {
-			thisLinfo.currentPay = &chalpay{
+			knum := len(g.keepers)
+			cpay := &chalpay{
 				STValue: mpb.STValue{
 					Start:  startTime,
 					Length: lastTime - startTime,
 					Value:  amount.Bytes(),
-					Status: int32(len(g.keepers)),
+					Status: int32(knum * 2 / 3), // need at least 2/3
+					Sign:   make([][]byte, knum),
+					Share:  make([]int64, knum+1),
+					Root:   mroot,
 				},
 			}
+
+			for i := 0; i < knum; i++ {
+				cpay.Share[i] = 1
+			}
+			cpay.Share[knum] = int64(knum)
+
+			st := big.NewInt(cpay.Start)
+			sl := big.NewInt(cpay.Length)
+			sv := new(big.Int).SetBytes(cpay.Value)
+			hash, err := role.GetHashForST(g.upkeeping.UpKeepingID, proID, st, sl, sv, cpay.Root[:32], cpay.Share)
+			if err != nil {
+				return err
+			}
+			cpay.Root = hash
+
+			sign, err := utils.Sign(localSk, hash)
+			if err != nil {
+				return err
+			}
+
+			var mkey strings.Builder
+			mkey.WriteString(g.groupID)
+			mkey.WriteString(metainfo.DELIMITER)
+			mkey.WriteString(strconv.Itoa(int(mpb.KeyType_Sign)))
+			mkey.WriteString(metainfo.DELIMITER)
+			mkey.WriteString(g.userID)
+			mkey.WriteString(metainfo.DELIMITER)
+			mkey.WriteString(proID)
+			mkey.WriteString(metainfo.DELIMITER)
+			mkey.WriteString(localID)
+			mkey.WriteString(metainfo.DELIMITER)
+			mkey.WriteString(st.String())
+			mkey.WriteString(metainfo.DELIMITER)
+			mkey.WriteString(sl.String())
+
+			key := mkey.String()
+			for i, kid := range g.keepers {
+				if kid == localID {
+					cpay.Sign[i] = sign
+				}
+			}
+
+			thisLinfo.currentPay = cpay
+
+			// sync to other keepers？
+			// get enough signs; then
+			for _, kid := range g.keepers {
+				if kid == localID {
+					continue
+				}
+				go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, hash, sign, kid)
+			}
 		}
-		// sync to other keepers？
-		// get enough signs; then
+		return nil
 	}
 
-	//TODO
-	stStart := stEnd
-	stLength := big.NewInt(time.Now().Unix() - stEnd.Int64())
-	merkleRoot := [32]byte{0}
-	share := []int{}
-	sign := [][]byte{}
-
-	spaceTime, _ := thisLinfo.resultSummary(startTime, time.Now().Unix())
-	amount := convertSpacetime(spaceTime, price)
-	if amount.Sign() > 0 {
+	if thisLinfo.currentPay != nil && thisLinfo.currentPay.Status <= 0 {
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
 		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
 
-		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, stStart, stLength, amount, merkleRoot, share, sign) //进行支付
+		st := big.NewInt(thisLinfo.currentPay.Start)
+		sl := big.NewInt(thisLinfo.currentPay.Length)
+		sv := new(big.Int).SetBytes(thisLinfo.currentPay.Value)
+		var root [32]byte
+		copy(root[:], thisLinfo.currentPay.Root[:32])
+		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, thisLinfo.currentPay.Share, thisLinfo.currentPay.Sign)
 		if err != nil {
 			utils.MLogger.Info("contracts.SpaceTimePay() failed: ", err)
 			return err
 		}
-	}
 
-	thisLinfo.currentPay.Status = 0
-	thisLinfo.lastPay = thisLinfo.currentPay
-	thisLinfo.currentPay = nil
+		thisLinfo.currentPay.Status = 0
+		thisLinfo.lastPay = thisLinfo.currentPay
+		thisLinfo.currentPay = nil
+		g.loadContracts(true)
+	}
 
 	return nil
-}
-
-//price: MB/day
-func convertSpacetime(spacetime *big.Int, price int64) *big.Int {
-	amount := big.NewInt(0)
-	if spacetime.Sign() <= 0 || price <= 0 {
-		utils.MLogger.Error("error! spaceTime:", spacetime.String(), ", price:", price)
-		return amount
-	}
-	amount.Mul(spacetime, big.NewInt(price))
-	amount.Quo(amount, big.NewInt(1024*1024*60*60*24)) //注意这里先用时空值×单位，计算出来更加准确
-	if amount.Sign() <= 0 {
-		utils.MLogger.Info("error! spaceTime:", spacetime, "amount:", amount, "price:", price)
-		return amount
-	}
-	return amount
 }
 
 type timeValue struct {
@@ -180,12 +204,11 @@ type timeValue struct {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
-	var tsl []timeValue //用来对挑战时间排序
+func (l *lInfo) resultSummary(price, start, end int64) (*big.Int, int64, []byte) {
 	spacetime := big.NewInt(0)
+	var tsl []timeValue //用来对挑战时间排序
 
 	var deletes []int64
-
 	l.chalMap.Range(func(k, value interface{}) bool {
 		// remove paid challenges
 		key := k.(int64)
@@ -209,22 +232,35 @@ func (l *lInfo) resultSummary(start, end int64) (*big.Int, int64) {
 
 	if len(tsl) <= 1 {
 		utils.MLogger.Info("no enough challenge data")
-		return spacetime, 0
+		return spacetime, 0, nil
 	}
 
 	sort.Slice(tsl, func(i, j int) bool {
 		return tsl[i].time < tsl[j].time
 	})
 
+	mtree := mt.New(sha256.New())
+	mtree.SetIndex(0)
+
 	timepre := tsl[0].time
 	lengthpre := tsl[0].space
+	var nbuf bytes.Buffer        // 替代网络连接
+	enc := gob.NewEncoder(&nbuf) // 将写入网络。
 	for _, tv := range tsl[1:] {
 		spacetime.Add(spacetime, big.NewInt((tv.time-timepre)*int64(lengthpre+tv.space)/2))
 		timepre = tv.time
 		lengthpre = tv.space
+		enc.Encode(tv)
+		mtree.Push(nbuf.Bytes())
 	}
 	if spacetime.Sign() <= 0 {
 		utils.MLogger.Info("error spacetime<=0")
 	}
-	return spacetime, timepre
+
+	spacetime.Mul(spacetime, big.NewInt(price))
+	spacetime.Quo(spacetime, big.NewInt(1024*1024*60*60))
+	if spacetime.Sign() <= 0 {
+		utils.MLogger.Info("error!amount:", spacetime, "price:", price)
+	}
+	return spacetime, timepre, mtree.Root()
 }

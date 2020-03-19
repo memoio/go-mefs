@@ -148,7 +148,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	stStart := providers[0].StEnd
 	stLength := big.NewInt(30)
 	merkleRoot := [32]byte{0}
-	share := []int{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
+	share := []int64{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
 	signs, err := getSigs(listKeeperAddr, listKeeperSk, listProviderAddr[0], ukaddr, stStart, stLength, amount, merkleRoot, share)
 	if err != nil {
 		log.Fatal("getSigs error:", err)
@@ -213,7 +213,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	stStart = providers[0].StEnd
 	stLength = big.NewInt(100)
 	merkleRoot = [32]byte{0}
-	share = []int{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
+	share = []int64{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
 	signs, err = getSigs(listKeeperAddr, listKeeperSk, listProviderAddr[0], ukaddr, stStart, stLength, amount, merkleRoot, share)
 	if err != nil {
 		log.Fatal("getSigs error:", err)
@@ -270,7 +270,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	stStart = providers[0].StEnd
 	stLength = big.NewInt(100)
 	merkleRoot = [32]byte{0}
-	share = []int{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
+	share = []int64{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
 	signs, err = getSigs(listKeeperAddr, listKeeperSk, listProviderAddr[0], ukaddr, stStart, stLength, amount, merkleRoot, share)
 	if err != nil {
 		log.Fatal("getSigs error:", err)
@@ -386,7 +386,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	return nil
 }
 
-func getSigs(keeperAddress []common.Address, keeperSk []string, providerAddr, upKeepingAddr common.Address, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int) ([][]byte, error) {
+func getSigs(keeperAddress []common.Address, keeperSk []string, providerAddr, upKeepingAddr common.Address, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int64) ([][]byte, error) {
 	sigs := [][]byte{}
 	for i := 0; i < len(keeperAddress); i++ {
 		sig, err := role.SignForStPay(upKeepingAddr, providerAddr, keeperSk[i], stStart, stLength, stValue, merkleRoot, share)
