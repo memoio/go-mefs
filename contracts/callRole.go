@@ -10,81 +10,17 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
+	"github.com/memoio/go-mefs/utils"
 )
 
-func GetKeeperContractFromIndexer(localAddress common.Address) (keeperContract *role.Keeper, err error) {
-	keeperContractAddr, _, err := GetResolver(localAddress, "keeper")
-	if err != nil {
-		log.Println("get keeper Contract Err:", err)
-		return keeperContract, err
-	}
-
-	keeperContract, err = role.NewKeeper(keeperContractAddr, GetClient(EndPoint))
-	if err != nil {
-		log.Println("newKeeperErr:", err)
-		return keeperContract, err
-	}
-	return keeperContract, nil
-}
-
-//IsKeeper judge if an account is keeper
-func IsKeeper(localAddress common.Address) (bool, error) {
-	keeperContract, err := GetKeeperContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("keeperContracterr:", err)
-		return false, err
-	}
-	isKeeper, _, _, _, err := keeperContract.Info(&bind.CallOpts{
-		From: localAddress,
-	}, localAddress)
-	if err != nil {
-		log.Println("isKeepererr:", err)
-		return false, err
-	}
-	return isKeeper, nil
-}
-
-func GetProviderContractFromIndexer(localAddress common.Address) (providerContract *role.Provider, err error) {
-	providerContractAddr, _, err := GetResolver(localAddress, "provider")
-	if err != nil {
-		log.Println("get provider Contract Err:", err)
-		return providerContract, err
-	}
-
-	providerContract, err = role.NewProvider(providerContractAddr, GetClient(EndPoint))
-	if err != nil {
-		log.Println(err)
-		return providerContract, err
-	}
-	return providerContract, nil
-}
-
-//IsProvider judge if an account is provider
-func IsProvider(localaddress common.Address) (bool, error) {
-	providerContract, err := GetProviderContractFromIndexer(localaddress)
-	if err != nil {
-		log.Println("providerContracterr:", err)
-		return false, err
-	}
-	isProvider, _, _, _, err := providerContract.Info(&bind.CallOpts{
-		From: localaddress,
-	}, localaddress)
-	if err != nil {
-		log.Println("isKeepererr:", err)
-		return false, err
-	}
-	return isProvider, nil
-}
-
-// KeeperContract deploy a keeper contract
-func KeeperContract(hexKey string) (err error) {
+// DeployKeeperAdmin deploy a keeper contract
+func DeployKeeperAdmin(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
-	//暂时将质押金额设为0
-	deposit := big.NewInt(0)
+	deposit := big.NewInt(keeperDeposit)
 	keeperContractAddr, _, _, err := role.DeployKeeper(auth, client, deposit)
 	if err != nil {
 		log.Println("deployKeeperErr:", err)
@@ -99,13 +35,33 @@ func KeeperContract(hexKey string) (err error) {
 		return err
 	}
 
-	indexer.Add(auth, "keeper", keeperContractAddr)
-	return nil
+	localAddr, err := utils.GetAdressFromSk(hexKey)
+	if err != nil {
+		return err
+	}
+
+	return AddToIndexer(localAddr, keeperContractAddr, keeperKey, hexKey, indexer)
+}
+
+func GetKeeperContractFromIndexer(localAddress common.Address) (common.Address, *role.Keeper, error) {
+	var res common.Address
+	keeperContractAddr, _, err := GetResolverAddr(localAddress, keeperKey)
+	if err != nil {
+		log.Println("get keeper Contract Err:", err)
+		return res, nil, err
+	}
+
+	keeperContract, err := role.NewKeeper(keeperContractAddr, GetClient(EndPoint))
+	if err != nil {
+		log.Println("newKeeperErr:", err)
+		return res, nil, err
+	}
+	return keeperContractAddr, keeperContract, nil
 }
 
 //SetKeeper set "localAddress" keeper in contract if isKeeper is true
 func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err error) {
-	keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
+	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
 		return err
@@ -122,15 +78,86 @@ func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err e
 	return nil
 }
 
-//ProviderContract deploy a keeper contract
-func ProviderContract(hexKey string) (err error) {
+//IsKeeper judge if an account is keeper
+func IsKeeper(localAddress common.Address) (bool, error) {
+	_, keeperContract, err := GetKeeperContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return false, err
+	}
+	isKeeper, _, _, _, err := keeperContract.Info(&bind.CallOpts{
+		From: localAddress,
+	}, localAddress)
+	if err != nil {
+		log.Println("isKeepererr:", err)
+		return false, err
+	}
+	return isKeeper, nil
+}
+
+func SetKeeperBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
+	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
+
+	_, err = keeperInstance.SetBanned(auth, localAddress, isBanned)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetKeeperPrice(localAddress common.Address, hexKey string, price *big.Int) (err error) {
+	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
+
+	_, err = keeperInstance.SetPrice(auth, price)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetKeeperPrice(localAddress common.Address) (*big.Int, error) {
+	_, keeperContract, err := GetKeeperContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return big.NewInt(0), err
+	}
+	price, err := keeperContract.GetPrice(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		log.Println("getKeeperPrice err:", err)
+		return price, err
+	}
+	return price, nil
+}
+
+//---------provider----------//
+
+//DeployProvider deploy a keeper contract
+func DeployProviderAdmin(hexKey string) (err error) {
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
-	//暂时将存储容量、质押金额设为0
-	deposit := big.NewInt(0)
+	//暂时将存储容量、质押金额设为1000
+	deposit := big.NewInt(providerDeposit)
 	providerContractAddr, _, _, err := role.DeployProvider(auth, client, deposit)
 	if err != nil {
 		log.Println("deployProviderErr:", err)
@@ -145,13 +172,33 @@ func ProviderContract(hexKey string) (err error) {
 		return err
 	}
 
-	indexer.Add(auth, "provider", providerContractAddr)
-	return nil
+	localAddr, err := utils.GetAdressFromSk(hexKey)
+	if err != nil {
+		return err
+	}
+
+	return AddToIndexer(localAddr, providerContractAddr, providerKey, hexKey, indexer)
+}
+
+func GetProviderContractFromIndexer(localAddress common.Address) (common.Address, *role.Provider, error) {
+	var res common.Address
+	providerContractAddr, _, err := GetResolverAddr(localAddress, providerKey)
+	if err != nil {
+		log.Println("get provider Contract Err:", err)
+		return res, nil, err
+	}
+
+	providerContract, err := role.NewProvider(providerContractAddr, GetClient(EndPoint))
+	if err != nil {
+		log.Println(err)
+		return res, nil, err
+	}
+	return providerContractAddr, providerContract, nil
 }
 
 //SetProvider set "localAddress" provider in contract if isProvider is true
 func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (err error) {
-	provider, err := GetProviderContractFromIndexer(localAddress)
+	_, provider, err := GetProviderContractFromIndexer(localAddress)
 	if err != nil {
 		return err
 	}
@@ -166,8 +213,79 @@ func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (e
 	return nil
 }
 
-//DeployKeeperProviderMap deploy KeeperProviderMap-contract
-func DeployKeeperProviderMap(hexKey string) error {
+//IsProvider judge if an account is provider
+func IsProvider(localaddress common.Address) (bool, error) {
+	_, providerContract, err := GetProviderContractFromIndexer(localaddress)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return false, err
+	}
+	isProvider, _, _, _, err := providerContract.Info(&bind.CallOpts{
+		From: localaddress,
+	}, localaddress)
+	if err != nil {
+		log.Println("isKeepererr:", err)
+		return false, err
+	}
+	return isProvider, nil
+}
+
+func SetProviderBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
+	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
+
+	_, err = providerInstance.SetBanned(auth, localAddress, isBanned)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetProviderPrice(localAddress common.Address) (*big.Int, error) {
+	_, providerContract, err := GetProviderContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return big.NewInt(0), err
+	}
+	price, err := providerContract.GetPrice(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		log.Println("getProviderPrice err:", err)
+		return price, err
+	}
+	return price, nil
+}
+
+func SetProviderPrice(localAddress common.Address, hexKey string, price *big.Int) (err error) {
+	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	auth := bind.NewKeyedTransactor(key)
+	auth.GasPrice = big.NewInt(defaultGasPrice)
+
+	_, err = providerInstance.SetPrice(auth, price)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//----------------------kpmap---------------------------//
+
+//DeployKPMa deploy KeeperProviderMap-contract
+func DeployKPMap(hexKey string) error {
 	log.Println("begin deploy keeperProviderMap...")
 
 	//之前没有部署过，部署keeperProviderMap合约
@@ -189,36 +307,25 @@ func DeployKeeperProviderMap(hexKey string) error {
 		return err
 	}
 
-	indexer.Add(auth, "keeperProviderMap", keeperProviderMapAddr)
+	indexer.Add(auth, kpMapKey, keeperProviderMapAddr)
 
 	log.Println("keeperProviderMap-contract have been successfully deployed!")
 	return nil
 }
 
-func getKeeperProviderMapInstanceFromIndexer(localAddress common.Address) (*role.KeeperProviderMap, error) {
-	var keeperProviderInstance *role.KeeperProviderMap
-
-	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+func getKPMap(localAddress common.Address) (common.Address, *role.KeeperProviderMap, error) {
+	res, _, err := GetResolverAddr(localAddress, kpMapKey)
 	if err != nil {
-		log.Println("newIndexerErr:", err)
-		return keeperProviderInstance, err
+		log.Println("get resolver for kpmap err: ", err)
+		return res, nil, err
 	}
 
-	_, keeperproviderMapContractAddr, err := indexer.Get(&bind.CallOpts{
-		From: localAddress,
-	}, "keeperProviderMap")
-	if err != nil {
-		log.Println("getkeeperproviderMapContractErr:", err)
-		return keeperProviderInstance, err
-	}
-
-	keeperProviderInstance, err = role.NewKeeperProviderMap(keeperproviderMapContractAddr, GetClient(EndPoint))
+	keeperProviderInstance, err := role.NewKeeperProviderMap(res, GetClient(EndPoint))
 	if err != nil {
 		log.Println("newKeeperProviderMapContractErr:", err)
-		return keeperProviderInstance, err
+		return res, keeperProviderInstance, err
 	}
-	return keeperProviderInstance, nil
+	return res, keeperProviderInstance, nil
 }
 
 // AddKeeperProvidersToKPMap adds provider/keeper to kpmap
@@ -237,7 +344,7 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 		}
 	}
 
-	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
@@ -251,7 +358,7 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 
-	_, err = keeperProviderMapInstance.Add(auth, keeperAddress, providerAddresses)
+	_, err = kpMapInstance.Add(auth, keeperAddress, providerAddresses)
 	if err != nil {
 		log.Println("addKeeperProviderTokpMapErr:", err)
 		return err
@@ -261,7 +368,7 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 
 // DeleteKeeperFromKPMap deletes keeper from kpmap
 func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address) error {
-	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
@@ -275,7 +382,7 @@ func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAdd
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 
-	_, err = keeperProviderMapInstance.DelKeeper(auth, keeperAddress)
+	_, err = kpMapInstance.DelKeeper(auth, keeperAddress)
 	if err != nil {
 		log.Println("deleteKeeperInkpMapErr:", err)
 		return err
@@ -285,7 +392,7 @@ func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAdd
 
 // DeleteProviderFromKPMap deletes provider from kpmap
 func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
-	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
@@ -299,7 +406,7 @@ func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperA
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 
-	_, err = keeperProviderMapInstance.DelProvider(auth, keeperAddress, providerAddress)
+	_, err = kpMapInstance.DelProvider(auth, keeperAddress, providerAddress)
 	if err != nil {
 		log.Println("deleteProviderInkpMapErr:", err)
 		return err
@@ -311,13 +418,13 @@ func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperA
 func GetAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) {
 	var keeperAddresses []common.Address
 
-	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return nil, err
 	}
 
-	keeperAddresses, err = keeperProviderMapInstance.GetAllKeeper(&bind.CallOpts{
+	keeperAddresses, err = kpMapInstance.GetAllKeeper(&bind.CallOpts{
 		From: localAddress,
 	})
 	if err != nil {
@@ -331,13 +438,13 @@ func GetAllKeeperInKPMap(localAddress common.Address) ([]common.Address, error) 
 func GetProviderInKPMap(localAddress common.Address, keeperAddress common.Address) ([]common.Address, error) {
 	var providerAddresses []common.Address
 
-	keeperProviderMapInstance, err := getKeeperProviderMapInstanceFromIndexer(localAddress)
+	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return nil, err
 	}
 
-	providerAddresses, err = keeperProviderMapInstance.GetProvider(&bind.CallOpts{
+	providerAddresses, err = kpMapInstance.GetProvider(&bind.CallOpts{
 		From: localAddress,
 	}, keeperAddress)
 	if err != nil {
@@ -345,108 +452,4 @@ func GetProviderInKPMap(localAddress common.Address, keeperAddress common.Addres
 		return nil, err
 	}
 	return providerAddresses, nil
-}
-
-func GetKeeperPrice(localAddress common.Address) (*big.Int, error) {
-	keeperContract, err := GetKeeperContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("keeperContracterr:", err)
-		return big.NewInt(0), err
-	}
-	price, err := keeperContract.GetPrice(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		log.Println("getKeeperPrice err:", err)
-		return price, err
-	}
-	return price, nil
-}
-
-func GetProviderPrice(localAddress common.Address) (*big.Int, error) {
-	providerContract, err := GetProviderContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("providerContracterr:", err)
-		return big.NewInt(0), err
-	}
-	price, err := providerContract.GetPrice(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		log.Println("getProviderPrice err:", err)
-		return price, err
-	}
-	return price, nil
-}
-
-func SetKeeperBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
-	keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("keeperContracterr:", err)
-		return err
-	}
-
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-
-	_, err = keeperInstance.SetBanned(auth, localAddress, isBanned)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func SetProviderBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
-	providerInstance, err := GetProviderContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("providerContracterr:", err)
-		return err
-	}
-
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-
-	_, err = providerInstance.SetBanned(auth, localAddress, isBanned)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func SetKeeperPrice(localAddress common.Address, hexKey string, price *big.Int) (err error) {
-	keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("keeperContracterr:", err)
-		return err
-	}
-
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-
-	_, err = keeperInstance.SetPrice(auth, price)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func SetProviderPrice(localAddress common.Address, hexKey string, price *big.Int) (err error) {
-	providerInstance, err := GetProviderContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("providerContracterr:", err)
-		return err
-	}
-
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-
-	_, err = providerInstance.SetPrice(auth, price)
-	if err != nil {
-		return err
-	}
-	return nil
 }

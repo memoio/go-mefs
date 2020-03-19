@@ -6,27 +6,16 @@ import (
 	"github.com/minio/minio-go/v6/pkg/s3utils"
 )
 
-//-------Group Type------
-
 const (
-	// KeeperSLA is keeper needed
-	KeeperSLA = 3
-	// ProviderSLA is provider needed
-	ProviderSLA = 6
-	// DefaultCapacity is default store capacity
-	DefaultCapacity int64 = 1000 //单位：MB
-	// DefaultDuration is default store days
-	DefaultDuration int64 = 100 //单位：天
-
 	defaultMetaBackupCount int32 = 3
 	flushLocalBackup             = 1
 
-	DefaultTransNum = 32
+	defaultTransNum = 32
 	// DefaultBufSize used for read
 	DefaultBufSize = 1024 * 1024 * 4
 )
 
-var transNum = DefaultTransNum
+var transNum = defaultTransNum
 
 var (
 	ErrPolicy               = errors.New("policy is error")

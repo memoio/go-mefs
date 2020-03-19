@@ -33,6 +33,21 @@ const (
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
 	checkTxRetryCount         = 10
+
+	providerDeposit = 1000000
+	keeperDeposit   = 1000000000
+)
+
+const (
+	keeperKey   = "keeperV1"
+	providerKey = "providerV1"
+	kpMapKey    = "kpMapV1"
+
+	offerKey   = "offerV1"
+	queryKey   = "queryV1"
+	ukey       = "upKeepingV1"
+	rootKey    = "rootV1"
+	channelKey = "channelV1"
 )
 
 var (
@@ -132,6 +147,15 @@ func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 
 // AddToIndexer adds
 func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, adminIndexer *indexer.Indexer) error {
+	_, ownAddr, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+	if ownAddr.String() == localAddress.String() {
+		return AlterAddrInIndexer(localAddress, addAddr, key, hexKey, adminIndexer)
+	}
+
+	if err == nil {
+		return nil
+	}
+
 	sk, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		log.Println("HexToECDSA err: ", err)
@@ -486,7 +510,7 @@ func GetLatestFromMapper(localAddress common.Address, mapperInstance *mapper.Map
 }
 
 // GetResolver gets role indexer
-func GetResolver(localAddress common.Address, key string) (common.Address, *resolver.Resolver, error) {
+func GetResolverAddr(localAddress common.Address, key string) (common.Address, common.Address, error) {
 	var resAddr common.Address
 
 	client := GetClient(EndPoint)
@@ -494,15 +518,24 @@ func GetResolver(localAddress common.Address, key string) (common.Address, *reso
 	adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
 	if err != nil {
 		log.Println("new admin Indexer err: ", err)
-		return resAddr, nil, err
+		return resAddr, resAddr, err
 	}
 
-	resAddr, _, err = GetAddrFromIndexer(localAddress, key, adminIndexer)
+	resAddr, ownAddr, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+	if err != nil {
+		return resAddr, resAddr, err
+	}
+
+	return resAddr, ownAddr, nil
+}
+
+func GetResolver(localAddress common.Address, key string) (common.Address, *resolver.Resolver, error) {
+	resAddr, _, err := GetResolverAddr(localAddress, key)
 	if err != nil {
 		return resAddr, nil, err
 	}
 
-	resInstance, err := resolver.NewResolver(resAddr, client)
+	resInstance, err := resolver.NewResolver(resAddr, GetClient(EndPoint))
 	if err != nil {
 		return resAddr, nil, err
 	}
@@ -583,42 +616,10 @@ func GetMapperFromResolver(localAddress common.Address, ownerAddress common.Addr
 func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *mapper.Mapper, error) {
 	var mapperAddr common.Address
 
-	if hexKey == "" {
-		flag = false
-	}
-
 	//获得userIndexer, key is userAddr.String()
-	_, resInstance, err := GetResolver(localAddr, key)
-	if err == ErrMisType {
-		return mapperAddr, nil, err
-	}
-
+	_, resInstance, err := GetResolverFromAdmin(localAddr, userAddr, key, hexKey, flag)
 	if err != nil {
-		if !flag {
-			return mapperAddr, nil, err
-		}
-		client := GetClient(EndPoint)
-		adminIndexerAddr := common.HexToAddress(indexerHex)
-		adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
-		if err != nil {
-			log.Println("New Admin Indexer Err: ", err)
-			return mapperAddr, nil, err
-		}
-
-		resAddr, rInstance, err := DeployResolver(hexKey)
-		if err != nil {
-			log.Println("Deploy Role Indexer Err:", err)
-			return mapperAddr, nil, err
-		}
-
-		log.Println("add resolver")
-		err = AddToIndexer(localAddr, resAddr, key, hexKey, adminIndexer)
-		if err != nil {
-			log.Println("add Role Indexer Err:", err)
-			return mapperAddr, nil, err
-		}
-
-		resInstance = rInstance
+		return mapperAddr, nil, err
 	}
 
 	mapperAddr, mapperInstance, err := GetMapperFromResolver(localAddr, userAddr, resInstance)
@@ -643,6 +644,48 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 	}
 
 	return mapperAddr, mapperInstance, nil
+}
+
+func GetResolverFromAdmin(localAddr, userAddr common.Address, key, hexKey string, flag bool) (common.Address, *resolver.Resolver, error) {
+	if hexKey == "" {
+		flag = false
+	}
+
+	//获得userIndexer, key is userAddr.String()
+	resolverAddr, resInstance, err := GetResolver(localAddr, key)
+	if err == ErrMisType {
+		return resolverAddr, nil, err
+	}
+
+	if err != nil {
+		if !flag {
+			return resolverAddr, nil, err
+		}
+		client := GetClient(EndPoint)
+		adminIndexerAddr := common.HexToAddress(indexerHex)
+		adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
+		if err != nil {
+			log.Println("New Admin Indexer Err: ", err)
+			return resolverAddr, nil, err
+		}
+
+		resAddr, rInstance, err := DeployResolver(hexKey)
+		if err != nil {
+			log.Println("Deploy Role Indexer Err:", err)
+			return resolverAddr, nil, err
+		}
+
+		log.Println("add resolver")
+		err = AddToIndexer(localAddr, resAddr, key, hexKey, adminIndexer)
+		if err != nil {
+			log.Println("add Role Indexer Err:", err)
+			return resolverAddr, nil, err
+		}
+
+		return resAddr, rInstance, nil
+	}
+
+	return resolverAddr, resInstance, nil
 }
 
 // GetMapperFromAdminV1 get mapper

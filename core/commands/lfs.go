@@ -288,11 +288,11 @@ var lfsStartUserCmd = &cmds.Command{
 	Options: []cmds.Option{
 		cmds.StringOption(SecreteKey, "sk", "The practice user's private key that you want to exec").WithDefault(""),
 		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
-		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(user.DefaultDuration),
-		cmds.Int64Option("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(user.DefaultCapacity),
+		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(utils.DefaultDuration),
+		cmds.Int64Option("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(utils.DefaultCapacity),
 		cmds.Int64Option("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
-		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(user.KeeperSLA),
-		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(user.ProviderSLA),
+		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(utils.KeeperSLA),
+		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(utils.ProviderSLA),
 		cmds.BoolOption("reDeployQuery", "rdo", "reDeploy query contract if user has not deploy upkeeping contract").WithDefault(false),
 		cmds.BoolOption("force", "f", "force user to write mode").WithDefault(false),
 	},
@@ -310,10 +310,11 @@ var lfsStartUserCmd = &cmds.Command{
 		sk := req.Options[SecreteKey].(string)
 		pwd := req.Options[PassWord].(string)
 		if sk != "" {
-			addr, err = address.GetAdressFromSk(sk)
+			addrCommon, err := utils.GetAdressFromSk(sk)
 			if err != nil {
 				return err
 			}
+			addr = addrCommon.Hex()
 			uid, err = address.GetIDFromAddress(addr)
 			if err != nil {
 				return err
@@ -521,7 +522,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if err != nil {
 			availTim = time.Unix(0, 0)
 		}
-		ctime := time.Unix(0, object.GetCTime()).In(time.Local)
+		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:           object.GetInfo().GetName(),
 			Size:           object.GetLength(),
@@ -622,7 +623,7 @@ var lfsPutObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(0, object.GetCTime()).In(time.Local)
+		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetInfo().GetName(),
 			Size:  object.GetLength(),
@@ -844,7 +845,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			Method: "List Objects",
 		}
 		for _, object := range objects {
-			ctime := time.Unix(0, object.GetCTime()).In(time.Local)
+			ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
@@ -933,7 +934,7 @@ var lfsDeleteObjectCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(0, object.GetCTime()).In(time.Local)
+		ctime := time.Unix(object.GetCTime(), 0).In(time.Local)
 		objectStat := ObjectStat{
 			Name:  object.GetInfo().GetName(),
 			Size:  object.GetLength(),
@@ -1010,7 +1011,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
+		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1125,7 +1126,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 			return err
 		}
 
-		ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
+		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,
@@ -1203,7 +1204,7 @@ It outputs the following to stdout:
 			Method: "List Buckets",
 		}
 		for _, bucket := range buckets {
-			ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
+			ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 			bucketStat := BucketStat{
 				Name:        bucket.Name,
 				BucketID:    bucket.BucketID,
@@ -1283,7 +1284,7 @@ It outputs the following to stdout:
 			return err
 		}
 
-		ctime := time.Unix(0, bucket.GetCTime()).In(time.Local)
+		ctime := time.Unix(bucket.GetCTime(), 0).In(time.Local)
 		bucketStat := BucketStat{
 			Name:        bucket.Name,
 			BucketID:    bucket.BucketID,

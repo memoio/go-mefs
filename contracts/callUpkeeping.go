@@ -12,8 +12,6 @@ import (
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 )
 
-const ukey = "memoriae"
-
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
 func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price, cycle int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
 	log.Println("begin deploy upKeeping...")

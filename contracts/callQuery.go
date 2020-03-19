@@ -16,9 +16,8 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 	log.Println("begin to deploy query-contract...")
 
 	var queryAddr common.Address
-	t := duration * 24 * 60 * 60
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "query", hexKey, true)
+	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, queryKey, hexKey, true)
 	if err != nil {
 		return queryAddr, err
 	}
@@ -42,7 +41,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(t), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("deployQueryErr:", err)
@@ -77,7 +76,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 //GetQueryAddrs get all querys
 func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common.Address, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "query", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, queryKey, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +87,7 @@ func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common
 //GetLatestQuery get latest query
 func GetLatestQuery(localAddress, userAddress common.Address) (queryAddr common.Address, queryInstance *market.Query, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "query", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, queryKey, "", false)
 	if err != nil {
 		return queryAddr, queryInstance, err
 	}

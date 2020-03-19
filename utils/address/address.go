@@ -1,14 +1,11 @@
 package address
 
 import (
-	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -85,21 +82,4 @@ func decodeHex(hexStr string) (addressByte []byte, err error) {
 		return addressByte, errLength
 	}
 	return addressByte, nil
-}
-
-//GetAdressFromSk get address from private key in ethereum format
-//eg: sk:0x5af8f531d9292ad04d6ff3835bf790959ada0f86f36a3d3ed9d0b8d32aa3ed11 ——>  address:0xb6BACd2625155dd0B65FAb00aA96aE5a669B77Da
-func GetAdressFromSk(sk string) (string, error) {
-	sk = strings.TrimPrefix(sk, "0x")
-	privateKey, err := ethcrypto.HexToECDSA(sk)
-	if err != nil {
-		return "", err
-	}
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return "", errors.New("error casting public key to ECDSA")
-	}
-	address := ethcrypto.PubkeyToAddress(*publicKeyECDSA)
-	return address.Hex(), nil
 }

@@ -96,7 +96,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 
 	if creation {
 		//add Object
-		ct := time.Now().UnixNano()
+		ct := time.Now().Unix()
 		oInfo := &mpb.Object{
 			Name:     objectName,
 			BucketID: bucket.BucketID,
@@ -173,7 +173,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		ObjectID: object.GetInfo().GetObjectID(),
 		PartID:   object.GetPartCount(),
 		Start:    bucket.GetLength(),
-		CTime:    time.Now().UnixNano(),
+		CTime:    time.Now().Unix(),
 	}
 
 	ul := &uploadTask{
@@ -326,12 +326,12 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	if tn != "" {
 		tNum, err := strconv.Atoi(tn)
 		if err != nil {
-			transNum = DefaultTransNum
+			transNum = defaultTransNum
 		} else {
 			transNum = tNum
 		}
 	} else {
-		transNum = DefaultTransNum
+		transNum = defaultTransNum
 	}
 
 	h := md5.New()

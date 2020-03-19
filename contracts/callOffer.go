@@ -17,7 +17,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 	var offerAddr common.Address
 	t := duration * 24 * 60 * 60
 
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, localAddress, "offer", hexKey, true)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, localAddress, offerKey, hexKey, true)
 	if err != nil {
 		return offerAddr, err
 	}
@@ -78,7 +78,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 //GetOfferAddrs get all offers
 func GetOfferAddrs(localAddress, ownerAddress common.Address) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, ownerAddress, "offer", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, ownerAddress, offerKey, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func GetOfferAddrs(localAddress, ownerAddress common.Address) ([]common.Address,
 //GetLatestOffer get latest query
 func GetLatestOffer(localAddress, userAddress common.Address) (offerAddr common.Address, offerInstance *market.Offer, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "offer", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, offerKey, "", false)
 	if err != nil {
 		return offerAddr, nil, err
 	}

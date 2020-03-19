@@ -172,7 +172,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	}
 
 	newcidinfo := &blockInfo{
-		availtime: time.Now().UnixNano(),
+		availtime: time.Now().Unix(),
 		offset:    offset,
 		repair:    0,
 		storedOn:  pid,

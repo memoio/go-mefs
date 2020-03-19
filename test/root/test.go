@@ -72,7 +72,7 @@ func main() {
 		log.Fatal("get wrong root contract")
 	}
 
-	keyTime := time.Now().UnixNano()
+	keyTime := time.Now().Unix()
 	res, err := contracts.GetMerkleRoot(localAddr, gotAddr, keyTime)
 	if err == nil {
 		log.Fatal("get empty merkle root fail, should return err")

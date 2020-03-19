@@ -238,7 +238,7 @@ func (l *LfsInfo) genRoot() {
 	if bucketNum == 0 {
 		return
 	}
-	ctime := time.Now().UnixNano()
+	ctime := time.Now().Unix()
 
 	lr := &mpb.LfsRoot{
 		BRoots: make([]*mpb.BucketRoot, bucketNum),

@@ -6,8 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	cy "github.com/libp2p/go-libp2p-core/crypto"
@@ -25,6 +27,23 @@ var (
 	errHexskFormat  = errors.New("the hexsk'format is wrong")
 	errIpfsSkFormat = errors.New("the ipfssk'format is wrong")
 )
+
+//GetAdressFromSk get address from private key in ethereum format
+//eg: sk:0x5af8f531d9292ad04d6ff3835bf790959ada0f86f36a3d3ed9d0b8d32aa3ed11 ——>  address:0xb6BACd2625155dd0B65FAb00aA96aE5a669B77Da
+func GetAdressFromSk(sk string) (common.Address, error) {
+	var addr common.Address
+	sk = strings.TrimPrefix(sk, "0x")
+	privateKey, err := crypto.HexToECDSA(sk)
+	if err != nil {
+		return addr, err
+	}
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return addr, errors.New("error casting public key to ECDSA")
+	}
+	return crypto.PubkeyToAddress(*publicKeyECDSA), nil
+}
 
 //IPFSskToEthsk 是将mefs格式的私钥转换为ethereum格式的私钥
 func IPFSskToEthsk(sk string) (string, error) {

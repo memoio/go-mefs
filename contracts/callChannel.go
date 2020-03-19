@@ -15,7 +15,7 @@ import (
 func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int, redo bool) (common.Address, error) {
 	var channelAddr common.Address
 
-	key := queryAddress.String() + "channel" + providerAddress.String()
+	key := queryAddress.String() + channelKey + providerAddress.String()
 
 	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, key, hexKey, true)
 	if err != nil {
@@ -79,7 +79,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 
 //GetChannelAddrs get the channel contract's address
 func GetChannelAddrs(localAddress, userAddress, providerAddress, queryAddress common.Address) ([]common.Address, error) {
-	key := queryAddress.String() + "channel" + providerAddress.String()
+	key := queryAddress.String() + channelKey + providerAddress.String()
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, key, "", false)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func GetChannelAddrs(localAddress, userAddress, providerAddress, queryAddress co
 //GetLatestChannel get the channel contract's address
 func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress common.Address) (common.Address, *channel.Channel, error) {
 	var channelAddr common.Address
-	key := queryAddress.String() + "channel" + providerAddress.String()
+	key := queryAddress.String() + channelKey + providerAddress.String()
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, key, "", false)
 	if err != nil {
 		return channelAddr, nil, err

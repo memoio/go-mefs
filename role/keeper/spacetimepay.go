@@ -114,7 +114,7 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 		startTime = thisLinfo.lastPay.Start + thisLinfo.lastPay.Length
 
-		spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().UnixNano())
+		spaceTime, lastTime := thisLinfo.resultSummary(startTime, time.Now().Unix())
 		amount := convertSpacetime(spaceTime, price)
 		if amount.Sign() > 0 {
 			thisLinfo.currentPay = &chalpay{

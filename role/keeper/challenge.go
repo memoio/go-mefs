@@ -97,7 +97,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string) (string,
 		return "", nil, role.ErrEmptyData
 	}
 
-	challengetime := time.Now().UnixNano()
+	challengetime := time.Now().Unix()
 
 	thischalresult := &mpb.ChalInfo{
 		KeeperID:    localID,

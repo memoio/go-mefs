@@ -624,7 +624,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		for _, pid := range gInfo.providers {
 			lin := &lInfo{
 				inChallenge:  false,
-				lastChalTime: time.Now().UnixNano(),
+				lastChalTime: time.Now().Unix(),
 			}
 
 			gInfo.ledgerMap.Store(pid, lin)

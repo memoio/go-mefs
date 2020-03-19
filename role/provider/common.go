@@ -9,9 +9,7 @@ import (
 )
 
 const (
-	DefaultCapacity int64 = 100000 //单位：MB
-	DefaultDuration int64 = 365    //单位：天
-	expireTime            = int64(30 * 60)
+	expireTime = int64(30 * 60)
 )
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {

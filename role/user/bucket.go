@@ -74,7 +74,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		BucketID:     bucketID,
 		BOpts:        options,
 		Length:       0,
-		CTime:        time.Now().UnixNano(),
+		CTime:        time.Now().Unix(),
 		Deletion:     false,
 		NextObjectID: 0,
 		NextOpID:     0,

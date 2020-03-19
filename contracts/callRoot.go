@@ -18,7 +18,7 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 
 	var rtAddr common.Address
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "root", hexKey, true)
+	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, rootKey, hexKey, true)
 	if err != nil {
 		return rtAddr, err
 	}
@@ -80,7 +80,7 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 //GetRootAddrs get all upKeeping address
 func GetRootAddrs(localAddress, userAddress common.Address) ([]common.Address, error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "root", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, rootKey, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func GetRootAddrs(localAddress, userAddress common.Address) ([]common.Address, e
 //GetRoot get root-contract from the mapper, and get the mapper from user's indexer
 func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr common.Address, rt *root.Root, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "root", "", false)
+	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, rootKey, "", false)
 	if err != nil {
 		return rtaddr, nil, err
 	}

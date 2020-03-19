@@ -22,8 +22,10 @@ const (
 	//SHOWTIME 用于输出给使用者
 	SHOWTIME = "2006-01-02 Mon 15:04:05 MST"
 
-	//utils.IDLength  目前ID的长度
+	//IDLength  目前ID的长度
 	IDLength = 30
+
+	DefaultPassword = "memoriae"
 
 	//READPRICEPERMB 读支付中1KB内容需要支付的金额
 	READPRICEPERMB int64 = 1024 * 1024
@@ -33,7 +35,21 @@ const (
 	// wei/MB*hour
 	STOREPRICEPEDOLLAR int64 = 400000000000
 
-	DefaultPassword = "123456789"
+	// KeeperSLA is keeper needed
+	KeeperSLA = 3
+	// ProviderSLA is provider needed
+	ProviderSLA = 6
+	// DefaultCapacity is default store capacity： 10000MB
+	DefaultCapacity int64 = 10000 //单位：MB
+	// DefaultDuration is default store days： 100 days
+	DefaultDuration int64 = 100 * 24 * 60 * 60
+	// DefaultCycle is default cycle: 1 day
+	DefaultCycle = 24 * 60 * 60
+
+	// DepositCapacity is provider
+	DepositCapacity int64 = 100000 //单位：MB
+	// DepositDuration is provider； 365 days
+	DepositDuration int64 = 365 * 24 * 60 * 60
 )
 
 //false 意味着有，true表示无重复

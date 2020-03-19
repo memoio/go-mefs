@@ -171,12 +171,12 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	if tn != "" {
 		tNum, err := strconv.Atoi(tn)
 		if err != nil {
-			transNum = DefaultTransNum
+			transNum = defaultTransNum
 		} else {
 			transNum = tNum
 		}
 	} else {
-		transNum = DefaultTransNum
+		transNum = defaultTransNum
 	}
 
 	utils.MLogger.Debugf("download rate is: ", transNum)

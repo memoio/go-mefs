@@ -160,7 +160,7 @@ func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio
 		return bi, convertToMinioError(err, bucket, "")
 	}
 	bi.Name = bucket
-	bi.Created = time.Unix(0, bucketInfo.CTime).UTC()
+	bi.Created = time.Unix(bucketInfo.GetCTime(), 0).UTC()
 	return bi, nil
 }
 
@@ -179,7 +179,7 @@ func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 	buckets = make([]minio.BucketInfo, len(bucketsInfo))
 	for i, v := range bucketsInfo {
 		buckets[i].Name = v.Name
-		buckets[i].Created = time.Unix(0, v.CTime).UTC()
+		buckets[i].Created = time.Unix(v.GetCTime(), 0).UTC()
 	}
 	return buckets, nil
 }
@@ -213,7 +213,7 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 		loi.Objects[i].ETag = v.GetETag()
 		loi.Objects[i].Name = v.GetInfo().GetName()
 		loi.Objects[i].Size = v.GetLength()
-		loi.Objects[i].ModTime = time.Unix(0, v.GetCTime()).UTC()
+		loi.Objects[i].ModTime = time.Unix(v.GetCTime(), 0).UTC()
 	}
 	return loi, nil
 }
@@ -237,7 +237,7 @@ func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continua
 		loi.Objects[i].ETag = v.GetETag()
 		loi.Objects[i].Name = v.GetInfo().GetName()
 		loi.Objects[i].Size = v.GetLength()
-		loi.Objects[i].ModTime = time.Unix(0, v.GetCTime()).UTC()
+		loi.Objects[i].ModTime = time.Unix(v.GetCTime(), 0).UTC()
 	}
 	return loi, nil
 }

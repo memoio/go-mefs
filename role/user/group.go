@@ -86,6 +86,7 @@ func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps i
 		storeDays:   duration,
 		storeSize:   capacity,
 		storePrice:  price,
+		stPayCycle:  utils.DefaultCycle,
 		keeperSLA:   ks,
 		providerSLA: ps,
 		keepers:     make(map[string]*keeperInfo, ks),

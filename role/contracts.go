@@ -44,12 +44,12 @@ type UpKeepingItem struct {
 	KeeperSLA   int32
 	ProviderSLA int32
 	Duration    int64 //存储时间，单位s(部署合约时的单位是天，获得的参数单位是s)
-	Capacity    int64
-	Price       int64 // 部署的价格
-	StartTime   int64 // 部署的时间
+	Capacity    int64 // MB
+	Price       int64 // 部署的价格: wei/(MB*h)
+	StartTime   int64 // 部署的时间: second
 	Money       *big.Int
-	EndDate     int64
-	Cycle       int64
+	EndDate     int64 // second
+	Cycle       int64 // 设置周期
 	NeedPay     int64
 	Proofs      []upKeeping.UpKeepingProof
 }
@@ -60,7 +60,7 @@ type OfferItem struct {
 	OfferID    string // offer address : id format
 	Capacity   int64
 	Duration   int64
-	Price      int64 // 合约给出的单价
+	Price      int64 //合约给出的单价
 	CreateDate int64 //合约创建时间
 }
 
@@ -75,7 +75,7 @@ type ChannelItem struct {
 	Sig       []byte // pb.Channelsignature(channel addr, value)
 	StartTime int64  // 部署的时间
 	Duration  int64  // timeout
-	Dirty     bool   //  value is change?
+	Dirty     bool   // value is change?
 }
 
 // QueryItem has query information
@@ -116,7 +116,7 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 		return item, err
 	}
 
-	keeperInstance, err := contracts.GetKeeperContractFromIndexer(localAddress)
+	_, keeperInstance, err := contracts.GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
 		return item, nil
 	}
@@ -171,7 +171,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 		return item, err
 	}
 
-	proInstance, err := contracts.GetProviderContractFromIndexer(localAddress)
+	_, proInstance, err := contracts.GetProviderContractFromIndexer(localAddress)
 	if err != nil {
 		return item, nil
 	}

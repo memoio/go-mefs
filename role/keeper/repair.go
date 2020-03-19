@@ -118,7 +118,7 @@ func (k *Info) repairRegular(ctx context.Context) {
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
 // value: chunkID1_pid1/chunkID2_pid2/...
 func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
-
+	utils.MLogger.Info("Repair blocks:", rBlockID)
 	var response string
 	// uid_qid_bid_sid_bid
 	blkinfo := strings.Split(rBlockID, metainfo.BlockDelimiter)
@@ -181,17 +181,17 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 		return
 	}
 
+	credit := 0
 	if len(response) > 0 {
+		proInfo, ok := k.providers.Load(response)
+		if ok {
+			credit = proInfo.(*pInfo).credit
+		}
+
 		if !k.ds.Connect(ctx, response) {
 			utils.MLogger.Info("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
-	}
-
-	credit := 0
-	proInfo, ok := k.providers.Load(response)
-	if ok {
-		credit = proInfo.(*pInfo).credit
 	}
 
 	if credit < 0 || len(response) == 0 || response == "" {
