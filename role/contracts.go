@@ -372,8 +372,8 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	// upKeeping cost
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(600000000)))
 	moneyAccount.Add(moneyAccount, big.NewInt(1128277))
-	// channel cost; read 10*ps times
-	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE*int64(10*ps)), big.NewInt(storeSize))
+	// channel cost; read ps times
+	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE*int64(ps)), big.NewInt(storeSize))
 	moneyAccount.Add(moneyAccount, moneyToChannel)
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
 	moneyAccount.Sub(moneyAccount, balance)
@@ -787,8 +787,8 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 
 	//依次与各provider签署channel合约，存储时间单位秒
 	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60))
-	// read 10 times
-	moneyToChannel := big.NewInt(utils.READPRICE * int64(storeSize*10))
+	// read ps times
+	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE), big.NewInt(storeSize))
 
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
