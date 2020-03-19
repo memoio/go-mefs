@@ -21,7 +21,7 @@ import (
 //随机文件最大大小
 const (
 	randomDataSize = 1024 * 1024 * 10
-	moneyTo        = 1000000000000000000
+	moneyTo        = 6000000000000000000
 )
 
 var ethEndPoint, qethEndPoint string
@@ -60,7 +60,7 @@ func lfsTest() error {
 
 	log.Println("create user sk: ", testuser.Sk, ",addr: ", testuser.Address)
 
-	flag := false
+	flag := true
 	if flag {
 		err := test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, qethEndPoint)
 		if err != nil {

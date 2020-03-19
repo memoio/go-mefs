@@ -367,22 +367,25 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	}
 
 	//balance >? query + upKeeping + channel cost
-	var moneyPerDay = new(big.Int)
-	moneyPerDay = moneyPerDay.Mul(big.NewInt(storePrice), big.NewInt(storeSize))
-	var moneyAccount = new(big.Int)
-	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(storeDays))
+	moneyAccount := new(big.Int).Mul(big.NewInt(storePrice), big.NewInt(storeSize))
+	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
+	// upKeeping cost
+	moneyAccount.Add(moneyAccount, big.NewInt(int64(600000000)))
+	moneyAccount.Add(moneyAccount, big.NewInt(1128277))
+	// channel cost; read 10*ps times
+	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE*int64(10*ps)), big.NewInt(storeSize))
+	moneyAccount.Add(moneyAccount, moneyToChannel)
+	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
+	moneyAccount.Sub(moneyAccount, balance)
 
-	deployPrice := big.NewInt(int64(740621000000000))
-	deployPrice.Add(big.NewInt(1128277), big.NewInt(int64(652346*ps)))
-	var leastMoney = new(big.Int)
-	leastMoney = leastMoney.Add(moneyAccount, deployPrice)
-	if balance.Cmp(leastMoney) < 0 { //余额不足
-		utils.MLogger.Info(uaddr.String(), " need more balance to start", leastMoney.String())
+	if moneyAccount.Sign() > 0 { //余额不足
+		utils.MLogger.Info(uaddr.String(), " need more balance to start: ", moneyAccount.String())
 		return queryID, ErrNotEnoughBalance
 	}
 
 	// deploy query
-	queryAddr, err := contracts.DeployQuery(uaddr, sk, storeSize, storeDays, storePrice, ks, ps, rdo)
+	duration := storeDays * 24 * 60 * 60
+	queryAddr, err := contracts.DeployQuery(uaddr, sk, storeSize, duration, storePrice, ks, ps, rdo)
 	if err != nil {
 		utils.MLogger.Error("fail to deploy query contract: ", err)
 		return queryID, err
@@ -506,7 +509,8 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 
 	utils.MLogger.Info("Begin to deploy upkeeping contract...")
 
-	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, storeDays, storeSize, storePrice, stPayCycle, moneyAccount, redo)
+	duration := storeDays * 24 * 60 * 60
+	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, duration, storeSize, storePrice, stPayCycle, moneyAccount, redo)
 	if err != nil {
 		utils.MLogger.Error("Deploy upkeeping contract failed: ", err)
 		return ukID, err

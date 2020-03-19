@@ -24,7 +24,7 @@ const randomDataSize = 1024 * 1024 * 10
 const dataCount = 3
 const parityCount = 2
 
-const moneyTo = 1000000000000000000
+const moneyTo = 6000000000000000000
 
 var objsInBucket sync.Map
 

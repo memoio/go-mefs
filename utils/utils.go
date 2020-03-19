@@ -34,14 +34,14 @@ const (
 	// DefaultCapacity is default store capacity： 10000 MB
 	DefaultCapacity int64 = 100000 //单位：MB
 	// DefaultDuration is default store days： 100 days
-	DefaultDuration int64 = 100 * 24 * 60 * 60
+	DefaultDuration int64 = 100
 	// DefaultCycle is default cycle: 1 day
 	DefaultCycle = 24 * 60 * 60
 
 	// DepositCapacity is provider
 	DepositCapacity int64 = 1000 //单位：MB
 	// DepositDuration is provider； 100 days
-	DepositDuration int64 = 100 * 24 * 60 * 60
+	DepositDuration int64 = 100
 
 	// Wei/MB
 	ProviderDeposit = 1000000

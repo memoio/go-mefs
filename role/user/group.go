@@ -128,7 +128,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 
 		g.tempKeepers = keepers
 		g.tempProviders = providers
-		g.storeDays = uItem.Duration
+		g.storeDays = uItem.Duration / (24 * 60 * 60)
 		g.storePrice = uItem.Price
 		g.storeSize = uItem.Capacity
 		g.stPayCycle = uItem.Cycle

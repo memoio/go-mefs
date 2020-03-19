@@ -144,8 +144,8 @@ environment variable:
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
-		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage").WithDefault(utils.DepositCapacity),
-		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage").WithDefault(utils.DepositDuration),
+		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage, uint is MB").WithDefault(utils.DepositCapacity),
+		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage, uint is day").WithDefault(utils.DepositDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
 	},
@@ -414,7 +414,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration, price, rdo, pos, gc)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, price, rdo, pos, gc)
 		if err != nil {
 			fmt.Println("Start provider Service failed:", err)
 			return err

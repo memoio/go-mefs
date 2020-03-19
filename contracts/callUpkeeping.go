@@ -13,7 +13,7 @@ import (
 )
 
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
-func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, days, size, price, cycle int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
+func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, duration, size, price, cycle int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
 	log.Println("begin deploy upKeeping...")
 
 	var ukAddr common.Address
@@ -46,7 +46,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = moneyAccount
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 s,存储大小 单位 MB
-		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(days), big.NewInt(size), big.NewInt(price), big.NewInt(cycle))
+		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(duration), big.NewInt(size), big.NewInt(price), big.NewInt(cycle))
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Uk Err:", err)
