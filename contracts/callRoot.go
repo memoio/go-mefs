@@ -16,24 +16,24 @@ import (
 func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bool) (common.Address, error) {
 	log.Println("begin deploy root contract...")
 
-	var ukAddr common.Address
+	var rtAddr common.Address
 
 	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, "root", hexKey, true)
 	if err != nil {
-		return ukAddr, err
+		return rtAddr, err
 	}
 
 	if !redo {
-		ukAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
+		rtAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
 		if err == nil {
-			return ukAddr, nil
+			return rtAddr, nil
 		}
 	}
 
 	key, err := crypto.HexToECDSA(hexKey)
 	if err != nil {
 		log.Println("HexToECDSAErr:", err)
-		return ukAddr, err
+		return rtAddr, err
 	}
 
 	// 部署UpKeeping
@@ -45,11 +45,11 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
-		ukAddress, tx, _, err := root.DeployRoot(auth, client, queryAddress)
+		rtAddress, tx, _, err := root.DeployRoot(auth, client, queryAddress)
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy root contract fails:", err)
-				return ukAddr, err
+				return rtAddr, err
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -57,24 +57,24 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("deploy root transaction fails", err)
-				return ukAddr, err
+				return rtAddr, err
 			}
 			continue
 		}
-		ukAddr = ukAddress
+		rtAddr = rtAddress
 		break
 	}
 
 	//uk放进mapper
-	err = AddToMapper(userAddress, ukAddr, hexKey, mapperInstance)
+	err = AddToMapper(userAddress, rtAddr, hexKey, mapperInstance)
 	if err != nil {
 		log.Println("add root contract addr Err:", err)
-		return ukAddr, err
+		return rtAddr, err
 	}
 	log.Println("root-contract have been successfully deployed!")
-	return ukAddr, nil
+	return rtAddr, nil
 }
 
 //GetRootAddrs get all upKeeping address
@@ -89,32 +89,32 @@ func GetRootAddrs(localAddress, userAddress common.Address) ([]common.Address, e
 }
 
 //GetRoot get root-contract from the mapper, and get the mapper from user's indexer
-func GetRoot(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *root.Root, err error) {
+func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr common.Address, rt *root.Root, err error) {
 	//获得userIndexer, key is userAddr
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, "root", "", false)
 	if err != nil {
-		return ukaddr, nil, err
+		return rtaddr, nil, err
 	}
 
-	uks, err := GetAddrsFromMapper(localAddress, mapperInstance)
+	rts, err := GetAddrsFromMapper(localAddress, mapperInstance)
 	if err != nil {
-		return ukaddr, uk, err
+		return rtaddr, rt, err
 	}
 
 	client := GetClient(EndPoint)
 
 	if key == "latest" {
-		ukaddr = uks[len(uks)-1]
-		uk, err := root.NewRoot(ukaddr, client)
+		rtaddr = rts[len(rts)-1]
+		rt, err := root.NewRoot(rtaddr, client)
 		if err != nil {
 			log.Println("new root Err:", err)
-			return ukaddr, uk, err
+			return rtaddr, rt, err
 		}
-		return ukaddr, uk, nil
+		return rtaddr, rt, nil
 	}
 
-	for _, ukAddr := range uks {
-		ukaddr = ukAddr
+	for _, rtAddr := range rts {
+		rtaddr = rtAddr
 		retryCount := 0
 		for {
 			retryCount++
@@ -123,11 +123,11 @@ func GetRoot(localAddress, userAddress common.Address, key string) (ukaddr commo
 				break
 			}
 
-			uk, err = root.NewRoot(ukaddr, client)
+			rt, err = root.NewRoot(rtaddr, client)
 			if err != nil {
 				continue
 			}
-			queryAddr, err := uk.QueryAddr(&bind.CallOpts{
+			queryAddr, err := rt.QueryAddr(&bind.CallOpts{
 				From: localAddress,
 			})
 			if err != nil {
@@ -136,18 +136,18 @@ func GetRoot(localAddress, userAddress common.Address, key string) (ukaddr commo
 			}
 
 			if queryAddr.String() == key {
-				return ukaddr, uk, nil
+				return rtaddr, rt, nil
 			}
 			break
 		}
 	}
 
-	return ukaddr, uk, ErrEmpty
+	return rtaddr, rt, ErrEmpty
 }
 
 // SetMerkleRoot sets Merkle root
 func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]byte) error {
-	uk, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return err
@@ -161,9 +161,9 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.GasLimit = spaceTimePayGasLimit
 
-		tx, err := uk.SetRoot(auth, key, value)
+		tx, err := rt.SetRoot(auth, key, value)
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("set root Err:", err)
 				return err
 			}
@@ -173,7 +173,7 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("set merkle root transaction fails", err)
 				return err
 			}
@@ -189,7 +189,7 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 // GetMerkleRoot gets Merkle root
 func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, error) {
 	var value [32]byte
-	uk, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return value, err
@@ -198,7 +198,7 @@ func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, 
 	retryCount := 0
 	for {
 		retryCount++
-		res, err := uk.GetRoot(&bind.CallOpts{
+		res, err := rt.GetRoot(&bind.CallOpts{
 			From: localAddress,
 		}, key)
 		if err != nil {
@@ -220,7 +220,7 @@ func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, 
 
 // GetMerkleKeys gets Merkle keys
 func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
-	uk, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return nil, err
@@ -229,7 +229,7 @@ func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		res, err := uk.GetAllKey(&bind.CallOpts{
+		res, err := rt.GetAllKey(&bind.CallOpts{
 			From: localAddress,
 		})
 		if err != nil {
@@ -252,7 +252,7 @@ func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
 // GetLatestMerkleRoot gets Merkle latest root
 func GetLatestMerkleRoot(localAddress, rootAddr common.Address) (int64, [32]byte, error) {
 	var val [32]byte
-	uk, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return 0, val, err
@@ -261,7 +261,7 @@ func GetLatestMerkleRoot(localAddress, rootAddr common.Address) (int64, [32]byte
 	retryCount := 0
 	for {
 		retryCount++
-		resKey, resVal, err := uk.GetLatest(&bind.CallOpts{
+		resKey, resVal, err := rt.GetLatest(&bind.CallOpts{
 			From: localAddress,
 		})
 		if err != nil {

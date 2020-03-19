@@ -15,6 +15,7 @@ import (
 func DeployOffer(localAddress common.Address, hexKey string, capacity int64, duration int64, price int64, redo bool) (common.Address, error) {
 	log.Println("begin to deploy offer-contract...")
 	var offerAddr common.Address
+	t := duration * 24 * 60 * 60
 
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, localAddress, "offer", hexKey, true)
 	if err != nil {
@@ -41,9 +42,9 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(duration), big.NewInt(price)) //提供存储容量 存储时段 存储单价
+		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(t), big.NewInt(price)) //提供存储容量 存储时段 存储单价
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Offer Err:", err)
 				return offerAddr, err
 			}
@@ -53,7 +54,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 
 		err = CheckTx(tx)
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("deploy offer transaction fails", err)
 				return offerAddr, err
 			}
@@ -107,4 +108,48 @@ func GetLatestOffer(localAddress, userAddress common.Address) (offerAddr common.
 	}
 
 	return offerAddr, offerInstance, nil
+}
+
+//ExtendOfferTime called by provider to extend the time in offer contract
+func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.Int) error {
+	offerInstance, err := market.NewOffer(offerAddress, GetClient(EndPoint))
+	if err != nil {
+		return err
+	}
+
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		log.Println("HetoECDSA err:", err)
+		return err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.GasLimit = defaultGasLimit
+		tx, err := offerInstance.Extend(auth, addTime)
+		if err != nil {
+			if retryCount > sendTransactionRetryCount {
+				log.Println("extendOfferTimeErr:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				log.Println("extendOfferTime fails", err)
+				return err
+			}
+			continue
+		}
+		break
+	}
+
+	log.Println("you have called extendOfferTime successfully!")
+	return nil
 }

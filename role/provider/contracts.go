@@ -167,9 +167,28 @@ func (g *groupInfo) loadContracts(proID string, mode bool) error {
 		if err != nil {
 			return err
 		}
+
+		var keepers []string
+		var providers []string
+		for _, keeper := range uItem.Keepers {
+			kid, err := address.GetIDFromAddress(keeper.Addr.String())
+			if err != nil {
+				return err
+			}
+			keepers = append(keepers, kid)
+		}
+
+		for _, provider := range uItem.Providers {
+			pid, err := address.GetIDFromAddress(provider.Addr.String())
+			if err != nil {
+				return err
+			}
+			providers = append(providers, pid)
+		}
+
 		g.upkeeping = &uItem
-		g.keepers = uItem.KeeperIDs
-		g.providers = uItem.ProviderIDs
+		g.keepers = keepers
+		g.providers = providers
 	}
 
 	cItem, err := role.GetLatestChannel(g.userID, g.groupID, proID)

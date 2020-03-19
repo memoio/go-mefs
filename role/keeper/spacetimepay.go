@@ -65,9 +65,15 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	// check again
 	found := false
-	for _, pid := range g.upkeeping.ProviderIDs {
+	stEnd := big.NewInt(0)
+	for _, pInfo := range g.upkeeping.Providers {
+		pid, err := address.GetIDFromAddress(pInfo.Addr.String())
+		if err != nil {
+			return err
+		}
 		if pid == proID {
 			found = true
+			stEnd = pInfo.StEnd
 			break
 		}
 	}
@@ -88,8 +94,9 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 
 	thisLinfo := thisIlinfo.(*lInfo)
 
+	var startTime int64
 	if thisLinfo.currentPay == nil {
-		startTime := g.upkeeping.StartTime
+		startTime = g.upkeeping.StartTime
 		if thisLinfo.lastPay == nil {
 			thisLinfo.lastPay = &chalpay{
 				STValue: mpb.STValue{
@@ -123,15 +130,20 @@ func (g *groupInfo) spaceTimePay(proID, localSk string) error {
 		// get enough signs; then
 	}
 
-	if thisLinfo.currentPay != nil {
-		amount := new(big.Int).SetBytes(thisLinfo.currentPay.GetValue())
+	//TODO
+	stStart := stEnd
+	stLength := big.NewInt(time.Now().Unix() - stEnd.Int64())
+	merkleRoot := [32]byte{0}
+	share := []int{}
+	sign := [][]byte{}
 
+	spaceTime, _ := thisLinfo.resultSummary(startTime, time.Now().Unix())
+	amount := convertSpacetime(spaceTime, price)
+	if amount.Sign() > 0 {
 		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
 		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
 
-		utils.MLogger.Infof("stpay: amount:%d,beginTime:%d, length:%d", amount, thisLinfo.currentPay.GetStart(), thisLinfo.currentPay.GetLength())
-
-		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, amount)
+		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, stStart, stLength, amount, merkleRoot, share, sign) //进行支付
 		if err != nil {
 			utils.MLogger.Info("contracts.SpaceTimePay() failed: ", err)
 			return err
