@@ -20,12 +20,15 @@ const (
 	randomDataSize = 1024 * 1024 * 10
 )
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;") //dev网
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+
 	flag.Parse()
 	ethEndPoint = *eth
+	qethEndPoint = *qeth
 
 	sh := shell.NewShell("localhost:5001")
 
@@ -37,7 +40,7 @@ func main() {
 	addr := testuser.Address
 
 	log.Println("======2. begin to transfer money======")
-	err = test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, ethEndPoint)
+	err = test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, qethEndPoint)
 	if err != nil {
 		log.Fatal("transfer failed ", err)
 	}
@@ -119,7 +122,7 @@ func main() {
 	addr2 := testuser2.Address
 
 	log.Println("======11. begin to transfer money======")
-	err = test.TransferTo(big.NewInt(moneyTo), addr2, ethEndPoint, ethEndPoint)
+	err = test.TransferTo(big.NewInt(moneyTo), addr2, ethEndPoint, qethEndPoint)
 	if err != nil {
 		log.Fatal("transfer failed ", err)
 	}

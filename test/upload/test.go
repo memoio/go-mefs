@@ -28,13 +28,17 @@ const moneyTo = 1000000000000000000
 
 var objsInBucket sync.Map
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
 	count := flag.Int("count", 100, "count of file we want to upload")
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+
 	flag.Parse()
 	ethEndPoint = *eth
+	qethEndPoint = *qeth
+
 	err := uploadTest(*count)
 	if err != nil {
 		log.Fatal(err)
@@ -55,7 +59,7 @@ func uploadTest(count int) error {
 		return err
 	}
 
-	err = test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, ethEndPoint)
+	err = test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, qethEndPoint)
 	if err != nil {
 		log.Println("transfer fails: ", err)
 		return err

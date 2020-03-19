@@ -261,6 +261,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		if nowTime >= endDate.Int64() {
 			break
 		}
+		time.Sleep(time.Duration((nowTime-endDate.Int64())*10 ^ 9))
 	}
 	log.Println("11.begin to third initiate spacetime pay , stLength is 100")
 	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())

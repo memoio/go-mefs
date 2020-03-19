@@ -24,12 +24,15 @@ const (
 	moneyTo        = 1000000000000000000
 )
 
-var ethEndPoint string
+var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address")
+	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+
 	flag.Parse()
 	ethEndPoint = *eth
+	qethEndPoint = *qeth
 
 	err := lfsTest()
 	if err != nil {
@@ -59,7 +62,7 @@ func lfsTest() error {
 
 	flag := false
 	if flag {
-		err := test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, ethEndPoint)
+		err := test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, qethEndPoint)
 		if err != nil {
 			log.Println("trnasfer fails: ", err)
 			return err

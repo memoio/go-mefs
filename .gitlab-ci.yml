@@ -198,7 +198,7 @@ lfs_test:
     - chmod 777 lfsTest.sh
     - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./lfsTest.sh $ETHENDPOINT $NETKEY
+    - ./lfsTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT
   after_script:
     - cat ~/daemon.stdout
     - cat ~/.mefs/logs/info.log
@@ -218,7 +218,7 @@ share_test:
     - chmod 777 shareTest.sh
     - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./shareTest.sh $ETHENDPOINT $NETKEY
+    - ./shareTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT
   after_script:
     - cat ~/daemon.stdout
     - cat ~/.mefs/logs/info.log
@@ -238,7 +238,7 @@ challenge_test:
     - chmod 777 challengeTest.sh
     - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./challengeTest.sh $ETHENDPOINT $NETKEY
+    - ./challengeTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT
   after_script:
     - cat ~/daemon.stdout
     - cat ~/.mefs/logs/info.log
@@ -259,7 +259,7 @@ upload_test:
     - echo $ETHENDPOINT
     - echo $NETKEY
     - echo $UPCOUNT
-    - ./uploadTest.sh $ETHENDPOINT $NETKEY $UPCOUNT
+    - ./uploadTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT $UPCOUNT
   after_script:
     - cat ~/daemon.stdout
     - cat ~/.mefs/logs/info.log

@@ -118,7 +118,7 @@ func testRole() (err error) {
 		log.Println("set provider success")
 		break
 	}
-
+	return nil
 	log.Println("test set add kp")
 	contracts.EndPoint = ethEndPoint
 	err = contracts.AddKeeperProvidersToKPMap(keeperAddr, kpSk, keeperAddr, []common.Address{providerAddr})
