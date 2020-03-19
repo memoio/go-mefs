@@ -409,6 +409,11 @@ func (n *MefsNode) Context() context.Context {
 	return n.ctx
 }
 
+// Process returns the Process object
+func (n *MefsNode) SetPassWord(pwd string) {
+	n.password = pwd
+}
+
 // teardown closes owned children. If any errors occur, this function returns
 // the first error.
 func (n *MefsNode) teardown() error {

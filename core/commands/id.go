@@ -58,11 +58,18 @@ If no peer is specified, prints out information for local peers.
 	Arguments: []cmds.Argument{
 		cmds.StringArg("peerid", false, false, "Peer.ID of node to look up."),
 	},
-	Options: []cmds.Option{},
+	Options: []cmds.Option{
+		cmds.StringOption("password", "pwd", "the password is used to encrypt the PrivateKey").WithDefault(""),
+	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		n, err := cmdenv.GetNode(env)
 		if err != nil {
 			return err
+		}
+
+		pwd, ok := req.Options["password"]
+		if ok {
+			n.SetPassWord(pwd.(string))
 		}
 
 		var id peer.ID
