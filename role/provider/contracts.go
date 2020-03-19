@@ -21,6 +21,21 @@ func (p *Info) loadContracts() error {
 		if err != nil {
 			return err
 		}
+
+		// capacity should > 0
+		if proItem.Capacity == 0 {
+			size := new(big.Int).SetInt64(utils.DepositCapacity)
+			err := role.PledgeProvider(proID, p.sk, size)
+			if err != nil {
+				return err
+			}
+
+			proItem, err = role.GetProviderInfo(proID, proID)
+			if err != nil {
+				return err
+			}
+		}
+
 		p.proContract = &proItem
 	}
 

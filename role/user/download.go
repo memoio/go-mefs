@@ -465,7 +465,7 @@ func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]
 	channelID := do.group.groupID
 
 	if cItem != nil {
-		money := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
+		money := big.NewInt(int64(readLen) * utils.READPRICE / (1024 * 1024 * 1024))
 		money.Add(money, cItem.Value) //100 + valueBase
 		if money.Cmp(cItem.Money) > 0 {
 			utils.MLogger.Warn("need to redeploy channel contract for ", cItem.ProID)

@@ -22,7 +22,7 @@ import (
 // ProviderItem has provider's info
 type ProviderItem struct {
 	ProviderID string   // providerid
-	Capacity   int64    // MB
+	Capacity   int64    // Bytes
 	Money      *big.Int // pledge money
 	StartTime  int64    // start time
 }
@@ -43,7 +43,7 @@ type UpKeepingItem struct {
 	Providers   []upKeeping.UpKeepingKPInfo
 	KeeperSLA   int32
 	ProviderSLA int32
-	Duration    int64 //存储时间，单位s(部署合约时的单位是天，获得的参数单位是s)
+	Duration    int64 //存储时间，单位second
 	Capacity    int64 // MB
 	Price       int64 // 部署的价格: wei/(MB*h)
 	StartTime   int64 // 部署的时间: second
@@ -150,6 +150,16 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	return item, ErrNotKeeper
 }
 
+// PledgeKeeper pledgs
+func PledgeKeeper(localID, hexKey string, amount *big.Int) error {
+	localAddress, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return err
+	}
+
+	return contracts.PledgeProvider(localAddress, hexKey, amount)
+}
+
 func IsKeeper(userID string) (bool, error) {
 	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
@@ -187,12 +197,27 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
+
+		price, err := proInstance.GetPrice(&bind.CallOpts{From: localAddress})
+		if err != nil {
+			if retryCount > 10 {
+				return item, nil
+			}
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		cap := utils.DepositCapacity
+		if price.Int64() != 0 {
+			cap = money.Div(money, price).Int64()
+		}
+
 		if isProvider && !isBanned {
 			item = ProviderItem{
 				ProviderID: proID,
 				Money:      money,
 				StartTime:  stime.Int64(),
-				Capacity:   0,
+				Capacity:   cap,
 			}
 			return item, nil
 		}
@@ -200,6 +225,16 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	}
 
 	return item, ErrNotProvider
+}
+
+// PledgeProvider returns provider info
+func PledgeProvider(localID, hexKey string, size *big.Int) error {
+	localAddress, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return err
+	}
+
+	return contracts.PledgeProvider(localAddress, hexKey, size)
 }
 
 func IsProvider(userID string) (bool, error) {
@@ -748,7 +783,8 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 
 	//依次与各provider签署channel合约，存储时间单位秒
 	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60))
-	moneyToChannel := big.NewInt(utils.READPRICEPERMB * int64(storeSize*100)) //暂定往每个channel合约中存储金额为：存储大小 x 每MB单价
+	// read 10 times
+	moneyToChannel := big.NewInt(utils.READPRICE * int64(storeSize*10))
 
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {

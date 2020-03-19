@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -20,7 +21,7 @@ func DeployKeeperAdmin(hexKey string) (err error) {
 	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
 
-	deposit := big.NewInt(keeperDeposit)
+	deposit := big.NewInt(utils.KeeperDeposit)
 	keeperContractAddr, _, _, err := role.DeployKeeper(auth, client, deposit)
 	if err != nil {
 		log.Println("deployKeeperErr:", err)
@@ -147,6 +148,42 @@ func GetKeeperPrice(localAddress common.Address) (*big.Int, error) {
 	return price, nil
 }
 
+func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (err error) {
+	_, kInstance, err := GetKeeperContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("getkeeperContracterr:", err)
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+	retryCount := 0
+	for {
+		retryCount++
+
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.Value = amount
+		tx, err := kInstance.Pledge(auth)
+		if err != nil {
+			return err
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				log.Println("keeper pledge transaction Err:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		break
+	}
+
+	return nil
+}
+
 //---------provider----------//
 
 //DeployProvider deploy a keeper contract
@@ -157,7 +194,7 @@ func DeployProviderAdmin(hexKey string) (err error) {
 	client := GetClient(EndPoint)
 
 	//暂时将存储容量、质押金额设为1000
-	deposit := big.NewInt(providerDeposit)
+	deposit := big.NewInt(utils.ProviderDeposit)
 	providerContractAddr, _, _, err := role.DeployProvider(auth, client, deposit)
 	if err != nil {
 		log.Println("deployProviderErr:", err)
@@ -279,6 +316,51 @@ func SetProviderPrice(localAddress common.Address, hexKey string, price *big.Int
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func PledgeProvider(localAddress common.Address, hexKey string, size *big.Int) (err error) {
+	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return err
+	}
+
+	price, err := providerInstance.GetPrice(&bind.CallOpts{
+		From: localAddress,
+	})
+	if err != nil {
+		log.Println("getProviderPrice err:", err)
+		return err
+	}
+
+	key, _ := crypto.HexToECDSA(hexKey)
+
+	retryCount := 0
+	for {
+		retryCount++
+
+		auth := bind.NewKeyedTransactor(key)
+		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.Value = size.Mul(size, price)
+		tx, err := providerInstance.Pledge(auth, size)
+		if err != nil {
+			return err
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				log.Println("provider pledge transaction Err:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		break
+	}
+
 	return nil
 }
 

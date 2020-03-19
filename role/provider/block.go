@@ -195,7 +195,7 @@ func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
 
 func verifyChanValue(oldValue, newValue *big.Int, readLen int) bool {
 	//verify value;： value ?= oldValue + 100
-	addValue := big.NewInt(int64(readLen) * utils.READPRICEPERMB / (1024 * 1024))
+	addValue := big.NewInt(int64(readLen) * utils.READPRICE / (1024 * 1024 * 1024))
 	addValue.Add(addValue, oldValue)
 	if newValue.Cmp(addValue) < 0 {
 		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", addValue.String())

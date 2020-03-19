@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -69,6 +70,31 @@ func (g *groupInfo) loadContracts(mode bool) error {
 		g.upkeeping = &uItem
 	}
 
+	return nil
+}
+
+func (k *Info) loadContract(mode bool) error {
+	if k.kItem == nil || mode {
+		kItem, err := role.GetKeeperInfo(k.localID, k.localID)
+		if err != nil {
+			return err
+		}
+
+		if kItem.Money.Sign() <= 0 {
+			amount := new(big.Int).SetInt64(utils.KeeperDeposit)
+			err := role.PledgeKeeper(k.localID, k.sk, amount)
+			if err != nil {
+				return err
+			}
+		}
+
+		kItem, err = role.GetKeeperInfo(k.localID, k.localID)
+		if err != nil {
+			return err
+		}
+
+		k.kItem = &kItem
+	}
 	return nil
 }
 

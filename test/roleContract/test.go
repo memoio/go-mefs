@@ -44,7 +44,7 @@ func main() {
 
 func testDeploy() error {
 	contracts.EndPoint = ethEndPoint
-	err := contracts.DeployKeeperProviderMap(adminSk)
+	err := contracts.DeployKPMap(adminSk)
 	if err != nil {
 		log.Println("DeployKeeperProviderMap err:", err)
 		return err

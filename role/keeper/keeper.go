@@ -45,6 +45,7 @@ type Info struct {
 	netIDs      map[string]struct{}
 	userConfigs *lru.LRU
 	stPays      *lru.LRU
+	kItem       *role.KeeperItem
 }
 
 // New is
@@ -60,7 +61,12 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		context: ctx,
 	}
 
-	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	err := m.loadContract(true)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
 		return nil, err
 	}

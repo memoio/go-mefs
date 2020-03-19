@@ -27,20 +27,12 @@ const (
 
 	DefaultPassword = "memoriae"
 
-	//READPRICEPERMB 读支付中1KB内容需要支付的金额
-	READPRICEPERMB int64 = 1024 * 1024
-
-	// Stored price 3$/TB*Month
-	// 1 eth=0.01$
-	// wei/MB*hour
-	STOREPRICEPEDOLLAR int64 = 400000000000
-
 	// KeeperSLA is keeper needed
 	KeeperSLA = 3
 	// ProviderSLA is provider needed
 	ProviderSLA = 6
-	// DefaultCapacity is default store capacity： 10000MB
-	DefaultCapacity int64 = 10000 //单位：MB
+	// DefaultCapacity is default store capacity： 10000 MB
+	DefaultCapacity int64 = 100000 //单位：MB
 	// DefaultDuration is default store days： 100 days
 	DefaultDuration int64 = 100 * 24 * 60 * 60
 	// DefaultCycle is default cycle: 1 day
@@ -50,6 +42,18 @@ const (
 	DepositCapacity int64 = 100000 //单位：MB
 	// DepositDuration is provider； 365 days
 	DepositDuration int64 = 365 * 24 * 60 * 60
+
+	// Wei/MB
+	ProviderDeposit = 1000000
+	KeeperDeposit   = 1000000000
+
+	//READPRICE 读支付中1MB内容需要支付的金额; wei/MB
+	READPRICE int64 = 1024 * 1024 * 1024
+
+	// Stored price 3$/TB*Month
+	// 1 eth=0.01$
+	// wei/MB*hour
+	STOREPRICEPEDOLLAR int64 = 400000000000
 )
 
 //false 意味着有，true表示无重复

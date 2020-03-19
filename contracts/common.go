@@ -33,9 +33,6 @@ const (
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
 	checkTxRetryCount         = 10
-
-	providerDeposit = 1000000
-	keeperDeposit   = 1000000000
 )
 
 const (
