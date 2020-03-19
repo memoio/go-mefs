@@ -103,6 +103,16 @@ type kpItem struct {
 
 var kpMap sync.Map
 
+func QueryBalance(localID string) (*big.Int, error) {
+	localAddress, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return nil, err
+	}
+
+	//获得用户的账户余额
+	return contracts.QueryBalance(localAddress.Hex())
+}
+
 // GetKeeperInfo returns keeper info
 func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	var item KeeperItem

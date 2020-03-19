@@ -709,6 +709,11 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 			}(proID)
 		}
 		wg.Wait()
+
+		balance, err := role.QueryBalance(g.userID)
+		if err == nil {
+			utils.MLogger.Infof("%s has balance: %s", g.userID, balance)
+		}
 	} else {
 		kmUser, err := metainfo.NewKey(g.groupID, mpb.KeyType_LFS, g.userID)
 		if err != nil {
