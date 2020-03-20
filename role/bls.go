@@ -85,18 +85,13 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		return mkey, err
 	}
 
-	// version is user for different default
-	if userBLS12ConfigProto.GetCount() == 0 {
-		pk.Count = mcl.PDPCount
-	} else {
-		pk.Count = int(userBLS12ConfigProto.GetCount())
-	}
-
 	if userBLS12ConfigProto.GetTagCount() == 0 {
 		pk.TagCount = mcl.TagAtomNum
 	} else {
 		pk.TagCount = int(userBLS12ConfigProto.GetTagCount())
 	}
+
+	pk.TagCount = len(userBLS12ConfigProto.PubkeyU)
 
 	pk.ElemG1s = make([]mcl.G1, pk.TagCount)
 	for i, u := range userBLS12ConfigProto.PubkeyU {
@@ -107,6 +102,15 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		}
 		pk.ElemG1s[i] = temp
 	}
+
+	// version is user for different default
+	if userBLS12ConfigProto.GetCount() == 0 {
+		pk.Count = mcl.PDPCount
+	} else {
+		pk.Count = int(userBLS12ConfigProto.GetCount())
+	}
+
+	pk.Count = len(userBLS12ConfigProto.PubkeyW)
 
 	pk.ElemG2s = make([]mcl.G2, pk.Count)
 	for i, w := range userBLS12ConfigProto.PubkeyW {
