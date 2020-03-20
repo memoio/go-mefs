@@ -82,6 +82,8 @@ var CommandsDaemonCmd = newcmd.CommandsCmd(Root)
 var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
 	"lfs":       LfsCmd,
+	"gateway":   GatewayCmd,
+	"block":     newcmd.BlockCmd,
 	"bootstrap": newcmd.BootstrapCmd,
 	"config":    newcmd.ConfigCmd,
 	"dht":       newcmd.DhtCmd,
@@ -91,7 +93,6 @@ var rootSubcommands = map[string]*cmds.Command{
 	"shutdown":  newcmd.DaemonShutdownCmd,
 	"create":    newcmd.CreateCmd,
 	"contract":  newcmd.ContractCmd,
-	"gateway":   GatewayCmd,
 }
 
 // RootRO is the readonly version of Root
