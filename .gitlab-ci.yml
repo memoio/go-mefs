@@ -96,7 +96,9 @@ compile:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - GO111MODULE=off make install
+    - GO111MODULE=off make user
+    - GO111MODULE=off make keeper
+    - GO111MODULE=off make provider
   tags:
     - "47.92.5.51"
 
@@ -193,7 +195,7 @@ lfs_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - GO111MODULE=off make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 lfsTest.sh
     - echo $ETHENDPOINT
@@ -213,7 +215,7 @@ share_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - GO111MODULE=off make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 shareTest.sh
     - echo $ETHENDPOINT
@@ -233,7 +235,7 @@ challenge_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - GO111MODULE=off make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 challengeTest.sh
     - echo $ETHENDPOINT
@@ -253,7 +255,7 @@ upload_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - GO111MODULE=off make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 uploadTest.sh
     - echo $ETHENDPOINT

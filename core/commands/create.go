@@ -20,7 +20,7 @@ type UserPrivMessage struct {
 	Sk      string
 }
 
-var createCmd = &cmds.Command{
+var CreateCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "create user.",
 		ShortDescription: `

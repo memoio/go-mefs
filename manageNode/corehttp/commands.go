@@ -16,7 +16,7 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core"
-	corecommands "github.com/memoio/go-mefs/core/commands"
+	newcmd "github.com/memoio/go-mefs/userNode/commands"
 )
 
 var (
@@ -137,13 +137,13 @@ func commandsOption(cctx oldcmds.Context, command *cmds.Command) ServeOption {
 // CommandsOption constructs a ServerOption for hooking the commands into the
 // HTTP server.
 func CommandsOption(cctx oldcmds.Context) ServeOption {
-	return commandsOption(cctx, corecommands.Root)
+	return commandsOption(cctx, newcmd.Root)
 }
 
 // CommandsROOption constructs a ServerOption for hooking the read-only commands
 // into the HTTP server.
 func CommandsROOption(cctx oldcmds.Context) ServeOption {
-	return commandsOption(cctx, corecommands.RootRO)
+	return commandsOption(cctx, newcmd.RootRO)
 }
 
 // CheckVersionOption returns a ServeOption that checks whether the client mefs version matches. Does nothing when the user agent string does not contain `/go-mefs/`

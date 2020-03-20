@@ -32,9 +32,9 @@ $(TRY_BUILD_$(d)): $(d) $$(DEPS_GO) ALWAYS
 	GOOS=$(GOOS) GOARCH=$(GOARCH) $(go-try-build)
 .PHONY: $(TRY_BUILD_$(d))
 
-$(d)-install: GOFLAGS += $(cmd/mefs_flags)
+$(d)-install: GOFLAGS += $(cmd/mefs-provider_flags)
 $(d)-install: $(d) $$(DEPS_GO) ALWAYS 
-	$(GOCC) install $(go-flags-with-tags) ./cmd/mefs
+	$(GOCC) install $(go-flags-with-tags) ./cmd/mefs-provider
 .PHONY: $(d)-install
 
 COVER_BIN_$(d) := $(d)/mefs-test-cover
@@ -42,7 +42,7 @@ CLEAN += $(COVER_BIN_$(d))
 
 $(COVER_BIN_$(d)): GOTAGS += testrunmain
 $(COVER_BIN_$(d)): $(d) $$(DEPS_GO) ALWAYS
-	$(eval TMP_PKGS := $(shell $(GOCC) list -f '{{range .Deps}}{{.}} {{end}}' $(go-flags-with-tags) ./cmd/mefs | sed 's/ /\n/g' | grep mefs/go-mefs) $(call go-pkg-name,$<))
+	$(eval TMP_PKGS := $(shell $(GOCC) list -f '{{range .Deps}}{{.}} {{end}}' $(go-flags-with-tags) ./cmd/mefs-provider | sed 's/ /\n/g' | grep mefs/go-mefs) $(call go-pkg-name,$<))
 	$(eval TMP_LIST := $(call join-with,$(comma),$(TMP_PKGS)))
 	@echo $(GOCC) test $@ -c -covermode atomic -coverpkg ... $(go-flags-with-tags) ./$(@D) # for info
 	@$(GOCC) test -o $@ -c -covermode atomic -coverpkg $(TMP_LIST) $(go-flags-with-tags) ./$(@D) 2>&1 | (grep -v 'warning: no packages being tested' || true)

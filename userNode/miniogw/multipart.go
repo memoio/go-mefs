@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/core"
-	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/userNode/user"
 
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/pkg/hash"

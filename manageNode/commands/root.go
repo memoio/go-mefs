@@ -5,11 +5,13 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	logging "github.com/ipfs/go-log"
+	newcmd "github.com/memoio/go-mefs/core/commands"
 )
 
-var log = logging.Logger("core/commands")
+var log = logging.Logger("keeper/commands")
 
-var ErrNotOnline = errors.New("this command must be run in online mode. Try running 'mefs daemon' first")
+var errWrongInput = errors.New("The input option is wrong")
+var ErrNotOnline = errors.New("this command must be run in online mode. Try running 'mefs-keeper daemon' first")
 
 const (
 	ConfigOption = "config"
@@ -21,36 +23,29 @@ const (
 var Root = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:  "Global p2p filesystem.",
-		Synopsis: "mefs [--config=<config> | -c] [--debug=<debug> | -D] [--help=<help>] [-h=<h>] [--local=<local> | -L] [--api=<api>] <command> ...",
+		Synopsis: "mefs-keeper [--config=<config> | -c] [--debug=<debug> | -D] [--help=<help>] [-h=<h>] [--local=<local> | -L] [--api=<api>] <command> ...",
 		Subcommands: `
 BASIC COMMANDS
   init          Initialize mefs local configuration
 
-DATA STRUCTURE COMMANDS
-  block         Interact with raw blocks in the datastore
-
 ADVANCED COMMANDS
   daemon        Start a long-running daemon process
   repo          Manipulate the MEFS repository
-  stats         Various operational stats
-  p2p           Libp2p stream mounting
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
   bootstrap     Add or remove bootstrap peers
   swarm         Manage connections to the p2p network
   dht           Query the DHT for values or peers
-  ping          Measure the latency of a connection
-  diag          Print diagnostics
 
 TOOL COMMANDS
   config        Manage configuration
   version       Show MEfs version information
   commands      List all available commands
 
-Use 'mefs <command> --help' to learn more about each command.
+Use 'mefs-keeper <command> --help' to learn more about each command.
 
-mefs uses a repository in the local file system. By default, the repo is
+mefs-keeper uses a repository in the local file system. By default, the repo is
 located at ~/.mefs. To change the repo location, set the $MEFS_PATH
 environment variable:
 
@@ -79,42 +74,35 @@ The CLI will exit with one of the following values:
 	},
 }
 
-// commandsDaemonCmd is the "mefs commands" command for daemon
-var CommandsDaemonCmd = CommandsCmd(Root)
+// CommandsDaemonCmd is the "mefs commands" command for daemon
+var CommandsDaemonCmd = newcmd.CommandsCmd(Root)
 
 //保存mefs一级命令的结构体
 var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
-	"block":     BlockCmd,
-	"lfs":       LfsCmd,
+	"bootstrap": newcmd.BootstrapCmd,
+	"config":    newcmd.ConfigCmd,
+	"dht":       newcmd.DhtCmd,
+	"id":        newcmd.IDCmd,
+	"swarm":     newcmd.SwarmCmd,
+	"version":   newcmd.VersionCmd,
+	"shutdown":  newcmd.DaemonShutdownCmd,
+	"create":    newcmd.CreateCmd,
+	"contract":  newcmd.ContractCmd,
 	"keeper":    KeeperCmd,
-	"stats":     StatsCmd,
-	"bootstrap": BootstrapCmd,
-	"config":    ConfigCmd,
-	"dht":       DhtCmd,
-	"id":        IDCmd,
-	"log":       LogCmd,
-	"swarm":     SwarmCmd,
-	"version":   VersionCmd,
-	"shutdown":  daemonShutdownCmd,
-	"create":    createCmd,
-	"diag":      sysDiagCmd,
-	"test":      TestCmd,
-	"contract":  ContractCmd,
-	"gateway":   GatewayCmd,
 }
 
 // RootRO is the readonly version of Root
 var RootRO = &cmds.Command{}
 
-var CommandsDaemonROCmd = CommandsCmd(RootRO)
+var CommandsDaemonROCmd = newcmd.CommandsCmd(RootRO)
 
 // RefsROCmd is `mefs refs` command
 var RefsROCmd = &cmds.Command{}
 
 var rootROSubcommands = map[string]*cmds.Command{
 	"commands": CommandsDaemonROCmd,
-	"version":  VersionCmd,
+	"version":  newcmd.VersionCmd,
 }
 
 func init() {

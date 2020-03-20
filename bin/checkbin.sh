@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mefs
+mefs-user
 if [ $? -ne 0 ]; then
         echo "====================="
         echo "recompile mcl library"

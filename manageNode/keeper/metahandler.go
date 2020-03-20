@@ -104,6 +104,7 @@ func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string
 }
 
 func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handlePutSign: ", km.ToString())
 	// verify sig first
 	// putSig
 	ops := km.GetOptions()
@@ -143,6 +144,7 @@ func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from strin
 
 // key is /qid/"Sign"/uid/pid/kid/stStart/length
 func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handleGetSign: ", km.ToString())
 	// verify sig first
 	// verify metaValue
 	// sign it

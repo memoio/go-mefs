@@ -1,11 +1,11 @@
 package commands
 
 import (
-	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 )
 
-var daemonShutdownCmd = &cmds.Command{
+var DaemonShutdownCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Shut down the mefs daemon",
 	},

@@ -7,8 +7,12 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/role/keeper"
+	"github.com/memoio/go-mefs/manageNode/keeper"
 )
+
+type StringList struct {
+	ChildLists []string
+}
 
 var KeeperCmd = &cmds.Command{
 	Helptext: cmds.HelpText{

@@ -16,18 +16,16 @@ import (
 	mprome "github.com/ipfs/go-metrics-prometheus"
 	version "github.com/memoio/go-mefs"
 	mcl "github.com/memoio/go-mefs/bls12"
-	utilmain "github.com/memoio/go-mefs/cmd/mefs/util"
+	utilmain "github.com/memoio/go-mefs/cmd/util"
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	"github.com/memoio/go-mefs/core/commands"
-	"github.com/memoio/go-mefs/core/corehttp"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
-	"github.com/memoio/go-mefs/role/keeper"
-	"github.com/memoio/go-mefs/role/provider"
-	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/storageNode/commands"
+	"github.com/memoio/go-mefs/storageNode/corehttp"
+	"github.com/memoio/go-mefs/storageNode/provider"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
@@ -72,25 +70,25 @@ var daemonCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Run a network-connected MEFS node.",
 		ShortDescription: `
-'mefs daemon' runs a persistent mefs daemon that can serve commands
+'mefs-provider daemon' runs a persistent mefs-provider daemon that can serve commands
 over the network. Most applications that use MEFS will do so by
 communicating with a daemon over the HTTP API. While the daemon is
-running, calls to 'mefs' commands will be sent over the network to
+running, calls to 'mefs-provider' commands will be sent over the network to
 the daemon.
 `,
 		LongDescription: `
 The daemon will start listening on ports on the network, which are
-documented in (and can be modified through) 'mefs config Addresses'.
+documented in (and can be modified through) 'mefs-provider config Addresses'.
 For example, to change the 'API' port:
 
-  mefs config Addresses.API /ip4/127.0.0.1/tcp/5001
+  mefs-provider config Addresses.API /ip4/127.0.0.1/tcp/5001
 
 Make sure to restart the daemon after changing addresses.
 
 By default, the API is only accessible locally. To expose it to
 other computers in the network, use 0.0.0.0 as the ip address:
 
-  mefs config Addresses.API /ip4/0.0.0.0/tcp/5001
+  mefs-provider config Addresses.API /ip4/0.0.0.0/tcp/5001
 
 Be careful if you expose the API. It is a security risk, as anyone could
 control your node remotely. If you need to control the node remotely,
@@ -99,10 +97,10 @@ make sure to protect the port as you would other services or database
 
 HTTP Headers
 
-mefs supports passing arbitrary headers to the API and Gateway. You can
+mefs-provider supports passing arbitrary headers to the API and Gateway. You can
 do this by setting headers on the API.HTTPHeaders key:
 
-  mefs config --json API.HTTPHeaders.X-Special-Header '["so special :)"]'
+  mefs-provider config --json API.HTTPHeaders.X-Special-Header '["so special :)"]'
 
 Note that the value of the keys is an _array_ of strings. This is because
 headers can have more than one value, and it is convenient to pass through
@@ -112,9 +110,9 @@ CORS Headers (for API)
 
 You can setup CORS headers the same way:
 
-  mefs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["example.com"]'
-  mefs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "GET", "POST"]'
-  mefs config --json API.HTTPHeaders.Access-Control-Allow-Credentials '["true"]'
+  mefs-provider config --json API.HTTPHeaders.Access-Control-Allow-Origin '["example.com"]'
+  mefs-provider config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "GET", "POST"]'
+  mefs-provider config --json API.HTTPHeaders.Access-Control-Allow-Credentials '["true"]'
 
 Shutdown
 
@@ -125,7 +123,7 @@ second signal.
 
 MEFS_PATH environment variable
 
-mefs uses a repository in the local file system. By default, the repo is
+mefs-provider uses a repository in the local file system. By default, the repo is
 located at ~/.mefs. To change the repo location, set the $MEFS_PATH
 environment variable:
 
@@ -135,18 +133,17 @@ environment variable:
 
 	Options: []cmds.Option{
 		cmds.BoolOption(initOptionKwd, "Initialize mefs with default settings if not already initialized"),
-		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
-		cmds.BoolOption(enableTendermintKwd, "If true, use Tendermint Core").WithDefault(false),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage, uint is MB").WithDefault(utils.DepositCapacity),
 		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage, uint is day").WithDefault(utils.DepositDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
 	},
 	Subcommands: map[string]*cmds.Command{},
@@ -321,12 +318,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children
 		// that it will wait for before closing, such as the API server.
-
-		err = node.Inst.Stop()
-		if err != nil {
-			utils.MLogger.Error("Persist before exist falied: ", err)
-		}
-
 		err = node.Close()
 		if err != nil {
 			utils.MLogger.Error("Mefs node close falied: ", err)
@@ -388,26 +379,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	}
 
 	switch cfg.Role {
-	case metainfo.RoleKeeper:
-		fmt.Println("Starting as a keeper")
-		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing)
-		if err != nil {
-			fmt.Println("Start keeper service fails; please restart")
-		}
-		node.Inst = ins
-
-		fmt.Println("Keeper service is ready")
-
-	case metainfo.RoleUser:
-		fmt.Println("Starting as a user")
-		ins, err := user.New(node.Context(), node.Identity.Pretty(), node.Data, node.Routing)
-		if err != nil {
-			fmt.Println("Start user daemon fails; please restart")
-		}
-
-		node.Inst = ins
-
-		fmt.Println("User service is ready; run `mefs lfs start` to start lfs service")
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("Starting as a provider")
 
@@ -423,6 +394,14 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		node.Inst = ins
 
 		fmt.Println("Provider service is ready")
+
+		defer func() {
+			err = node.Inst.Stop()
+			if err != nil {
+				utils.MLogger.Error("Persist before exist falied: ", err)
+			}
+		}()
+
 	default:
 	}
 

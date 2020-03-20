@@ -5,6 +5,8 @@ import (
 
 	"github.com/memoio/go-mefs/core/commands"
 
+	newcmd "github.com/memoio/go-mefs/manageNode/commands"
+
 	cmds "github.com/ipfs/go-ipfs-cmds"
 )
 
@@ -12,8 +14,8 @@ import (
 // Some subcommands (like 'mefs daemon' or 'mefs init') are only accessible here,
 // and can't be called through the HTTP API.
 var Root = &cmds.Command{
-	Options:  commands.Root.Options,
-	Helptext: commands.Root.Helptext,
+	Options:  newcmd.Root.Options,
+	Helptext: newcmd.Root.Helptext,
 }
 
 // commandsClientCmd is the "mefs commands" command for local cli
@@ -32,7 +34,7 @@ func init() {
 	// (some commands make references to Root)
 	Root.Subcommands = localCommands
 
-	for k, v := range commands.Root.Subcommands {
+	for k, v := range newcmd.Root.Subcommands {
 		if _, found := Root.Subcommands[k]; !found {
 			Root.Subcommands[k] = v
 		}

@@ -21,6 +21,10 @@ const (
 	codeName = "whoisyourdaddy"
 )
 
+type StringList struct {
+	ChildLists []string
+}
+
 var ContractCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "",

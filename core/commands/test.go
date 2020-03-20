@@ -101,7 +101,7 @@ var showBalanceCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{},
 	Options: []cmds.Option{
-		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+		cmds.StringOption("address", "addr", "The practice user's addressid that you want to exec").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -109,7 +109,7 @@ var showBalanceCmd = &cmds.Command{
 			return err
 		}
 		var userid string
-		addressid, found := req.Options[AddressID].(string)
+		addressid, found := req.Options["address"].(string)
 		if addressid == "" || !found {
 			userid = node.Identity.Pretty()
 			address, err := address.GetAddressFromID(userid)

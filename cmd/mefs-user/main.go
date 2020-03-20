@@ -26,11 +26,11 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core"
-	corecmds "github.com/memoio/go-mefs/core/commands"
-	"github.com/memoio/go-mefs/core/corehttp"
 	"github.com/memoio/go-mefs/plugin/loader"
 	"github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/fsrepo"
+	newcmd "github.com/memoio/go-mefs/userNode/commands"
+	"github.com/memoio/go-mefs/userNode/corehttp"
 	"github.com/memoio/go-mefs/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -42,7 +42,7 @@ func init() {
 }
 
 // log is the command logger
-var log = logging.Logger("cmd/mefs")
+var log = logging.Logger("cmd/mefs-user")
 
 // declared as a var for testing purposes
 var dnsResolver = madns.DefaultResolver
@@ -108,7 +108,7 @@ func mainRet() int {
 
 	// output depends on executable name passed in os.Args
 	// so we need to make sure it's stable
-	os.Args[0] = "mefs"
+	os.Args[0] = "mefs-user"
 
 	buildEnv := func(ctx context.Context, req *cmds.Request) (cmds.Environment, error) {
 		checkDebug(req)
@@ -171,7 +171,7 @@ func checkDebug(req *cmds.Request) {
 }
 
 func apiAddrOption(req *cmds.Request) (ma.Multiaddr, error) {
-	apiAddrStr, apiSpecified := req.Options[corecmds.ApiOption].(string)
+	apiAddrStr, apiSpecified := req.Options[newcmd.ApiOption].(string)
 	if !apiSpecified {
 		return nil, nil
 	}

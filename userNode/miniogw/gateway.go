@@ -15,7 +15,7 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
-	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/userNode/user"
 	"github.com/memoio/go-mefs/utils/address"
 
 	"github.com/minio/cli"
