@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	lru "github.com/hashicorp/golang-lru/simplelru"
+	lru "github.com/hashicorp/golang-lru"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -43,7 +43,7 @@ type impl struct {
 	aCache  *Cache
 	rt      routing.Routing
 	ph      p2phost.Host
-	pubKeys *lru.LRU
+	pubKeys *lru.ARCCache
 }
 
 // New returns data.Service
@@ -53,7 +53,7 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 	}
 
 	// cache public keys, key is userID
-	pcache, err := lru.NewLRU(2048, nil)
+	pcache, err := lru.NewARC(2048)
 	if err != nil {
 		utils.MLogger.Error("new lru err:", err)
 		return nil
