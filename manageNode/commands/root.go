@@ -80,6 +80,7 @@ var CommandsDaemonCmd = newcmd.CommandsCmd(Root)
 //保存mefs一级命令的结构体
 var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
+	"info":      KeeperCmd,
 	"bootstrap": newcmd.BootstrapCmd,
 	"config":    newcmd.ConfigCmd,
 	"dht":       newcmd.DhtCmd,
@@ -89,7 +90,6 @@ var rootSubcommands = map[string]*cmds.Command{
 	"shutdown":  newcmd.DaemonShutdownCmd,
 	"create":    newcmd.CreateCmd,
 	"contract":  newcmd.ContractCmd,
-	"info":      KeeperCmd,
 }
 
 // RootRO is the readonly version of Root
