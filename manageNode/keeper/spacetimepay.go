@@ -64,7 +64,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		return nil
 	}
 
-	if g.upkeeping != nil {
+	if g.upkeeping == nil {
 		return nil
 	}
 
