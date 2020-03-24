@@ -15,7 +15,7 @@ var (
 )
 
 const (
-	moneyTo = 1000000000000000000
+	moneyTo = 6000000000000000000
 )
 
 func main() {
