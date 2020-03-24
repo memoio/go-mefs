@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/memoio/go-mefs/config"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
@@ -135,7 +136,7 @@ func (n *impl) GetUserPublicKey(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	gotID, err := utils.IDFromPublicKey(pubrec.GetValue())
+	gotID, err := id.GetIDFromCompressPubKey(pubrec.GetValue())
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,7 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 
 	switch keys[1] {
 	case strconv.Itoa(int(mpb.KeyType_PublicKey)):
-		gotID, err := utils.IDFromPublicKey(value)
+		gotID, err := id.GetIDFromCompressPubKey(value)
 		if err != nil {
 			utils.MLogger.Warn("convert public key to id fails: ", err)
 			return false
@@ -179,7 +180,7 @@ func (n *impl) VerifyKey(ctx context.Context, key string, value, sig []byte) boo
 			return false
 		}
 
-		return utils.VerifySigForKey(pubKey, key, value, sig)
+		return id.VerifySigForKey(pubKey, key, value, sig)
 	}
 }
 

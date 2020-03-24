@@ -13,6 +13,7 @@ import (
 	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -969,7 +970,7 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	hash := crypto.Keccak256(channelAddr.Bytes(), valueNew) //32Byte
 
 	//私钥格式转换
-	skECDSA, err := utils.EthskToECDSAsk(hexKey)
+	skECDSA, err := id.ECDSAStringToSk(hexKey)
 	if err != nil {
 		return sig, err
 	}
@@ -980,7 +981,7 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 		return sig, err
 	}
 
-	pubKey, err := utils.GetPkFromEthSk(hexKey)
+	pubKey, err := id.GetCompressPubByte(hexKey)
 	if err != nil {
 		utils.MLogger.Error("Get public key fail: ", err)
 		return nil, err
@@ -1149,7 +1150,7 @@ func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stS
 	hash := d.Sum(nil)
 
 	//私钥格式转换
-	skECDSA, err := utils.EthskToECDSAsk(hexKey)
+	skECDSA, err := id.ECDSAStringToSk(hexKey)
 	if err != nil {
 		return sig, err
 	}

@@ -5,7 +5,7 @@ import (
 	"io"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
-	config "github.com/memoio/go-mefs/config"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
 )
@@ -34,27 +34,38 @@ var CreateCmd = &cmds.Command{
 		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		var address string
-		var err error
-		path, _ := config.PathRoot()
 		pwd, found := req.Options[PassWord].(string)
 		if pwd == "" || !found {
 			pwd = utils.DefaultPassword
 		}
 		sk, found := req.Options[SecreteKey].(string)
 		if sk == "" || !found {
-			address, sk, err = fsrepo.CreateAddressAndStoreInKeystore(path, pwd)
+			tsk, err := id.Create()
 			if err != nil {
 				return err
 			}
-		} else {
-			address, err = fsrepo.GetAddressAndStoreInKeystore(path, sk, pwd)
-			if err != nil {
-				return err
-			}
+			sk = id.ECDSAByteToString(id.ToECDSAByte(tsk))
+		}
+		pub, err := id.GetPubByte(sk)
+		if err != nil {
+			return err
+		}
+		pid, err := id.GetIDFromPubKey(pub)
+		if err != nil {
+			return err
 		}
 
-		return cmds.EmitOnce(res, &UserPrivMessage{Address: address, Sk: sk})
+		err = fsrepo.PutPrivateKeyToKeystore(sk, pid, pwd)
+		if err != nil {
+			return err
+		}
+
+		addr, err := id.GetAdressFromSk(sk)
+		if err != nil {
+			return err
+		}
+
+		return cmds.EmitOnce(res, &UserPrivMessage{Address: addr.String(), Sk: sk})
 	},
 	Type: UserPrivMessage{},
 	Encoders: cmds.EncoderMap{

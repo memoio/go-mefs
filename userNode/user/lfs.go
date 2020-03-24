@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"time"
 
 	mcl "github.com/memoio/go-mefs/bls12"
@@ -93,6 +94,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 			utils.MLogger.Info("Init bls config fail: ", err)
 			return err
 		}
+		utils.MLogger.Info("seed is: ", hex.EncodeToString(seed[:]))
 
 		l.keySet = mkey
 		l.putUserConfig(ctx)

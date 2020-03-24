@@ -38,10 +38,14 @@ const (
 	// DefaultCycle is default cycle: 1 day
 	DefaultCycle = 24 * 60 * 60
 
-	// DepositCapacity is provider
-	DepositCapacity int64 = 1000 //单位：MB
-	// DepositDuration is provider； 100 days
-	DepositDuration int64 = 100
+	// offer options
+
+	// DefaultOfferCapacity is provider
+	DefaultOfferCapacity int64 = 10000 //单位：MB
+	// DefaultOfferDuration is provider； 100 days
+	DefaultOfferDuration int64 = 100
+
+	DepositCapacity int64 = 1000000
 
 	// Wei/MB
 	ProviderDeposit = 1000000

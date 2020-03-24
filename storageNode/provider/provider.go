@@ -89,7 +89,7 @@ type kInfo struct {
 }
 
 //New start provider service
-func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price int64, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
+func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price, depositSize int64, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
 	m := &Info{
 		localID: id,
 		sk:      sk,
@@ -112,7 +112,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	go func() {
 		for {
-			err := m.loadContracts()
+			err := m.loadContracts(capacity, duration, price, depositSize, reDeployOffer)
 			if err != nil || reDeployOffer {
 				_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
 				if err != nil {

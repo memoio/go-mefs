@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,9 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/memoio/go-mefs/config"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 // TransferTo trans money
@@ -114,19 +112,16 @@ func QueryBalance(addr, ethEndPoint string) *big.Int {
 }
 
 func CreateAddr() (string, string, error) {
-	identity, err := config.CreateID(os.Stdout, 2048)
+	tsk, err := id.Create()
 	if err != nil {
 		return "", "", err
 	}
-	address, err := address.GetAddressFromID(identity.PeerID)
+	sk := id.ECDSAByteToString(id.ToECDSAByte(tsk))
+	address, err := id.GetAdressFromSk(sk)
 	if err != nil {
 		return "", "", err
 	}
 	addressHex := address.Hex()
-	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
-	if err != nil {
-		return "", "", err
-	}
 
 	return addressHex, sk, nil
 }

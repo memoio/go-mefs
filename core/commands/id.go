@@ -15,7 +15,7 @@ import (
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	core "github.com/memoio/go-mefs/core"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/utils"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -174,8 +174,7 @@ func printSelf(node *core.MefsNode) (interface{}, error) {
 		}
 	}
 
-	sk := node.PrivateKey
-	pkb, err := utils.GetPkFromEthSk(sk)
+	pkb, err := id.GetCompressPubByte(node.PrivateKey)
 	if err != nil {
 		return nil, err
 	}

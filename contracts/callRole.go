@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	"github.com/memoio/go-mefs/utils"
 )
 
@@ -36,7 +37,7 @@ func DeployKeeperAdmin(hexKey string) (err error) {
 		return err
 	}
 
-	localAddr, err := utils.GetAdressFromSk(hexKey)
+	localAddr, err := id.GetAdressFromSk(hexKey)
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func DeployProviderAdmin(hexKey string) (err error) {
 		return err
 	}
 
-	localAddr, err := utils.GetAdressFromSk(hexKey)
+	localAddr, err := id.GetAdressFromSk(hexKey)
 	if err != nil {
 		return err
 	}

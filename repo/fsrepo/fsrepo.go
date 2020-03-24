@@ -1,7 +1,6 @@
 package fsrepo
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -16,16 +15,14 @@ import (
 	lockfile "github.com/ipfs/go-fs-lock"
 	util "github.com/ipfs/go-ipfs-util"
 	logging "github.com/ipfs/go-log"
-	cy "github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	config "github.com/memoio/go-mefs/config"
 	serialize "github.com/memoio/go-mefs/config/serialize"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	repo "github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/common"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	measure "github.com/memoio/go-mefs/source/go-ds-measure"
 	"github.com/memoio/go-mefs/utils"
-	ad "github.com/memoio/go-mefs/utils/address"
 	homedir "github.com/mitchellh/go-homedir"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -35,6 +32,7 @@ import (
 const (
 	LockFile               = "repo.lock"
 	nBitsForKeypairDefault = 2048
+	version                = 3
 )
 
 var log = logging.Logger("fsrepo")
@@ -262,71 +260,7 @@ func initKeyStore(path string, privateKey string, peerID string, password string
 		return err
 	}
 
-	return StoreEncryptedPrivateKey(dir, privateKey, peerID, password)
-}
-
-//CreateAddressAndStoreInKeystore create another ID and store it in keystore
-func CreateAddressAndStoreInKeystore(repoPath string, password string) (string, string, error) {
-	identity, err := config.CreateID(os.Stdout, nBitsForKeypairDefault)
-	if err != nil {
-		return "", "", err
-	}
-	address, err := ad.GetAddressFromID(identity.PeerID)
-	if err != nil {
-		return "", "", err
-	}
-	addressHex := address.Hex()
-	dir, err := config.Path(repoPath, Keystore)
-	if err != nil {
-		return "", "", err
-	}
-
-	sk, err := utils.IPFSskToEthsk(identity.PrivKey)
-	if err != nil {
-		return "", "", err
-	}
-	return addressHex, "0x" + sk, StoreEncryptedPrivateKey(dir, identity.PrivKey, identity.PeerID, password)
-}
-
-//GetAddressAndStoreInKeystore get address from privateKey and store in keystore
-func GetAddressAndStoreInKeystore(repoPath string, privKey string, password string) (string, error) {
-	dir, err := config.Path(repoPath, Keystore)
-	if err != nil {
-		return "", err
-	}
-	skBytes, err := base64.StdEncoding.DecodeString(privKey)
-	if err != nil {
-		return "", err
-	}
-	sk, err := cy.UnmarshalPrivateKey(skBytes)
-	if err != nil {
-		return "", err
-	}
-	pk := sk.GetPublic()
-	id, err := peer.IDFromPublicKey(pk)
-	if err != nil {
-		return "", err
-	}
-	peerID := id.Pretty()
-	address, err := ad.GetAddressFromID(peerID)
-	if err != nil {
-		return "", err
-	}
-	addressHex := address.Hex()
-	path := filepath.Join(dir, peerID)
-	if !util.FileExists(path) { //keystore中还没存此私钥
-		return addressHex, StoreEncryptedPrivateKey(dir, privKey, peerID, password)
-	}
-	//keystore中已经存过了
-	_, err = getPrivateKeyFromKeystore(peerID, path, password)
-	if err != nil { //此password不是之前存入keystore时的password
-		err = os.Remove(path) //删除之前存入的privateKey
-		if err != nil {
-			return addressHex, err
-		}
-		return addressHex, StoreEncryptedPrivateKey(dir, privKey, peerID, password) //用新的password重新加密存储privateKey
-	}
-	return addressHex, nil
+	return id.StorePrivateKey(dir, privateKey, peerID, password)
 }
 
 // Init initializes a new FSRepo at the given path with the provided config.

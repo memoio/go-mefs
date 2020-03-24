@@ -47,6 +47,7 @@ import (
 	p2pbhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	version "github.com/memoio/go-mefs"
 	config "github.com/memoio/go-mefs/config"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	p2p "github.com/memoio/go-mefs/p2p"
 	repo "github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/fsrepo"
@@ -56,7 +57,6 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	dhtopts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
 	"github.com/memoio/go-mefs/source/instance"
-	"github.com/memoio/go-mefs/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -549,7 +549,10 @@ func (n *MefsNode) LoadPrivateKey() error {
 
 	n.PrivateKey = sk
 
-	skEcdsa, err := utils.EthskToECDSAsk(sk)
+	skEcdsa, err := id.ECDSAStringToSk(sk)
+	if err != nil {
+		return err
+	}
 	prik := (*cy.Secp256k1PrivateKey)((*btcec.PrivateKey)(skEcdsa))
 	n.Peerstore.AddPrivKey(n.Identity, prik)
 	n.Peerstore.AddPubKey(n.Identity, prik.GetPublic())

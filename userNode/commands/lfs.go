@@ -14,9 +14,9 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	files "github.com/ipfs/go-ipfs-files"
-	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/core/commands/e"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
@@ -315,7 +315,7 @@ var lfsStartUserCmd = &cmds.Command{
 		sk := req.Options[SecreteKey].(string)
 		pwd := req.Options[PassWord].(string)
 		if sk != "" {
-			addrCommon, err := utils.GetAdressFromSk(sk)
+			addrCommon, err := id.GetAdressFromSk(sk)
 			if err != nil {
 				return err
 			}
@@ -325,13 +325,7 @@ var lfsStartUserCmd = &cmds.Command{
 				return err
 			}
 
-			sk, err = utils.EthskToIPFSsk(sk)
-			if err != nil {
-				return err
-			}
-			rootpath, _ := fsrepo.BestKnownPath()
-			keypath, _ := config.Path(rootpath, fsrepo.Keystore)
-			err = fsrepo.StoreEncryptedPrivateKey(keypath, sk, uid, pwd)
+			err = fsrepo.PutPrivateKeyToKeystore(sk, uid, pwd)
 			if err != nil {
 				return err
 			}

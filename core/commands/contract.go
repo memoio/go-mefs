@@ -13,7 +13,7 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/utils"
+	id "github.com/memoio/go-mefs/crypto/identity"
 )
 
 const (
@@ -76,7 +76,7 @@ var deployResolverCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		localAddr, err := utils.GetAdressFromSk(hexPk)
+		localAddr, err := id.GetAdressFromSk(hexPk)
 		if err != nil {
 			return err
 		}
@@ -351,7 +351,7 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		localAddr, err := utils.GetAdressFromSk(hexPk)
+		localAddr, err := id.GetAdressFromSk(hexPk)
 		if err != nil {
 			return err
 		}
@@ -408,7 +408,7 @@ var addMasterKeeperCmd = &cmds.Command{
 		contracts.EndPoint = cfg.Eth
 
 		hexSk := node.PrivateKey
-		localAddr, _ := utils.GetAdressFromSk(hexSk)
+		localAddr, _ := id.GetAdressFromSk(hexSk)
 
 		kaddr := req.Arguments[0]
 
@@ -460,7 +460,7 @@ var addMyProviderCmd = &cmds.Command{
 		contracts.EndPoint = cfg.Eth
 
 		hexSk := node.PrivateKey
-		localAddr, _ := utils.GetAdressFromSk(hexSk)
+		localAddr, _ := id.GetAdressFromSk(hexSk)
 
 		paddr := req.Arguments[0]
 
@@ -515,7 +515,7 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		localAddr, err := utils.GetAdressFromSk(hexPk)
+		localAddr, err := id.GetAdressFromSk(hexPk)
 		if err != nil {
 			return err
 		}
@@ -572,7 +572,7 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		localAddr, err := utils.GetAdressFromSk(hexPk)
+		localAddr, err := id.GetAdressFromSk(hexPk)
 		if err != nil {
 			return err
 		}
@@ -627,7 +627,7 @@ var getProviderInKPMapCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		localAddr, err := utils.GetAdressFromSk(hexPk)
+		localAddr, err := id.GetAdressFromSk(hexPk)
 		if err != nil {
 			return err
 		}
@@ -689,7 +689,7 @@ var getAllKeeperInKPMapCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		localAddr, err := utils.GetAdressFromSk(hexPk)
+		localAddr, err := id.GetAdressFromSk(hexPk)
 		if err != nil {
 			return err
 		}

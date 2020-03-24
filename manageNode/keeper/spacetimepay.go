@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
@@ -132,7 +133,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 			}
 			cpay.Root = hash
 
-			sign, err := utils.Sign(localSk, hash)
+			sign, err := id.Sign(localSk, hash)
 			if err != nil {
 				return err
 			}

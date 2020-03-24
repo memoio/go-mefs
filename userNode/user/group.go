@@ -13,6 +13,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
@@ -305,7 +306,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	}
 
 	// send pubKey to all kps
-	pubKey, err := utils.GetPkFromEthSk(g.privKey)
+	pubKey, err := id.GetCompressPubByte(g.privKey)
 	if err != nil {
 		utils.MLogger.Error("Get publickey for: ", g.shareToID, " fail: ", err)
 		return err
@@ -346,7 +347,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	kms := kmc.ToString()
 	val := []byte(res.String())
 
-	sig, err := utils.SignForKey(g.privKey, kms, val)
+	sig, err := id.SignForKey(g.privKey, kms, val)
 	if err != nil {
 		return err
 	}
@@ -888,7 +889,7 @@ func (g *groupInfo) GetProviders(ctx context.Context, count int) ([]string, []st
 func (g *groupInfo) putToAll(ctx context.Context, key string, value []byte) {
 	g.ds.PutKey(ctx, key, value, nil, "local")
 
-	sig, err := utils.SignForKey(g.privKey, key, value)
+	sig, err := id.SignForKey(g.privKey, key, value)
 	if err != nil {
 		utils.MLogger.Error("sign for key %s fails: %s", key, err)
 		return
@@ -942,7 +943,7 @@ func (g *groupInfo) putDataToKeepers(ctx context.Context, key string, value []by
 		return ErrLfsServiceNotReady
 	}
 
-	sig, err := utils.SignForKey(g.privKey, key, value)
+	sig, err := id.SignForKey(g.privKey, key, value)
 	if err != nil {
 		utils.MLogger.Error("sign for key %s fails: %s", key, err)
 		return err

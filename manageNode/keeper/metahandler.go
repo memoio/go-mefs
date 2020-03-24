@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
@@ -148,7 +149,7 @@ func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from strin
 	// verify sig first
 	// verify metaValue
 	// sign it
-	nsig, err := utils.Sign(k.sk, metaValue)
+	nsig, err := id.Sign(k.sk, metaValue)
 	if err != nil {
 		return
 	}

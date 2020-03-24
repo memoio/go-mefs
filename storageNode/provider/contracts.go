@@ -13,7 +13,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func (p *Info) loadContracts() error {
+func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDeployOffer bool) error {
 	proID := p.localID
 
 	if p.proContract == nil {
@@ -23,9 +23,9 @@ func (p *Info) loadContracts() error {
 		}
 
 		// capacity should > 0
-		if proItem.Capacity == 0 {
-			size := new(big.Int).SetInt64(utils.DepositCapacity)
-			err := role.PledgeProvider(proID, p.sk, size)
+		if proItem.Capacity < depositSize {
+			dsize := new(big.Int).SetInt64(depositSize - proItem.Capacity)
+			err := role.PledgeProvider(proID, p.sk, dsize)
 			if err != nil {
 				return err
 			}
@@ -42,6 +42,16 @@ func (p *Info) loadContracts() error {
 	proAddr, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return err
+	}
+
+	if capacity > p.proContract.Capacity {
+		utils.MLogger.Infof("your pledge capacity is %d, so change %d to it", capacity, p.proContract.Capacity)
+		capacity = p.proContract.Capacity
+	}
+
+	_, err = role.DeployOffer(p.localID, p.sk, capacity, duration, price, reDeployOffer)
+	if err != nil {
+		utils.MLogger.Error("provider deploying resolver and offer failed: ", err)
 	}
 
 	offers, err := contracts.GetOfferAddrs(proAddr, proAddr)

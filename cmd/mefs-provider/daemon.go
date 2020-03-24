@@ -140,9 +140,10 @@ environment variable:
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(utils.DefaultPassword),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
-		cmds.Int64Option(capacityKwd, "cap", "implement user needs or provider offers how many capacity of storage, uint is MB").WithDefault(utils.DepositCapacity),
-		cmds.Int64Option(durationKwd, "dur", "implement user needs or provider offers how much time of storage, uint is day").WithDefault(utils.DepositDuration),
+		cmds.Int64Option(capacityKwd, "cap", "provider offers how many capacity of storage, uint is MB").WithDefault(utils.DefaultOfferCapacity),
+		cmds.Int64Option(durationKwd, "dur", "provider offers how much time of storage, uint is day").WithDefault(utils.DefaultOfferDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.Int64Option("depositCapacity", "deCap", "provider deposits how capacity of storage, uint is MB").WithDefault(utils.DepositCapacity),
 		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
 	},
@@ -378,6 +379,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errRepoExists
 	}
 
+	decapacity, ok := req.Options["depositCapacity"].(int64)
+	if !ok || decapacity <= 0 {
+		fmt.Println("input wrong capacity.")
+		return errRepoExists
+	}
+
 	switch cfg.Role {
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("Starting as a provider")
@@ -385,7 +392,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, price, rdo, pos, gc)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, price, decapacity, rdo, pos, gc)
 		if err != nil {
 			fmt.Println("Start provider Service failed:", err)
 			return err

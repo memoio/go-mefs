@@ -14,10 +14,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
-	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -165,7 +165,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 			return nil, err
 		}
 
-		ok := utils.VerifySigForKey(pubrec.GetValue(), string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
+		ok := id.VerifySigForKey(pubrec.GetValue(), string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
 		if !ok {
 			log.Println("key signature is wrong for: ", string(rec.GetKey()))
 			return nil, errors.New("key signature is wrong")
