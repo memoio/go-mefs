@@ -18,7 +18,7 @@ var KeeperCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Interact with keeper.",
 		ShortDescription: `
-'mefs keeper' is a plumbing command used to manipulate keeper service.
+'mefs-keeper info' is a plumbing command used to manipulate keeper service.
 `,
 	},
 
@@ -34,7 +34,7 @@ var KeeperListUsersCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "List Users.",
 		ShortDescription: `
-'mefs keeper list_users' is a plumbing command for printing users for a keeper.
+'mefs-keeper info list_users' is a plumbing command for printing users for a keeper.
 `,
 	},
 
@@ -50,7 +50,7 @@ var KeeperListUsersCmd = &cmds.Command{
 
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return errWrongInput
+			return ErrNotOnline
 		}
 
 		users, err := keeperIns.GetUsers()
@@ -75,7 +75,7 @@ var KeeperListProvidersCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "List Providers.",
 		ShortDescription: `
-'mefs keeper list_providers' is a plumbing command for printing providers for a keeper.
+'mefs-keeper info list_providers' is a plumbing command for printing providers for a keeper.
 `,
 	},
 
@@ -90,7 +90,7 @@ var KeeperListProvidersCmd = &cmds.Command{
 		}
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return errWrongInput
+			return ErrNotOnline
 		}
 		providers, err := keeperIns.GetProviders()
 
@@ -115,7 +115,7 @@ var KeeperListKeepersCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "List keepers.",
 		ShortDescription: `
-'mefs keeper list_keepers' is a plumbing command for printing providers for a keeper.
+'mefs-keeper info list_keepers' is a plumbing command for printing providers for a keeper.
 `,
 	},
 
@@ -131,7 +131,7 @@ var KeeperListKeepersCmd = &cmds.Command{
 
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return errWrongInput
+			return ErrNotOnline
 		}
 
 		keepers, err := keeperIns.GetKeepers()
@@ -154,9 +154,9 @@ var KeeperListKeepersCmd = &cmds.Command{
 
 var KeeperFlushCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
-		Tagline: "List keepers.",
+		Tagline: "Flush keepers and providers.",
 		ShortDescription: `
-'mefs keeper list_keepers' is a plumbing command for printing providers for a keeper.
+'mefs-keeper info flush' is a plumbing command for printing providers for a keeper.
 `,
 	},
 
