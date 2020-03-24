@@ -1162,3 +1162,22 @@ func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stS
 
 	return sig, nil
 }
+
+//SignForSetStop keeper signature to set provider or keeper stop in upkeeping contract
+func SignForSetStop(upKeepingAddr, providerAddr common.Address, hexKey string) ([]byte, error) {
+	hash := crypto.Keccak256(upKeepingAddr.Bytes(), providerAddr.Bytes())
+
+	//私钥格式转换
+	skECDSA, err := utils.EthskToECDSAsk(hexKey)
+	if err != nil {
+		return nil, err
+	}
+
+	//私钥对上述哈希值签名
+	sig, err := crypto.Sign(hash, skECDSA)
+	if err != nil {
+		return nil, err
+	}
+
+	return sig, nil
+}
