@@ -383,6 +383,7 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 		tx, err := uk.SetKeeperStop(auth, keeperAddr, sign)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
+				log.Println("setKeeperStop fails, err: ", err)
 				return err
 			}
 			time.Sleep(time.Minute)
@@ -392,6 +393,7 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 		err = CheckTx(tx)
 		if err != nil {
 			if retryCount > checkTxRetryCount {
+				log.Println("setKeeperStop tx fails, err: ", err)
 				return err
 			}
 			time.Sleep(time.Minute)
@@ -418,9 +420,10 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr comm
 		sk, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := uk.SetKeeperStop(auth, providerAddr, sign)
+		tx, err := uk.SetProviderStop(auth, providerAddr, sign)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
+				log.Println("setProviderStop fails, err: ", err)
 				return err
 			}
 			time.Sleep(time.Minute)
@@ -430,6 +433,7 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr comm
 		err = CheckTx(tx)
 		if err != nil {
 			if retryCount > checkTxRetryCount {
+				log.Println("setProviderStop tx fails, err: ", err)
 				return err
 			}
 			time.Sleep(time.Minute)
