@@ -1169,7 +1169,7 @@ func SignForSetStop(upKeepingAddr, providerAddr common.Address, hexKey string) (
 	hash := crypto.Keccak256(upKeepingAddr.Bytes(), providerAddr.Bytes())
 
 	//私钥格式转换
-	skECDSA, err := utils.EthskToECDSAsk(hexKey)
+	skECDSA, err := id.ECDSAStringToSk(hexKey)
 	if err != nil {
 		return nil, err
 	}
