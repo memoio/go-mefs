@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"math/big"
@@ -9,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/test"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
@@ -37,7 +39,11 @@ func main() {
 	//	log.Fatal(err)
 	//}
 
-	if err := testRole(); err != nil {
+	if err := testKeeper(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := testProvider(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -51,6 +57,149 @@ func testDeploy() error {
 	}
 
 	time.Sleep(2 * time.Minute)
+
+	return nil
+}
+
+func testKeeper() (err error) {
+	log.Println("==========test keeper=========")
+
+	userAddr, userSk, err := test.CreateAddr()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	err = test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	log.Println("1. test set keeper")
+
+	keeperAddr := common.HexToAddress(userAddr[2:])
+
+	contracts.EndPoint = ethEndPoint
+	err = contracts.SetKeeper(keeperAddr, adminSk, true)
+	if err != nil {
+		log.Println("setKeeper err:", err)
+		return err
+	}
+
+	contracts.EndPoint = qethEndPoint
+	retryCount := 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		res, err := contracts.IsKeeper(keeperAddr)
+		if err != nil || res == false {
+			if retryCount > 20 {
+				log.Fatal("set keeper fails")
+			}
+			continue
+		}
+		log.Println("set keeper success")
+		break
+	}
+
+	price, err := contracts.GetKeeperPrice(keeperAddr)
+	if err != nil {
+		return err
+	}
+
+	log.Println("set keeper need price is: ", price)
+	log.Println("set keeper price is: ", utils.KeeperDeposit)
+	contracts.EndPoint = ethEndPoint
+	log.Println("2. test pledge keeper")
+	amount := new(big.Int).SetInt64(utils.KeeperDeposit)
+	err = contracts.PledgeKeeper(keeperAddr, userSk, amount)
+	if err != nil {
+		return err
+	}
+
+	active, banned, money, time, err := contracts.GetKeeperInfo(keeperAddr)
+	if err != nil {
+		return err
+	}
+
+	log.Println("get keepe info: ", active, banned, money, time)
+
+	if money.Cmp(amount) != 0 {
+		return errors.New("wrong parameters")
+	}
+
+	return nil
+}
+
+func testProvider() (err error) {
+	log.Println("==========test provider=========")
+
+	userAddr, userSk, err := test.CreateAddr()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	err = test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	log.Println("1. test set provider")
+
+	proAddr := common.HexToAddress(userAddr[2:])
+
+	contracts.EndPoint = ethEndPoint
+	err = contracts.SetProvider(proAddr, adminSk, true)
+	if err != nil {
+		log.Println("setProvider err:", err)
+		return err
+	}
+
+	contracts.EndPoint = qethEndPoint
+	retryCount := 0
+	for {
+		retryCount++
+		time.Sleep(30 * time.Second)
+		res, err := contracts.IsProvider(proAddr)
+		if err != nil || res == false {
+			if retryCount > 20 {
+				log.Fatal("set provider fails")
+			}
+			continue
+		}
+		break
+	}
+
+	log.Println("set provider success")
+
+	price, err := contracts.GetProviderPrice(proAddr)
+	if err != nil {
+		return err
+	}
+
+	log.Println("pledge provide need price is: ", price)
+	contracts.EndPoint = ethEndPoint
+	log.Println("2. test pledge provider")
+	size := new(big.Int).SetInt64(utils.DepositCapacity)
+	err = contracts.PledgeProvider(proAddr, userSk, size)
+	if err != nil {
+		return err
+	}
+
+	active, banned, money, time, err := contracts.GetProviderInfo(proAddr)
+	if err != nil {
+		return err
+	}
+
+	log.Println("get provider info: ", active, banned, money, time)
+
+	size.Mul(size, price)
+	if money.Cmp(size) != 0 {
+		return errors.New("wrong parameters")
+	}
 
 	return nil
 }

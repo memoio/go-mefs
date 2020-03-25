@@ -63,7 +63,7 @@ func (p *Info) getDiskUsage() (uint64, error) {
 }
 
 // getDiskTotal gets the disk total space which is set in config
-// default is 10TB
+// default is 1TB
 func (p *Info) getDiskTotal() uint64 {
 	maxSpaceInByte := uint64(1024 * 1024 * 1024 * 1024)
 	if p.proContract != nil {

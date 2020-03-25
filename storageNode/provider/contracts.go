@@ -45,7 +45,7 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 	}
 
 	if capacity > p.proContract.Capacity {
-		utils.MLogger.Infof("your pledge capacity is %d, so change %d to it", capacity, p.proContract.Capacity)
+		utils.MLogger.Infof("your pledge capacity is %d, so change %d to it", p.proContract.Capacity, capacity)
 		capacity = p.proContract.Capacity
 	}
 

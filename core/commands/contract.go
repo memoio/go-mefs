@@ -8,12 +8,14 @@ package commands
 import (
 	"fmt"
 	"io"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	id "github.com/memoio/go-mefs/crypto/identity"
+	"github.com/memoio/go-mefs/utils"
 )
 
 const (
@@ -32,11 +34,13 @@ var ContractCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"deployResolver":           deployResolverCmd,          //deploy resolver contract
-		"deployKeeper":             deployKeeperCmd,            //deploy keeper contract
-		"setKeeper":                setKeeperCmd,               //将传入的账户设为keeper
-		"deployProvider":           deployProviderCmd,          //deploy keeper contract
-		"setProvider":              setProviderCmd,             //将传入的账户设为provider
+		"deployResolver":           deployResolverCmd, //deploy resolver contract
+		"deployKeeper":             deployKeeperCmd,   //deploy keeper contract
+		"setKeeper":                setKeeperCmd,      //将传入的账户设为keeper
+		"setKeeperPrice":           setKeeperPriceCmd,
+		"deployProvider":           deployProviderCmd, //deploy keeper contract
+		"setProvider":              setProviderCmd,    //将传入的账户设为provider
+		"setProviderPrice":         setProviderPriceCmd,
 		"deployKeeperProviderMap":  deployKeeperProviderMapCmd, //部署 KeeperProviderMap 合约
 		"addMasterKeeper":          addMasterKeeperCmd,
 		"addMyProvider":            addMyProviderCmd,
@@ -190,6 +194,51 @@ var setKeeperCmd = &cmds.Command{
 	},
 }
 
+var setKeeperPriceCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test setKeeper",
+		ShortDescription: "set the account'Role keeper",
+	},
+
+	Options: []cmds.Option{ //选项列表
+		cmds.Int64Option("price", "price", "price").WithDefault(utils.KeeperDeposit),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		hexPk := adminSk
+
+		price, ok := req.Options["price"].(int64)
+		if !ok || price <= 0 {
+			price = utils.KeeperDeposit
+		}
+		localAddr := common.HexToAddress(req.Arguments[0][2:])
+
+		err := contracts.SetKeeperPrice(localAddr, hexPk, big.NewInt(price))
+		if err != nil {
+			fmt.Println("setKeeper price err:", err)
+			return err
+		}
+		fmt.Println("setKeeper price success")
+
+		return nil
+	},
+}
+
 var deployProviderCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "test deployProvider",
@@ -274,6 +323,51 @@ var setProviderCmd = &cmds.Command{
 			return err
 		}
 		fmt.Println("setProvider success")
+
+		return nil
+	},
+}
+
+var setProviderPriceCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test setKeeper",
+		ShortDescription: "set the account'Role keeper",
+	},
+
+	Options: []cmds.Option{ //选项列表
+		cmds.Int64Option("price", "price", "price").WithDefault(utils.ProviderDeposit),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		hexPk := adminSk
+
+		price, ok := req.Options["price"].(int64)
+		if !ok || price <= 0 {
+			price = utils.ProviderDeposit
+		}
+		localAddr := common.HexToAddress(req.Arguments[0][2:])
+
+		err := contracts.SetProviderPrice(localAddr, hexPk, big.NewInt(price))
+		if err != nil {
+			fmt.Println("set Provider price err:", err)
+			return err
+		}
+		fmt.Println("set Provider price success")
 
 		return nil
 	},

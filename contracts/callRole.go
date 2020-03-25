@@ -97,6 +97,17 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 	return isKeeper, nil
 }
 
+func GetKeeperInfo(localAddress common.Address) (bool, bool, *big.Int, *big.Int, error) {
+	_, keeperContract, err := GetKeeperContractFromIndexer(localAddress)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return false, false, nil, nil, err
+	}
+	return keeperContract.Info(&bind.CallOpts{
+		From: localAddress,
+	}, localAddress)
+}
+
 func SetKeeperBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
 	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
@@ -268,6 +279,17 @@ func IsProvider(localaddress common.Address) (bool, error) {
 	return isProvider, nil
 }
 
+func GetProviderInfo(localaddress common.Address) (bool, bool, *big.Int, *big.Int, error) {
+	_, providerContract, err := GetProviderContractFromIndexer(localaddress)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return false, false, nil, nil, err
+	}
+	return providerContract.Info(&bind.CallOpts{
+		From: localaddress,
+	}, localaddress)
+}
+
 func SetProviderBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
 	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
 	if err != nil {
@@ -343,7 +365,7 @@ func PledgeProvider(localAddress common.Address, hexKey string, size *big.Int) (
 
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.Value = size.Mul(size, price)
+		auth.Value = price.Mul(price, size)
 		tx, err := providerInstance.Pledge(auth, size)
 		if err != nil {
 			return err
