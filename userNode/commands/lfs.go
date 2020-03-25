@@ -239,6 +239,10 @@ var lfsKillUserCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
 		var uid string
 		if len(req.Arguments) > 0 {
 			addr := req.Arguments[0]
@@ -256,7 +260,7 @@ var lfsKillUserCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		err = node.Inst.(*user.Info).KillUser(uid)
+		err = userIns.KillUser(uid)
 		if err != nil {
 			return err
 		}
@@ -309,7 +313,10 @@ var lfsStartUserCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
-
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
 		var addr = ""
 		var uid = ""
 		sk := req.Options[SecreteKey].(string)
@@ -416,15 +423,15 @@ var lfsStartUserCmd = &cmds.Command{
 			}
 		}
 
-		lfs, err := node.Inst.(*user.Info).NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo, force)
+		lfs, err := userIns.NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo, force)
 		if err != nil {
-			node.Inst.(*user.Info).KillUser(uid)
+			userIns.KillUser(uid)
 			return err
 		}
 
 		err = lfs.Start(req.Context)
 		if err != nil {
-			node.Inst.(*user.Info).KillUser(uid)
+			userIns.KillUser(uid)
 			return err
 		}
 
@@ -440,7 +447,7 @@ var lfsStartUserCmd = &cmds.Command{
 			case <-tick:
 				waitCount++
 				if waitCount >= waitLimited {
-					node.Inst.(*user.Info).KillUser(uid)
+					userIns.KillUser(uid)
 					return errTimeOut
 				}
 			}
@@ -492,7 +499,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 
 		var userid string
@@ -586,7 +593,7 @@ var lfsPutObjectCmd = &cmds.Command{
 
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 
 		var userid string
@@ -689,7 +696,7 @@ var lfsGetObjectCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -814,7 +821,7 @@ var lfsListObjectsCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -917,7 +924,7 @@ var lfsDeleteObjectCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -994,7 +1001,7 @@ var lfsHeadBucketCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1078,7 +1085,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1182,7 +1189,7 @@ It outputs the following to stdout:
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1266,7 +1273,7 @@ It outputs the following to stdout:
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1335,7 +1342,7 @@ var lfsListKeepersCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1399,7 +1406,7 @@ var lfsListProviderrsCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1464,7 +1471,7 @@ var lfsListUsersCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		users := userIns.GetAllUser()
 		userAddrs := make([]string, len(users))
@@ -1519,7 +1526,7 @@ var lfsFsyncCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1582,7 +1589,7 @@ mefs lfs show_storage show the storage space used(kb)
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1671,7 +1678,7 @@ var lfsGetShareCmd = &cmds.Command{
 
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)
@@ -1786,7 +1793,7 @@ var lfsGenShareCmd = &cmds.Command{
 		}
 		userIns, ok := node.Inst.(*user.Info)
 		if !ok {
-			return errLfsServiceNotReady
+			return ErrNotReady
 		}
 		var userid string
 		addressid, found := req.Options[AddressID].(string)

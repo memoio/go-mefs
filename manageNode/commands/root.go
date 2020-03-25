@@ -12,6 +12,7 @@ var log = logging.Logger("keeper/commands")
 
 var errWrongInput = errors.New("The input option is wrong")
 var ErrNotOnline = errors.New("this command must be run in online mode. Try running 'mefs-keeper daemon' first")
+var ErrNotReady = errors.New("this instance is not ready, please check")
 
 const (
 	ConfigOption = "config"
