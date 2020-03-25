@@ -8,6 +8,7 @@ import (
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/userNode/miniogw"
+	"github.com/memoio/go-mefs/userNode/user"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -46,6 +47,10 @@ var gwStartCmd = &cmds.Command{
 		if !node.OnlineMode() {
 			return ErrNotOnline
 		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
 		var uid string
 		if len(req.Arguments) > 0 {
 			addr := req.Arguments[0]
@@ -55,6 +60,11 @@ var gwStartCmd = &cmds.Command{
 			}
 		} else {
 			uid = node.Identity.Pretty()
+		}
+
+		lfs := userIns.GetUser(uid)
+		if lfs == nil || !lfs.Online() {
+			return errLfsServiceNotReady
 		}
 
 		// 查看pwd是否能获取sk，确定是user发起的kill命令

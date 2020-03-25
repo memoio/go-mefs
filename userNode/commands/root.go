@@ -11,6 +11,7 @@ import (
 var log = logging.Logger("core/commands")
 
 var ErrNotOnline = errors.New("this command must be run in online mode. Try running 'mefs-user daemon' first")
+var ErrNotReady = errors.New("this instance is not ready, please check")
 
 const (
 	ConfigOption = "config"
