@@ -110,20 +110,11 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}
 	m.userConfigs = ucache
 
-	go func() {
-		for {
-			err := m.loadContracts(capacity, duration, price, depositSize, reDeployOffer)
-			if err != nil || reDeployOffer {
-				_, err := role.DeployOffer(id, sk, capacity, duration, price, reDeployOffer)
-				if err != nil {
-					utils.MLogger.Error("provider deploying resolver and offer failed: ", err)
-					time.Sleep(2 * time.Minute)
-				} else {
-					break
-				}
-			}
-		}
-	}()
+	err = m.loadContracts(capacity, duration, price, depositSize, reDeployOffer)
+	if err != nil {
+		utils.MLogger.Error("provider load contarct failed: ", err)
+		return nil, err
+	}
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
 

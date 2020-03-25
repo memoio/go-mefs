@@ -51,7 +51,7 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 
 	_, err = role.DeployOffer(p.localID, p.sk, capacity, duration, price, reDeployOffer)
 	if err != nil {
-		utils.MLogger.Error("provider deploying resolver and offer failed: ", err)
+		return err
 	}
 
 	offers, err := contracts.GetOfferAddrs(proAddr, proAddr)
