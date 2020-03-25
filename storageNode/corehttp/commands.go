@@ -16,7 +16,7 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	config "github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/core"
-	newcmd "github.com/memoio/go-mefs/userNode/commands"
+	newcmd "github.com/memoio/go-mefs/storageNode/commands"
 )
 
 var (

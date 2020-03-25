@@ -59,6 +59,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 }
 
 func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID string, ds data.Service) error {
+	utils.MLogger.Infof("spaceTimePay start for %s", proID)
 	// only master triggers,
 	// todo round-robin
 	if !g.isMaster(proID) {
