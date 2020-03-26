@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"math/big"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -702,9 +703,14 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 			wg.Add(1)
 			go func(proID string) {
 				defer wg.Done()
-				_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
-				if err != nil {
-					return
+				for i := 0; i < 5; i++ {
+					tdelay := rand.Int63n(int64(i+1) * 60000000000)
+					time.Sleep(time.Duration(tdelay))
+					_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+					if err != nil {
+						continue
+					}
+					utils.MLogger.Infof("deploy channel contract for %s success", proID)
 				}
 				// need persist
 			}(proID)
