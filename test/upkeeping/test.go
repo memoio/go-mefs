@@ -162,7 +162,6 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	log.Println("spacetime pay trigger", "nowTime:", time.Now().Unix(), "createDate+3*cycle:", createDate.Int64()+3*cycle.Int64())
 
 	log.Println("6.begin to query results of first stPay")
-	//timeNow := time.Now().Unix()
 	retryCount = 0
 	for {
 		if retryCount > 20 {
@@ -327,13 +326,13 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		return err
 	}
 
-	//等待now > endDate,触发第三次时空支付
+	//等待now > endDate + 60,触发第三次时空支付
 	for {
 		nowTime := time.Now().Unix()
-		if nowTime >= endDate.Int64() {
+		if nowTime >= endDate.Int64()+60 {
 			break
 		}
-		time.Sleep(time.Duration(endDate.Int64()-nowTime) * time.Second)
+		time.Sleep(time.Duration(endDate.Int64()+60-nowTime) * time.Second)
 	}
 	fmt.Println("nowTime:", time.Now().Unix(), "endDate:", endDate.Int64())
 
