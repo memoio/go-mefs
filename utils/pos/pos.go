@@ -9,10 +9,7 @@ import (
 )
 
 func GetPosAddr() string {
-	// sk:7a81e548e9f62f01e7eadb5af37d3ea15689602b470be9812752177464661c5c
-	// groupID: 8MKM7it7TwjdMN8S8tfEbFMvjqoYBL
-	// upKeeping: 8MH8MpDqsHGST7CJ8EDA3JbmW2AD4p
-	return "0x6C93F7D1437CF44048849657853f10F9802f3364"
+	return "0x46EF41A6c60912173b50dAD714Ca2a6f82c32aE8"
 }
 
 func GetPosId() string {
@@ -25,7 +22,7 @@ func GetPosPrice() int64 {
 }
 
 func GetPosSeed() []byte {
-	seed, err := hex.DecodeString("8bee9763fcf2740b0cb6ad3351addfb9f8ee48efc1b7b4204fa6fd06b25cde89")
+	seed, err := hex.DecodeString("c7463268d6b2ad969b3457d9e89c5f34e9debe445417fbf50299fe471a28f2c7")
 	if err != nil {
 		return nil
 	}

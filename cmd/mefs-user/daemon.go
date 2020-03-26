@@ -360,7 +360,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		node.Inst = ins
 
-		fmt.Println("User service is ready; run `mefs lfs start` to start lfs service")
+		fmt.Println("User service is ready; run `mefs-user lfs start` to start lfs service")
 
 		defer func() {
 			err = node.Inst.Stop()

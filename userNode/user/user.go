@@ -81,34 +81,27 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 
 	// queryID == userID indicats this is a testuser
 	if queryID != userID {
-		qItem, err := role.GetQueryInfo(userID, queryID)
-		if err == nil {
-			ginfo.queryItem = &qItem
-			ginfo.keeperSLA = int(qItem.KeeperNums)
-			ginfo.providerSLA = int(qItem.ProviderNums)
-		} else {
-			if sk == "" {
-				return nil, role.ErrEmptyPrivateKey
-			}
-			qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
-			if err != nil {
-				return nil, err
-			}
-			qItem, err := role.GetLatestQuery(userID)
-			if err != nil {
-				utils.MLogger.Infof("get query %s for user %s from chain failed: %s, please restart", qid, userID, err)
-				return nil, err
-			}
-
-			if qItem.QueryID != qid {
-				utils.MLogger.Infof("get latest query %s for user %s from chain failed", qItem.QueryID, userID)
-			}
-
-			queryID = qid
-			ginfo.queryItem = &qItem
+		if sk == "" {
+			return nil, role.ErrEmptyPrivateKey
 		}
+		qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
+		if err != nil {
+			return nil, err
+		}
+
+		queryID = qid
+
+		qItem, err := role.GetQueryInfo(userID, queryID)
+		if err != nil {
+			utils.MLogger.Infof("get query %s for user %s from chain failed: %s, please restart", queryID, userID, err)
+			return nil, err
+		}
+
+		ginfo.queryItem = &qItem
+		ginfo.keeperSLA = int(qItem.KeeperNums)
+		ginfo.providerSLA = int(qItem.ProviderNums)
 		ginfo.groupID = queryID
-		uItem, err := role.GetUpKeeping(ginfo.userID, ginfo.groupID)
+		uItem, err := role.GetUpKeeping(userID, queryID)
 		if err == nil {
 			ginfo.upKeepingItem = &uItem
 		}

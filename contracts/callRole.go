@@ -72,6 +72,7 @@ func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err e
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	auth.GasLimit = defaultGasLimit
 
 	_, err = keeperInstance.Set(auth, localAddress, isKeeper)
 	if err != nil {
@@ -118,6 +119,7 @@ func SetKeeperBanned(localAddress common.Address, hexKey string, isBanned bool) 
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	auth.GasLimit = defaultGasLimit
 
 	_, err = keeperInstance.SetBanned(auth, localAddress, isBanned)
 	if err != nil {
@@ -136,6 +138,7 @@ func SetKeeperPrice(localAddress common.Address, hexKey string, price *big.Int) 
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	auth.GasLimit = defaultGasLimit
 
 	_, err = keeperInstance.SetPrice(auth, price)
 	if err != nil {
@@ -174,6 +177,7 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.GasLimit = defaultGasLimit
 		auth.Value = amount
 		tx, err := kInstance.Pledge(auth)
 		if err != nil {
@@ -255,6 +259,7 @@ func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (e
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	auth.GasLimit = defaultGasLimit
 	_, err = provider.Set(auth, localAddress, isProvider)
 	if err != nil {
 		return err
@@ -300,6 +305,7 @@ func SetProviderBanned(localAddress common.Address, hexKey string, isBanned bool
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	auth.GasLimit = defaultGasLimit
 
 	_, err = providerInstance.SetBanned(auth, localAddress, isBanned)
 	if err != nil {
@@ -334,6 +340,7 @@ func SetProviderPrice(localAddress common.Address, hexKey string, price *big.Int
 	key, _ := crypto.HexToECDSA(hexKey)
 	auth := bind.NewKeyedTransactor(key)
 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	auth.GasLimit = defaultGasLimit
 
 	_, err = providerInstance.SetPrice(auth, price)
 	if err != nil {
@@ -366,6 +373,7 @@ func PledgeProvider(localAddress common.Address, hexKey string, size *big.Int) (
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = price.Mul(price, size)
+		auth.GasLimit = defaultGasLimit
 		tx, err := providerInstance.Pledge(auth, size)
 		if err != nil {
 			return err
