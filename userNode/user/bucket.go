@@ -49,6 +49,11 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		return nil, ErrPolicy
 	}
 
+	// datacount + parityCount should <= providerSLA
+	if options.DataCount+options.ParityCount > int32(l.gInfo.providerSLA) {
+		return nil, ErrPolicy
+	}
+
 	// tagCount决定了最大的segmentSize
 	if int(options.GetSegmentSize()) > 32*l.keySet.Pk.TagCount {
 		return nil, ErrPolicy
