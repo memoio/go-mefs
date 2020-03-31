@@ -12,7 +12,7 @@ import (
 )
 
 //Init init config
-func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error) {
+func Init(out io.Writer, sk string) (*Config, string, error) {
 	var identity Identity
 
 	identity, err := CreateIdentity(out, sk)
@@ -80,7 +80,7 @@ func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error
 }
 
 //InitTestnet init config
-func InitTestnet(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error) {
+func InitTestnet(out io.Writer, sk string) (*Config, string, error) {
 	identity, err := CreateIdentity(out, sk)
 	if err != nil {
 		return nil, "", err

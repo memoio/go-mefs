@@ -397,6 +397,9 @@ var lfsStartUserCmd = &cmds.Command{
 
 		// 读keystore下uid文件
 		hexSk, err := fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
+		if err != nil {
+			return err
+		}
 
 		cfg, err := node.Repo.Config()
 		if err != nil {

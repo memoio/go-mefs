@@ -3,11 +3,10 @@ package main
 import (
 	"fmt"
 
-	"github.com/memoio/go-mefs/core/commands"
-
-	newcmd "github.com/memoio/go-mefs/manageNode/commands"
-
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	minit "github.com/memoio/go-mefs/cmd/mefs"
+	"github.com/memoio/go-mefs/core/commands"
+	newcmd "github.com/memoio/go-mefs/manageNode/commands"
 )
 
 // Root is the CLI root, used for executing commands accessible to CLI clients.
@@ -25,7 +24,7 @@ var commandsClientCmd = commands.CommandsCmd(Root)
 // They can override subcommands in commands.Root by defining a subcommand with the same name.
 var localCommands = map[string]*cmds.Command{
 	"daemon":   daemonCmd,
-	"init":     initCmd,
+	"init":     minit.InitCmd,
 	"commands": commandsClientCmd,
 }
 

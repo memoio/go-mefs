@@ -6,7 +6,6 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/userNode/miniogw"
 	"github.com/memoio/go-mefs/userNode/user"
 	"github.com/memoio/go-mefs/utils"
@@ -67,7 +66,6 @@ var gwStartCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		// 查看pwd是否能获取sk，确定是user发起的kill命令
 		pwd, ok := req.Options[PassWord].(string)
 		if !ok || len(pwd) < 8 {
 			return errWrongInput
@@ -76,11 +74,6 @@ var gwStartCmd = &cmds.Command{
 		ep, ok := req.Options["EndPoint"].(string)
 		if !ok {
 			return errWrongInput
-		}
-
-		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
-		if err != nil {
-			return err
 		}
 
 		addr, err := address.GetAddressFromID(uid)

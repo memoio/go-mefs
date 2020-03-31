@@ -16,6 +16,7 @@ import (
 	mprome "github.com/ipfs/go-metrics-prometheus"
 	version "github.com/memoio/go-mefs"
 	mcl "github.com/memoio/go-mefs/bls12"
+	minit "github.com/memoio/go-mefs/cmd/mefs"
 	utilmain "github.com/memoio/go-mefs/cmd/util"
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
@@ -204,7 +205,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		// cfg 为配置根路径
 		cfg := cctx.ConfigRoot
 		if !fsrepo.IsInitialized(cfg) {
-			err := doInit(os.Stdout, cfg, nBitsForKeypairDefault, password, nil, hexsk, nKey)
+			err := minit.DoInit(os.Stdout, cfg, password, nil, hexsk, nKey)
 			if err != nil {
 				return err
 			}

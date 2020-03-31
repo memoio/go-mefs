@@ -236,6 +236,11 @@ func decryptKey(keyjson []byte, password string) (*Key, error) {
 		return nil, err
 	}
 	key := crypto.ToECDSAUnsafe(keyBytes)
+
+	if key == nil {
+		return nil, ErrDecrypt
+	}
+
 	secpkey := (*ci.Secp256k1PrivateKey)((*btcec.PrivateKey)(key))
 	pubkey := secpkey.GetPublic()
 	id, err := peer.IDFromPublicKey(pubkey)

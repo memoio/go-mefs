@@ -1,9 +1,11 @@
-package main
+package mefs
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 
@@ -16,10 +18,18 @@ import (
 )
 
 const (
-	nBitsForKeypairDefault = 2048
+	passwordKwd  = "password"
+	secretKeyKwd = "secretKey"
+	netKeyKwd    = "netKey"
 )
 
-var initCmd = &cmds.Command{
+var (
+	errRepoExists    = errors.New("mefs configuration file already exists, reinitializing would overwrite your keys")
+	errShortPassword = errors.New("password is too short; length should be at least 8")
+)
+
+// InitCmd inits
+var InitCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Initializes mefs config file.",
 		ShortDescription: `
@@ -47,9 +57,9 @@ environment variable:
 			return err
 		}
 
-		log.Info("checking if daemon is running...")
+		log.Println("checking if daemon is running...")
 		if daemonLocked {
-			log.Debug("mefs-user daemon is running")
+			log.Println("mefs-user daemon is running")
 			e := "mefs-user daemon is running. please stop it to run this command"
 			return cmds.ClientError(e)
 		}
@@ -63,7 +73,10 @@ environment variable:
 		}
 
 		hexsk, _ := req.Options[secretKeyKwd].(string)
-		password, _ := req.Options[passwordKwd].(string)
+		password, ok := req.Options[passwordKwd].(string)
+		if !ok || (hexsk == "" && len(password) <= 8) {
+			return errShortPassword
+		}
 		netKey, _ := req.Options[netKeyKwd].(string)
 
 		var conf *config.Config
@@ -81,11 +94,11 @@ environment variable:
 			}
 		}
 
-		return doInit(os.Stdout, cctx.ConfigRoot, nBitsForKeypairDefault, password, conf, hexsk, netKey)
+		return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
 	},
 }
 
-func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string, conf *config.Config, prikey, netKey string) error {
+func DoInit(out io.Writer, repoRoot string, password string, conf *config.Config, prikey, netKey string) error {
 	if _, err := fmt.Fprintf(out, "initializing MEFS node at %s\n", repoRoot); err != nil {
 		return err
 	}
@@ -102,12 +115,12 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string
 		var err error
 		switch netKey {
 		case "testnet":
-			conf, prikey, err = config.InitTestnet(out, nBitsForKeypair, prikey)
+			conf, prikey, err = config.InitTestnet(out, prikey)
 			if err != nil {
 				return err
 			}
 		default:
-			conf, prikey, err = config.Init(out, nBitsForKeypair, prikey)
+			conf, prikey, err = config.Init(out, prikey)
 			if err != nil {
 				return err
 			}
