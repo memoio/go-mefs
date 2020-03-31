@@ -144,7 +144,7 @@ func (p *Info) GetRole() string {
 	return metainfo.RoleProvider
 }
 
-func (p *Info) Stop() error {
+func (p *Info) Close() error {
 	return p.save(p.context)
 }
 

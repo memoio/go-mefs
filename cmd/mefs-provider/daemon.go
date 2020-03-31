@@ -402,13 +402,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		fmt.Println("Provider service is ready")
 
-		defer func() {
-			err = node.Inst.Stop()
-			if err != nil {
-				utils.MLogger.Error("Persist before exist falied: ", err)
-			}
-		}()
-
 	default:
 	}
 

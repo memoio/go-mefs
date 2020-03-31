@@ -60,7 +60,7 @@ var KeeperListUsersCmd = &cmds.Command{
 
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return ErrNotOnline
+			return ErrNotReady
 		}
 
 		users, err := keeperIns.GetUsers()
@@ -100,7 +100,7 @@ var KeeperListProvidersCmd = &cmds.Command{
 		}
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return ErrNotOnline
+			return ErrNotReady
 		}
 		providers, err := keeperIns.GetProviders()
 
@@ -141,7 +141,7 @@ var KeeperListKeepersCmd = &cmds.Command{
 
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return ErrNotOnline
+			return ErrNotReady
 		}
 
 		keepers, err := keeperIns.GetKeepers()
@@ -181,7 +181,7 @@ var KeeperFlushCmd = &cmds.Command{
 		}
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
-			return errWrongInput
+			return ErrNotReady
 		}
 		return keeperIns.FlushPeers(context.Background())
 	},

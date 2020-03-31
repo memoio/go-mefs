@@ -23,5 +23,5 @@ type Service interface {
 	// type, key, value, from
 	HandleMetaMessage(mpb.OpType, string, []byte, []byte, string) ([]byte, error)
 	GetRole() string
-	Stop() error
+	Close() error
 }

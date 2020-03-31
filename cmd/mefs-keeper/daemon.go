@@ -361,12 +361,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		node.Inst = ins
 
 		fmt.Println("Keeper service is ready")
-		defer func() {
-			err = node.Inst.Stop()
-			if err != nil {
-				utils.MLogger.Error("Persist before exist falied: ", err)
-			}
-		}()
 	default:
 	}
 
