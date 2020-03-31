@@ -15,6 +15,10 @@ import (
 
 // HandleMetaMessage callback
 func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, sig []byte, from string) ([]byte, error) {
+	if !k.Online() {
+		return nil, role.ErrServiceNotReady
+	}
+
 	km, err := metainfo.NewKeyFromString(metaKey)
 	if err != nil {
 		return nil, err

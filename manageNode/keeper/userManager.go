@@ -122,7 +122,10 @@ func (g *groupInfo) getLInfo(proID string, mode bool) *lInfo {
 	thisIl, ok := g.ledgerMap.Load(proID)
 	if !ok {
 		if mode {
-			templInfo := &lInfo{}
+			templInfo := &lInfo{
+				inChallenge:  false,
+				lastChalTime: time.Now().Unix(),
+			}
 			g.ledgerMap.Store(proID, templInfo)
 			return templInfo
 		}

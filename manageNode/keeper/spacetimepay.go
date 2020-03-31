@@ -7,8 +7,6 @@ import (
 	"encoding/gob"
 	"math/big"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -50,7 +48,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 						continue
 					}
 
-					k.savePay(qid, proID)
+					k.savePay(uq.uid, qid, proID)
 				}
 
 			}
@@ -97,12 +95,14 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		return nil
 	}
 
-	thisIlinfo, ok := g.ledgerMap.Load(proID)
-	if !ok {
+	thisLinfo := g.getLInfo(proID, false)
+	if thisLinfo == nil {
 		return role.ErrNotMyProvider
 	}
 
-	thisLinfo := thisIlinfo.(*lInfo)
+	if thisLinfo.lastPay != nil {
+		startTime = thisLinfo.lastPay.GetStart() + thisLinfo.lastPay.GetLength()
+	}
 
 	if thisLinfo.currentPay == nil {
 		amount, lastTime, mroot := thisLinfo.resultSummary(price, startTime, time.Now().Unix())
@@ -139,22 +139,9 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 				return err
 			}
 
-			var mkey strings.Builder
-			mkey.WriteString(g.groupID)
-			mkey.WriteString(metainfo.DELIMITER)
-			mkey.WriteString(strconv.Itoa(int(mpb.KeyType_Sign)))
-			mkey.WriteString(metainfo.DELIMITER)
-			mkey.WriteString(g.userID)
-			mkey.WriteString(metainfo.DELIMITER)
-			mkey.WriteString(proID)
-			mkey.WriteString(metainfo.DELIMITER)
-			mkey.WriteString(localID)
-			mkey.WriteString(metainfo.DELIMITER)
-			mkey.WriteString(st.String())
-			mkey.WriteString(metainfo.DELIMITER)
-			mkey.WriteString(sl.String())
+			mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_Sign, g.userID, proID, localID, st.String(), sl.String())
 
-			key := mkey.String()
+			key := mkey.ToString()
 			for i, kid := range g.keepers {
 				if kid == localID {
 					cpay.Sign[i] = sign
@@ -174,7 +161,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 
 			utils.MLogger.Infof("SpaceTimePay start for %s at %d ", proID, thisLinfo.currentPay.Start)
 		}
-		return nil
+		return role.ErrEmptyData
 	}
 
 	if thisLinfo.currentPay != nil && thisLinfo.currentPay.Status <= 0 {
@@ -198,9 +185,10 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		thisLinfo.lastPay = thisLinfo.currentPay
 		thisLinfo.currentPay = nil
 		g.loadContracts(true)
+		return nil
 	}
 
-	return nil
+	return role.ErrEmptyData
 }
 
 type timeValue struct {

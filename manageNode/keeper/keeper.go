@@ -236,17 +236,17 @@ func (k *Info) save(ctx context.Context) error {
 		}
 
 		for _, proID := range gp.providers {
-			k.savePay(qu.qid, proID)
+			k.savePay(qu.uid, qu.qid, proID)
 		}
 	}
 
 	return nil
 }
 
-func (k *Info) savePay(qid, pid string) error {
+func (k *Info) savePay(userID, qid, pid string) error {
 	thisLinfo := k.getLInfo(qid, qid, pid, false)
 
-	if thisLinfo != nil && thisLinfo.lastPay != nil && thisLinfo.lastPay.Status == 0 {
+	if thisLinfo != nil && thisLinfo.lastPay != nil && thisLinfo.lastPay.Status <= 0 {
 		ctx := k.context
 
 		//key: qid/`lastpay"/pid`
@@ -267,8 +267,8 @@ func (k *Info) savePay(qid, pid string) error {
 
 		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID, true)
 
-		//key: `qid/"chalpay"/pid/beginTime/length`
-		km, err := metainfo.NewKey(qid, mpb.KeyType_ChalPay, pid, utils.UnixToString(thisLinfo.lastPay.GetStart()), utils.UnixToString(thisLinfo.lastPay.GetLength()))
+		//key: `qid/"chalpay"/userID/pid/kid/beginTime/length`
+		km, err := metainfo.NewKey(qid, mpb.KeyType_ChalPay, userID, pid, k.localID, utils.UnixToString(thisLinfo.lastPay.GetStart()), utils.UnixToString(thisLinfo.lastPay.GetLength()))
 		if err != nil {
 			return err
 		}
@@ -338,7 +338,9 @@ func (k *Info) loadUser(ctx context.Context) error {
 						continue
 					}
 
+					k.loadUserBucket(qid)
 					k.loadUserBlock(qid)
+					k.loadUserPay(userID, qid)
 				}
 			}(userID)
 		}
@@ -349,7 +351,8 @@ func (k *Info) loadUser(ctx context.Context) error {
 	return nil
 }
 
-func (k *Info) loadUserBlock(qid string) error {
+func (k *Info) loadUserBucket(qid string) error {
+	// load bucketinfo
 	prefix := qid + metainfo.DELIMITER + strconv.Itoa(int(mpb.KeyType_Bucket))
 
 	es, _ := k.ds.Itererate(prefix)
@@ -378,9 +381,13 @@ func (k *Info) loadUserBlock(qid string) error {
 		}
 		k.addBucket(km.GetMid(), ops[1], binfo)
 	}
+	return nil
+}
 
-	prefix = qid + metainfo.BlockDelimiter
-	es, _ = k.ds.Itererate(prefix)
+func (k *Info) loadUserBlock(qid string) error {
+	// load blockinfo
+	prefix := qid + metainfo.BlockDelimiter
+	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
 		rec := new(recpb.Record)
 		err := proto.Unmarshal(e.Value, rec)
@@ -416,6 +423,92 @@ func (k *Info) loadUserBlock(qid string) error {
 		}
 
 		k.addBlockMeta(qid, getID[1], pids[0], off, false)
+	}
+	return nil
+}
+
+func (k *Info) loadUserPay(userID, qid string) error {
+	ctx := k.context
+	gInfo := k.getGroupInfo(userID, qid, true)
+	if gInfo == nil {
+		return role.ErrNotMyUser
+	}
+
+	if gInfo.userID == gInfo.groupID {
+		return nil
+	}
+
+	for _, proID := range gInfo.providers {
+		lin := gInfo.getLInfo(proID, true)
+		if lin == nil {
+			continue
+		}
+		kmLast, err := metainfo.NewKey(qid, mpb.KeyType_LastPay, proID)
+		if err != nil {
+			return err
+		}
+		res, err := k.ds.GetKey(ctx, kmLast.ToString(), "local")
+		if err == nil && len(res) > 0 {
+			val := mpb.STValue{}
+			err := proto.Unmarshal(res, &val)
+			if err != nil {
+				return err
+			}
+			lin.lastPay = &chalpay{
+				STValue: val,
+			}
+		}
+	}
+	return nil
+}
+
+func (k *Info) loadUserChallenge(userID, qid string, payTime int64) error {
+	gInfo := k.getGroupInfo(userID, qid, true)
+	if gInfo == nil {
+		return role.ErrNotMyUser
+	}
+
+	if gInfo.userID == gInfo.groupID {
+		return nil
+	}
+
+	for _, proID := range gInfo.providers {
+		lin := gInfo.getLInfo(proID, true)
+		if lin == nil {
+			continue
+		}
+		km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, k.localID)
+		if err != nil {
+			return err
+		}
+		prefix := km.ToString()
+		es, _ := k.ds.Itererate(prefix)
+		for _, e := range es {
+			rec := new(recpb.Record)
+			err := proto.Unmarshal(e.Value, rec)
+			if err != nil {
+				continue
+			}
+			keys := strings.Split(string(rec.GetKey()), metainfo.DELIMITER)
+			if len(keys) != 6 {
+				continue
+			}
+			chalTime, err := strconv.ParseInt(keys[5], 10, 0)
+			if err != nil {
+				continue
+			}
+
+			if chalTime < payTime {
+				continue
+			}
+
+			chalRes := new(mpb.ChalInfo)
+			err = proto.Unmarshal(rec.GetValue(), chalRes)
+			if err != nil {
+				continue
+			}
+			lin.chalMap.Store(chalTime, chalRes)
+		}
 	}
 	return nil
 }
