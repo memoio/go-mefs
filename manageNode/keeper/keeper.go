@@ -337,10 +337,6 @@ func (k *Info) loadUser(ctx context.Context) error {
 						utils.MLogger.Error("Load user: ", userID, " 's query: ", qid, " fail: ", err)
 						continue
 					}
-
-					k.loadUserBucket(qid)
-					k.loadUserBlock(qid)
-					k.loadUserPay(userID, qid)
 				}
 			}(userID)
 		}
@@ -438,6 +434,7 @@ func (k *Info) loadUserPay(userID, qid string) error {
 		return nil
 	}
 
+	payTime := gInfo.upkeeping.StartTime
 	for _, proID := range gInfo.providers {
 		lin := gInfo.getLInfo(proID, true)
 		if lin == nil {
@@ -458,11 +455,38 @@ func (k *Info) loadUserPay(userID, qid string) error {
 				STValue: val,
 			}
 		}
+
+		if lin.lastPay == nil {
+
+			found := false
+			for _, pInfo := range gInfo.upkeeping.Providers {
+				pid, err := address.GetIDFromAddress(pInfo.Addr.String())
+				if err != nil {
+					return err
+				}
+				if pid == proID {
+					found = true
+					payTime = pInfo.StEnd.Int64()
+					break
+				}
+			}
+
+			if !found {
+				continue
+			}
+
+			lin.lastPay = &chalpay{
+				STValue: mpb.STValue{
+					Start:  payTime,
+					Length: 0,
+				},
+			}
+		}
 	}
 	return nil
 }
 
-func (k *Info) loadUserChallenge(userID, qid string, payTime int64) error {
+func (k *Info) loadUserChallenge(userID, qid string) error {
 	gInfo := k.getGroupInfo(userID, qid, true)
 	if gInfo == nil {
 		return role.ErrNotMyUser
@@ -472,11 +496,19 @@ func (k *Info) loadUserChallenge(userID, qid string, payTime int64) error {
 		return nil
 	}
 
+	payTime := gInfo.upkeeping.StartTime
 	for _, proID := range gInfo.providers {
 		lin := gInfo.getLInfo(proID, true)
 		if lin == nil {
 			continue
 		}
+
+		if lin.lastPay == nil {
+			continue
+		}
+
+		payTime = lin.lastPay.GetStart() + lin.lastPay.GetLength()
+
 		km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, k.localID)
 		if err != nil {
 			return err
@@ -744,8 +776,23 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 				}
 			}
 		}
-		go gInfo.loadContracts(true)
-		go k.loadUserBlock(qid)
+
+		retry := 0
+		for retry > 10 {
+			err := gInfo.loadContracts(true)
+			if err != nil {
+				utils.MLogger.Errorf("load contarcts for user %s failed %s", gInfo.userID, err)
+				retry++
+				time.Sleep(time.Minute)
+				continue
+			}
+			break
+		}
+
+		k.loadUserBucket(qid)
+		k.loadUserBlock(qid)
+		k.loadUserPay(uid, qid)
+		k.loadUserChallenge(uid, qid)
 		return gInfo, nil
 	}
 	// init userConfig
