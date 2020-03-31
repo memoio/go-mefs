@@ -73,6 +73,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 
 	price := g.upkeeping.Price
 	if g.userID == pos.GetPosId() {
+		// todo, price depends on total pledge data
 		price = pos.GetPosPrice()
 	}
 
@@ -170,6 +171,8 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 				}
 				go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, hash, sign, kid)
 			}
+
+			utils.MLogger.Infof("SpaceTimePay start for %s at %d ", proID, thisLinfo.currentPay.Start)
 		}
 		return nil
 	}

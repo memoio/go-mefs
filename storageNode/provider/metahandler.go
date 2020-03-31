@@ -37,7 +37,7 @@ func (p *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		case mpb.OpType_Put:
 			err := p.handlePutBlock(km, metaValue, from)
 			if err != nil {
-				utils.MLogger.Error("put blcok error: ", err)
+				utils.MLogger.Error("put block error: ", err)
 				return nil, err
 			}
 		case mpb.OpType_Get:
@@ -45,7 +45,7 @@ func (p *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		case mpb.OpType_Append:
 			err := p.handleAppendBlock(km, metaValue, from)
 			if err != nil {
-				utils.MLogger.Info("append blcok error: ", err)
+				utils.MLogger.Info("append block error: ", err)
 				return nil, err
 			}
 		case mpb.OpType_Delete:

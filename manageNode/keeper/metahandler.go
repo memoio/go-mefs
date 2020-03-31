@@ -70,7 +70,7 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		case mpb.OpType_Put:
 			k.handlePutSign(km, metaValue, sig, from)
 		case mpb.OpType_Get:
-			k.handlePutSign(km, metaValue, sig, from)
+			k.handleGetSign(km, metaValue, sig, from)
 		}
 	default:
 		switch opType {
