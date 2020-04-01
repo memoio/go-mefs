@@ -43,6 +43,7 @@ var (
 	ErrObjectNameInvalid    = errors.New("object name is invalid")
 	ErrObjectOptionsInvalid = errors.New("object option is invalid")
 	ErrObjectIsDir          = errors.New("object is directory")
+	ErrNoEnoughBlockUpload  = errors.New("block uploaded is not enough")
 )
 
 //检查文件名合法性

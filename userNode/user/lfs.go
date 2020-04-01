@@ -37,10 +37,11 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return ErrLfsServiceNotReady
 	}
 	// 证明该user已经启动
-	if l.online || (l.gInfo.state == groupStarted) {
+	if l.online || (l.gInfo.state >= groupStarted) {
 		return nil
 	}
-	if l.gInfo.state >= starting && l.gInfo.state < groupStarted {
+	//有一个启动任务正在进行
+	if l.gInfo.state >= starting {
 		return ErrLfsStarting
 	}
 	l.gInfo.state = starting

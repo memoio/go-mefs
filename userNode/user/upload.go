@@ -13,7 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/semaphore"
+
 	"github.com/gogo/protobuf/proto"
+	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -21,6 +24,8 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
+
+var defaultTaskWorkerCount int64 = 8
 
 //UploadOptions 下载时的一些参数
 type UploadOptions struct {
@@ -30,18 +35,19 @@ type UploadOptions struct {
 
 // uploadTask has info for upload
 type uploadTask struct { //一个上传任务实例
-	encrypt   int32
-	sKey      [32]byte
-	bucketID  int64
-	begin     int64
-	length    int64
-	rawLen    int64
-	sucLen    int64
-	etag      string
-	gInfo     *groupInfo
-	reader    io.Reader
-	startTime time.Time
-	encoder   *dataformat.DataCoder
+	encrypt         int32
+	sKey            [32]byte
+	bucketID        int64
+	begin           int64
+	length          int64
+	rawLen          int64
+	sucLen          int64
+	etag            string
+	taskWorkerCount int64
+	gInfo           *groupInfo
+	reader          io.Reader
+	startTime       time.Time
+	encoder         *dataformat.DataCoder
 }
 
 // PutObject constructs upload process
@@ -177,13 +183,14 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	}
 
 	ul := &uploadTask{
-		startTime: time.Now(), // for queue?
-		reader:    reader,
-		gInfo:     l.gInfo,
-		bucketID:  bucket.BucketID,
-		begin:     bucket.GetLength(),
-		encoder:   encoder,
-		encrypt:   bucket.BOpts.Encryption,
+		startTime:       time.Now(), // for queue?
+		reader:          reader,
+		gInfo:           l.gInfo,
+		bucketID:        bucket.BucketID,
+		begin:           bucket.GetLength(),
+		encoder:         encoder,
+		encrypt:         bucket.BOpts.Encryption,
+		taskWorkerCount: defaultTaskWorkerCount,
 	}
 
 	if bucket.BOpts.Encryption == 1 {
@@ -281,6 +288,7 @@ type blockMeta struct {
 
 //Start 上传文件
 func (u *uploadTask) Start(ctx context.Context) error {
+	//计算一些参数
 	enc := u.encoder
 	dc := enc.Prefix.Bopts.DataCount
 	pc := enc.Prefix.Bopts.ParityCount
@@ -294,6 +302,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	curStripe := int(u.begin) / stripeSize
 	curOffset := (int(u.begin) % stripeSize) / segStripeSize
 
+	//获取存储矿工
 	var pros []string
 	breakFlag := false
 	for !breakFlag {
@@ -312,6 +321,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		}
 	}
 
+	//加密设置
 	var bEnc cipher.BlockMode
 	if u.encrypt == 1 {
 		tmpEnc, err := aes.ContructAesEnc(u.sKey[:])
@@ -321,6 +331,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		bEnc = tmpEnc
 	}
 
+	//分片传输设置
 	tn := os.Getenv("MEFS_TRANS")
 	utils.MLogger.Infof("MEFS_TRANS in upload is set to %s", tn)
 	if tn != "" {
@@ -335,25 +346,47 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	}
 
 	h := md5.New()
-	parllel := int32(0)
 	var wg sync.WaitGroup
 	rdata := make([]byte, stripeSize)
-	extra := make([]byte, 0, stripeSize)
-
+	var extra []byte
+	errc := make(chan error)
+	var errrt error
 	breakFlag = false
+	//减少内存分配
+	poolbuf := new(pool.BufferPool)
+	//任务分配管道
+	workerc := make(chan struct{})
+	sm := semaphore.NewWeighted(u.taskWorkerCount)
+	//申请资源
+	sm.Acquire(ctx, 1)
+	//第一次任务分配
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case workerc <- struct{}{}:
+		}
+	}()
+	wc := 0
+	//循环执行任务
 	for !breakFlag {
 		select {
 		case <-ctx.Done():
 			utils.MLogger.Warn("upload cancel")
 			return nil
-		default:
+		case errrt = <-errc:
+			utils.MLogger.Warn("upload meet a err:", errrt)
+			return errrt
+		case <-workerc:
+			wc++
 			// clear itself
-			data := make([]byte, 0, stripeSize)
+			data := poolbuf.Get(stripeSize)
+			data = data[:0]
 			extraLen := len(extra)
 			readLen := stripeSize - int(curOffset)*segStripeSize - extraLen
 			if extraLen > 0 {
 				data = append(data, extra...)
-				extra = extra[:0]
+				poolbuf.Put(extra)
 			}
 
 			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, expected length: %d", curStripe, curOffset, readLen)
@@ -364,16 +397,31 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			} else if err != nil {
 				return err
 			}
+			//给下一个传输任务指令
+			if !breakFlag {
+				sm.Acquire(ctx, 1)
+				go func() {
+					select {
+					case <-ctx.Done():
+						return
+					case workerc <- struct{}{}:
+					}
+				}()
+			}
 
 			// need handle n > readLen
 			if n > readLen {
 				data = append(data, rdata[:readLen]...)
+				extra = poolbuf.Get(stripeSize)
+				extra = extra[:0]
 				extra = append(extra, rdata[readLen:n]...)
 				n = readLen
 			} else {
 				data = append(data, rdata[:n]...)
 			}
-
+			if len(data) == 0 {
+				break
+			}
 			// plus extra
 			n += extraLen
 
@@ -403,17 +451,10 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				copy(data, crypted)
 			}
 
-			for {
-				if atomic.LoadInt32(&parllel) < 32 {
-					break
-				}
-				time.Sleep(time.Second)
-			}
-			atomic.AddInt32(&parllel, 1)
 			wg.Add(1)
 			go func(data []byte, stripeID, start int) {
 				defer wg.Done()
-				defer atomic.AddInt32(&parllel, -1)
+				defer sm.Release(1)
 
 				bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
 
@@ -448,6 +489,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 					encodedData, offset, err := enc.Encode(transData, bm.ToString(3), start)
 					if err != nil {
+						errrt = err
+						errc <- err
 						return
 					}
 
@@ -512,8 +555,18 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				}
 				if count >= dc {
 					for _, v := range blockMetas {
-						u.gInfo.putDataMetaToKeepers(ctx, v.cid, v.provider, v.end)
+						err := u.gInfo.putDataMetaToKeepers(ctx, v.cid, v.provider, v.end)
+						if err != nil {
+							errrt = err
+							errc <- err
+							return
+						}
 					}
+					poolbuf.Put(data)
+				} else {
+					errrt = ErrNoEnoughBlockUpload
+					errc <- ErrNoEnoughBlockUpload
+					return
 				}
 			}(data, curStripe, curOffset)
 
@@ -530,7 +583,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 
 	wg.Wait()
 
-	return nil
+	return errrt
 }
 
 func calulateETag(ob *objectInfo) string {

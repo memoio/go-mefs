@@ -462,9 +462,12 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 				return err
 			}
 			obMetaFile.Write(bucket.obMetaCache[:bucket.obCacheSize])
+			obMetaFile.Write(lenBuf[:n])
+			obMetaFile.Write(data)
 			obMetaFile.Sync()
 			obMetaFile.Close()
 			bucket.obCacheSize = 0
+			continue
 		}
 
 		copy(bucket.obMetaCache[bucket.obCacheSize:], lenBuf[:n])
@@ -595,7 +598,6 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 }
 
 func writeToMeta(data []byte, fsID, buc string) error {
-	metapath := getMetaPath(fsID)
 	metapath, err := checkMetaPath(fsID)
 	if err != nil {
 		return err
@@ -613,7 +615,6 @@ func writeToMeta(data []byte, fsID, buc string) error {
 }
 
 func readFromMeta(fsID, buc string) ([]byte, error) {
-	metapath := getMetaPath(fsID)
 	metapath, err := checkMetaPath(fsID)
 	if err != nil {
 		return nil, err
