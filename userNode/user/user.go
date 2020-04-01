@@ -143,7 +143,7 @@ func (u *Info) GetRole() string {
 }
 
 // Stop stops service after persist
-func (u *Info) Stop() error {
+func (u *Info) Close() error {
 	u.fsMap.Range(func(key, value interface{}) bool {
 		uInfo := value.(*LfsInfo)
 		if !uInfo.online {

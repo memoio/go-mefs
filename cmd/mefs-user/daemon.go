@@ -363,12 +363,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		fmt.Println("User service is ready; run `mefs-user lfs start` to start lfs service")
 
-		defer func() {
-			err = node.Inst.Stop()
-			if err != nil {
-				utils.MLogger.Error("Persist before exist falied: ", err)
-			}
-		}()
 	default:
 	}
 

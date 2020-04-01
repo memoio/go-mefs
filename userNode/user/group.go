@@ -981,6 +981,10 @@ func (g *groupInfo) putDataToKeepers(ctx context.Context, key string, value []by
 
 	wg.Wait()
 
+	if int(count) == len(g.tempKeepers) {
+		return ErrNoEnoughKeeper
+	}
+
 	return nil
 }
 

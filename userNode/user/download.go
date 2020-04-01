@@ -19,6 +19,7 @@ import (
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"golang.org/x/sync/semaphore"
 )
 
 type downloadTask struct {
@@ -185,6 +186,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			utils.MLogger.Warn("download cancel")
+			do.Complete(nil)
 			return nil
 		default:
 			start := do.start + do.sizeReceived
@@ -225,6 +227,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 
 			wl, err := do.writer.Write(data[offset : offset+length])
 			if err != nil {
+				do.Complete(err)
 				return err
 			}
 
@@ -315,27 +318,41 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	parllel := int32(0)
+	//只下载成功dataCount个
+	sm := semaphore.NewWeighted(int64(dataCount))
+	wg := new(sync.WaitGroup)
 	success := int32(0)
 	fail := int32(0)
 	wrongMoney := int32(0)
 	for i := 0; i < int(blockCount); i++ {
+		//获得资源，上传，只在出错的时候以及下载满datacount后release资源
+		err = sm.Acquire(ctx, 1)
+		if err != nil {
+			return nil, 0, err
+		}
+
 		// fails too many, no need to download
 		if atomic.LoadInt32(&fail) > parityCount {
 			utils.MLogger.Error("Download obeject failed too much: ", ErrCannotGetEnoughBlock)
-			continue
+			break
 		}
 
+		// enough, no need to download
+		if atomic.LoadInt32(&success) >= dataCount {
+			break
+		}
+
+		//需要修复
 		if i > int(dataCount)-1 {
 			needRepair = true
 		}
 
-		atomic.AddInt32(&parllel, 1)
 		bm.SetCid(strconv.Itoa(i))
 		ncid := bm.ToString()
+		wg.Add(1)
 		go func(inum int, chunkid string) {
-			defer atomic.AddInt32(&parllel, -1)
 			defer atomic.AddInt32(&fail, 1)
+			defer wg.Done()
 			var provider string
 			pro, ok := do.cidMaps.Load(chunkid)
 			if ok {
@@ -344,6 +361,8 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 				providerID, _, err := do.group.getBlockProviders(ctx, chunkid)
 				if err != nil || providerID == do.group.groupID {
 					utils.MLogger.Warnf("Get Block %s 's provider from keeper failed: %s", chunkid, err)
+					//在所有出错的地方释放资源，以便新的下载线程
+					sm.Release(1)
 					return
 				}
 				provider = providerID
@@ -353,6 +372,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			pinfo, ok := do.group.providers[provider]
 			if !ok {
 				utils.MLogger.Warn(provider, " is not my provider")
+				sm.Release(1)
 				return
 			}
 
@@ -361,6 +381,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			if err != nil {
 				if do.group.userID != do.group.groupID {
 					utils.MLogger.Warnf("get channel fails: %s", err)
+					sm.Release(1)
 					return
 				}
 			}
@@ -379,18 +400,21 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 					atomic.AddInt32(&wrongMoney, 1)
 					do.group.loadContracts(ctx, provider)
 				}
+				sm.Release(1)
 				return
 			}
 			blkData := b.RawData()
 			ok, err = dataformat.VerifyBlockLength(blkData, segStart, segNeed)
 			if !ok || err != nil {
 				utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", chunkid, provider, err)
+				sm.Release(1)
 				return
 			}
 
 			_, _, ok = do.decoder.VerifyBlock(blkData, chunkid)
 			if !ok {
 				utils.MLogger.Warn("Fail to verify block: ", chunkid, " from:", provider)
+				sm.Release(1)
 				return
 			}
 
@@ -410,33 +434,14 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			datas[inum] = blkData
 			atomic.AddInt32(&success, 1)
 			atomic.AddInt32(&fail, -1)
+			// 释放资源，退出循环
+			if atomic.LoadInt32(&success) >= dataCount {
+				sm.Release(1)
+			}
 		}(i, ncid)
-
-		if i >= int(dataCount-1) {
-			for {
-				if atomic.LoadInt32(&parllel)+atomic.LoadInt32(&success) < dataCount {
-					break
-				}
-
-				if atomic.LoadInt32(&success) == dataCount {
-					break
-				}
-				time.Sleep(time.Second)
-			}
-
-			if atomic.LoadInt32(&success) == dataCount {
-				break
-			}
-		}
 	}
 
-	for {
-		if atomic.LoadInt32(&parllel) == 0 {
-			break
-		}
-
-		time.Sleep(time.Second)
-	}
+	wg.Wait()
 
 	if success < dataCount {
 		utils.MLogger.Errorf("Download object failed: %s", ErrCannotGetEnoughBlock)

@@ -57,6 +57,7 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	dhtopts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
 	"github.com/memoio/go-mefs/source/instance"
+	"github.com/memoio/go-mefs/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -425,6 +426,13 @@ func (n *MefsNode) teardown() error {
 	// NOTE: The order that objects are added(closed) matters, if an object
 	// needs to use another during its shutdown/cleanup process, it should be
 	// closed before that other object
+
+	if n.Inst != nil {
+		err := n.Inst.Close()
+		if err != nil {
+			utils.MLogger.Error("Persist before exist falied: ", err)
+		}
+	}
 
 	if n.Routing != nil {
 		closers = append(closers, n.Routing.(*dht.KadDHT).Process())

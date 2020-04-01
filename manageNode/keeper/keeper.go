@@ -119,12 +119,12 @@ func (k *Info) GetRole() string {
 }
 
 // Stop is
-func (k *Info) Stop() error {
-	k.save(k.context)
+func (k *Info) Close() error {
+	err := k.save(k.context)
 	if k.dnh != nil {
 		k.dnh.Stop()
 	}
-	return nil
+	return err
 }
 
 /*====================Save and Load========================*/
