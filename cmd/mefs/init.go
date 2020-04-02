@@ -74,7 +74,7 @@ environment variable:
 
 		hexsk, _ := req.Options[secretKeyKwd].(string)
 		password, ok := req.Options[passwordKwd].(string)
-		if !ok || (hexsk == "" && len(password) <= 8) {
+		if !ok || (hexsk == "" && len(password) < 8) {
 			return errShortPassword
 		}
 		netKey, _ := req.Options[netKeyKwd].(string)
