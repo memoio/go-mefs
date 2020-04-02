@@ -79,6 +79,7 @@ var CommandsDaemonCmd = newcmd.CommandsCmd(Root)
 //保存mefs一级命令的结构体
 var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
+	"info":      InfoCmd,
 	"bootstrap": newcmd.BootstrapCmd,
 	"config":    newcmd.ConfigCmd,
 	"dht":       newcmd.DhtCmd,

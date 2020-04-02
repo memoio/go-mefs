@@ -148,6 +148,10 @@ func (p *Info) Close() error {
 	return p.save(p.context)
 }
 
+func (p *Info) GetStorageInfo() (int64, uint64) {
+	return p.proContract.Capacity, p.storageUsed
+}
+
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
 	g := &groupInfo{
 		userID:    uid,
@@ -480,6 +484,9 @@ func (p *Info) storageSync(ctx context.Context) error {
 	}
 
 	maxSpace := p.getDiskTotal()
+
+	p.storageUsed = actulDataSpace
+	p.storageTotal = maxSpace
 
 	klist, ok := role.GetKeepersOfPro(p.localID)
 	if !ok {
