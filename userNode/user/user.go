@@ -69,8 +69,8 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 	if !rdo {
 		// check stats
 		fs := u.GetUser(userID)
-		if fs != nil && fs.Online() {
-			return fs.(*LfsInfo), nil
+		if fs != nil {
+			return fs, nil
 		}
 	}
 

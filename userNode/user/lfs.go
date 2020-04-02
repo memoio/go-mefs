@@ -36,14 +36,11 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 	if l.gInfo == nil {
 		return ErrLfsServiceNotReady
 	}
-	// 证明该user已经启动
-	if l.online || (l.gInfo.state >= groupStarted) {
+	// user is online or starting
+	if l.online || (l.gInfo.state >= starting) {
 		return nil
 	}
-	//有一个启动任务正在进行
-	if l.gInfo.state >= starting {
-		return ErrLfsStarting
-	}
+
 	l.gInfo.state = starting
 	l.online = false
 	l.writable = true

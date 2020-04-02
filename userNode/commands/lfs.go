@@ -420,6 +420,11 @@ var lfsStartUserCmd = &cmds.Command{
 			}
 		}
 
+		fs := userIns.GetUser(uid)
+		if fs != nil {
+
+		}
+
 		lfs, err := userIns.NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo, force)
 		if err != nil {
 			userIns.KillUser(uid)
@@ -432,24 +437,6 @@ var lfsStartUserCmd = &cmds.Command{
 			return err
 		}
 
-		// 等待启动完成, 4minute
-		waitLimited := 160
-		waitCount := 0
-		tick := time.Tick(3 * time.Second)
-		for {
-			if lfs.Online() {
-				break
-			}
-			select {
-			case <-tick:
-				waitCount++
-				if waitCount >= waitLimited {
-					userIns.KillUser(uid)
-					return errTimeOut
-				}
-			}
-
-		}
 		list := &StringList{
 			ChildLists: []string{"User is started, the address is : " + addr},
 		}
