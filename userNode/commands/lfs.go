@@ -420,11 +420,6 @@ var lfsStartUserCmd = &cmds.Command{
 			}
 		}
 
-		fs := userIns.GetUser(uid)
-		if fs != nil {
-
-		}
-
 		lfs, err := userIns.NewFS(uid, uid, qid, hexSk, capacity, duration, price, ks, ps, rdo, force)
 		if err != nil {
 			userIns.KillUser(uid)
