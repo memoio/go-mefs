@@ -132,7 +132,6 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 			if err != nil {
 				return err
 			}
-			cpay.Root = hash
 
 			sign, err := id.Sign(localSk, hash)
 			if err != nil {
