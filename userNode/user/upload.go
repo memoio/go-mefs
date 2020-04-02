@@ -440,17 +440,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				copy(data, crypted)
 			}
 
-			//给下一个传输任务指令
-			if !breakFlag {
-				sm.Acquire(ctx, 1)
-				go func() {
-					select {
-					case <-ctx.Done():
-						return
-					case workerc <- struct{}{}:
-					}
-				}()
-			}
 			wg.Add(1)
 			go func(data []byte, stripeID, start int) {
 				defer wg.Done()
