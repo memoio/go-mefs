@@ -166,7 +166,8 @@ func (do *downloadTask) Start(ctx context.Context) error {
 		bEnc = tmpEnc
 	}
 
-	var length int64
+	// transNum can be adjusted by change MEFS_TRANS;
+	// larger MEFS_TRANS has large rate when network is ok
 	tn := os.Getenv("MEFS_TRANS")
 	utils.MLogger.Infof("MEFS_TRANS in download is set to %s", tn)
 	if tn != "" {
@@ -179,8 +180,9 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	} else {
 		transNum = defaultTransNum
 	}
-
 	utils.MLogger.Debugf("download rate is: ", transNum)
+
+	var length int64
 	breakFlag := false
 	for !breakFlag {
 		select {
@@ -282,7 +284,7 @@ type (
 
 //从一个stripe内指定范围读取数据写入到writer内
 func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]byte, int64, error) {
-	//首先设置一些本次stripe下载的基本参数
+	// bucket options
 	dataCount := do.decoder.Prefix.Bopts.DataCount
 	parityCount := do.decoder.Prefix.Bopts.ParityCount
 	blockCount := dataCount + parityCount
@@ -294,6 +296,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 		tagSize = 48
 	}
 
+	// convert start and length to stripe, segment parameters
 	curStripe := start / stripeSize
 	segStart := int(start % stripeSize / segStripeSize)
 	offset := start % segStripeSize
@@ -318,14 +321,16 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	//只下载成功dataCount个
+	// download dataCount in parallel
 	sm := semaphore.NewWeighted(int64(dataCount))
 	wg := new(sync.WaitGroup)
 	success := int32(0)
 	fail := int32(0)
+	// record money problem; redo it
 	wrongMoney := int32(0)
 	for i := 0; i < int(blockCount); i++ {
-		//获得资源，上传，只在出错的时候以及下载满datacount后release资源
+		// wait here;
+		// 只在出错的时候以及下载满datacount后才会release资源
 		err = sm.Acquire(ctx, 1)
 		if err != nil {
 			return nil, 0, err
@@ -342,8 +347,8 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			break
 		}
 
-		//需要修复
-		if i > int(dataCount)-1 {
+		// need reapir in decoder
+		if i >= int(dataCount) {
 			needRepair = true
 		}
 
@@ -434,7 +439,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			datas[inum] = blkData
 			atomic.AddInt32(&success, 1)
 			atomic.AddInt32(&fail, -1)
-			// 释放资源，退出循环
+			// download dataCount; release resource
 			if atomic.LoadInt32(&success) >= dataCount {
 				sm.Release(1)
 			}

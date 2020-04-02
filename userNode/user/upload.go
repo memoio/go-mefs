@@ -375,7 +375,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("upload cancel")
 			return nil
 		case errrt = <-errc:
-			utils.MLogger.Warn("upload meet a err:", errrt)
+			utils.MLogger.Warn("upload encounter an err:", errrt)
 			return errrt
 		case <-workerc:
 			wc++
@@ -397,17 +397,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			} else if err != nil {
 				return err
 			}
-			//给下一个传输任务指令
-			if !breakFlag {
-				sm.Acquire(ctx, 1)
-				go func() {
-					select {
-					case <-ctx.Done():
-						return
-					case workerc <- struct{}{}:
-					}
-				}()
-			}
 
 			// need handle n > readLen
 			if n > readLen {
@@ -419,9 +408,11 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			} else {
 				data = append(data, rdata[:n]...)
 			}
+
 			if len(data) == 0 {
 				break
 			}
+
 			// plus extra
 			n += extraLen
 
@@ -575,6 +566,18 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				curOffset = 0
 			} else {
 				curOffset = endOffset
+			}
+
+			//给下一个传输任务指令
+			if !breakFlag {
+				sm.Acquire(ctx, 1)
+				go func() {
+					select {
+					case <-ctx.Done():
+						return
+					case workerc <- struct{}{}:
+					}
+				}()
 			}
 		}
 	}
