@@ -179,11 +179,11 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		copy(root[:], thisLinfo.currentPay.Root[:32])
 		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, thisLinfo.currentPay.Share, thisLinfo.currentPay.Sign)
 		if err != nil {
-			utils.MLogger.Error("SpaceTimePay failed: ", err)
+			utils.MLogger.Errorf("SpaceTimePay start pay for %s from %s, length %s value %s failed %s", proID, st.String(), sl.String(), sv.String(), err)
 			return err
 		}
 
-		utils.MLogger.Infof("spaceTimePay success for %s at %d ", proID, thisLinfo.currentPay.Start)
+		utils.MLogger.Infof("SpaceTimePay start pay for %s from %s, length %s value %s success", proID, st.String(), sl.String(), sv.String())
 
 		thisLinfo.currentPay.Status = 0
 		thisLinfo.lastPay = thisLinfo.currentPay
