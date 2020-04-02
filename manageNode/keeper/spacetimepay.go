@@ -160,6 +160,8 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 			}
 
 			utils.MLogger.Infof("SpaceTimePay start for %s at %d ", proID, thisLinfo.currentPay.Start)
+		} else {
+			utils.MLogger.Infof("SpaceTimePay start for %s for zero", proID)
 		}
 		return role.ErrEmptyData
 	}
@@ -171,11 +173,14 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		st := big.NewInt(thisLinfo.currentPay.Start)
 		sl := big.NewInt(thisLinfo.currentPay.Length)
 		sv := new(big.Int).SetBytes(thisLinfo.currentPay.Value)
+
+		utils.MLogger.Infof("SpaceTimePay start pay for %s from %s, length %s value %s", proID, st.String(), sl.String(), sv.String())
+
 		var root [32]byte
 		copy(root[:], thisLinfo.currentPay.Root[:32])
 		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, thisLinfo.currentPay.Share, thisLinfo.currentPay.Sign)
 		if err != nil {
-			utils.MLogger.Error("contracts.SpaceTimePay() failed: ", err)
+			utils.MLogger.Error("SpaceTimePay failed: ", err)
 			return err
 		}
 

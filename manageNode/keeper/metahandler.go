@@ -123,26 +123,17 @@ func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from strin
 	}
 
 	linfo := gp.getLInfo(ops[1], false)
-	if linfo == nil {
-		return
-	}
-
 	// verify currentPay
-	if linfo.currentPay == nil {
+	if linfo == nil || linfo.currentPay == nil || len(linfo.currentPay.GetSign()) < len(gp.keepers) {
 		return
 	}
-
-	if len(linfo.currentPay.GetSign()) < len(gp.keepers) {
-		return
-	}
-
-	linfo.currentPay.Lock()
-	defer linfo.currentPay.Unlock()
 
 	for i, kid := range gp.keepers {
 		if kid == string(metaValue) {
+			linfo.currentPay.Lock()
 			linfo.currentPay.GetSign()[i] = sig
 			linfo.currentPay.Status--
+			linfo.currentPay.Unlock()
 		}
 	}
 }

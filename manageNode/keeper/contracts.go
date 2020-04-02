@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -43,7 +42,6 @@ func (g *groupInfo) loadContracts(mode bool) error {
 			}
 			keepers = append(keepers, kid)
 		}
-		sort.Strings(keepers)
 
 		for _, provider := range uItem.Providers {
 			pid, err := address.GetIDFromAddress(provider.Addr.String())
@@ -52,7 +50,6 @@ func (g *groupInfo) loadContracts(mode bool) error {
 			}
 			providers = append(providers, pid)
 		}
-		sort.Strings(providers)
 
 		flag := false
 		for _, keeperID := range keepers {
