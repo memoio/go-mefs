@@ -750,32 +750,6 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		}
 
 		k.ukpGroup.Store(qid, gInfo)
-		ctx := k.context
-		for _, pid := range gInfo.providers {
-			lin := &lInfo{
-				inChallenge:  false,
-				lastChalTime: time.Now().Unix(),
-			}
-
-			gInfo.ledgerMap.Store(pid, lin)
-
-			kmLast, err := metainfo.NewKey(qid, mpb.KeyType_LastPay, pid)
-			if err != nil {
-				continue
-			}
-
-			res, err := k.ds.GetKey(ctx, kmLast.ToString(), "local")
-			if err == nil && len(res) > 0 {
-				val := mpb.STValue{}
-				err := proto.Unmarshal(res, &val)
-				if err != nil {
-					continue
-				}
-				lin.lastPay = &chalpay{
-					STValue: val,
-				}
-			}
-		}
 
 		retry := 0
 		for retry > 10 {
