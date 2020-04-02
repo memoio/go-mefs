@@ -367,7 +367,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		case workerc <- struct{}{}:
 		}
 	}()
-	wc := 0
 	//循环执行任务
 	for !breakFlag {
 		select {
@@ -378,7 +377,6 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			utils.MLogger.Warn("upload encounter an err:", errrt)
 			return errrt
 		case <-workerc:
-			wc++
 			// clear itself
 			data := poolbuf.Get(stripeSize)
 			data = data[:0]
@@ -442,6 +440,17 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				copy(data, crypted)
 			}
 
+			//给下一个传输任务指令
+			if !breakFlag {
+				sm.Acquire(ctx, 1)
+				go func() {
+					select {
+					case <-ctx.Done():
+						return
+					case workerc <- struct{}{}:
+					}
+				}()
+			}
 			wg.Add(1)
 			go func(data []byte, stripeID, start int) {
 				defer wg.Done()

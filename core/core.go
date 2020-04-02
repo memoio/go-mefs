@@ -428,6 +428,7 @@ func (n *MefsNode) teardown() error {
 	// closed before that other object
 
 	if n.Inst != nil {
+		fmt.Println("Node Instance exiting")
 		err := n.Inst.Close()
 		if err != nil {
 			utils.MLogger.Error("Persist before exist falied: ", err)
