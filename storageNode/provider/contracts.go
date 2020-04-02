@@ -22,7 +22,7 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 			return err
 		}
 
-		// capacity should > 0
+		// pledge again
 		if proItem.Capacity < depositSize {
 			dsize := new(big.Int).SetInt64(depositSize - proItem.Capacity)
 			err := role.PledgeProvider(proID, p.sk, dsize)

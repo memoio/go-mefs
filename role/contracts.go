@@ -23,7 +23,7 @@ import (
 // ProviderItem has provider's info
 type ProviderItem struct {
 	ProviderID string   // providerid
-	Capacity   int64    // Bytes
+	Capacity   int64    // Bytes, pledge capacity
 	Money      *big.Int // pledge money
 	StartTime  int64    // start time
 }
