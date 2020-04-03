@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/memoio/go-mefs/utils/RbTree"
 	"github.com/gogo/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -20,7 +21,7 @@ func newSuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
 	return &superBucket{
 		BucketInfo:  binfo,
 		dirty:       true,
-		objects:     make(map[string]*objectInfo),
+		objects:     rbtree.NewTree(),
 		obMetaCache: make([]byte, maxCacheSize),
 		obCacheSize: 0,
 		mtree:       mt.New(sha256.New()),
