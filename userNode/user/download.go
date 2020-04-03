@@ -55,14 +55,14 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		return ErrBucketNotExist
 	}
 
-	object, ok := bucket.objects[objectName]
-	if !ok {
+	objectRes := bucket.objects.Find(MetaName(objectName))
+	if objectRes == nil {
 		for _, f := range completeFuncs {
 			f(ErrObjectNotExist)
 		}
 		return ErrObjectNotExist
 	}
-
+	object := objectRes.(*objectInfo)
 	object.RLock()
 	defer object.RUnlock()
 

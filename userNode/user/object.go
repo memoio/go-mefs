@@ -45,7 +45,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 		return nil, ErrObjectNotExist
 	}
 
-	object, ok := bucket.objects[objectName]
+	object, ok := bucket.objects.Find(MetaName(objectName)).(*objectInfo)
 	if !ok {
 		return nil, ErrObjectNotExist
 	}
@@ -79,9 +79,9 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 
 	object.Deletion = true
 	bucket.dirty = true
-	oName := object.GetInfo().GetName() + "." + strconv.Itoa(int(object.GetInfo().ObjectID))
-	delete(bucket.objects, object.GetInfo().GetName())
-	bucket.objects[oName] = object
+	oName := object.GetInfo().GetName() + "." + strconv.FormatInt(object.GetInfo().GetObjectID(), 10)
+	bucket.objects.Delete(MetaName(object.GetInfo().GetName()))
+	bucket.objects.Insert(MetaName(oName), object)
 
 	return &object.ObjectInfo, nil
 }
@@ -111,7 +111,7 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 		return nil, ErrObjectNotExist
 	}
 
-	object, ok := bucket.objects[objectName]
+	object, ok := bucket.objects.Find(MetaName(objectName)).(*objectInfo)
 	if !ok || bucket.Deletion {
 		return nil, ErrObjectNotExist
 	}
@@ -136,7 +136,9 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 	}
 
 	var objects []*mpb.ObjectInfo
-	for _, object := range bucket.objects {
+	objectIter := bucket.objects.Iterator()
+	for objectIter != nil {
+		object := objectIter.Value.(*objectInfo)
 		if object.Deletion {
 			continue
 		}
@@ -144,6 +146,7 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 		if strings.HasPrefix(object.GetInfo().GetName(), prefix) {
 			objects = append(objects, &object.ObjectInfo)
 		}
+		objectIter = objectIter.Next()
 	}
 	sort.Slice(objects, func(i, j int) bool {
 		return objects[i].GetInfo().GetName() < objects[j].GetInfo().GetName()
@@ -159,15 +162,11 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 
 	var storageSpace uint64
 	for _, bucket := range l.meta.buckets {
-		bucket.RLock()
-		for _, object := range bucket.objects {
-			if object.Deletion {
-				continue
-			}
-
-			storageSpace += uint64(object.GetLength())
+		bucketStorage, err := l.ShowBucketStorage(ctx, bucket.Name)
+		if err != nil {
+			continue
 		}
-		bucket.RUnlock()
+		storageSpace += uint64(bucketStorage)
 	}
 
 	return storageSpace, nil
@@ -188,9 +187,12 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 	if !ok || bucket == nil || bucket.Deletion {
 		return 0, ErrBucketNotExist
 	}
-
+	bucket.RLock()
+	defer bucket.RUnlock()
 	var storageSpace uint64
-	for _, object := range bucket.objects {
+	objectIter := bucket.objects.Iterator()
+	for objectIter != nil {
+		object := objectIter.Value.(*objectInfo)
 		if object.Deletion {
 			continue
 		}

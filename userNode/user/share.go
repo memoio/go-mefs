@@ -26,7 +26,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		return "", ErrBucketNotExist
 	}
 
-	object, ok := bucket.objects[objectName]
+	object, ok := bucket.objects.Find(MetaName(objectName)).(*objectInfo)
 	if !ok || object.Deletion {
 		return "", ErrObjectNotExist
 	}

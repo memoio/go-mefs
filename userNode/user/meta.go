@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -19,6 +20,7 @@ import (
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
+	rbtree "github.com/memoio/go-mefs/utils/RbTree"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
@@ -43,7 +45,7 @@ type superBlock struct {
 // superBucket has lfs objects info
 type superBucket struct {
 	mpb.BucketInfo
-	objects     map[string]*objectInfo
+	objects     *rbtree.Tree
 	obMetaCache []byte
 	obCacheSize int //obMetaCache 已经用了多少
 	dirty       bool
@@ -55,6 +57,17 @@ type superBucket struct {
 type objectInfo struct {
 	mpb.ObjectInfo
 	sync.RWMutex
+}
+
+type MetaName string
+
+func (x MetaName) LessThan(y interface{}) bool {
+	yStr := y.(MetaName)
+	res := strings.Compare(string(x), string(yStr))
+	if res >= 0 {
+		return false
+	}
+	return true
 }
 
 //----------------------Flush superBlock---------------------------
@@ -343,10 +356,10 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			utils.MLogger.Error("OpAdd payload parse failed, bucket: ", bucket.GetName())
 			return err
 		}
-		if ob, ok := bucket.objects[info.GetName()]; ob != nil || ok {
+		if ob := bucket.objects.Find(MetaName(info.GetName())); ob != nil {
 			return ErrObjectAlreadyExist
 		}
-		bucket.objects[info.GetName()] = &objectInfo{
+		bucket.objects.Insert(MetaName(info.GetName()), &objectInfo{
 			ObjectInfo: mpb.ObjectInfo{
 				Info:      &info,
 				Deletion:  false,
@@ -356,7 +369,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 				PartCount: 0,
 				Parts:     make([]*mpb.ObjectPart, 0, 1),
 			},
-		}
+		})
 		utils.MLogger.Info("Add Object-", info.GetName(), " in bucket: ", bucket.Name)
 	case mpb.LfsOp_OpAppend:
 		part := mpb.ObjectPart{}
@@ -365,8 +378,8 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			utils.MLogger.Error("OpAppend payload parse failed, bucket: ", bucket.GetName())
 			return err
 		}
-		ob := bucket.objects[part.GetName()]
-		if ob == nil {
+		ob, ok := bucket.objects.Find(MetaName(part.GetName())).(*objectInfo)
+		if !ok || ob == nil {
 			utils.MLogger.Error("Add Part-", part.GetPartID(), "to an inexistent object-", part.GetName())
 			return ErrObjectNotExist
 		}
@@ -389,16 +402,16 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			utils.MLogger.Error("OpDelete payload parse failed, bucket: ", bucket.GetName())
 			return err
 		}
-		ob := bucket.objects[mes.GetName()]
-		if ob == nil {
+		ob, ok := bucket.objects.Find(MetaName(mes.GetName())).(*objectInfo)
+		if !ok || ob == nil {
 			utils.MLogger.Error("Delete an inexistent object-", mes.GetName())
 			return err
 		}
 		ob.Lock()
 		ob.Deletion = true
-		delete(bucket.objects, mes.GetName())
+		bucket.objects.Delete(MetaName(mes.GetName()))
 		deleteOName := mes.GetName() + "." + strconv.FormatInt(mes.GetObjectID(), 10)
-		bucket.objects[deleteOName] = ob
+		bucket.objects.Insert(MetaName(deleteOName), ob)
 		ob.Unlock()
 	case mpb.LfsOp_OpCancel:
 		return errors.New("Undefined")

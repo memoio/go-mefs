@@ -92,9 +92,9 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		return nil, nil, ErrBucketNotExist
 	}
 
-	objectElement, ok := bucket.objects[objectName]
-	if ok || objectElement != nil {
-		return bucket, objectElement, nil
+	objectElement := bucket.objects.Find(MetaName(objectName))
+	if objectElement != nil {
+		return bucket, objectElement.(*objectInfo), nil
 	}
 
 	bucket.Lock()
@@ -122,7 +122,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 			},
 		}
 
-		bucket.objects[objectName] = object
+		bucket.objects.Insert(MetaName(objectName), object)
 		bucket.NextObjectID++
 
 		payload, err := proto.Marshal(oInfo)
