@@ -11,7 +11,10 @@ import (
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"golang.org/x/sync/semaphore"
 )
+
+const defaultWeighted = int64(100)
 
 //Info implements user service
 type Info struct {
@@ -130,6 +133,7 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 		privateKey: sk,
 		gInfo:      ginfo,
 		ds:         u.ds,
+		Sm:         semaphore.NewWeighted(defaultWeighted),
 	}
 
 	u.fsMap.Store(queryID, lInfo)
@@ -167,7 +171,10 @@ func (u *Info) KillUser(userID string) error {
 		queryID := uinfo.(*queryInfo).getQuery()
 		fs, ok := u.fsMap.Load(queryID)
 		if ok {
-			fs.(*LfsInfo).Stop()
+			err := fs.(*LfsInfo).Stop()
+			if err != nil {
+				return err
+			}
 			u.fsMap.Delete(queryID)
 		}
 	}

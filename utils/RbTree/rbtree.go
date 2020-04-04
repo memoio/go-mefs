@@ -19,6 +19,11 @@ type node struct {
 	Value               valuetype
 }
 
+//方便迭代器使用
+func NewNode() *node {
+	return nil
+}
+
 // Tree is a struct of red-black tree.
 type Tree struct {
 	root *node
@@ -32,6 +37,9 @@ func NewTree() *Tree {
 
 // Find finds the node and return its value.
 func (t *Tree) Find(key Keytype) interface{} {
+	if t == nil || t.root == nil {
+		return nil
+	}
 	n := t.findnode(key)
 	if n != nil {
 		return n.Value
@@ -41,6 +49,9 @@ func (t *Tree) Find(key Keytype) interface{} {
 
 // FindIt finds the node and return it as an iterator.
 func (t *Tree) FindIt(key Keytype) *node {
+	if t == nil || t.root == nil {
+		return nil
+	}
 	return t.findnode(key)
 }
 
@@ -54,6 +65,9 @@ func (t *Tree) Empty() bool {
 
 // Iterator creates the rbtree's iterator that points to the minmum node.
 func (t *Tree) Iterator() *node {
+	if t == nil || t.root == nil {
+		return nil
+	}
 	return minimum(t.root)
 }
 
@@ -70,6 +84,9 @@ func (t *Tree) Clear() {
 
 // Insert inserts the key-value pair into the rbtree.
 func (t *Tree) Insert(key Keytype, value valuetype) {
+	if t == nil {
+		return
+	}
 	x := t.root
 	var y *node
 
@@ -100,6 +117,9 @@ func (t *Tree) Insert(key Keytype, value valuetype) {
 
 // Delete deletes the node by key
 func (t *Tree) Delete(key Keytype) {
+	if t == nil || t.root == nil {
+		return
+	}
 	z := t.findnode(key)
 	if z == nil {
 		return
@@ -305,11 +325,17 @@ func (t *Tree) findnode(key Keytype) *node {
 
 // Next returns the node's successor as an iterator.
 func (n *node) Next() *node {
+	if n == nil {
+		return nil
+	}
 	return successor(n)
 }
 
 // successor returns the successor of the node
 func successor(x *node) *node {
+	if x == nil {
+		return x
+	}
 	if x.right != nil {
 		return minimum(x.right)
 	}
@@ -331,6 +357,9 @@ func getColor(n *node) bool {
 
 // minimum finds the minimum node of subtree n.
 func minimum(n *node) *node {
+	if n == nil {
+		return n
+	}
 	for n.left != nil {
 		n = n.left
 	}

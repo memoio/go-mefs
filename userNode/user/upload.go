@@ -51,7 +51,13 @@ type uploadTask struct { //一个上传任务实例
 }
 
 // PutObject constructs upload process
-func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error) {
+func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts PutObjectOptions) (*mpb.ObjectInfo, error) {
+	//上传需要10资源
+	ok := l.Sm.TryAcquire(10)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(10)
 	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
 
 	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, true)
@@ -63,7 +69,13 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 }
 
 // AppendObject constructs upload process
-func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error) {
+func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts UploadOptions) (*mpb.ObjectInfo, error) {
+	//上传需要10资源
+	ok := l.Sm.TryAcquire(10)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(10)
 	utils.MLogger.Infof("Upload append object: %s to bucket: %s begin", objectName, bucketName)
 	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, false)
 	if err != nil {
@@ -73,7 +85,7 @@ func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName strin
 	return l.addObjectData(ctx, bucket, object, reader)
 }
 
-func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation bool) (*superBucket, *objectInfo, error) {
+func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation bool) (*superBucket, *ObjectInfo, error) {
 	if !l.online || l.meta.buckets == nil {
 		return nil, nil, ErrLfsServiceNotReady
 	}
@@ -92,9 +104,9 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		return nil, nil, ErrBucketNotExist
 	}
 
-	objectElement := bucket.objects.Find(MetaName(objectName))
+	objectElement := bucket.Objects.Find(MetaName(objectName))
 	if objectElement != nil {
-		return bucket, objectElement.(*objectInfo), nil
+		return bucket, objectElement.(*ObjectInfo), nil
 	}
 
 	bucket.Lock()
@@ -111,7 +123,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 			Dir:      false,
 		}
 
-		object := &objectInfo{
+		object := &ObjectInfo{
 			ObjectInfo: mpb.ObjectInfo{
 				Info:      oInfo,
 				PartCount: 0,
@@ -122,7 +134,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 			},
 		}
 
-		bucket.objects.Insert(MetaName(objectName), object)
+		bucket.Objects.Insert(MetaName(objectName), object)
 		bucket.NextObjectID++
 
 		payload, err := proto.Marshal(oInfo)
@@ -153,7 +165,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 }
 
 // make sure bucket and object is ont empty
-func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object *objectInfo, reader io.Reader) (*mpb.ObjectInfo, error) {
+func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object *ObjectInfo, reader io.Reader) (*mpb.ObjectInfo, error) {
 	bucket.Lock()
 	defer bucket.Unlock()
 
@@ -587,7 +599,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	return errrt
 }
 
-func calulateETag(ob *objectInfo) string {
+func calulateETag(ob *ObjectInfo) string {
 	if len(ob.GetParts()) == 1 {
 		return ob.GetParts()[0].ETag
 	}

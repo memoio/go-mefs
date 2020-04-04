@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +14,12 @@ import (
 
 // DeleteObject deletes a object in lfs
 func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error) {
+	//????1??
+	ok := l.Sm.TryAcquire(1)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(1)
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -41,11 +46,11 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	// TODO:具体实现
 	bucket.Lock()
 	defer bucket.Unlock()
-	if bucket.objects == nil {
+	if bucket.Objects == nil {
 		return nil, ErrObjectNotExist
 	}
 
-	object, ok := bucket.objects.Find(MetaName(objectName)).(*objectInfo)
+	object, ok := bucket.Objects.Find(MetaName(objectName)).(*ObjectInfo)
 	if !ok {
 		return nil, ErrObjectNotExist
 	}
@@ -79,15 +84,19 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 
 	object.Deletion = true
 	bucket.dirty = true
-	oName := object.GetInfo().GetName() + "." + strconv.FormatInt(object.GetInfo().GetObjectID(), 10)
-	bucket.objects.Delete(MetaName(object.GetInfo().GetName()))
-	bucket.objects.Insert(MetaName(oName), object)
-
+	bucket.Objects.Delete(MetaName(object.GetInfo().GetName()))
+	bucket.DeletedObject = append(bucket.DeletedObject, object)
 	return &object.ObjectInfo, nil
 }
 
 // HeadObject get the info of an object
-func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*mpb.ObjectInfo, error) {
+func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error) {
+	//????1??
+	ok := l.Sm.TryAcquire(1)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(1)
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -107,11 +116,11 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 		return nil, ErrBucketNotExist
 	}
 
-	if bucket.objects == nil {
+	if bucket.Objects == nil {
 		return nil, ErrObjectNotExist
 	}
 
-	object, ok := bucket.objects.Find(MetaName(objectName)).(*objectInfo)
+	object, ok := bucket.Objects.Find(MetaName(objectName)).(*ObjectInfo)
 	if !ok || bucket.Deletion {
 		return nil, ErrObjectNotExist
 	}
@@ -120,7 +129,45 @@ func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string,
 }
 
 // ListObjects lists all objects of a bucket
-func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*mpb.ObjectInfo, error) {
+func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, opts ListObjectsOptions) ([]*mpb.ObjectInfo, error) {
+	//????2??
+	ok := l.Sm.TryAcquire(2)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(2)
+	if !l.online || l.meta.buckets == nil {
+		return nil, ErrLfsServiceNotReady
+	}
+
+	err := checkBucketName(bucketName)
+	if err != nil {
+		return nil, ErrBucketNameInvalid
+	}
+
+	bucket, ok := l.meta.buckets[bucketName]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, ErrBucketNotExist
+	}
+	bucket.RLock()
+	defer bucket.RUnlock()
+	var objects []*mpb.ObjectInfo
+	objectIter := bucket.Objects.Iterator()
+	for objectIter != nil {
+		object := objectIter.Value.(*ObjectInfo)
+		if object.Deletion {
+			continue
+		}
+
+		if strings.HasPrefix(object.GetInfo().GetName(), prefix) {
+			objects = append(objects, &object.ObjectInfo)
+		}
+		objectIter = objectIter.Next()
+	}
+	return objects, nil
+}
+
+func (l *LfsInfo) GetsuperBucket(ctx context.Context, bucketName string) (*superBucket, error) {
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -135,27 +182,17 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 		return nil, ErrBucketNotExist
 	}
 
-	var objects []*mpb.ObjectInfo
-	objectIter := bucket.objects.Iterator()
-	for objectIter != nil {
-		object := objectIter.Value.(*objectInfo)
-		if object.Deletion {
-			continue
-		}
-
-		if strings.HasPrefix(object.GetInfo().GetName(), prefix) {
-			objects = append(objects, &object.ObjectInfo)
-		}
-		objectIter = objectIter.Next()
-	}
-	sort.Slice(objects, func(i, j int) bool {
-		return objects[i].GetInfo().GetName() < objects[j].GetInfo().GetName()
-	})
-	return objects, nil
+	return bucket, nil
 }
 
 // ShowStorage show lfs used space without appointed bucket
 func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
+	//????2??
+	ok := l.Sm.TryAcquire(2)
+	if !ok {
+		return 0, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(2)
 	if !l.online || l.meta.buckets == nil {
 		return 0, ErrLfsServiceNotReady
 	}
@@ -190,9 +227,9 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 	bucket.RLock()
 	defer bucket.RUnlock()
 	var storageSpace uint64
-	objectIter := bucket.objects.Iterator()
-	for objectIter != nil {
-		object := objectIter.Value.(*objectInfo)
+	objectIter := bucket.Objects.Iterator()
+	for ; objectIter != nil; objectIter = objectIter.Next() {
+		object := objectIter.Value.(*ObjectInfo)
 		if object.Deletion {
 			continue
 		}
@@ -201,7 +238,7 @@ func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uin
 	return storageSpace, nil
 }
 
-func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
+func (l *LfsInfo) getLastChalTime(ctx context.Context, blockID string) (time.Time, error) {
 	latestTime := time.Unix(0, 0)
 	gp := l.gInfo
 	conkeepers, _, err := gp.GetKeepers(l.context, -1)
@@ -218,7 +255,6 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 	}
 
 	var tempTime time.Time
-	ctx := l.context
 	for _, keeper := range conkeepers {
 		res, err := l.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), nil, nil, keeper)
 		if err != nil {
@@ -234,12 +270,18 @@ func (l *LfsInfo) getLastChalTime(blockID string) (time.Time, error) {
 }
 
 // GetObjectAvailTime get available time of objects
-func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
-	latestTime := time.Unix(0, 0)
-	if len(object.Parts) == 0 {
-		return latestTime.Format(utils.BASETIME), ErrBucketNotExist
+func (l *LfsInfo) GetObjectAvailTime(ctx context.Context, object *mpb.ObjectInfo) (string, error) {
+	//????2??
+	ok := l.Sm.TryAcquire(2)
+	if !ok {
+		return "", ErrResourceUnavailable
 	}
+	defer l.Sm.Release(2)
 
+	if len(object.Parts) == 0 {
+		return time.Unix(object.GetCTime(), 0).Format(utils.BASETIME), nil
+	}
+	latestTime := time.Unix(0, 0)
 	bucketName, ok := l.meta.bucketIDToName[object.GetInfo().GetBucketID()]
 	if !ok {
 		return latestTime.Format(utils.BASETIME), ErrBucketNotExist
@@ -263,7 +305,7 @@ func (l *LfsInfo) GetObjectAvailTime(object *mpb.ObjectInfo) (string, error) {
 	for i := 0; i < int(blockCount); i++ {
 		bm.SetCid(strconv.Itoa(i))
 		blockID := bm.ToString()
-		blockAvailTime, err := l.getLastChalTime(blockID)
+		blockAvailTime, err := l.getLastChalTime(ctx, blockID)
 		if err != nil {
 			utils.MLogger.Warn("Get block: %s's availTime failed: %s", blockID, err)
 			continue
