@@ -112,7 +112,11 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 
 	n.Connect(ctx, to)
 
-	return n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
+	res, err := n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
+	if err != nil {
+		utils.MLogger.Errorf("SendMetaRequest %s to %s fails: %s", key, to, err)
+	}
+	return res, err
 }
 
 func (n *impl) GetUserPublicKey(key string) ([]byte, error) {
@@ -211,13 +215,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 		n.Connect(ctx, to)
 	}
 
-	res, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, to)
-	if err != nil {
-		utils.MLogger.Error("GetKey err:", err, ", key is: ", key, " from: ", to)
-		return nil, err
-	}
-
-	return res, nil
+	return n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, to)
 }
 
 func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to string) error {
