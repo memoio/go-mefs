@@ -136,7 +136,6 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 		gInfo:      ginfo,
 		ds:         u.ds,
 		Sm:         semaphore.NewWeighted(defaultWeighted),
-		downSem:    semaphore.NewWeighted(1),
 	}
 
 	u.fsMap.Store(queryID, lInfo)

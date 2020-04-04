@@ -40,6 +40,7 @@ type keeperInfo struct {
 }
 
 type providerInfo struct {
+	sync.Mutex
 	providerID string
 	connected  bool
 	sessionID  uuid.UUID // for one write
@@ -1090,10 +1091,10 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 	var wg sync.WaitGroup
 	for _, pInfo := range g.providers {
 		wg.Add(1)
-		go func(proInfo *providerInfo) {
+		go func(pinfo *providerInfo) {
 			defer wg.Done()
-			proID := proInfo.providerID
-			cItem := proInfo.chanItem
+			proID := pinfo.providerID
+			cItem := pinfo.chanItem
 			if cItem != nil {
 				if pid == proID {
 					cItem.Money = role.GetBalance(cItem.ChannelID)
@@ -1122,10 +1123,12 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 								if ok {
 									value := new(big.Int).SetBytes(cSign.GetValue())
 									utils.MLogger.Info("channel value in local is:", value.String())
+									pinfo.Lock()
 									if value.Cmp(cItem.Value) > 0 {
 										cItem.Value = value
 										cItem.Sig = valueByte
 									}
+									pinfo.Unlock()
 								}
 							}
 						}
@@ -1138,17 +1141,21 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 								if ok {
 									value := new(big.Int).SetBytes(cSign.GetValue())
 									utils.MLogger.Info("channel value from remote is:", value.String())
+									pinfo.Lock()
 									if value.Cmp(cItem.Value) > 0 {
 										cItem.Value = value
 										cItem.Sig = valueRemote
 									}
+									pinfo.Unlock()
 								}
 							}
 						}
 
 						g.ds.PutKey(ctx, km.ToString(), cItem.Sig, nil, "local")
 						if cItem.Value.Cmp(cItem.Money) < 0 {
-							proInfo.chanItem = cItem
+							pinfo.Lock()
+							pinfo.chanItem = cItem
+							pinfo.Unlock()
 							return
 						}
 					}
@@ -1172,7 +1179,9 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 				return
 			}
 
-			proInfo.chanItem = &gotItem
+			pinfo.Lock()
+			pinfo.chanItem = &gotItem
+			pinfo.Unlock()
 		}(pInfo)
 	}
 	wg.Wait()
@@ -1205,10 +1214,12 @@ func (g *groupInfo) loadChannelValue(ctx context.Context) error {
 						if ok {
 							value := new(big.Int).SetBytes(cSign.GetValue())
 							utils.MLogger.Info("channel value in local is:", value.String())
+							proInfo.Lock()
 							if value.Cmp(proInfo.chanItem.Value) > 0 {
 								proInfo.chanItem.Value = value
 								proInfo.chanItem.Sig = valueByte
 							}
+							proInfo.Unlock()
 						}
 					}
 
@@ -1221,10 +1232,13 @@ func (g *groupInfo) loadChannelValue(ctx context.Context) error {
 							if ok {
 								value := new(big.Int).SetBytes(cSign.GetValue())
 								utils.MLogger.Info("channel value from remote is:", value.String())
+
+								proInfo.Lock()
 								if value.Cmp(proInfo.chanItem.Value) > 0 {
 									proInfo.chanItem.Value = value
 									proInfo.chanItem.Sig = valueRemote
 								}
+								proInfo.Unlock()
 							}
 						}
 					}

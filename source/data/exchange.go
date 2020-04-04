@@ -334,7 +334,6 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		}
 		if err.Error() == dataformat.ErrDataTooShort.Error() {
 			go n.aCache.Summit(skey[0])
-			return nil, ErrRetry
 		}
 		return nil, err
 	}

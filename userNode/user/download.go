@@ -39,16 +39,6 @@ type downloadTask struct {
 
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts DownloadObjectOptions) error {
-	// download are not parallel now; due to readpay
-	// modify later
-	got := l.downSem.TryAcquire(1)
-	if !got {
-		for _, f := range completeFuncs {
-			f(ErrResourceUnavailable)
-		}
-		return ErrResourceUnavailable
-	}
-	defer l.downSem.Release(1)
 	//下载需要10资源
 	ok := l.Sm.TryAcquire(10)
 	if !ok {
@@ -392,11 +382,14 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 				return
 			}
 
+			pinfo.Lock()
+
 			//user给channel合约签名，发给provider
 			mes, money, err := do.getChannelSign(pinfo.chanItem, eachLen)
 			if err != nil {
 				if do.group.userID != do.group.groupID {
 					utils.MLogger.Warnf("get channel fails: %s", err)
+					pinfo.Unlock()
 					sm.Release(1)
 					return
 				}
@@ -406,6 +399,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			bgm, _ := metainfo.NewKey(chunkid, mpb.KeyType_Block, strconv.Itoa(int(segStart)), strconv.Itoa(segNeed))
 			b, err := do.group.ds.GetBlock(ctx, bgm.ToString(), mes, provider)
 			if err != nil {
+				pinfo.Unlock()
 				utils.MLogger.Warnf("Get Block %s from %s failed: %s", ncid, provider, err)
 				if err.Error() == role.ErrWrongMoney.Error() {
 					utils.MLogger.Infof("Try load channel value from %s", provider)
@@ -423,6 +417,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			ok, err = dataformat.VerifyBlockLength(blkData, segStart, segNeed)
 			if !ok || err != nil {
 				utils.MLogger.Errorf("Verify Block %s from %s offset unmatched, Err: %s", chunkid, provider, err)
+				pinfo.Unlock()
 				sm.Release(1)
 				return
 			}
@@ -430,6 +425,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			_, _, ok = do.decoder.VerifyBlock(blkData, chunkid)
 			if !ok {
 				utils.MLogger.Warn("Fail to verify block: ", chunkid, " from:", provider)
+				pinfo.Unlock()
 				sm.Release(1)
 				return
 			}
@@ -440,11 +436,13 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 				pinfo.chanItem.Sig = mes
 				pinfo.chanItem.Dirty = true
 				utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
-
+				pinfo.Unlock()
 				key, err := metainfo.NewKey(pinfo.chanItem.ChannelID, mpb.KeyType_Channel)
 				if err == nil {
 					do.group.ds.PutKey(ctx, key.ToString(), mes, nil, "local")
 				}
+			} else {
+				pinfo.Unlock()
 			}
 
 			datas[inum] = blkData

@@ -27,7 +27,6 @@ type LfsInfo struct {
 	keySet     *mcl.KeySet
 	meta       *lfsMeta            //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
 	Sm         *semaphore.Weighted //用来控制对lfs的操作，目前设置为总量100，stop需要100资源，上传下载需要10，其他需要1
-	downSem    *semaphore.Weighted // download one
 	online     bool
 	writable   bool // only one user can write
 	context    context.Context
