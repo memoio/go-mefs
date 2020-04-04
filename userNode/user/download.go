@@ -39,6 +39,16 @@ type downloadTask struct {
 
 // GetObject constructs lfs download process
 func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts DownloadObjectOptions) error {
+	// download are not parallel now; due to readpay
+	// modify later
+	got := l.downSem.TryAcquire(1)
+	if !got {
+		for _, f := range completeFuncs {
+			f(ErrResourceUnavailable)
+		}
+		return ErrResourceUnavailable
+	}
+	defer l.downSem.Release(1)
 	//下载需要10资源
 	ok := l.Sm.TryAcquire(10)
 	if !ok {

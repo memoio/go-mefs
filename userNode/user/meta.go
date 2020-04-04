@@ -325,7 +325,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			bucket.mtree.Push(tag)
 			if opNum == broot.GetOpCount() {
 				if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) != 0 {
-					utils.MLogger.Errorf("bucket %s expect root %s, but got %s", bucket.Name, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(broot.GetRoot()))
+					utils.MLogger.Errorf("bucket %s expect root %s, but got %s", bucket.Name, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(bucket.mtree.Root()))
 				}
 			}
 		}
