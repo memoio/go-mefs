@@ -263,7 +263,6 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 
 	objsTree := sbucket.Objects
 
-	recursive := delimiter == ""
 	if maxKeys > user.MaxListKeys || maxKeys == 0 {
 		maxKeys = user.MaxListKeys
 	}
@@ -273,10 +272,14 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 	loi.Objects = make([]minio.ObjectInfo, 0, maxKeys)
 	recursiveKey := ""
 	entryPrefixMatch := prefix
-	lastIndex := strings.LastIndex(prefix, delimiter)
-	if lastIndex != -1 {
-		entryPrefixMatch = prefix[:lastIndex+1]
+	if len(delimiter) > 0 {
+		lastIndex := strings.LastIndex(prefix, delimiter)
+		if lastIndex > 0 {
+			entryPrefixMatch = prefix[:lastIndex+1]
+		}
 	}
+	//没有delimiter的时候全返回，有的时候只返回一层
+	recursive := len(delimiter) > 0
 	prefixLen := len(entryPrefixMatch)
 	objectIter := rbtree.NewNode()
 	if marker == "" {
