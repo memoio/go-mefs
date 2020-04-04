@@ -17,7 +17,7 @@ import (
 // GenShareObject constructs sharelink
 func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) (string, error) {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return "", ErrLfsServiceNotReady
 	}
 

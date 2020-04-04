@@ -292,10 +292,11 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 	}
 	limit := maxKeys
 
+	hasPrefixKey := false
+
 	//用于过滤prefix
 	first := true
 	for ; limit > 0 && objectIter != nil; objectIter = objectIter.Next() {
-		limit--
 		object := objectIter.Value.(*user.ObjectInfo)
 		if object.Deletion {
 			continue
@@ -312,6 +313,11 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 
 		//非递归，只返回一级目录
 		if !recursive {
+			//已经新建有用Prefix命名的了
+			if name == prefix {
+				hasPrefixKey = true
+			}
+			//看看这个能不能抽象出文件夹
 			index := strings.Index(name[prefixLen:], delimiter)
 			//无"/"，简单对象
 			if index < 0 {
@@ -324,28 +330,24 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 					ETag:        object.GetETag(),
 					ContentType: object.GetInfo().GetContentType(),
 				})
-				continue
-			}
-			//有"/"，获取文件夹
-			if first {
-				first = false
-				recursiveKey = name[:prefixLen+index+1]
-				loi.Prefixes = append(loi.Prefixes, recursiveKey)
 			} else {
-				//这个前缀已经记录，不管
-				if strings.HasPrefix(name, recursiveKey) {
-					continue
-				}
+				//有"/"，获取文件夹抽象
+				if first {
+					first = false
+					recursiveKey = name[:prefixLen+index+1]
+					loi.Prefixes = append(loi.Prefixes, recursiveKey)
+				} else {
+					//这个前缀已经记录，不管
+					if strings.HasPrefix(name, recursiveKey) {
+						continue
+					}
 
-				//一个新前缀
-				recursiveKey = name[:prefixLen+index+1]
-				loi.Prefixes = append(loi.Prefixes, recursiveKey)
+					//一个新前缀
+					recursiveKey = name[:prefixLen+index+1]
+					loi.Prefixes = append(loi.Prefixes, recursiveKey)
+				}
 			}
 		} else { //递归获取，全部返回
-			//进行前缀判定
-			if !strings.HasPrefix(name, prefix) {
-				continue
-			}
 			loi.Objects = append(loi.Objects, minio.ObjectInfo{
 				Bucket:      bucket,
 				Name:        object.GetInfo().GetName(),
@@ -356,6 +358,18 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 				ContentType: object.GetInfo().GetContentType(),
 			})
 		}
+		limit--
+	}
+
+	//!recursive时返回的结果依然包括Prefix，抽象成文件夹
+	if len(prefix) > 0 && !recursive && !hasPrefixKey {
+		loi.Objects = append(loi.Objects, minio.ObjectInfo{
+			Bucket:  bucket,
+			Name:    entryPrefixMatch,
+			Size:    0,
+			IsDir:   true,
+			ModTime: time.Now().UTC(),
+		})
 	}
 	//没读完
 	if objectIter != nil {

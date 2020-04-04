@@ -828,6 +828,19 @@ func (g *groupInfo) getBlockProviders(ctx context.Context, blockID string) (stri
 	return "", 0, ErrNoProviders
 }
 
+func (g *groupInfo) CheckKeepersConn(ctx context.Context) (int, error) {
+	if g == nil {
+		return 0, ErrLfsServiceNotReady
+	}
+	count := 0
+	for _, kp := range g.tempKeepers {
+		if g.ds.Connect(ctx, kp) { //连接不上此keeper
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []string, error) {
 	if g == nil {
 		return nil, nil, ErrLfsServiceNotReady

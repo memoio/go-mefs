@@ -20,7 +20,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 		return nil, ErrResourceUnavailable
 	}
 	defer l.Sm.Release(1)
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -91,13 +91,13 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 
 // HeadObject get the info of an object
 func (l *LfsInfo) HeadObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error) {
-	//????1??
+	//需要1资源
 	ok := l.Sm.TryAcquire(1)
 	if !ok {
 		return nil, ErrResourceUnavailable
 	}
 	defer l.Sm.Release(1)
-	if !l.online || l.meta.buckets == nil {
+	if l.meta.buckets == nil { //只读不需要Online
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -135,8 +135,8 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 	if !ok {
 		return nil, ErrResourceUnavailable
 	}
-	defer l.Sm.Release(2)
-	if !l.online || l.meta.buckets == nil {
+	defer l.Sm.Release(2) //只读不需要Online
+	if l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -168,7 +168,7 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 }
 
 func (l *LfsInfo) GetsuperBucket(ctx context.Context, bucketName string) (*superBucket, error) {
-	if !l.online || l.meta.buckets == nil {
+	if l.meta.buckets == nil { //只读不需要Online
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -193,7 +193,7 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 		return 0, ErrResourceUnavailable
 	}
 	defer l.Sm.Release(2)
-	if !l.online || l.meta.buckets == nil {
+	if l.meta.buckets == nil { //只读不需要Online
 		return 0, ErrLfsServiceNotReady
 	}
 
@@ -211,7 +211,7 @@ func (l *LfsInfo) ShowStorage(ctx context.Context) (uint64, error) {
 
 // ShowBucketStorage show lfs used spaceBucket
 func (l *LfsInfo) ShowBucketStorage(ctx context.Context, bucketName string) (uint64, error) {
-	if !l.online || l.meta.buckets == nil {
+	if l.meta.buckets == nil { //只读不需要Online
 		return 0, ErrLfsServiceNotReady
 	}
 

@@ -49,7 +49,7 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 	}
 	defer l.Sm.Release(10)
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		for _, f := range completeFuncs {
 			f(ErrLfsServiceNotReady)
 		}

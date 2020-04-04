@@ -86,7 +86,7 @@ func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName strin
 }
 
 func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation bool) (*superBucket, *ObjectInfo, error) {
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return nil, nil, ErrLfsServiceNotReady
 	}
 
