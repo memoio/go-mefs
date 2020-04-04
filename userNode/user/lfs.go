@@ -39,7 +39,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return ErrLfsServiceNotReady
 	}
 	// user is online or starting
-	if l.online || (l.gInfo.state >= starting) {
+	if l.Online() || (l.gInfo.state >= starting) {
 		return nil
 	}
 
@@ -210,6 +210,15 @@ func (l *LfsInfo) Stop() error {
 
 // Online user's info
 func (l *LfsInfo) Online() bool {
+	if l.gInfo.state < groupStarted {
+		return false
+	}
+	count, err := l.gInfo.CheckKeepersConn(l.context)
+	if count <= 0 || err != nil {
+		l.online = false
+	} else {
+		l.online = true
+	}
 	//用于通知资源释放
 	return l.online
 }
@@ -228,7 +237,7 @@ func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if l.online && l.writable {
+			if l.Online() && l.writable {
 				ok := l.Sm.TryAcquire(1)
 				//sendHeartBeat的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
 				if ok {
@@ -250,7 +259,7 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if l.online && l.writable {
+			if l.Online() && l.writable {
 				ok := l.Sm.TryAcquire(1)
 				//persistRoot的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
 				if ok {
@@ -259,7 +268,7 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 				l.genRoot()
 			}
 		case <-ctx.Done():
-			if l.online && l.writable {
+			if l.Online() && l.writable {
 				l.genRoot()
 			}
 			return nil
@@ -348,14 +357,14 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if l.online && l.writable { //LFS没启动不刷新
+			if l.Online() && l.writable { //LFS没启动不刷新
 				err := l.Fsync(false)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
 				}
 			}
 		case <-ctx.Done():
-			if l.online && l.writable { //LFS没启动不刷新
+			if l.Online() && l.writable { //LFS没启动不刷新
 				err := l.Fsync(true)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
@@ -373,7 +382,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	if ok {
 		defer l.Sm.Release(1)
 	}
-	if !l.online {
+	if !l.Online() {
 		return ErrLfsServiceNotReady
 	}
 

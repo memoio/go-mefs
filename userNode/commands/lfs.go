@@ -195,6 +195,7 @@ var LfsCmd = &cmds.Command{
 		"list_providers": lfsListProviderrsCmd,
 		"list_users":     lfsListUsersCmd,
 		"fsync":          lfsFsyncCmd,
+		"online":         lfsOnlineCmd,
 		"start":          lfsStartUserCmd,
 		"kill":           lfsKillUserCmd,
 		"show_storage":   lfsShowStorageCmd,
@@ -1483,7 +1484,7 @@ var lfsFsyncCmd = &cmds.Command{
 'mefs lfs fsync' is a plumbing command to flush lfs.
  It outputs the following to stdout:
 
-	error of Flush Success)
+	error or Flush Success
 
 `,
 	},
@@ -1492,7 +1493,7 @@ var lfsFsyncCmd = &cmds.Command{
 		//暂时不需要输入
 	},
 	Options: []cmds.Option{
-		cmds.BoolOption(ForceFlush, "f", "Prefix can filter result").WithDefault(false),
+		cmds.BoolOption(ForceFlush, "f", "Force flush").WithDefault(false),
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -1531,19 +1532,79 @@ var lfsFsyncCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		return cmds.EmitOnce(res, &StringList{
-			ChildLists: []string{"Flush Success"},
-		})
+		return cmds.EmitOnce(res, "Flush Success\n")
 	},
-	Type: StringList{},
+	Type: "",
 	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl string) error {
 			_, err := fmt.Fprintf(w, "%s", fl)
 			return err
 		}),
 	},
 }
 
+var lfsOnlineCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "Check whether specified user online or not",
+		ShortDescription: `
+'mefs lfs online' is a plumbing command to check net.
+ It outputs the following to stdout:
+
+	true or false
+
+`,
+	},
+
+	Arguments: []cmds.Argument{
+		//暂时不需要输入
+	},
+	Options: []cmds.Option{
+		cmds.BoolOption(ForceFlush, "f", "Prefix can filter result").WithDefault(false),
+		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
+		var userid string
+		addressid, found := req.Options[AddressID].(string)
+		if addressid == "" || !found {
+			userid = node.Identity.Pretty()
+		} else {
+			userid, err = address.GetIDFromAddress(addressid)
+			if err != nil {
+				return err
+			}
+		}
+		lfs := userIns.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
+			ok = false
+		} else {
+			ok = true
+		}
+		return cmds.EmitOnce(res, ok)
+	},
+	Type: bool(true),
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, ok bool) error {
+			var err error
+			if ok {
+				_, err = fmt.Fprintf(w, "%s\n", "online")
+			} else {
+				_, err = fmt.Fprintf(w, "%s\n", "offline")
+			}
+			return err
+		}),
+	},
+}
 var lfsShowStorageCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "show the storage space used",
@@ -1554,7 +1615,7 @@ mefs lfs show_storage show the storage space used(kb)
 	},
 
 	Arguments: []cmds.Argument{
-		cmds.StringArg("BucketName", false, false, "The bucket you want to show storage").EnableStdin(),
+		cmds.StringArg("BucketName", false, false, "The bucket you want to show storage"),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),

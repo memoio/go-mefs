@@ -37,7 +37,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	}
 	defer l.Sm.Release(1)
 	// TODO judge datacount + parity count <= providers
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -126,7 +126,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 		return nil, ErrResourceUnavailable
 	}
 	defer l.Sm.Release(1)
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -165,7 +165,7 @@ func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.Bucke
 		return nil, ErrResourceUnavailable
 	}
 	defer l.Sm.Release(1)
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
@@ -189,7 +189,7 @@ func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*mpb.Bucket
 		return nil, ErrResourceUnavailable
 	}
 	defer l.Sm.Release(2)
-	if !l.online || l.meta.buckets == nil {
+	if !l.Online() || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
 
