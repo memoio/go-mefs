@@ -419,6 +419,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	}
 	for i := len(l.meta.deletedBuckets) - 1; i >= 0; i-- {
 		bucket := l.meta.deletedBuckets[i]
+		dirty := bucket.dirty
 		if bucket.dirty || isForce {
 			err := l.flushBucketAndObjects(bucket, isForce)
 			if err != nil {
@@ -426,7 +427,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			}
 		}
 
-		if !isForce && !bucket.dirty {
+		if !isForce && !dirty {
 			//deletedBuckets 只有最后几个可能为脏
 			break
 		}

@@ -20,7 +20,7 @@ import (
 func newsuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
 	return &superBucket{
 		BucketInfo:  binfo,
-		dirty:       true,
+		dirty:       dirty,
 		Objects:     rbtree.NewTree(),
 		obMetaCache: make([]byte, maxCacheSize),
 		obCacheSize: 0,

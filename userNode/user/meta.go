@@ -203,7 +203,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 			bucketIDToName: make(map[int64]string),
 		}
 
-		utils.MLogger.Info("%s has %d buckets", l.fsID, lm.sb.GetNextBucketID()-1)
+		utils.MLogger.Infof("%s has %d buckets", l.fsID, lm.sb.GetNextBucketID()-1)
 		if l.userID != l.gInfo.rootID {
 			gotTime, gotRoot, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
 			if err == nil {
@@ -214,7 +214,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 					}
 				}
 				if has {
-					utils.MLogger.Info("local fs has contract merkle root")
+					utils.MLogger.Infof("local fs contais contract merkle root: %s at %d", hex.EncodeToString(gotRoot[:]), gotTime)
 				} else {
 					utils.MLogger.Info("local fs has not contract merkle root")
 				}
@@ -276,21 +276,22 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
 			l.meta.bucketIDToName[bucketID] = bname
 		}
 		return nil
-	} else {
-		utils.MLogger.Info("Construct delete buckets: ", bucketID)
-		binfo := mpb.BucketInfo{
-			Name:     strconv.FormatInt(bucketID, 10),
-			BucketID: bucketID,
-			Deletion: true,
-		}
-
-		bucket := newsuperBucket(binfo, true)
-
-		bucket.mtree.SetIndex(0)
-		bucket.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
-		l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
 	}
-	return ErrCannotLoadMetaBlock
+
+	utils.MLogger.Info("Construct delete buckets: ", bucketID)
+	binfo := mpb.BucketInfo{
+		Name:     strconv.FormatInt(bucketID, 10),
+		BucketID: bucketID,
+		Deletion: true,
+	}
+
+	bucket := newsuperBucket(binfo, true)
+
+	bucket.mtree.SetIndex(0)
+	bucket.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
+	bucket.Root = bucket.mtree.Root()
+	l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
+	return nil
 }
 
 //-------------------------Load Objectinfo----------------------------
@@ -343,7 +344,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 			bucket.mtree.Push(tag)
 			if opNum == broot.GetOpCount() {
 				if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) != 0 {
-					utils.MLogger.Errorf("bucket %s expect root %s, but got %s", bucket.Name, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(bucket.mtree.Root()))
+					utils.MLogger.Errorf("bucket %s at ops %d expect root %s, but got %s", bucket.Name, opNum, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(bucket.mtree.Root()))
 				}
 			}
 		}
@@ -352,7 +353,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
 		// verify root
 		// verify ops
 		if opNum != bucket.GetNextOpID() {
-			utils.MLogger.Infof("Load ops is not correct, expect: %d, but got %d", bucket.GetNextOpID(), opNum)
+			utils.MLogger.Errorf("Load ops is not correct, expect: %d, but got %d", bucket.GetNextOpID(), opNum)
 		}
 
 		return nil
