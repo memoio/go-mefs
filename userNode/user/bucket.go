@@ -8,20 +8,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/memoio/go-mefs/utils/RbTree"
 	"github.com/gogo/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
+	rbtree "github.com/memoio/go-mefs/utils/RbTree"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
-func newSuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
+func newsuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
 	return &superBucket{
 		BucketInfo:  binfo,
 		dirty:       true,
-		objects:     rbtree.NewTree(),
+		Objects:     rbtree.NewTree(),
 		obMetaCache: make([]byte, maxCacheSize),
 		obCacheSize: 0,
 		mtree:       mt.New(sha256.New()),
@@ -30,6 +30,12 @@ func newSuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
 
 // CreateBucket create a bucket for a specified LFSservice
 func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *mpb.BucketOptions) (*mpb.BucketInfo, error) {
+	//操作需要1资源
+	ok := l.Sm.TryAcquire(1)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(1)
 	// TODO judge datacount + parity count <= providers
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
@@ -89,7 +95,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		NextOpID:     0,
 	}
 
-	bucket := newSuperBucket(binfo, true)
+	bucket := newsuperBucket(binfo, true)
 
 	bucket.mtree.SetIndex(0)
 	bucket.mtree.Push([]byte(l.fsID + bucketName))
@@ -114,6 +120,12 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 
 // DeleteBucket deletes a bucket from a specified LFSservice
 func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error) {
+	//操作需要1资源
+	ok := l.Sm.TryAcquire(1)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(1)
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -137,9 +149,8 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	bucket.Lock()
 	bucket.Deletion = true
 	delete(l.meta.buckets, bucket.Name)
-	bname := bucket.Name + "." + strconv.Itoa(int(bucket.BucketID))
-	l.meta.buckets[bname] = bucket
-	l.meta.bucketIDToName[bucket.BucketID] = bname
+	delete(l.meta.bucketIDToName, bucket.GetBucketID())
+	l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
 	bucket.dirty = true
 	bucket.Unlock()
 
@@ -148,6 +159,12 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 
 // HeadBucket get a superBucket's metainfo
 func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error) {
+	//操作需要1资源
+	ok := l.Sm.TryAcquire(1)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(1)
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}
@@ -166,6 +183,12 @@ func (l *LfsInfo) HeadBucket(ctx context.Context, bucketName string) (*mpb.Bucke
 
 // ListBuckets lists all Buckets information
 func (l *LfsInfo) ListBuckets(ctx context.Context, prefix string) ([]*mpb.BucketInfo, error) {
+	//操作需要2资源
+	ok := l.Sm.TryAcquire(2)
+	if !ok {
+		return nil, ErrResourceUnavailable
+	}
+	defer l.Sm.Release(2)
 	if !l.online || l.meta.buckets == nil {
 		return nil, ErrLfsServiceNotReady
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
 	mt "gitlab.com/NebulousLabs/merkletree"
+	"golang.org/x/sync/semaphore"
 )
 
 // LfsInfo has lfs info
@@ -24,7 +25,8 @@ type LfsInfo struct {
 	gInfo      *groupInfo
 	ds         data.Service
 	keySet     *mcl.KeySet
-	meta       *lfsMeta //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
+	meta       *lfsMeta            //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
+	Sm         *semaphore.Weighted //用来控制对lfs的操作，目前设置为总量100，stop需要100资源，上传下载需要10，其他需要1
 	online     bool
 	writable   bool // only one user can write
 	context    context.Context
@@ -41,6 +43,11 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		return nil
 	}
 
+	err := l.Sm.Acquire(ctx, defaultWeighted)
+	if err != nil {
+		return err
+	}
+	defer l.Sm.Release(defaultWeighted)
 	l.gInfo.state = starting
 	l.online = false
 	l.writable = true
@@ -130,7 +137,19 @@ func (l *LfsInfo) startLfs() error {
 			utils.MLogger.Info("Load bucket info fail: ", err)
 			return err
 		}
+		//优先加载没被删除的
 		for _, bucket := range l.meta.buckets {
+			bucket.Lock()
+			err = l.loadObjectsInfo(bucket) //再加载Object元数据
+			bucket.Unlock()
+			if err != nil {
+				utils.MLogger.Error("Load objects in bucket", bucket.Name, " fail: ", err)
+				continue
+			}
+			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
+		}
+
+		for _, bucket := range l.meta.deletedBuckets {
 			bucket.Lock()
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
 			bucket.Unlock()
@@ -177,6 +196,12 @@ func newSuperBlock() *superBlock {
 
 // Stop user's info
 func (l *LfsInfo) Stop() error {
+	//操作需要所有资源
+	ok := l.Sm.TryAcquire(defaultWeighted)
+	if !ok {
+		return ErrResourceUnavailable
+	}
+	defer l.Sm.Release(defaultWeighted)
 	//用于通知资源释放
 	l.gInfo.stop(l.context)
 	l.cancelFunc()
@@ -204,6 +229,11 @@ func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 		select {
 		case <-tick.C:
 			if l.online && l.writable {
+				ok := l.Sm.TryAcquire(1)
+				//sendHeartBeat的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
+				if ok {
+					defer l.Sm.Release(1)
+				}
 				l.gInfo.heartbeat(ctx)
 			}
 		case <-ctx.Done():
@@ -221,6 +251,11 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 		select {
 		case <-tick.C:
 			if l.online && l.writable {
+				ok := l.Sm.TryAcquire(1)
+				//persistRoot的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
+				if ok {
+					defer l.Sm.Release(1)
+				}
 				l.genRoot()
 			}
 		case <-ctx.Done():
@@ -333,6 +368,11 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 
 //Fsync 现在只刷新metaBlock，以后可以删除数据块的时候先只标记，然后再在Fsync统一刷新
 func (l *LfsInfo) Fsync(isForce bool) error {
+	ok := l.Sm.TryAcquire(1)
+	//Fsync的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
+	if ok {
+		defer l.Sm.Release(1)
+	}
 	if !l.online {
 		return ErrLfsServiceNotReady
 	}
@@ -350,6 +390,18 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 		err := l.flushBucketAndObjects(bucket, isForce)
 		if err != nil {
 			return err
+		}
+	}
+	for i := len(l.meta.deletedBuckets) - 1; i >= 0; i-- {
+		bucket := l.meta.deletedBuckets[i]
+		if bucket.dirty || isForce {
+			err := l.flushBucketAndObjects(bucket, isForce)
+			if err != nil {
+				utils.MLogger.Error("Flush deleted bucket's info failed, bucket is", bucket.GetName())
+			} else {
+				//deletedBuckets 只有最后几个可能为脏
+				break
+			}
 		}
 	}
 

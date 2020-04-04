@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/memoio/go-mefs/core"
 	"github.com/memoio/go-mefs/userNode/user"
 
 	minio "github.com/minio/minio/cmd"
@@ -27,13 +26,16 @@ var (
 )
 
 func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object string, options minio.ObjectOptions) (uploadID string, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return "", errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return "", errLfsServiceNotReady
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	_, err = lfs.HeadBucket(ctx, bucket)
+	_, err = l.lfs.HeadBucket(ctx, bucket)
 	if err != nil {
 		cancel()
 		return "", err
@@ -45,12 +47,13 @@ func (l *lfsGateway) NewMultipartUpload(ctx context.Context, bucket, object stri
 		return "", err
 	}
 
-	ops := user.DefaultOption()
-	ops.UserDefined = options.UserDefined
+	ops := user.PutObjectOptions{
+		UserDefined: options.UserDefined,
+	}
 
 	go func() {
 		reader := bufio.NewReaderSize(upload.Stream, user.DefaultBufSize)
-		obj, err := lfs.PutObject(ctx, bucket, object, reader, ops)
+		obj, err := l.lfs.PutObject(ctx, bucket, object, reader, ops)
 		uploads.RemoveByID(upload.ID)
 		if err != nil {
 			upload.fail(err)

@@ -15,7 +15,7 @@ import (
 )
 
 // GenShareObject constructs sharelink
-func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (string, error) {
+func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName string) (string, error) {
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.buckets == nil {
 		return "", ErrLfsServiceNotReady
@@ -26,7 +26,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 		return "", ErrBucketNotExist
 	}
 
-	object, ok := bucket.objects.Find(MetaName(objectName)).(*objectInfo)
+	object, ok := bucket.Objects.Find(MetaName(objectName)).(*ObjectInfo)
 	if !ok || object.Deletion {
 		return "", ErrObjectNotExist
 	}
@@ -71,7 +71,7 @@ func (l *LfsInfo) GenShareObject(ctx context.Context, bucketName, objectName str
 }
 
 // GetShareObject constructs lfs download process
-func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string, opts ObjectOptions) error {
+func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFuncs []CompleteFunc, uid, localSk string, share string) error {
 	utils.MLogger.Debug("Download Share Object")
 	shareByte, err := b58.Decode(share)
 	if err != nil {

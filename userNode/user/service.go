@@ -7,12 +7,40 @@ import (
 	mpb "github.com/memoio/go-mefs/proto"
 )
 
-type ObjectOptions struct {
+type DownloadObjectOptions struct {
+	Start, Length int64
+}
+
+func DefaultDownloadOption() DownloadObjectOptions {
+	return DownloadObjectOptions{
+		Start:  0,
+		Length: -1,
+	}
+}
+
+type ListObjectsOptions struct {
+	Prefix, Marker, Delimiter string
+	MaxKeys                   int
+	Recursive                 bool
+}
+
+func DefaultListOption() ListObjectsOptions {
+	return ListObjectsOptions{
+		MaxKeys:   MaxListKeys,
+		Recursive: true,
+	}
+}
+
+type ListObjectsResult struct {
+	Objects []*mpb.ObjectInfo
+}
+
+type PutObjectOptions struct {
 	UserDefined map[string]string
 }
 
-func DefaultOption() ObjectOptions {
-	return ObjectOptions{
+func DefaultUploadOption() PutObjectOptions {
+	return PutObjectOptions{
 		UserDefined: make(map[string]string),
 	}
 }
@@ -29,11 +57,11 @@ type FileSyetem interface {
 	HeadBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error)
 	DeleteBucket(ctx context.Context, bucketName string) (*mpb.BucketInfo, error)
 
-	ListObjects(ctx context.Context, bucketName, prefix string, opts ObjectOptions) ([]*mpb.ObjectInfo, error)
+	ListObjects(ctx context.Context, bucketName, prefix string, opts ListObjectsOptions) ([]*mpb.ObjectInfo, error)
 
-	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts ObjectOptions) (*mpb.ObjectInfo, error)
-	GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts ObjectOptions) error
-	HeadObject(ctx context.Context, bucketName, objectName string, opts ObjectOptions) (*mpb.ObjectInfo, error)
+	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, opts PutObjectOptions) (*mpb.ObjectInfo, error)
+	GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts DownloadObjectOptions) error
+	HeadObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error)
 	DeleteObject(ctx context.Context, bucketName, objectName string) (*mpb.ObjectInfo, error)
 
 	ShowStorage(ctx context.Context) (uint64, error)

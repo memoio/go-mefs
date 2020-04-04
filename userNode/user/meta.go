@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -33,6 +32,7 @@ type lfsMeta struct {
 	sb             *superBlock
 	bucketIDToName map[int64]string        //bucketID-> bucketName
 	buckets        map[string]*superBucket //bucketName -> bucket
+	deletedBuckets []*superBucket
 }
 
 // superBlock has lfs bucket info
@@ -45,16 +45,17 @@ type superBlock struct {
 // superBucket has lfs objects info
 type superBucket struct {
 	mpb.BucketInfo
-	objects     *rbtree.Tree
-	obMetaCache []byte
-	obCacheSize int //obMetaCache 已经用了多少
-	dirty       bool
+	Objects       *rbtree.Tree
+	DeletedObject []*ObjectInfo
+	obMetaCache   []byte
+	obCacheSize   int //obMetaCache 已经用了多少
+	dirty         bool
 	sync.RWMutex
 	mtree *mt.Tree
 }
 
 // objectInfo stores an object meta info
-type objectInfo struct {
+type ObjectInfo struct {
 	mpb.ObjectInfo
 	sync.RWMutex
 }
@@ -63,11 +64,7 @@ type MetaName string
 
 func (x MetaName) LessThan(y interface{}) bool {
 	yStr := y.(MetaName)
-	res := strings.Compare(string(x), string(yStr))
-	if res >= 0 {
-		return false
-	}
-	return true
+	return x < yStr
 }
 
 //----------------------Flush superBlock---------------------------
@@ -148,7 +145,7 @@ func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 
 //---------------------Flush objects' Meta for given superBucket--------
 func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
-	if bucket == nil || bucket.objects == nil {
+	if bucket == nil || bucket.Objects == nil {
 		return nil
 	}
 
@@ -261,17 +258,18 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
 			return err
 		}
 
-		tsb := newSuperBucket(bucket, false)
+		tsb := newsuperBucket(bucket, false)
 
 		tsb.mtree.SetIndex(0)
 		tsb.mtree.Push([]byte(l.fsID + bucket.Name))
 
 		bname := bucket.Name
 		if bucket.Deletion {
-			bname = bucket.Name + "." + strconv.Itoa(int(bucket.BucketID))
+			l.meta.deletedBuckets = append(l.meta.deletedBuckets, tsb)
+		} else {
+			l.meta.buckets[bname] = tsb
+			l.meta.bucketIDToName[bucketID] = bname
 		}
-		l.meta.buckets[bname] = tsb
-		l.meta.bucketIDToName[bucketID] = bname
 		return nil
 	}
 	return ErrCannotLoadMetaBlock
@@ -356,10 +354,10 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			utils.MLogger.Error("OpAdd payload parse failed, bucket: ", bucket.GetName())
 			return err
 		}
-		if ob := bucket.objects.Find(MetaName(info.GetName())); ob != nil {
+		if ob := bucket.Objects.Find(MetaName(info.GetName())); ob != nil {
 			return ErrObjectAlreadyExist
 		}
-		bucket.objects.Insert(MetaName(info.GetName()), &objectInfo{
+		bucket.Objects.Insert(MetaName(info.GetName()), &ObjectInfo{
 			ObjectInfo: mpb.ObjectInfo{
 				Info:      &info,
 				Deletion:  false,
@@ -378,7 +376,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			utils.MLogger.Error("OpAppend payload parse failed, bucket: ", bucket.GetName())
 			return err
 		}
-		ob, ok := bucket.objects.Find(MetaName(part.GetName())).(*objectInfo)
+		ob, ok := bucket.Objects.Find(MetaName(part.GetName())).(*ObjectInfo)
 		if !ok || ob == nil {
 			utils.MLogger.Error("Add Part-", part.GetPartID(), "to an inexistent object-", part.GetName())
 			return ErrObjectNotExist
@@ -402,16 +400,15 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			utils.MLogger.Error("OpDelete payload parse failed, bucket: ", bucket.GetName())
 			return err
 		}
-		ob, ok := bucket.objects.Find(MetaName(mes.GetName())).(*objectInfo)
+		ob, ok := bucket.Objects.Find(MetaName(mes.GetName())).(*ObjectInfo)
 		if !ok || ob == nil {
 			utils.MLogger.Error("Delete an inexistent object-", mes.GetName())
 			return err
 		}
 		ob.Lock()
 		ob.Deletion = true
-		bucket.objects.Delete(MetaName(mes.GetName()))
-		deleteOName := mes.GetName() + "." + strconv.FormatInt(mes.GetObjectID(), 10)
-		bucket.objects.Insert(MetaName(deleteOName), ob)
+		bucket.Objects.Delete(MetaName(mes.GetName()))
+		bucket.DeletedObject = append(bucket.DeletedObject, ob)
 		ob.Unlock()
 	case mpb.LfsOp_OpCancel:
 		return errors.New("Undefined")

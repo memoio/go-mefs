@@ -38,7 +38,16 @@ type downloadTask struct {
 }
 
 // GetObject constructs lfs download process
-func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts ObjectOptions) error {
+func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer, completeFuncs []CompleteFunc, opts DownloadObjectOptions) error {
+	//下载需要10资源
+	ok := l.Sm.TryAcquire(10)
+	if !ok {
+		for _, f := range completeFuncs {
+			f(ErrResourceUnavailable)
+		}
+		return ErrResourceUnavailable
+	}
+	defer l.Sm.Release(10)
 	utils.MLogger.Info("Download Object: ", objectName, " from bucket: ", bucketName)
 	if !l.online || l.meta.buckets == nil {
 		for _, f := range completeFuncs {
@@ -55,14 +64,14 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		return ErrBucketNotExist
 	}
 
-	objectRes := bucket.objects.Find(MetaName(objectName))
+	objectRes := bucket.Objects.Find(MetaName(objectName))
 	if objectRes == nil {
 		for _, f := range completeFuncs {
 			f(ErrObjectNotExist)
 		}
 		return ErrObjectNotExist
 	}
-	object := objectRes.(*objectInfo)
+	object := objectRes.(*ObjectInfo)
 	object.RLock()
 	defer object.RUnlock()
 
@@ -73,17 +82,9 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		return ErrObjectNotExist
 	}
 
-	opStart := int64(0)
-	pst, ok := opts.UserDefined["start"]
-	if ok {
-		opStart, _ = strconv.ParseInt(pst, 10, 0)
-	}
+	opStart := opts.Start
 
-	length := int64(-1)
-	ple, ok := opts.UserDefined["length"]
-	if ok {
-		length, _ = strconv.ParseInt(ple, 10, 0)
-	}
+	length := opts.Length
 
 	if length <= 0 {
 		length = object.GetLength() - opStart

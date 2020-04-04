@@ -496,7 +496,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		object, err := lfs.HeadObject(req.Context, req.Arguments[0], req.Arguments[1], user.DefaultOption())
+		object, err := lfs.HeadObject(req.Context, req.Arguments[0], req.Arguments[1])
 		if err != nil {
 			return err
 		}
@@ -504,7 +504,7 @@ var lfsHeadObjectCmd = &cmds.Command{
 		if !ok {
 			return errLfsServiceNotReady
 		}
-		avail, err := lfsInfo.GetObjectAvailTime(object)
+		avail, err := lfsInfo.GetObjectAvailTime(req.Context, object)
 		if err != nil {
 			return err
 		}
@@ -609,7 +609,7 @@ var lfsPutObjectCmd = &cmds.Command{
 		case files.File:
 			fileNext = fileType
 		}
-		object, err := lfs.PutObject(req.Context, bucketName, objectName, fileNext, user.DefaultOption())
+		object, err := lfs.PutObject(req.Context, bucketName, objectName, fileNext, user.DefaultUploadOption())
 		if err != nil {
 			return err
 		}
@@ -705,7 +705,7 @@ var lfsGetObjectCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		go lfs.GetObject(req.Context, req.Arguments[0], req.Arguments[1], bufw, complete, user.DefaultOption())
+		go lfs.GetObject(req.Context, req.Arguments[0], req.Arguments[1], bufw, complete, user.DefaultDownloadOption())
 
 		return res.Emit(piper)
 	},
@@ -788,7 +788,7 @@ var lfsListObjectsCmd = &cmds.Command{
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
 		cmds.StringOption(PrefixFilter, "Prefix can filter result").WithDefault(""),
-		cmds.BoolOption(AvailTime, "a", "The option determine wheather show available time.").WithDefault(true),
+		cmds.BoolOption(AvailTime, "a", "The option determine wheather show available time.").WithDefault(false),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -827,7 +827,7 @@ var lfsListObjectsCmd = &cmds.Command{
 		}
 
 		bucketName := req.Arguments[0]
-		objects, err := lfs.ListObjects(req.Context, bucketName, prefix, user.DefaultOption())
+		objects, err := lfs.ListObjects(req.Context, bucketName, prefix, user.DefaultListOption())
 		if err != nil {
 			return err
 		}
@@ -840,7 +840,7 @@ var lfsListObjectsCmd = &cmds.Command{
 			// init with creation time
 			avaTime := ctime.Format(utils.SHOWTIME)
 			if avail {
-				at, err := lfs.(*user.LfsInfo).GetObjectAvailTime(object)
+				at, err := lfs.(*user.LfsInfo).GetObjectAvailTime(req.Context, object)
 				if err == nil {
 					availTim, err := time.Parse(utils.BASETIME, at)
 					if err == nil {
@@ -1237,7 +1237,7 @@ It outputs the following to stdout:
 	},
 
 	Arguments: []cmds.Argument{
-		cmds.StringArg("BucketName", true, false, "The dirName you want to list").EnableStdin(),
+		cmds.StringArg("BucketName", true, false, "The bucket you want to list").EnableStdin(),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
@@ -1553,10 +1553,11 @@ mefs lfs show_storage show the storage space used(kb)
 `,
 	},
 
-	Arguments: []cmds.Argument{},
+	Arguments: []cmds.Argument{
+		cmds.StringArg("BucketName", false, false, "The bucket you want to show storage").EnableStdin(),
+	},
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
-		cmds.StringOption(PrefixFilter, "Prefix can filter result").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -1580,27 +1581,24 @@ mefs lfs show_storage show the storage space used(kb)
 				return err
 			}
 		}
-		prefix, found := req.Options[PrefixFilter].(string)
-		if !found {
-			prefix = ""
-		}
 		lfs := userIns.GetUser(userid)
 		if lfs == nil || !lfs.Online() {
 			return errLfsServiceNotReady
 		}
 
-		buckets, err := lfs.ListBuckets(req.Context, prefix)
-		if err != nil {
-			return err
-		}
 		var storageSize uint64
-		for _, bucket := range buckets {
-			storageSpace, err := lfs.ShowBucketStorage(req.Context, bucket.Name)
+		if len(req.Arguments) > 0 {
+			storageSize, err = lfs.ShowBucketStorage(req.Context, req.Arguments[0])
 			if err != nil {
 				return err
 			}
-			storageSize += storageSpace
+		} else {
+			storageSize, err = lfs.ShowStorage(req.Context)
+			if err != nil {
+				return err
+			}
 		}
+
 		FloatStorage := float64(storageSize)
 		var OutStorage string
 		if FloatStorage < 1024 && FloatStorage >= 0 {
@@ -1688,7 +1686,7 @@ var lfsGetShareCmd = &cmds.Command{
 		}
 		var complete []user.CompleteFunc
 		complete = append(complete, checkErrAndClosePipe)
-		go userIns.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0], user.DefaultOption())
+		go userIns.GetShareObject(req.Context, bufw, complete, userid, sk, req.Arguments[0])
 
 		return res.Emit(piper)
 	},
@@ -1789,7 +1787,7 @@ var lfsGenShareCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
-		slink, err := lfs.(*user.LfsInfo).GenShareObject(req.Context, req.Arguments[0], req.Arguments[1], user.DefaultOption())
+		slink, err := lfs.(*user.LfsInfo).GenShareObject(req.Context, req.Arguments[0], req.Arguments[1])
 		if err != nil {
 			return err
 		}

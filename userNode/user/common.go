@@ -13,6 +13,8 @@ const (
 	defaultTransNum = 32
 	// DefaultBufSize used for read
 	DefaultBufSize = 1024 * 1024 * 4
+
+	MaxListKeys = 1000
 )
 
 var transNum = defaultTransNum
@@ -26,6 +28,7 @@ var (
 	ErrCannotLoadMetaBlock  = errors.New("cannot load metaBlock")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
 	ErrUpload               = errors.New("upload fails")
+	ErrResourceUnavailable  = errors.New("resource unavailable")
 
 	ErrNoProviders      = errors.New("there is no providers")
 	ErrNoKeepers        = errors.New("there is no keepers")

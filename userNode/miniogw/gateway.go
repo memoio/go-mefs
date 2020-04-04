@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/memoio/go-mefs/core"
@@ -16,6 +17,7 @@ import (
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/userNode/user"
+	rbtree "github.com/memoio/go-mefs/utils/RbTree"
 	"github.com/memoio/go-mefs/utils/address"
 
 	"github.com/minio/cli"
@@ -83,14 +85,20 @@ func (g *Mefs) NewGatewayLayer(creds auth.Credentials) (minio.ObjectLayer, error
 	}
 	uploads := NewMultipartUploads()
 
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(uid)
-	if lfs == nil {
-		log.Println("warn: please start lfs first to use gateway service")
+	var lfs user.FileSyetem
+	userIns, ok := core.LocalNode.Inst.(*user.Info)
+	if !ok {
+		log.Println("warn: please check user Instance before use gateway service")
+	} else {
+		lfs = userIns.GetUser(uid)
+		if lfs == nil {
+			log.Println("warn: please start lfs first to use gateway service")
+		}
 	}
-
 	return &lfsGateway{
 		userID:    uid,
 		multipart: uploads,
+		lfs:       lfs,
 	}, nil
 }
 
@@ -102,18 +110,35 @@ func (g *Mefs) Production() bool {
 // lfsGateway implements gateway.
 type lfsGateway struct {
 	minio.GatewayUnsupported
+	lfs       user.FileSyetem
 	userID    string
 	multipart *MultipartUploads
+}
+
+func (l *lfsGateway) checkLfs(ctx context.Context) error {
+	userIns, ok := core.LocalNode.Inst.(*user.Info)
+	if !ok {
+		return errLfsServiceNotReady
+	}
+	lfs := userIns.GetUser(l.userID)
+	if lfs == nil || !lfs.Online() {
+		return errLfsServiceNotReady
+	}
+	l.lfs = lfs
+	return nil
 }
 
 // Shutdown saves any gateway metadata to disk
 // if necessary and reload upon next restart.
 func (l *lfsGateway) Shutdown(ctx context.Context) error {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
-	return lfs.Stop()
+	return l.lfs.Stop()
 }
 
 // StorageInfo is not relevant to LFS backend.
@@ -121,21 +146,27 @@ func (l *lfsGateway) StorageInfo(ctx context.Context) (si minio.StorageInfo) {
 	si.Backend.Type = minio.BackendGateway
 	si.Backend.GatewayOnline = true
 
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return si
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return si
+		}
 	}
 
-	use, _ := lfs.ShowStorage(ctx)
+	use, _ := l.lfs.ShowStorage(ctx)
 	si.Used = []uint64{use}
 	return si
 }
 
 // MakeBucketWithLocation creates a new container on LFS backend.
 func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options string) error {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
 	bucketOptions := &mpb.BucketOptions{}
@@ -143,19 +174,22 @@ func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options
 	if err != nil {
 		bucketOptions = df.DefaultBucketOptions()
 	}
-	_, err = lfs.CreateBucket(ctx, bucket, bucketOptions)
+	_, err = l.lfs.CreateBucket(ctx, bucket, bucketOptions)
 
 	return convertToMinioError(err, bucket, "")
 }
 
 // GetBucketInfo gets bucket metadata.
 func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return bi, errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return bi, convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
-	bucketInfo, err := lfs.HeadBucket(ctx, bucket)
+	bucketInfo, err := l.lfs.HeadBucket(ctx, bucket)
 	if err != nil {
 		return bi, convertToMinioError(err, bucket, "")
 	}
@@ -166,12 +200,15 @@ func (l *lfsGateway) GetBucketInfo(ctx context.Context, bucket string) (bi minio
 
 // ListBuckets lists all LFS buckets.
 func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInfo, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return nil, user.ErrLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return nil, user.ErrLfsServiceNotReady
+		}
 	}
 
-	bucketsInfo, err := lfs.ListBuckets(ctx, "")
+	bucketsInfo, err := l.lfs.ListBuckets(ctx, "")
 	if err != nil {
 		return nil, convertToMinioError(err, "", "")
 	}
@@ -186,67 +223,175 @@ func (l *lfsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 
 // DeleteBucket deletes a bucket on LFS.
 func (l *lfsGateway) DeleteBucket(ctx context.Context, bucket string) error {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
-	_, err := lfs.DeleteBucket(ctx, bucket)
+	_, err := l.lfs.DeleteBucket(ctx, bucket)
 	return convertToMinioError(err, bucket, "")
 }
 
 // ListObjects lists all blobs in LFS bucket filtered by prefix.
 func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return loi, errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return loi, convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
-
-	objs, err := lfs.ListObjects(ctx, bucket, prefix, user.DefaultOption())
+	lfsInfo := l.lfs.(*user.LfsInfo)
+	sbucket, err := lfsInfo.GetsuperBucket(ctx, bucket)
 	if err != nil {
 		return loi, convertToMinioError(err, bucket, "")
 	}
 
-	loi.Objects = make([]minio.ObjectInfo, len(objs))
-	for i, v := range objs {
-		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.GetETag()
-		loi.Objects[i].Name = v.GetInfo().GetName()
-		loi.Objects[i].Size = v.GetLength()
-		loi.Objects[i].ModTime = time.Unix(v.GetCTime(), 0).UTC()
+	//list_object需要2资源
+	err = lfsInfo.Sm.Acquire(ctx, 2)
+	if err != nil {
+		return loi, convertToMinioError(err, "", "")
+	}
+	defer lfsInfo.Sm.Release(2)
+
+	sbucket.RLock()
+	//给Bucket解锁
+	defer sbucket.RUnlock()
+
+	objsTree := sbucket.Objects
+
+	recursive := delimiter == ""
+	if maxKeys > user.MaxListKeys || maxKeys == 0 {
+		maxKeys = user.MaxListKeys
+	}
+	if maxKeys > objsTree.Size() {
+		maxKeys = objsTree.Size()
+	}
+	loi.Objects = make([]minio.ObjectInfo, 0, maxKeys)
+	recursiveKey := ""
+	entryPrefixMatch := prefix
+	lastIndex := strings.LastIndex(prefix, delimiter)
+	if lastIndex != -1 {
+		entryPrefixMatch = prefix[:lastIndex+1]
+	}
+	prefixLen := len(entryPrefixMatch)
+	objectIter := rbtree.NewNode()
+	if marker == "" {
+		objectIter = objsTree.Iterator()
+	} else {
+		objectIter = objsTree.FindIt(user.MetaName(marker))
+		if objectIter != nil {
+			objectIter = objectIter.Next()
+		}
+	}
+	limit := maxKeys
+
+	//用于过滤prefix
+	first := true
+	for ; limit > 0 && objectIter != nil; objectIter = objectIter.Next() {
+		limit--
+		object := objectIter.Value.(*user.ObjectInfo)
+		if object.Deletion {
+			continue
+		}
+		//如果没读完，则需要接着进行
+		if limit == 1 {
+			loi.NextMarker = object.GetInfo().GetName()
+		}
+		name := object.GetInfo().GetName()
+		//首先进行前缀判定
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+
+		//非递归，只返回一级目录
+		if !recursive {
+			index := strings.Index(name[prefixLen:], delimiter)
+			//无"/"，简单对象
+			if index < 0 {
+				loi.Objects = append(loi.Objects, minio.ObjectInfo{
+					Bucket:      bucket,
+					Name:        name,
+					ModTime:     time.Unix(object.GetMTime(), 0),
+					Size:        object.GetLength(),
+					IsDir:       object.GetInfo().GetDir(),
+					ETag:        object.GetETag(),
+					ContentType: object.GetInfo().GetContentType(),
+				})
+				continue
+			}
+			//有"/"，获取文件夹
+			if first {
+				first = false
+				recursiveKey = name[:prefixLen+index+1]
+				loi.Prefixes = append(loi.Prefixes, recursiveKey)
+			} else {
+				//这个前缀已经记录，不管
+				if strings.HasPrefix(name, recursiveKey) {
+					continue
+				}
+
+				//一个新前缀
+				recursiveKey = name[:prefixLen+index+1]
+				loi.Prefixes = append(loi.Prefixes, recursiveKey)
+			}
+		} else { //递归获取，全部返回
+			//进行前缀判定
+			if !strings.HasPrefix(name, prefix) {
+				continue
+			}
+			loi.Objects = append(loi.Objects, minio.ObjectInfo{
+				Bucket:      bucket,
+				Name:        object.GetInfo().GetName(),
+				ModTime:     time.Unix(object.GetMTime(), 0),
+				Size:        object.GetLength(),
+				IsDir:       object.GetInfo().GetDir(),
+				ETag:        object.GetETag(),
+				ContentType: object.GetInfo().GetContentType(),
+			})
+		}
+	}
+	//没读完
+	if objectIter != nil {
+		loi.IsTruncated = true
 	}
 	return loi, nil
 }
 
 // ListObjectsV2 lists all blobs in LFS bucket filtered by prefix
 func (l *lfsGateway) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string, maxKeys int,
-	fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, err error) {
-
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return loi, errLfsServiceNotReady
+	fetchOwner bool, startAfter string) (loiv2 minio.ListObjectsV2Info, err error) {
+	marker := continuationToken
+	if marker == "" {
+		marker = startAfter
 	}
 
-	objs, err := lfs.ListObjects(ctx, bucket, prefix, user.DefaultOption())
+	loi, err := l.ListObjects(ctx, bucket, prefix, marker, delimiter, maxKeys)
 	if err != nil {
-		return loi, convertToMinioError(err, bucket, "")
+		return loiv2, err
 	}
-	loi.Objects = make([]minio.ObjectInfo, len(objs))
-	for i, v := range objs {
-		loi.Objects[i].Bucket = bucket
-		loi.Objects[i].ETag = v.GetETag()
-		loi.Objects[i].Name = v.GetInfo().GetName()
-		loi.Objects[i].Size = v.GetLength()
-		loi.Objects[i].ModTime = time.Unix(v.GetCTime(), 0).UTC()
+
+	loiv2 = minio.ListObjectsV2Info{
+		IsTruncated:           loi.IsTruncated,
+		ContinuationToken:     continuationToken,
+		NextContinuationToken: loi.NextMarker,
+		Objects:               loi.Objects,
+		Prefixes:              loi.Prefixes,
 	}
-	return loi, nil
+	return loiv2, err
 }
 
 // GetObjectNInfo - returns object info and locked object ReadCloser
 func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return gr, errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return gr, convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
 	objInfo, err := l.GetObjectInfo(ctx, bucket, object, opts)
@@ -266,7 +411,11 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	go lfs.GetObject(ctx, bucket, object, bufw, complete, user.DefaultOption())
+	start, length, err := rs.GetOffsetLength(objInfo.Size)
+	if err != nil {
+		return gr, err
+	}
+	go l.lfs.GetObject(ctx, bucket, object, bufw, complete, user.DownloadObjectOptions{Start: start, Length: length})
 
 	// Setup cleanup function to cause the above go-routine to
 	// exit in case of partial read
@@ -281,9 +430,12 @@ func (l *lfsGateway) GetObjectNInfo(ctx context.Context, bucket, object string, 
 // startOffset indicates the starting read location of the object.
 // length indicates the total length of the object.
 func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOffset, length int64, writer io.Writer, etag string, opts minio.ObjectOptions) error {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
 	var errRes error
@@ -294,7 +446,7 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 	}
 	var complete []user.CompleteFunc
 	complete = append(complete, checkErrAndClosePipe)
-	err := lfs.GetObject(ctx, bucket, key, bufw, complete, user.DefaultOption())
+	err := l.lfs.GetObject(ctx, bucket, key, bufw, complete, user.DownloadObjectOptions{Start: startOffset, Length: length})
 
 	if err != nil {
 		return convertToMinioError(err, bucket, "")
@@ -305,12 +457,15 @@ func (l *lfsGateway) GetObject(ctx context.Context, bucket, key string, startOff
 
 // GetObjectInfo reads object info and replies back ObjectInfo.
 func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return minio.ObjectInfo{}, errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return minio.ObjectInfo{}, convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
-	obj, err := lfs.HeadObject(ctx, bucket, object, user.DefaultOption())
+	obj, err := l.lfs.HeadObject(ctx, bucket, object)
 	if err != nil {
 		return minio.ObjectInfo{}, convertToMinioError(err, bucket, object)
 	}
@@ -329,15 +484,18 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 
 // PutObject creates a new object with the incoming data.
 func (l *lfsGateway) PutObject(ctx context.Context, bucket, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return minio.ObjectInfo{}, errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return minio.ObjectInfo{}, convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
-	ops := user.DefaultOption()
+	ops := user.DefaultUploadOption()
 	ops.UserDefined = opts.UserDefined
 	reader := bufio.NewReaderSize(r.Reader, user.DefaultBufSize)
-	obj, err := lfs.PutObject(ctx, bucket, object, reader, ops)
+	obj, err := l.lfs.PutObject(ctx, bucket, object, reader, ops)
 	if err != nil {
 		return objInfo, convertToMinioError(err, bucket, object)
 	}
@@ -361,26 +519,32 @@ func (l *lfsGateway) CopyObject(ctx context.Context, srcBucket, srcObject, dstBu
 
 // DeleteObject deletes a blob in bucket.
 func (l *lfsGateway) DeleteObject(ctx context.Context, bucket, object string) error {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
-	_, err := lfs.DeleteObject(ctx, bucket, object)
+	_, err := l.lfs.DeleteObject(ctx, bucket, object)
 
 	return convertToMinioError(err, bucket, object)
 }
 
 func (l *lfsGateway) DeleteObjects(ctx context.Context, bucket string, objects []string) ([]error, error) {
-	lfs := core.LocalNode.Inst.(*user.Info).GetUser(l.userID)
-	if lfs == nil || !lfs.Online() {
-		return nil, errLfsServiceNotReady
+	if l.lfs == nil || !l.lfs.Online() {
+		//再检查一次
+		err := l.checkLfs(ctx)
+		if err != nil {
+			return nil, convertToMinioError(errLfsServiceNotReady, "", "")
+		}
 	}
 
 	errFlag := 0
 	errs := make([]error, len(objects))
 	for i, object := range objects {
-		_, err := lfs.DeleteObject(ctx, bucket, object)
+		_, err := l.lfs.DeleteObject(ctx, bucket, object)
 		if err != nil {
 			errFlag = 1
 			errs[i] = convertToMinioError(err, bucket, object)
@@ -405,7 +569,7 @@ func (l *lfsGateway) SetBucketPolicy(ctx context.Context, bucket string, bucketP
 
 // GetBucketPolicy will get policy on bucket.
 func (l *lfsGateway) GetBucketPolicy(ctx context.Context, bucket string) (*policy.Policy, error) {
-	return nil, errLfsServiceNotReady
+	return nil, convertToMinioError(errLfsServiceNotReady, "", "")
 }
 
 // DeleteBucketPolicy deletes all policies on bucket.
@@ -420,6 +584,10 @@ func (l *lfsGateway) IsCompressionSupported() bool {
 
 func convertToMinioError(err error, bucket, object string) error {
 	switch err {
+	case errLfsServiceNotReady:
+		return minio.BackendDown{}
+	case user.ErrLfsReadOnly:
+		return minio.PrefixAccessDenied{Bucket: bucket, Object: object}
 	case user.ErrBucketNameInvalid:
 		return minio.BucketNameInvalid{Bucket: bucket}
 	case user.ErrBucketNotExist:
@@ -434,7 +602,9 @@ func convertToMinioError(err error, bucket, object string) error {
 		return minio.ObjectNotFound{Bucket: bucket, Object: object}
 	case user.ErrObjectIsDir:
 		return minio.ObjectExistsAsDirectory{Bucket: bucket, Object: object}
+	case nil:
+		return nil
 	default:
-		return err
+		return minio.PrefixAccessDenied{Bucket: bucket, Object: object}
 	}
 }
