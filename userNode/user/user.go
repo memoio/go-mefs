@@ -87,12 +87,14 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, pr
 		if sk == "" {
 			return nil, role.ErrEmptyPrivateKey
 		}
-		qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
-		if err != nil {
-			return nil, err
-		}
 
-		queryID = qid
+		if queryID == "" || rdo {
+			qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
+			if err != nil {
+				return nil, err
+			}
+			queryID = qid
+		}
 
 		qItem, err := role.GetQueryInfo(userID, queryID)
 		if err != nil {

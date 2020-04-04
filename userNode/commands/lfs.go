@@ -305,6 +305,7 @@ var lfsStartUserCmd = &cmds.Command{
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(utils.ProviderSLA),
 		cmds.BoolOption("reDeployQuery", "rdo", "reDeploy query contract if user has not deploy upkeeping contract").WithDefault(false),
 		cmds.BoolOption("force", "f", "force user to write mode").WithDefault(false),
+		cmds.IntOption("filesystem", "fs", "which filesystem").WithDefault(0),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -396,6 +397,12 @@ var lfsStartUserCmd = &cmds.Command{
 			return errWrongInput
 		}
 
+		fsIndex, ok := req.Options["filesystem"].(int)
+		if !ok {
+			fmt.Println("input wrong fs nums.")
+			return errWrongInput
+		}
+
 		// 读keystore下uid文件
 		hexSk, err := fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
 		if err != nil {
@@ -412,12 +419,19 @@ var lfsStartUserCmd = &cmds.Command{
 		if cfg.Test {
 			qid = uid
 		} else {
-			qitem, err := role.GetLatestQuery(uid)
+			querys, err := role.GetAllQuerys(uid)
 			if err != nil {
 				rdo = true
 				qid = ""
 			} else {
-				qid = qitem.QueryID
+				if fsIndex > 0 && len(querys) < fsIndex {
+					return errWrongInput
+				}
+				if fsIndex == 0 {
+					qid = querys[len(querys)-1]
+				} else {
+					qid = querys[fsIndex]
+				}
 			}
 		}
 
@@ -1854,5 +1868,72 @@ var lfsGenShareCmd = &cmds.Command{
 		}
 
 		return cmds.EmitOnce(res, slink)
+	},
+}
+
+var lfsListQuerysCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "List querys for user.",
+		ShortDescription: `
+'mefs lfs list_querys' is a plumbing command for printing querys for user.
+`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Options: []cmds.Option{
+		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+		var userid string
+		addressid, found := req.Options[AddressID].(string)
+		if addressid == "" || !found {
+			userid = node.Identity.Pretty()
+		} else {
+			userid, err = address.GetIDFromAddress(addressid)
+			if err != nil {
+				return err
+			}
+		}
+
+		querys, err := role.GetAllQuerys(userid)
+		if err != nil {
+			return err
+		}
+
+		result := make([]string, len(querys))
+		for i := 0; i < len(querys); i++ {
+			qItem, err := role.GetQueryInfo(userid, querys[i])
+			if err != nil {
+				return err
+			}
+			qad, err := address.GetAddressFromID(querys[i])
+			if err != nil {
+				return err
+			}
+			if qItem.Completed {
+				result[i] = qad.String() + " Completed"
+			} else {
+				result[i] = qad.String() + " UnCompleted"
+			}
+
+		}
+		list := &StringList{
+			ChildLists: result,
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, pl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", pl)
+			return err
+		}),
 	},
 }

@@ -440,6 +440,29 @@ func GetLatestQuery(userID string) (QueryItem, error) {
 	return item, nil
 }
 
+// GetAllQuerys gets
+func GetAllQuerys(userID string) ([]string, error) {
+	userAddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	qAddrs, err := contracts.GetQueryAddrs(userAddr, userAddr)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]string, len(qAddrs))
+	for i := 0; i < len(qAddrs); i++ {
+		queryID, err := address.GetIDFromAddress(qAddrs[i].String())
+		if err != nil {
+			return nil, err
+		}
+		res[i] = queryID
+	}
+
+	return res, nil
+}
+
 //GetQueryInfo get user's query-info
 // 分别返回申请的容量、持久化时间、价格、keeper数量、provider数量、是否成功放进upkeeping中
 func GetQueryInfo(localID, queryID string) (QueryItem, error) {
