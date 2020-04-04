@@ -274,12 +274,12 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 	entryPrefixMatch := prefix
 	if len(delimiter) > 0 {
 		lastIndex := strings.LastIndex(prefix, delimiter)
-		if lastIndex > 0 {
+		if lastIndex > 0 && lastIndex < len(prefix) {
 			entryPrefixMatch = prefix[:lastIndex+1]
 		}
 	}
-	//没有delimiter的时候全返回，有的时候只返回一层
-	recursive := len(delimiter) > 0
+	//没有delimiter的时候全返回（recursive），有的时候只返回一层（no-recursive）
+	recursive := len(delimiter) <= 0
 	prefixLen := len(entryPrefixMatch)
 	objectIter := rbtree.NewNode()
 	if marker == "" {
