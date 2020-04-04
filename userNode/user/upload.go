@@ -106,6 +106,9 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 
 	objectElement := bucket.Objects.Find(MetaName(objectName))
 	if objectElement != nil {
+		if creation {
+			return nil, nil, ErrObjectAlreadyExist
+		}
 		return bucket, objectElement.(*ObjectInfo), nil
 	}
 
