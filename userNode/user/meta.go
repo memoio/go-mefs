@@ -159,6 +159,10 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 
 	bucket.ObjectsBlockSize = int64(len(data))
 
+	if len(data) == 0 {
+		return nil
+	}
+
 	return l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
 }
 
@@ -199,6 +203,7 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 			bucketIDToName: make(map[int64]string),
 		}
 
+		utils.MLogger.Info("%s has %d buckets", l.fsID, lm.sb.GetNextBucketID()-1)
 		if l.userID != l.gInfo.rootID {
 			gotTime, gotRoot, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
 			if err == nil {
@@ -271,6 +276,19 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
 			l.meta.bucketIDToName[bucketID] = bname
 		}
 		return nil
+	} else {
+		utils.MLogger.Info("Construct delete buckets: ", bucketID)
+		binfo := mpb.BucketInfo{
+			Name:     strconv.FormatInt(bucketID, 10),
+			BucketID: bucketID,
+			Deletion: true,
+		}
+
+		bucket := newsuperBucket(binfo, true)
+
+		bucket.mtree.SetIndex(0)
+		bucket.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
+		l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
 	}
 	return ErrCannotLoadMetaBlock
 }

@@ -304,6 +304,22 @@ func (l *LfsInfo) genRoot() {
 		}
 		bucket.RUnlock()
 	}
+
+	for _, bucket := range l.meta.deletedBuckets {
+		bucket.RLock()
+		i := int(bucket.BucketID - 1)
+		if i >= int(bucketNum) {
+			utils.MLogger.Errorf("bucketID is %d, but total is %d", bucket.BucketID, bucketNum)
+		}
+
+		lr.BRoots[i] = &mpb.BucketRoot{
+			BucketID: bucket.BucketID,
+			Root:     bucket.Root,
+			OpCount:  bucket.NextOpID, // opID as count
+		}
+		bucket.RUnlock()
+	}
+
 	l.meta.sb.RUnlock()
 
 	mtree := mt.New(sha256.New())
@@ -408,10 +424,12 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 			err := l.flushBucketAndObjects(bucket, isForce)
 			if err != nil {
 				utils.MLogger.Error("Flush deleted bucket's info failed, bucket is", bucket.GetName())
-			} else {
-				//deletedBuckets 只有最后几个可能为脏
-				break
 			}
+		}
+
+		if !isForce && !bucket.dirty {
+			//deletedBuckets 只有最后几个可能为脏
+			break
 		}
 	}
 
