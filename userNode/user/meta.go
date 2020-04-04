@@ -446,14 +446,7 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 	}
 	obpath := path.Join(metapath, strconv.FormatInt(bucket.BucketID, 10)+".object")
 	stat, err := os.Stat(obpath)
-	if os.IsNotExist(err) {
-		// 本地这个文件被删了，要先读取回来
-		data, err := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-		if err != nil {
-			return err
-		}
-		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
-	} else if stat.IsDir() {
+	if stat.IsDir() {
 		err = os.Rename(metapath, metapath+".bak")
 		if err != nil {
 			err = os.Remove(metapath)
@@ -461,12 +454,14 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 				return err
 			}
 		}
+	}
+
+	if err != nil {
 		// 本地这个文件被删了，要先读取回来
-		data, err := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-		if err != nil {
-			return err
+		data, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
+		if len(data) > 0 {
+			writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
 		}
-		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
 	}
 
 	if len(ops) == 0 && bucket.obCacheSize == 0 {
