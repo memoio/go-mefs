@@ -239,11 +239,11 @@ func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 		case <-tick.C:
 			if l.Online() && l.writable {
 				ok := l.Sm.TryAcquire(1)
+				l.gInfo.heartbeat(ctx)
 				//sendHeartBeat的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
 				if ok {
-					defer l.Sm.Release(1)
+					l.Sm.Release(1)
 				}
-				l.gInfo.heartbeat(ctx)
 			}
 		case <-ctx.Done():
 			return nil
@@ -261,11 +261,11 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 		case <-tick.C:
 			if l.Online() && l.writable {
 				ok := l.Sm.TryAcquire(1)
+				l.genRoot()
 				//persistRoot的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
 				if ok {
-					defer l.Sm.Release(1)
+					l.Sm.Release(1)
 				}
-				l.genRoot()
 			}
 		case <-ctx.Done():
 			if l.Online() && l.writable {
@@ -419,15 +419,12 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	}
 	for i := len(l.meta.deletedBuckets) - 1; i >= 0; i-- {
 		bucket := l.meta.deletedBuckets[i]
-		dirty := bucket.dirty
 		if bucket.dirty || isForce {
 			err := l.flushBucketAndObjects(bucket, isForce)
 			if err != nil {
 				utils.MLogger.Error("Flush deleted bucket's info failed, bucket is", bucket.GetName())
 			}
-		}
-
-		if !isForce && !dirty {
+		} else {
 			//deletedBuckets 只有最后几个可能为脏
 			break
 		}

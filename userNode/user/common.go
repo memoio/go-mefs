@@ -60,10 +60,5 @@ func checkObjectName(objectName string) error {
 		return err
 	}
 
-	for i := 0; i < len(objectName); i++ {
-		if objectName[i] == '\\' || objectName[i] == '\n' {
-			return ErrObjectNameInvalid
-		}
-	}
 	return nil
 }
