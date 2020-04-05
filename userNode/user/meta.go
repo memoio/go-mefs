@@ -450,9 +450,8 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 	if err != nil {
 		// 本地这个文件被删了，要先读取回来
 		data, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-		if len(data) > 0 {
-			writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
-		}
+		// data nil -> create
+		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
 	}
 
 	if len(ops) == 0 && bucket.obCacheSize == 0 {
@@ -606,8 +605,10 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 			utils.MLogger.Info("Decode data fail: ", err)
 			return nil, err
 		}
+
+		return data, nil
 	}
-	return data, nil
+	return nil, role.ErrEmptyData
 }
 
 func writeToMeta(data []byte, fsID, buc string) error {
@@ -618,10 +619,10 @@ func writeToMeta(data []byte, fsID, buc string) error {
 
 	sbpath := path.Join(metapath, buc)
 	sbMetaFile, err := os.Create(sbpath)
-	defer sbMetaFile.Close()
 	if err != nil {
 		return err
 	}
+	defer sbMetaFile.Close()
 	sbMetaFile.Write(data)
 	sbMetaFile.Sync()
 	return nil
@@ -635,11 +636,10 @@ func readFromMeta(fsID, buc string) ([]byte, error) {
 
 	sbpath := path.Join(metapath, buc)
 	sbMetaFile, err := os.Open(sbpath)
-	defer sbMetaFile.Close()
 	if err != nil {
 		return nil, err
 	}
-
+	defer sbMetaFile.Close()
 	return ioutil.ReadAll(sbMetaFile)
 }
 
