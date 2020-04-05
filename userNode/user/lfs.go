@@ -143,7 +143,7 @@ func (l *LfsInfo) startLfs() error {
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
 			bucket.Unlock()
 			if err != nil {
-				utils.MLogger.Error("Load objects in bucket", bucket.Name, " fail: ", err)
+				utils.MLogger.Error("Load objects in bucket: ", bucket.Name, " fail: ", err)
 				continue
 			}
 			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
@@ -154,7 +154,7 @@ func (l *LfsInfo) startLfs() error {
 			err = l.loadObjectsInfo(bucket) //再加载Object元数据
 			bucket.Unlock()
 			if err != nil {
-				utils.MLogger.Error("Load objects in bucket", bucket.Name, " fail: ", err)
+				utils.MLogger.Error("Load objects in deleted bucket: ", bucket.Name, " fail: ", err)
 				continue
 			}
 			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
