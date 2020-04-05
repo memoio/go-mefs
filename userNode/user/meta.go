@@ -446,17 +446,7 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 		return err
 	}
 	obpath := path.Join(metapath, strconv.FormatInt(bucket.BucketID, 10)+".object")
-	stat, err := os.Stat(obpath)
-	if stat.IsDir() {
-		err = os.Rename(metapath, metapath+".bak")
-		if err != nil {
-			err = os.Remove(metapath)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
+	_, err = os.Stat(obpath)
 	if err != nil {
 		// 本地这个文件被删了，要先读取回来
 		data, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
