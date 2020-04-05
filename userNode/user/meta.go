@@ -233,7 +233,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 	for bucketID := int64(1); bucketID < l.meta.sb.NextBucketID; bucketID++ {
 		err = l.loadSingleBucketInfo(bucketID)
 		if err != nil {
-			utils.MLogger.Error("Load BucketInfo failed , bucketID: ", bucketID)
+			utils.MLogger.Errorf("Load BucketInfo %d failed: %s", bucketID, err)
 		}
 	}
 	return nil
@@ -242,11 +242,7 @@ func (l *LfsInfo) loadBucketInfo() error {
 func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
 	data, err := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
 	if err != nil || len(data) == 0 {
-		datagot, err := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
-		if err != nil {
-			return err
-		}
-
+		datagot, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
 		if len(datagot) > len(data) {
 			data = datagot
 			writeToMeta(data, l.fsID, strconv.FormatInt(bucketID, 10))
