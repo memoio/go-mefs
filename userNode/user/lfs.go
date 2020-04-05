@@ -414,15 +414,16 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	for _, bucket := range l.meta.buckets {
 		err := l.flushBucketAndObjects(bucket, isForce)
 		if err != nil {
-			return err
+			utils.MLogger.Errorf("Flush bucket: %s info failed: %s", bucket.GetName(), err)
 		}
 	}
+
 	for i := len(l.meta.deletedBuckets) - 1; i >= 0; i-- {
 		bucket := l.meta.deletedBuckets[i]
 		if bucket.dirty || isForce {
 			err := l.flushBucketAndObjects(bucket, isForce)
 			if err != nil {
-				utils.MLogger.Error("Flush deleted bucket's info failed, bucket is", bucket.GetName())
+				utils.MLogger.Errorf("Flush deleted bucket: %s info failed: %s", bucket.GetName(), err)
 			}
 		} else {
 			//deletedBuckets 只有最后几个可能为脏

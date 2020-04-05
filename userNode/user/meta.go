@@ -470,9 +470,8 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 		n := binary.PutUvarint(lenBuf, length)
 
 		if bucket.obCacheSize+len(data)+n > maxCacheSize {
-			obMetaFile, err := os.OpenFile(obpath, os.O_APPEND|os.O_WRONLY, 0666)
+			obMetaFile, err := os.OpenFile(obpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 			if err != nil {
-				obMetaFile.Close()
 				return err
 			}
 			obMetaFile.Write(bucket.obMetaCache[:bucket.obCacheSize])
