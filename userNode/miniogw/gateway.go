@@ -314,7 +314,7 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 		//非递归，只返回一级目录
 		if !recursive {
 			//已经新建有用Prefix命名的了
-			if name == prefix {
+			if name == entryPrefixMatch {
 				hasPrefixKey = true
 			}
 			//看看这个能不能抽象出文件夹
