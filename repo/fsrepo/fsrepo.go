@@ -408,7 +408,7 @@ func (r *FSRepo) openDatastore() error {
 	r.ds = d
 
 	// Wrap it with metrics gathering
-	prefix := "ipfs.fsrepo.datastore"
+	prefix := "mefs.fsrepo.datastore"
 	r.ds = measure.New(prefix, r.ds)
 
 	return nil
