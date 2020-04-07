@@ -16,6 +16,7 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	config "github.com/memoio/go-mefs/config"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
 )
@@ -46,11 +47,12 @@ environment variable:
 `,
 	},
 	Arguments: []cmds.Argument{
-		cmds.FileArg("default-config", false, false, "Initialize with the given configuration.").EnableStdin(),
+		cmds.FileArg("config", false, false, "Initialize with the given configuration.").EnableStdin(),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the PrivateKey").WithDefault(""),
-		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to load/store the PrivateKey from keyfile").WithDefault(""),
+		cmds.StringOption(secretKeyKwd, "sk", "the privateKey").WithDefault(""),
+		cmds.StringOption("keyfile", "kf", "the path of keyfile").WithDefault(""),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 	},
 	PreRun: func(req *cmds.Request, env cmds.Environment) error {
@@ -80,6 +82,38 @@ environment variable:
 			return err
 		}
 
+		netKey, _ := req.Options[netKeyKwd].(string)
+
+		var conf *config.Config
+
+		f := req.Files
+		if f != nil {
+			confFile, err := cmdenv.GetFileArg(req.Files.Entries())
+			if err != nil {
+				return err
+			}
+
+			conf = &config.Config{}
+			if err := json.NewDecoder(confFile).Decode(conf); err != nil {
+				return err
+			}
+		}
+
+		kf, ok := req.Options["keyfile"].(string)
+		if ok && kf != "" {
+			password, ok := req.Options[passwordKwd].(string)
+			if !ok || password == "" {
+				password = GetPassWord()
+			}
+			hexsk, err := id.GetPrivateKey("", password, kf)
+			if err == nil {
+				return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
+			}
+
+			fmt.Println("load keyfile fails:", err)
+			fmt.Println("====== manually input privatekey and password =====")
+		}
+
 		hexsk, ok := req.Options[secretKeyKwd].(string)
 		if !ok || hexsk == "" {
 			fmt.Printf("input your private key: ")
@@ -98,28 +132,13 @@ environment variable:
 			}
 		}
 		fmt.Printf("\n")
+
 		password, ok := req.Options[passwordKwd].(string)
-		if !ok || (hexsk == "" && len(password) < 8) {
+		if !ok || len(password) < 8 {
 			fmt.Println(errShortPassword)
 			password = GetPassWord()
 			if len(password) < 8 {
 				return errShortPassword
-			}
-		}
-		netKey, _ := req.Options[netKeyKwd].(string)
-
-		var conf *config.Config
-
-		f := req.Files
-		if f != nil {
-			confFile, err := cmdenv.GetFileArg(req.Files.Entries())
-			if err != nil {
-				return err
-			}
-
-			conf = &config.Config{}
-			if err := json.NewDecoder(confFile).Decode(conf); err != nil {
-				return err
 			}
 		}
 
@@ -129,10 +148,10 @@ environment variable:
 
 func GetPassWord() string {
 	var password string
-	fmt.Printf("input your password: ")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	go func() {
 		defer cancel()
+		fmt.Printf("input your password: ")
 		input := bufio.NewScanner(os.Stdin)
 		ok := input.Scan()
 		if ok {
@@ -145,7 +164,7 @@ func GetPassWord() string {
 	}
 
 	if password == "" {
-		fmt.Println("\nuse default password")
+		fmt.Println("\nuse default password: ", utils.DefaultPassword)
 		password = utils.DefaultPassword
 	}
 	return password

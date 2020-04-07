@@ -1,10 +1,12 @@
 package fsrepo
 
 import (
+	"os"
 	"path/filepath"
 
 	config "github.com/memoio/go-mefs/config"
 	id "github.com/memoio/go-mefs/crypto/identity"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 // PutPrivateKeyToKeystore puts to keystore
@@ -17,12 +19,29 @@ func PutPrivateKeyToKeystore(privatekey string, peerID string, password string) 
 
 //GetPrivateKeyFromKeystore 是从keystore中获得ethereum格式的私钥, 没有"0x"前缀
 func GetPrivateKeyFromKeystore(peerID string, password string) (privateKey string, err error) {
-	//get privatekey's filepath, the dafault is "~/.ipfs/keystore/peerID"
+	//get privatekey's filepath, the dafault is "~/.mefs/keystore/peerID"
 	fsrepoPath, err := BestKnownPath()
 	dir, err := config.Path(fsrepoPath, Keystore)
 	filePath, err := config.Path(dir, peerID)
 	if err != nil {
 		return "", err
+	}
+
+	_, err = os.Lstat(filePath)
+	if os.IsNotExist(err) {
+		// get peeraddress file
+		peerAddr, err := address.GetAddressFromID(peerID)
+		if err != nil {
+			return "", err
+		}
+		filePath, err = config.Path(dir, peerAddr.String())
+		if err != nil {
+			return "", err
+		}
+		_, err = os.Lstat(filePath)
+		if os.IsNotExist(err) {
+			return "", err
+		}
 	}
 
 	//get config.PeerID from MefsNode.Identity

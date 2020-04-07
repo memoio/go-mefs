@@ -120,7 +120,7 @@ func GetPrivateKey(peerID string, password, path string) (privateKey string, err
 		return "", err
 	}
 	// Make sure we're really operating on the requested key (no swap attacks)
-	if key.PeerID != peerID {
+	if peerID != "" && key.PeerID != peerID {
 		return "", fmt.Errorf("key content mismatch: have peer %x, want %x", key.PeerID, peerID)
 	}
 
