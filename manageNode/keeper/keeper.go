@@ -514,7 +514,10 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 			return err
 		}
 		prefix := km.ToString()
-		es, _ := k.ds.Itererate(prefix)
+		es, err := k.ds.Itererate(prefix)
+		if err != nil {
+			continue
+		}
 		for _, e := range es {
 			rec := new(recpb.Record)
 			err := proto.Unmarshal(e.Value, rec)
@@ -539,6 +542,10 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 			if err != nil {
 				continue
 			}
+			// verify chalres
+			// then set
+			chalRes.Blocks = nil
+			chalRes.FaultBlocks = nil
 			lin.chalMap.Store(chalTime, chalRes)
 		}
 	}

@@ -95,11 +95,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		tmpseg, tmptag, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
 		if !isTrue {
 			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
-			//验证失败，则在本地删除此块
-			err := p.ds.DeleteBlock(p.context, blockID, "local")
-			if err != nil {
-				utils.MLogger.Info("Delete block", blockID, "error:", err)
-			}
 			faultBlocks = append(faultBlocks, index)
 			continue
 		}
