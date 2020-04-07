@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
 	"sync"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -144,7 +145,7 @@ environment variable:
 		cmds.Int64Option(capacityKwd, "cap", "provider offers how many capacity of storage, uint is MB").WithDefault(utils.DefaultOfferCapacity),
 		cmds.Int64Option(durationKwd, "dur", "provider offers how much time of storage, uint is day").WithDefault(utils.DefaultOfferDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
-		cmds.Int64Option("depositCapacity", "deCap", "provider deposits how capacity of storage, uint is MB").WithDefault(utils.DepositCapacity),
+		cmds.StringOption("depositCapacity", "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
 		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
 	},
@@ -362,29 +363,47 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	capacity, ok := req.Options[capacityKwd].(int64)
 	if !ok || capacity <= 0 {
 		fmt.Println("input wrong capacity.")
-		return errRepoExists
+		return errWrongInput
 	}
 	duration, ok := req.Options[durationKwd].(int64)
 	if !ok || duration <= 0 {
 		fmt.Println("input wrong duration.")
-		return errRepoExists
+		return errWrongInput
 	}
 	price, ok := req.Options[priceKwd].(int64)
 	if !ok || price <= 0 {
 		fmt.Println("input wrong price.")
-		return errRepoExists
+		return errWrongInput
 	}
 
 	rdo, ok := req.Options[reDeploy].(bool)
 	if !ok {
 		fmt.Println("input wrong value for redeploy.")
-		return errRepoExists
+		return errWrongInput
 	}
 
-	decapacity, ok := req.Options["depositCapacity"].(int64)
-	if !ok || decapacity <= 0 {
-		fmt.Println("input wrong capacity.")
-		return errRepoExists
+	decapacity := utils.DepositCapacity
+	decap, ok := req.Options["depositCapacity"].(string)
+	if ok {
+		if len(decap) <= 2 {
+			return errWrongInput
+		}
+		res, err := strconv.ParseInt(decap[:len(decap)-2], 10, 0)
+		if err != nil {
+			return err
+		}
+		deUnit := decap[len(decap)-2 : len(decap)]
+		switch deUnit {
+		case "MB":
+			decapacity = res
+		case "GB":
+			decapacity = res * (1024)
+		case "TB":
+			decapacity = res * (1024 * 1024)
+		default:
+			fmt.Println("input wrong capacity uint.")
+			return errWrongInput
+		}
 	}
 
 	switch cfg.Role {
