@@ -89,7 +89,6 @@ environment variable:
 				input := bufio.NewScanner(os.Stdin)
 				ok := input.Scan()
 				if ok {
-					fmt.Println(input.Text())
 					hexsk = input.Text()
 				}
 			}()
@@ -101,28 +100,8 @@ environment variable:
 		fmt.Printf("\n")
 		password, ok := req.Options[passwordKwd].(string)
 		if !ok || (hexsk == "" && len(password) < 8) {
-			fmt.Println()
-			fmt.Printf("input your new password (at least 8): ")
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			go func() {
-				defer cancel()
-				input := bufio.NewScanner(os.Stdin)
-				ok := input.Scan()
-				if ok {
-					fmt.Println(input.Text())
-					password = input.Text()
-				}
-			}()
-
-			select {
-			case <-ctx.Done():
-			}
-
-			if password == "" {
-				fmt.Println("\nset your password to default")
-				password = utils.DefaultPassword
-			}
-
+			fmt.Println(errShortPassword)
+			password = GetPassWord()
 			if len(password) < 8 {
 				return errShortPassword
 			}
@@ -146,6 +125,30 @@ environment variable:
 
 		return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
 	},
+}
+
+func GetPassWord() string {
+	var password string
+	fmt.Printf("input your password: ")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	go func() {
+		defer cancel()
+		input := bufio.NewScanner(os.Stdin)
+		ok := input.Scan()
+		if ok {
+			password = input.Text()
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+	}
+
+	if password == "" {
+		fmt.Println("\nuse default password")
+		password = utils.DefaultPassword
+	}
+	return password
 }
 
 func CheckRepo(repoRoot string) error {

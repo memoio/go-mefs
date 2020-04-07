@@ -139,7 +139,7 @@ environment variable:
 		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(""),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
 		cmds.Int64Option(capacityKwd, "cap", "provider offers how many capacity of storage, uint is MB").WithDefault(utils.DefaultOfferCapacity),
@@ -204,7 +204,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	}
 
 	hexsk, _ := req.Options[secretKeyKwd].(string)
-	password, _ := req.Options[passwordKwd].(string)
+	password, ok := req.Options[passwordKwd].(string)
+	if !ok || password == "" {
+		password = minit.GetPassWord()
+	}
+
 	nKey, _ := req.Options[netKeyKwd].(string)
 
 	// first, whether user has provided the initialization flag. we may be
