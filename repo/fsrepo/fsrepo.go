@@ -163,7 +163,7 @@ func newFSRepo(rpath string) (*FSRepo, error) {
 
 func checkInitialized(path string) error {
 	if !isInitializedUnsynced(path) {
-		alt := strings.Replace(path, ".mefs", ".go-ipfs", 1)
+		alt := strings.Replace(path, ".mefs", ".go-mefs", 1)
 		if isInitializedUnsynced(alt) {
 			return ErrNoVersion
 		}

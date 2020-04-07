@@ -1,6 +1,8 @@
 package mefs
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	oldcmds "github.com/memoio/go-mefs/commands"
@@ -46,7 +49,7 @@ environment variable:
 		cmds.FileArg("default-config", false, false, "Initialize with the given configuration.").EnableStdin(),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the PrivateKey").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the PrivateKey").WithDefault(""),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 	},
@@ -72,10 +75,57 @@ environment variable:
 			return cmds.Error{Message: "init must be run offline only"}
 		}
 
-		hexsk, _ := req.Options[secretKeyKwd].(string)
+		err := CheckRepo(cctx.ConfigRoot)
+		if err != nil {
+			return err
+		}
+
+		hexsk, ok := req.Options[secretKeyKwd].(string)
+		if !ok || hexsk == "" {
+			fmt.Printf("input your private key: ")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			go func() {
+				defer cancel()
+				input := bufio.NewScanner(os.Stdin)
+				ok := input.Scan()
+				if ok {
+					fmt.Println(input.Text())
+					hexsk = input.Text()
+				}
+			}()
+
+			select {
+			case <-ctx.Done():
+			}
+		}
+		fmt.Printf("\n")
 		password, ok := req.Options[passwordKwd].(string)
 		if !ok || (hexsk == "" && len(password) < 8) {
-			return errShortPassword
+			fmt.Println()
+			fmt.Printf("input your new password (at least 8): ")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			go func() {
+				defer cancel()
+				input := bufio.NewScanner(os.Stdin)
+				ok := input.Scan()
+				if ok {
+					fmt.Println(input.Text())
+					password = input.Text()
+				}
+			}()
+
+			select {
+			case <-ctx.Done():
+			}
+
+			if password == "" {
+				fmt.Println("\nset your password to default")
+				password = utils.DefaultPassword
+			}
+
+			if len(password) < 8 {
+				return errShortPassword
+			}
 		}
 		netKey, _ := req.Options[netKeyKwd].(string)
 
@@ -96,6 +146,39 @@ environment variable:
 
 		return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
 	},
+}
+
+func CheckRepo(repoRoot string) error {
+	if err := checkWritable(repoRoot); err != nil {
+		return err
+	}
+
+	if fsrepo.IsInitialized(repoRoot) {
+		fmt.Println(repoRoot, "already exists, reinitializing need to delete this directory")
+		fmt.Printf("delete (y/n): ")
+		var deleteCmd string
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		go func() {
+			defer cancel()
+			input := bufio.NewScanner(os.Stdin)
+			ok := input.Scan()
+			if ok {
+				fmt.Println(input.Text())
+				deleteCmd = input.Text()
+			}
+		}()
+
+		select {
+		case <-ctx.Done():
+		}
+
+		if deleteCmd == "y" {
+			return os.RemoveAll(repoRoot)
+		}
+		return errRepoExists
+	}
+
+	return nil
 }
 
 func DoInit(out io.Writer, repoRoot string, password string, conf *config.Config, prikey, netKey string) error {
