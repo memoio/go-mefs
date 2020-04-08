@@ -142,7 +142,7 @@ environment variable:
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(""),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
-		cmds.Int64Option(capacityKwd, "cap", "provider offers how many capacity of storage, uint is MB").WithDefault(utils.DefaultOfferCapacity),
+		cmds.StringOption(capacityKwd, "cap", "provider offers how many capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
 		cmds.Int64Option(durationKwd, "dur", "provider offers how much time of storage, uint is day").WithDefault(utils.DefaultOfferDuration),
 		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
 		cmds.StringOption("depositCapacity", "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
@@ -348,9 +348,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
-	// just for minio
-	core.LocalNode = node
-
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.MefsNodeCollector{Node: node})
 
@@ -364,11 +361,67 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		utils.MLogger.Info("Init BLS12_381 curve success")
 	}
 
-	capacity, ok := req.Options[capacityKwd].(int64)
-	if !ok || capacity <= 0 {
-		fmt.Println("input wrong capacity.")
+	capacity := utils.DepositCapacity
+	cap, ok := req.Options[capacityKwd].(string)
+	if ok {
+		if len(cap) > 2 {
+			res, err := strconv.ParseInt(cap[:len(cap)-2], 10, 0)
+			if err != nil {
+				return err
+			}
+
+			if res == 0 {
+				return errWrongInput
+			}
+
+			deUnit := cap[len(cap)-2 : len(cap)]
+			switch deUnit {
+			case "MB":
+				capacity = res
+			case "GB":
+				capacity = res * (1024)
+			case "TB":
+				capacity = res * (1024 * 1024)
+			default:
+				fmt.Println("input wrong capacity uint.")
+				return errWrongInput
+			}
+		}
+	}
+
+	decapacity := utils.DepositCapacity
+	decap, ok := req.Options["depositCapacity"].(string)
+	if ok {
+		if len(decap) > 2 {
+			res, err := strconv.ParseInt(decap[:len(decap)-2], 10, 0)
+			if err != nil {
+				return err
+			}
+
+			if res == 0 {
+				return errWrongInput
+			}
+
+			deUnit := decap[len(decap)-2 : len(decap)]
+			switch deUnit {
+			case "MB":
+				decapacity = res
+			case "GB":
+				decapacity = res * (1024)
+			case "TB":
+				decapacity = res * (1024 * 1024)
+			default:
+				fmt.Println("input wrong capacity uint.")
+				return errWrongInput
+			}
+		}
+	}
+
+	if decapacity < capacity {
+		fmt.Println("deposit is less than your capacity.")
 		return errWrongInput
 	}
+
 	duration, ok := req.Options[durationKwd].(int64)
 	if !ok || duration <= 0 {
 		fmt.Println("input wrong duration.")
@@ -384,30 +437,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if !ok {
 		fmt.Println("input wrong value for redeploy.")
 		return errWrongInput
-	}
-
-	decapacity := utils.DepositCapacity
-	decap, ok := req.Options["depositCapacity"].(string)
-	if ok {
-		if len(decap) <= 2 {
-			return errWrongInput
-		}
-		res, err := strconv.ParseInt(decap[:len(decap)-2], 10, 0)
-		if err != nil {
-			return err
-		}
-		deUnit := decap[len(decap)-2 : len(decap)]
-		switch deUnit {
-		case "MB":
-			decapacity = res
-		case "GB":
-			decapacity = res * (1024)
-		case "TB":
-			decapacity = res * (1024 * 1024)
-		default:
-			fmt.Println("input wrong capacity uint.")
-			return errWrongInput
-		}
 	}
 
 	switch cfg.Role {

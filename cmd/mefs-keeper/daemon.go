@@ -340,9 +340,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
-	// just for minio
-	core.LocalNode = node
-
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.MefsNodeCollector{Node: node})
 

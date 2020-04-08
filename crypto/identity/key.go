@@ -90,7 +90,7 @@ func newKey(privatekey string, peerID string) (*Key, error) {
 }
 
 //StorePrivateKey encrypt the privatekey by password and then store it in keystore
-func StorePrivateKey(dir string, privatekey string, peerID string, password string) error {
+func StorePrivateKey(dir, privatekey, peerID, password string) error {
 	path := joinPath(dir, peerID)
 	_, err := os.Stat(path)
 	if os.IsExist(err) {
@@ -109,7 +109,7 @@ func StorePrivateKey(dir string, privatekey string, peerID string, password stri
 	return writeKeyFile(path, keyjson) //写入文件
 }
 
-func GetPrivateKey(peerID string, password, path string) (privateKey string, err error) {
+func GetPrivateKey(peerID, password, path string) (privateKey string, err error) {
 	// Load the key from the keystore and decrypt its contents
 	keyjson, err := ioutil.ReadFile(path)
 	if err != nil {

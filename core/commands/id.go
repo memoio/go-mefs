@@ -16,6 +16,7 @@ import (
 	core "github.com/memoio/go-mefs/core"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	id "github.com/memoio/go-mefs/crypto/identity"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -59,7 +60,7 @@ If no peer is specified, prints out information for local peers.
 		cmds.StringArg("peerid", false, false, "Peer.ID of node to look up."),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("password", "pwd", "the password is used to encrypt the PrivateKey").WithDefault(""),
+		cmds.StringOption("password", "pwd", "the password is used to encrypt the PrivateKey").WithDefault(utils.DefaultPassword),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		n, err := cmdenv.GetNode(env)
@@ -67,9 +68,9 @@ If no peer is specified, prints out information for local peers.
 			return err
 		}
 
-		pwd, ok := req.Options["password"]
+		pwd, ok := req.Options["password"].(string)
 		if ok {
-			n.SetPassWord(pwd.(string))
+			n.SetPassWord(pwd)
 		}
 
 		var id peer.ID

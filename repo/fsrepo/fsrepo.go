@@ -243,7 +243,7 @@ func initSpec(path string, conf map[string]interface{}) error {
 	return ioutil.WriteFile(fn, bytes, 0600)
 }
 
-func initKeyStore(path string, privateKey string, peerID string, password string) error {
+func initKeyStore(path, privateKey, peerID, password string) error {
 	dir, err := config.Path(path, Keystore)
 	if err != nil {
 		return err
