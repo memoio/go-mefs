@@ -321,7 +321,22 @@ func (g *groupInfo) connect(ctx context.Context) error {
 
 	g.putToAll(ctx, kmp.ToString(), pubKey)
 
+	kmsess, err := metainfo.NewKey(g.groupID, mpb.KeyType_Session, g.userID)
+	if err != nil {
+		return err
+	}
+
 	newID := uuid.New()
+	sessByte, err := g.ds.GetKey(ctx, kmsess.ToString(), "local")
+	if err == nil && len(sessByte) > 0 {
+		sID, err := uuid.ParseBytes(sessByte)
+		if err == nil {
+			newID = sID
+		}
+	} else {
+		g.ds.PutKey(ctx, kmsess.ToString(), []byte(newID.String()), nil, "local")
+	}
+
 	g.sessionID = newID
 
 	force := "0"

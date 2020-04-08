@@ -24,6 +24,7 @@ enum KeyType {
     ChalTime = 12;
     Pos = 13;
     Bucket = 14;
+    Session = 15;
 	
     HeartBeat = 20;
     UserInit = 21;
