@@ -6,5 +6,5 @@ if [ $? -ne 0 ]; then
         echo "recompile mcl library"
         echo "====================="
         cd /go/docker-mefs-env
-        make
+        make install-mcl-ull
 fi
