@@ -24,6 +24,7 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 
 		// pledge again
 		if proItem.Capacity < depositSize {
+			utils.MLogger.Infof("your old pledge capacity is %d, now will change to %d", proItem.Capacity, depositSize)
 			dsize := new(big.Int).SetInt64(depositSize - proItem.Capacity)
 			err := role.PledgeProvider(proID, p.sk, dsize)
 			if err != nil {
@@ -45,7 +46,7 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 	}
 
 	if capacity > p.proContract.Capacity {
-		utils.MLogger.Infof("your pledge capacity is %d, so change %d to it", p.proContract.Capacity, capacity)
+		utils.MLogger.Infof("your offer-capacity is %d, more than your deposit capacity %d, so change it to %d", capacity, p.proContract.Capacity, p.proContract.Capacity)
 		capacity = p.proContract.Capacity
 	}
 
@@ -59,6 +60,8 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 		return err
 	}
 
+	//p.offers保存该provider所有的offer合约信息
+save:
 	for _, offAddr := range offers {
 		offerID, err := address.GetIDFromAddress(offAddr.String())
 		if err != nil {
@@ -67,7 +70,7 @@ func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDep
 
 		for _, item := range p.offers {
 			if item.OfferID == offerID {
-				continue
+				continue save
 			}
 		}
 
@@ -139,7 +142,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 			cSign := &mpb.ChannelSign{}
 			err = proto.Unmarshal(valueByte, cSign)
 			if err != nil {
-				utils.MLogger.Error("proto.Unmarshal err:", err)
+				utils.MLogger.Error("proto.Unmarshal channelSign err:", err)
 				return true
 			}
 

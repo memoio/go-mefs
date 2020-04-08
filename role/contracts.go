@@ -1097,7 +1097,7 @@ func SaveKpMap(peerID string) error {
 					kidres := &kpItem{
 						keeperIDs: kidList,
 					}
-					kpMap.Store(keeperID, kidres)
+					kpMap.Store(pid, kidres)
 				}
 			}
 		}

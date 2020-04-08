@@ -5,7 +5,15 @@ import (
 	"errors"
 	"log"
 	"math/big"
+	"strings"
 	"time"
+
+	"github.com/memoio/go-mefs/contracts/channel"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/memoio/go-mefs/contracts/upKeeping"
+
+	"github.com/ethereum/go-ethereum"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -71,6 +79,17 @@ var (
 	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
 	ErrTxFail           = errors.New("transaction fails")
 )
+
+type LogPay struct {
+	From  common.Address
+	To    common.Address
+	Value *big.Int
+}
+
+type LogCloseChannel struct {
+	From  common.Address
+	Value *big.Int
+}
 
 func init() {
 	EndPoint = "http://212.64.28.207:8101"
@@ -762,8 +781,6 @@ func CheckTx(tx *types.Transaction) error {
 	for i := 0; i < 60; i++ {
 		receipt = GetTransactionReceipt(tx.Hash())
 		if receipt != nil {
-			//TxReceipt, _ := receipt.MarshalJSON()
-			//log.Println("TxReceipt:", string(TxReceipt))
 			break
 		}
 		time.Sleep(30 * time.Second)
@@ -786,9 +803,140 @@ func CheckTx(tx *types.Transaction) error {
 func GetTransactionReceipt(hash common.Hash) *types.Receipt {
 	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		log.Fatal(err)
+		log.Fatal("rpc.Dial err", err)
 	}
 	receipt, err := client.TransactionReceipt(context.Background(), hash)
 	return receipt
+}
+
+//GetStorageIncome filter upkeeping-contract Pay-logs to calculate provider's income
+func GetStorageIncome(upcontractAddress []common.Address, providerAddr common.Address) (*big.Int, *big.Int, error) {
+	log.Println("begin to filter upkeeping Pay logs in chain...")
+
+	totalIncome := big.NewInt(0)
+	dailyIncome := big.NewInt(0)
+
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		log.Println("rpc.Dial err", err)
+		return totalIncome, dailyIncome, err
+	}
+
+	query := ethereum.FilterQuery{
+		Addresses: upcontractAddress,
+	}
+
+	logs, err := client.FilterLogs(context.Background(), query)
+	if err != nil {
+		log.Println("filterLogs err:", err)
+		return totalIncome, dailyIncome, err
+	}
+
+	contractAbi, err := abi.JSON(strings.NewReader(string(upKeeping.UpKeepingABI)))
+	if err != nil {
+		log.Println("abi json err:", err)
+		return totalIncome, dailyIncome, err
+	}
+
+	logPaySignHash := crypto.Keccak256Hash([]byte("Pay(address,address,uint256)"))
+
+	for _, vLog := range logs {
+		if vLog.Topics[0].Hex() == logPaySignHash.Hex() && common.HexToAddress(vLog.Topics[2].Hex()).Hex() == providerAddr.Hex() {
+			var payLog LogPay
+			err := contractAbi.Unpack(&payLog, "Pay", vLog.Data)
+			if err != nil {
+				log.Println("unpack log err: ", err)
+				return totalIncome, dailyIncome, err
+			}
+
+			totalIncome.Add(totalIncome, payLog.Value)
+
+			t, err := GetBlockTime(vLog.BlockHash)
+			if err != nil {
+				log.Println("getBlockTime err:", err)
+				return totalIncome, dailyIncome, err
+			}
+			if isToday(int64(t)) {
+				dailyIncome.Add(dailyIncome, payLog.Value)
+			}
+		}
+	}
+	return totalIncome, dailyIncome, nil
+}
+
+//GetDownloadIncome filter channel-contract CloseChannel-logs to calculate provider's income
+func GetDownloadIncome(channelContractAddress []common.Address, providerAddr common.Address) (*big.Int, *big.Int, error) {
+	log.Println("begin to filter channel closeChannel logs in chain...")
+
+	totalIncome := big.NewInt(0)
+	dailyIncome := big.NewInt(0)
+
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		log.Println("rpc.Dial err", err)
+		return totalIncome, dailyIncome, err
+	}
+
+	query := ethereum.FilterQuery{
+		Addresses: channelContractAddress,
+	}
+
+	logs, err := client.FilterLogs(context.Background(), query)
+	if err != nil {
+		log.Println("filterLogs err:", err)
+		return totalIncome, dailyIncome, err
+	}
+
+	contractAbi, err := abi.JSON(strings.NewReader(string(channel.ChannelABI)))
+	if err != nil {
+		log.Println("abi json err:", err)
+		return totalIncome, dailyIncome, err
+	}
+
+	logCloseChannelSignHash := crypto.Keccak256Hash([]byte("closeChannel(address,uint256)"))
+
+	for _, vLog := range logs {
+		if vLog.Topics[0].Hex() == logCloseChannelSignHash.Hex() && common.HexToAddress(vLog.Topics[1].Hex()).Hex() == providerAddr.Hex() {
+			var channelLog LogCloseChannel
+			err := contractAbi.Unpack(&channelLog, "closeChannel", vLog.Data)
+			if err != nil {
+				log.Println("unpack log err: ", err)
+				return totalIncome, dailyIncome, err
+			}
+
+			totalIncome.Add(totalIncome, channelLog.Value)
+
+			t, err := GetBlockTime(vLog.BlockHash)
+			if err != nil {
+				log.Println("getBlockTime err:", err)
+				return totalIncome, dailyIncome, err
+			}
+			if isToday(int64(t)) {
+				dailyIncome.Add(dailyIncome, channelLog.Value)
+			}
+		}
+	}
+	return totalIncome, dailyIncome, nil
+}
+
+//GetBlockTime get block's timeStamp
+func GetBlockTime(blockHash common.Hash) (uint64, error) {
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		return 0, err
+	}
+
+	blockHeader, err := client.HeaderByHash(context.Background(), blockHash)
+	time := blockHeader.Time
+	return time, nil
+}
+
+func isToday(t int64) bool {
+	currentTime := time.Now()
+	startTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), 0, 0, 0, 0, currentTime.Location())
+	oneDay := int64(24 * 60 * 60)
+	if t >= startTime.Unix() && t <= startTime.Unix()+oneDay {
+		return true
+	}
+	return false
 }

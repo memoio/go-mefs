@@ -125,7 +125,7 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		ui.setQuery(gid)
 		p.users.Store(uid, ui)
 	} else {
-		ui.(*uInfo).setQuery(groupID)
+		ui.(*uInfo).setQuery(gid)
 	}
 
 	kmkps, _ := metainfo.NewKey(gid, mpb.KeyType_LFS, uid)

@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
+
+	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/utils/address"
 
 	"github.com/memoio/go-mefs/role"
 
@@ -16,6 +20,8 @@ import (
 type pInfoOutput struct {
 	DepositCapacity uint64
 	UsedCapacity    uint64
+	TotalIncome     *big.Int
+	DailyIncome     *big.Int
 }
 
 var InfoCmd = &cmds.Command{
@@ -35,6 +41,8 @@ var InfoCmd = &cmds.Command{
 
 		var depositCapacity int64
 		var usedCapacity uint64
+		totalIncome := big.NewInt(0)
+		dailyIncome := big.NewInt(0)
 
 		providerIns, ok := node.Inst.(*provider.Info)
 
@@ -49,13 +57,33 @@ var InfoCmd = &cmds.Command{
 			if err != nil {
 				return err
 			}
+			fmt.Println("if you want to see the real income, please run 'mefs-provider daemon' first")
 		} else {
 			depositCapacity, usedCapacity = providerIns.GetStorageInfo()
+			ukAddress, channelAddress := providerIns.GetIncomeInfo()
+
+			localAddr, err := address.GetAddressFromID(node.Identity.Pretty())
+			if err != nil {
+				return err
+			}
+			totalIncome, dailyIncome, err = contracts.GetStorageIncome(ukAddress, localAddr) //income for storage
+			if err != nil {
+				return err
+			}
+			t, d, err := contracts.GetDownloadIncome(channelAddress, localAddr)
+			if err != nil {
+				return err
+			}
+
+			totalIncome.Add(totalIncome, t)
+			dailyIncome.Add(dailyIncome, d)
 		}
 
 		output := &pInfoOutput{
 			DepositCapacity: uint64(depositCapacity),
 			UsedCapacity:    usedCapacity,
+			TotalIncome:     totalIncome,
+			DailyIncome:     dailyIncome,
 		}
 		return cmds.EmitOnce(res, output)
 	},
