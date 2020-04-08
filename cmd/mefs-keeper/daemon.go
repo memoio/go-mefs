@@ -361,7 +361,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("Starting as a keeper")
 		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing)
 		if err != nil {
-			fmt.Println("Start keeper service fails; please restart")
+			fmt.Println("Start keeper service fails: ", err, "; please restart")
+			return err
 		}
 		node.Inst = ins
 

@@ -359,7 +359,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("Starting as a user")
 		ins, err := user.New(node.Context(), node.Identity.Pretty(), node.Data, node.Routing)
 		if err != nil {
-			fmt.Println("Start user daemon fails; please restart")
+			fmt.Println("Start user daemon fails:", err)
+			return err
 		}
 
 		node.Inst = ins
