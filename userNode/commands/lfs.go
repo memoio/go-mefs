@@ -214,7 +214,7 @@ const (
 	AddressID    = "address"
 	Encryption   = "encryption"
 	PrefixFilter = "prefix"
-	AvailTime    = "Avail"
+	AvailTime    = "availTime"
 	OutputPath   = "output"
 	ForceFlush   = "force" //设置这个选项，会强制刷新给Provider，无论是否表示为脏
 )

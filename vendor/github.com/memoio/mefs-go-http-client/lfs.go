@@ -95,9 +95,9 @@ func SetCrypto(crypto bool) LfsOpts {
 	}
 }
 
-func NeedAvailTime(enabled bool) LfsOpts {
+func SetAvailTime(enabled bool) LfsOpts {
 	return func(rb *RequestBuilder) error {
-		rb.Option("Avail", enabled)
+		rb.Option("availTime", enabled)
 		return nil
 	}
 }

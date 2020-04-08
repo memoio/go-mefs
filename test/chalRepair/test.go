@@ -128,7 +128,7 @@ func challengeTest() error {
 			return errors.New("ChallengeTest failed, Last challenge time not change")
 		}
 		time.Sleep(2 * time.Minute)
-		getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr))
+		getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr), shell.SetAvailTime(true))
 		if err != nil {
 			log.Println("List Objects failed :", err)
 			return err
