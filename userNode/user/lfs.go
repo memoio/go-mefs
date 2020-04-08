@@ -105,6 +105,12 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		l.putUserConfig(ctx)
 	}
 
+	if l.gInfo.force {
+		// wait 90 seconds for other insatnce to sync data
+		// need sessionID for each request?
+		time.Sleep(90 * time.Second)
+	}
+
 	// in case persist is cancel
 	err = l.startLfs()
 	if err != nil {
@@ -232,15 +238,22 @@ func (l *LfsInfo) GetGroup() *groupInfo {
 
 func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 	utils.MLogger.Infof("Send Heartbeat %s is ready for: %s", l.fsID, l.userID)
-	tick := time.NewTicker(5 * time.Minute)
+	tick := time.NewTicker(1 * time.Minute)
 	defer tick.Stop()
 	for {
 		select {
 		case <-tick.C:
 			if l.Online() && l.writable {
 				ok := l.Sm.TryAcquire(1)
-				l.gInfo.heartbeat(ctx)
-				//sendHeartBeat的时候不能Stop，如果没获取到证明其他任务占住了，继续执行
+				err := l.gInfo.heartbeat(ctx)
+				if err != nil {
+					// need flush for lasttime; maybe inconsistent?
+					l.Fsync(true)
+					l.genRoot()
+					// change to readonly, because of other force
+					l.writable = false
+					utils.MLogger.Infof("Lfs %s is changed to readonly mode", l.fsID)
+				}
 				if ok {
 					l.Sm.Release(1)
 				}

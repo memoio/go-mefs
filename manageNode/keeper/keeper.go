@@ -941,7 +941,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 
 // flag: weather noyify provider to actual delete
 func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
-	utils.MLogger.Info("delete block: ", bid, "for query: ", qid)
+	utils.MLogger.Info("delete block: ", bid, " for query: ", qid)
 
 	ctx := k.context
 

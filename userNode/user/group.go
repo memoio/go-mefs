@@ -745,7 +745,7 @@ func (g *groupInfo) stop(ctx context.Context) error {
 
 	utils.MLogger.Info("Stop user: ", g.userID)
 
-	// key: queryID/"UserStart"/userID/kc/pc/id
+	// key: queryID/"UserStop"/userID/kc/pc/id
 	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserStop, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())
 	if err != nil {
 		return err
@@ -789,7 +789,20 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	}
 
 	for _, kid := range g.tempKeepers {
-		g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kid)
+		res, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kid)
+		if err != nil {
+			continue
+		}
+
+		uuidtmp, err := uuid.ParseBytes(res)
+		if err != nil {
+			utils.MLogger.Warn("uuid ParseBytes: ", string(res), " err: ", err)
+			continue
+		}
+
+		if uuidtmp != uuid.Nil && g.sessionID != uuidtmp {
+			return ErrLfsReadOnly
+		}
 	}
 
 	for _, pid := range g.tempProviders {

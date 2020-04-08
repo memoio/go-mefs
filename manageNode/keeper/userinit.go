@@ -158,12 +158,12 @@ func (k *Info) handleUserNotify(km *metainfo.Key, metaValue []byte, from string)
 	return []byte("ok"), nil
 }
 
-func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) {
-	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
+func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleHeartBeat: ", km.ToString(), " from:", from)
 
 	ops := km.GetOptions()
 	if len(ops) != 4 {
-		return
+		return nil, role.ErrWrongKey
 	}
 
 	uid := ops[0]
@@ -173,7 +173,7 @@ func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 	if gp != nil {
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		if gp.sessionID == uuid.Nil {
@@ -183,10 +183,13 @@ func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 		if gp.sessionID == sessID {
 			gp.sessionTime = time.Now().Unix()
 		}
-		return
+
+		sessID = gp.sessionID
+
+		return []byte(sessID.String()), nil
 	}
 
-	return
+	return nil, role.ErrNotMyUser
 }
 
 // key: queryID/"UserStop"/userID/keepercount/providercount/sessionID;

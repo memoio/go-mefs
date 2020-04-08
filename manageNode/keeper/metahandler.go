@@ -34,7 +34,7 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	case mpb.KeyType_UserStop:
 		go k.handleUserStop(km, metaValue, from)
 	case mpb.KeyType_HeartBeat:
-		go k.handleHeartBeat(km, metaValue, from)
+		return k.handleHeartBeat(km, metaValue, from)
 	case mpb.KeyType_Bucket:
 		go k.handleAddBucket(km, metaValue, sig, from)
 	case mpb.KeyType_BlockPos:
