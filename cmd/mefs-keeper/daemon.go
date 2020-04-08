@@ -365,6 +365,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 		fmt.Println("Keeper service is ready")
 	default:
+		fmt.Println("Your role is not keeper, please register first")
+		return errors.New("role is not keeper")
 	}
 
 	// collect long-running errors and block for shutdown

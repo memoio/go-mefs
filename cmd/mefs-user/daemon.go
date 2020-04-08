@@ -366,8 +366,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		node.Inst = ins
 
 		fmt.Println("User service is ready; run `mefs-user lfs start` to start lfs service")
-
 	default:
+		fmt.Println("Your role is not user")
+		return errors.New("role is not user")
 	}
 
 	// collect long-running errors and block for shutdown

@@ -455,8 +455,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		node.Inst = ins
 
 		fmt.Println("Provider service is ready")
-
 	default:
+		fmt.Println("Your role is not provider, please register first")
+		return errors.New("role is not provider")
 	}
 
 	// collect long-running errors and block for shutdown

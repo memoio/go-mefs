@@ -68,9 +68,11 @@ If no peer is specified, prints out information for local peers.
 			return err
 		}
 
-		pwd, ok := req.Options["password"].(string)
-		if ok {
-			n.SetPassWord(pwd)
+		if !n.OnlineMode() {
+			pwd, ok := req.Options["password"].(string)
+			if ok {
+				n.SetPassWord(pwd)
+			}
 		}
 
 		var id peer.ID
