@@ -41,7 +41,7 @@ const (
 	// offer options
 
 	// DefaultOfferCapacity is provider
-	DefaultOfferCapacity int64 = 10000 //单位：MB
+	DefaultOfferCapacity int64 = 1000000 //单位：MB
 	// DefaultOfferDuration is provider； 100 days
 	DefaultOfferDuration int64 = 100
 

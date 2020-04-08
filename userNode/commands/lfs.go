@@ -297,9 +297,9 @@ var lfsStartUserCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(SecreteKey, "sk", "The practice user's private key that you want to exec").WithDefault(""),
-		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(""),
+		cmds.StringOption("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(""),
 		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(utils.DefaultDuration),
-		cmds.Int64Option("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(utils.DefaultCapacity),
 		cmds.Int64Option("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(utils.KeeperSLA),
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(utils.ProviderSLA),
@@ -321,8 +321,13 @@ var lfsStartUserCmd = &cmds.Command{
 		}
 		var addr = ""
 		var uid = ""
-		sk := req.Options[SecreteKey].(string)
+
 		pwd := req.Options[PassWord].(string)
+		if !ok || pwd == "" {
+			pwd = utils.DefaultPassword
+		}
+
+		sk := req.Options[SecreteKey].(string)
 		if sk != "" {
 			addrCommon, err := id.GetAdressFromSk(sk)
 			if err != nil {
@@ -359,11 +364,35 @@ var lfsStartUserCmd = &cmds.Command{
 			}
 		}
 
-		capacity, ok := req.Options["capacity"].(int64) //user签署合约时指定的需求存储空间
-		if !ok || capacity <= 0 {
-			fmt.Println("input wrong capacity.")
-			return errWrongInput
+		//user签署合约时指定的需求存储空间
+		capacity := utils.DefaultCapacity
+		cap, ok := req.Options["capacity"].(string)
+		if ok {
+			if len(cap) > 2 {
+				res, err := strconv.ParseInt(cap[:len(cap)-2], 10, 0)
+				if err != nil {
+					return err
+				}
+
+				if res == 0 {
+					return errWrongInput
+				}
+
+				deUnit := cap[len(cap)-2 : len(cap)]
+				switch deUnit {
+				case "MB":
+					capacity = res
+				case "GB":
+					capacity = res * (1024)
+				case "TB":
+					capacity = res * (1024 * 1024)
+				default:
+					fmt.Println("input wrong capacity uint.")
+					return errWrongInput
+				}
+			}
 		}
+
 		duration, ok := req.Options["duration"].(int64) //user签署合约时指定的需求存储时长
 		if !ok || duration <= 0 {
 			fmt.Println("input wrong duration.")

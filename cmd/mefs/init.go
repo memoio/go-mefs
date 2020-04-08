@@ -151,7 +151,7 @@ func GetPassWord() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	go func() {
 		defer cancel()
-		fmt.Printf("input your password: ")
+		fmt.Printf("Please input your password: ")
 		input := bufio.NewScanner(os.Stdin)
 		ok := input.Scan()
 		if ok {
