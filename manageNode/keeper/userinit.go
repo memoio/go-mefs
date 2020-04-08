@@ -193,7 +193,7 @@ func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 }
 
 // key: queryID/"UserStop"/userID/keepercount/providercount/sessionID;
-func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
+func (k *Info) handleUserStop(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStop: ", km.ToString(), " from:", from)
 
 	ops := km.GetOptions()
@@ -206,6 +206,11 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp != nil {
+		ok := k.ds.VerifyKey(k.context, km.ToString(), metaValue, sig)
+		if !ok {
+			utils.MLogger.Infof("key signature is wrong for %s", km.ToString())
+			return nil, role.ErrWrongSign
+		}
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
 			return nil, err

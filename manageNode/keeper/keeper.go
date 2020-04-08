@@ -347,9 +347,9 @@ func (k *Info) loadUser(ctx context.Context) error {
 	return nil
 }
 
-func (k *Info) loadUserBucket(qid string) error {
+func (k *Info) loadUserBucket(uid, qid string) error {
 	// load bucketinfo
-	prefix := qid + metainfo.DELIMITER + strconv.Itoa(int(mpb.KeyType_Bucket))
+	prefix := qid + metainfo.DELIMITER + strconv.Itoa(int(mpb.KeyType_Bucket)) + metainfo.DELIMITER + uid
 
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
@@ -367,6 +367,10 @@ func (k *Info) loadUserBucket(qid string) error {
 
 		ops := km.GetOptions()
 		if len(ops) != 2 {
+			continue
+		}
+
+		if ops[0] != uid {
 			continue
 		}
 
@@ -770,7 +774,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 			break
 		}
 
-		k.loadUserBucket(qid)
+		k.loadUserBucket(uid, qid)
 		k.loadUserBlock(qid)
 		k.loadUserPay(uid, qid)
 		k.loadUserChallenge(uid, qid)
@@ -867,6 +871,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 
 			kmBlock, err := metainfo.NewKey(blockID, mpb.KeyType_BlockPos)
 			if err != nil {
+				return false
 			}
 
 			//delete from local

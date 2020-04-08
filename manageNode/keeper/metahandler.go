@@ -32,7 +32,7 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	case mpb.KeyType_UserStart:
 		return k.handleUserStart(km, metaValue, sig, from)
 	case mpb.KeyType_UserStop:
-		go k.handleUserStop(km, metaValue, from)
+		go k.handleUserStop(km, metaValue, sig, from)
 	case mpb.KeyType_HeartBeat:
 		return k.handleHeartBeat(km, metaValue, from)
 	case mpb.KeyType_Bucket:

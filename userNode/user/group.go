@@ -751,16 +751,22 @@ func (g *groupInfo) stop(ctx context.Context) error {
 		return err
 	}
 
+	kms := kmc.ToString()
+
+	sig, err := id.SignForKey(g.privKey, kms, nil)
+	if err != nil {
+		return err
+	}
+
 	for _, kinfo := range g.keepers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, kinfo.keeperID)
+		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, sig, kinfo.keeperID)
 		if err != nil {
 			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
-			continue
 		}
 	}
 
 	for _, pinfo := range g.providers {
-		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pinfo.providerID)
+		_, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, sig, pinfo.providerID)
 		if err != nil {
 			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
 		}
