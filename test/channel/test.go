@@ -109,20 +109,12 @@ func testChannelTimeout() (err error) {
 		log.Println("Get Wrong Channel")
 	}
 
-	log.Println("test channel timeout before enddate, should return err")
+	log.Println("test channel timeout")
 	//触发channelTimeout()
 	contracts.EndPoint = ethEndPoint
 	err = contracts.ChannelTimeout(channelAddr, userSk)
-	if err == nil {
-		log.Println("call channelTimeout success, but time is early")
-		return err
-	}
-
-	log.Println("test channel timeout after enddate")
-	time.Sleep(300 * time.Second)
-	err = contracts.ChannelTimeout(channelAddr, userSk)
 	if err != nil {
-		log.Println("call channelTimeout err:", err)
+		log.Println("call channelTimeout fail")
 		return err
 	}
 
@@ -287,6 +279,17 @@ func testCloseChannel() (err error) {
 
 		log.Println("call close channel success: user has refund his remain value")
 		break
+	}
+
+	log.Println("test get download income from chain")
+	chAddrs := []common.Address{channelAddr}
+	total, daily, err := contracts.GetDownloadIncome(chAddrs, providerAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("totalIncome: ", total.String(), "\ndailyIncome: ", daily.String())
+	if total.Cmp(value) != 0 {
+		log.Fatal("test get income failed")
 	}
 	return nil
 }

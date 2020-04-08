@@ -25,6 +25,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 	if !redo {
 		offerAddr, err = GetLatestFromMapper(localAddress, mapperInstance)
 		if err == nil {
+			log.Println("you have deployed offer-contract")
 			return offerAddr, nil
 		}
 	}

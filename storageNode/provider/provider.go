@@ -7,6 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/utils/address"
+
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -152,6 +156,37 @@ func (p *Info) GetStorageInfo() (int64, uint64) {
 	return p.proContract.Capacity, p.storageUsed
 }
 
+//GetIncomeInfo get upkeepingAddress and channelAddress of this provider to filter logs in chain
+func (p *Info) GetIncomeInfo() ([]common.Address, []common.Address) {
+	ukAddr := []common.Address{}
+	channelAddr := []common.Address{}
+	p.fsGroup.Range(func(key, value interface{}) bool {
+		gInfo, ok := value.(*groupInfo)
+		if !ok {
+			return true
+		}
+		ukid := gInfo.upkeeping.UpKeepingID
+		tmp, err := address.GetAddressFromID(ukid)
+		if err != nil {
+			return false
+		}
+		ukAddr = append(ukAddr, tmp)
+
+		gInfo.channel.Range(func(key, value interface{}) bool {
+			cItem, ok := value.(*role.ChannelItem)
+			if !ok {
+				return true
+			}
+			if cItem.ProID == p.localID {
+				channelAddr = append(channelAddr) //此处需要return false终止遍历吗
+			}
+			return true
+		})
+		return true
+	})
+	return ukAddr, channelAddr
+}
+
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
 	g := &groupInfo{
 		userID:    uid,
@@ -179,46 +214,46 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 
 		res, _ := p.ds.GetKey(ctx, kmkps.ToString(), "local")
 		kpids = string(res)
+	}
 
-		splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
+	splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
 
-		has := false
-		if len(splitedMeta) == 2 {
-			kps := splitedMeta[0]
-			for i := 0; i < len(kps)/utils.IDLength; i++ {
-				kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-				_, err := peer.IDB58Decode(kid)
-				if err != nil {
-					continue
-				}
-				tmpKps = append(tmpKps, kid)
+	has := false
+	if len(splitedMeta) == 2 {
+		kps := splitedMeta[0]
+		for i := 0; i < len(kps)/utils.IDLength; i++ {
+			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(kid)
+			if err != nil {
+				continue
+			}
+			tmpKps = append(tmpKps, kid)
+		}
+
+		kps = splitedMeta[1]
+		for i := 0; i < len(kps)/utils.IDLength; i++ {
+			pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+			_, err := peer.IDB58Decode(pid)
+			if err != nil {
+				continue
 			}
 
-			kps = splitedMeta[1]
-			for i := 0; i < len(kps)/utils.IDLength; i++ {
-				pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-				_, err := peer.IDB58Decode(pid)
-				if err != nil {
-					continue
-				}
-
-				if pid == p.localID {
-					has = true
-				}
-
-				tmpPros = append(tmpPros, pid)
+			if pid == p.localID {
+				has = true
 			}
-		}
 
-		if len(tmpKps) == 0 || len(tmpPros) == 0 {
-			utils.MLogger.Warn(groupID, " has no keeper or providers")
-			return nil
+			tmpPros = append(tmpPros, pid)
 		}
+	}
 
-		if !has {
-			utils.MLogger.Warn(groupID, " is not my user")
-			return nil
-		}
+	if len(tmpKps) == 0 || len(tmpPros) == 0 {
+		utils.MLogger.Warn(groupID, " has no keeper or providers")
+		return nil
+	}
+
+	if !has {
+		utils.MLogger.Warn(groupID, " is not my user")
+		return nil
 	}
 
 	gp := newGroup(p.localID, userID, groupID, tmpKps, tmpPros)
@@ -367,7 +402,7 @@ func (p *Info) save(ctx context.Context) error {
 
 	localID := p.localID
 
-	var pids strings.Builder
+	var kids strings.Builder
 
 	// persist keepers
 	kmKID, err := metainfo.NewKey(localID, mpb.KeyType_Keepers)
@@ -376,37 +411,37 @@ func (p *Info) save(ctx context.Context) error {
 	}
 
 	p.keepers.Range(func(key, value interface{}) bool {
-		pids.WriteString(key.(string))
+		kids.WriteString(key.(string))
 		return true
 	})
 
-	if pids.Len() > 0 {
-		err = p.ds.PutKey(ctx, kmKID.ToString(), []byte(pids.String()), nil, "local")
+	if kids.Len() > 0 {
+		err = p.ds.PutKey(ctx, kmKID.ToString(), []byte(kids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
 	}
 
-	pids.Reset()
+	kids.Reset()
 	kmUID, err := metainfo.NewKey(localID, mpb.KeyType_Users)
 	if err != nil {
 		return err
 	}
 
 	p.users.Range(func(key, value interface{}) bool {
-		pids.WriteString(key.(string))
+		kids.WriteString(key.(string))
 		return true
 	})
 
-	if pids.Len() > 0 {
-		err = p.ds.PutKey(ctx, kmUID.ToString(), []byte(pids.String()), nil, "local")
+	if kids.Len() > 0 {
+		err = p.ds.PutKey(ctx, kmUID.ToString(), []byte(kids.String()), nil, "local")
 		if err != nil {
 			return err
 		}
 	}
 
 	p.users.Range(func(key, value interface{}) bool {
-		pids.Reset()
+		kids.Reset()
 		uid := key.(string)
 		ui := value.(*uInfo)
 		qus := ui.getQuery()
@@ -417,11 +452,11 @@ func (p *Info) save(ctx context.Context) error {
 			}
 
 			for _, qid := range qus {
-				pids.WriteString(qid)
+				kids.WriteString(qid)
 			}
 
-			if pids.Len() > 0 {
-				err = p.ds.PutKey(ctx, kmQID.ToString(), []byte(pids.String()), nil, "local")
+			if kids.Len() > 0 {
+				err = p.ds.PutKey(ctx, kmQID.ToString(), []byte(kids.String()), nil, "local")
 				if err != nil {
 					return true
 				}
@@ -432,7 +467,7 @@ func (p *Info) save(ctx context.Context) error {
 
 	// store keepers and channel value
 	res := p.getGroups()
-	pids.Reset()
+	kids.Reset()
 	for _, qu := range res {
 		p.saveChannelValue(qu.uid, qu.qid, p.localID)
 		p.loadChannelValue(qu.uid, qu.qid)

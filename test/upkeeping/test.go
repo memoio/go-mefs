@@ -18,7 +18,7 @@ import (
 const (
 	moneyTo      = 10000000000000000
 	moneyToUK    = 234500
-	defaultCycle = 180 // only 90 is rigt?
+	defaultCycle = 240
 )
 
 var serverKaddrs = []string{"0x25a239c463415fF09767EDd051323385C9CE670c", "0xc67F94895F9626506857919D997e8dA7ffd95bF7", "0x9ADb6BC98FD4eE2bFF716034B9653dC5F0558B5f", "0xf904237239a79f535bdc77622CCfB31E3B3f83C9", "0x6Bd50cA3Ba83151f8Cb133B3C90737E173243adf", "0xd61E260aAA4AF3D64B899029E8c4025c96Ab31ec"}
@@ -87,7 +87,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	}
 
 	log.Println("1.begin to deploy upkeeping first")
-	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr[0], listKeeperAddr, listProviderAddr, 600, 1024, 111, defaultCycle, big.NewInt(moneyToUK), false)
+	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr[0], listKeeperAddr, listProviderAddr, 780, 1024, 111, defaultCycle, big.NewInt(moneyToUK), false)
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err
@@ -138,7 +138,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		log.Fatal("ukGetOrder error:", err)
 	}
 	createdate := big.NewInt(0)
-	if (queryAddrGet != listKeeperAddr[0]) || (timeGet.Cmp(big.NewInt(600)) != 0) || (sizeG.Cmp(big.NewInt(1024)) != 0) || (priceG.Cmp(big.NewInt(111)) != 0) || (endDate.Cmp(createdate.Add(createDate, timeGet)) != 0) || (cycle.Cmp(big.NewInt(defaultCycle)) != 0) || (needPay.Cmp(big.NewInt(0)) != 0) {
+	if (queryAddrGet != listKeeperAddr[0]) || (timeGet.Cmp(big.NewInt(780)) != 0) || (sizeG.Cmp(big.NewInt(1024)) != 0) || (priceG.Cmp(big.NewInt(111)) != 0) || (endDate.Cmp(createdate.Add(createDate, timeGet)) != 0) || (cycle.Cmp(big.NewInt(defaultCycle)) != 0) || (needPay.Cmp(big.NewInt(0)) != 0) {
 		log.Fatal("ukGetOrder get wrong parameters:", queryAddrGet.String(), " ", timeGet, sizeG, priceG, createDate, endDate, cycle, needPay)
 	}
 
@@ -448,6 +448,18 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	}
 	if len(keeperInfo) != kCount || !keeperInfo[1].Stop {
 		log.Fatal("keeper is not stopped, error")
+	}
+
+	//query provider[0]'s income
+	log.Println("17. begin to test getStorageIncome")
+	upAddrs := []common.Address{uAddr}
+	total, daily, err := contracts.GetStorageIncome(upAddrs, listProviderAddr[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("totalIncome: ", total.String(), "\ndailyIncome: ", daily.String())
+	if total.Cmp(big.NewInt(120*9*3)) != 0 {
+		log.Fatal("query providers[0]'s storageIncome failed, it is not equal to 3240")
 	}
 
 	log.Println("upkeeping's tests pass")
