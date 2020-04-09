@@ -523,6 +523,7 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 		if err != nil {
 			continue
 		}
+		chalRes := new(mpb.ChalInfo)
 		for _, e := range es {
 			rec := new(recpb.Record)
 			err := proto.Unmarshal(e.Value, rec)
@@ -542,7 +543,6 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 				continue
 			}
 
-			chalRes := new(mpb.ChalInfo)
 			err = proto.Unmarshal(rec.GetValue(), chalRes)
 			if err != nil {
 				continue
