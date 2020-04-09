@@ -461,7 +461,6 @@ func (k *Info) loadUserPay(userID, qid string) error {
 		}
 
 		if lin.lastPay == nil {
-
 			found := false
 			for _, pInfo := range gInfo.upkeeping.Providers {
 				pid, err := address.GetIDFromAddress(pInfo.Addr.String())
@@ -513,6 +512,8 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 
 		payTime = lin.lastPay.GetStart() + lin.lastPay.GetLength()
 
+		utils.MLogger.Infof("PayTime for %s and %s at %s", userID, proID, time.Unix(payTime, 0).Format(utils.BASETIME))
+
 		km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, k.localID)
 		if err != nil {
 			return err
@@ -546,11 +547,15 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 			if err != nil {
 				continue
 			}
-			// verify chalres
-			// then set
-			chalRes.Blocks = nil
-			chalRes.FaultBlocks = nil
-			lin.chalMap.Store(chalTime, chalRes)
+
+			utils.MLogger.Infof("Found chalresult at %s", time.Unix(chalTime, 0).Format(utils.BASETIME))
+
+			// only need successLength for stpay
+			chalNeed := &mpb.ChalInfo{
+				SuccessLength: chalRes.GetSuccessLength(),
+			}
+
+			lin.chalMap.Store(chalTime, chalNeed)
 		}
 	}
 	return nil

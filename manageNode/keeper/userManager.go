@@ -31,7 +31,7 @@ type groupInfo struct {
 	providers    []string
 	upkeeping    *role.UpKeepingItem
 	query        *role.QueryItem
-	buckets      sync.Map // key:bucketID; value: *bucketInfo
+	buckets      sync.Map // key:bucketID(string); value: *bucketInfo
 	ledgerMap    sync.Map // key:proID，value:*chalInfo
 }
 
@@ -143,8 +143,11 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 	thisIb, ok := g.buckets.Load(bucketID)
 	if !ok {
 		if mode {
+			bop := df.DefaultBucketOptions()
 			tempInfo := &bucketInfo{
-				bops: df.DefaultBucketOptions(),
+				bops:       bop,
+				curStripes: -1,
+				chunkNum:   int(bop.GetDataCount() + bop.GetParityCount()),
 			}
 			g.buckets.Store(bucketID, tempInfo)
 			return tempInfo
@@ -162,6 +165,7 @@ func (g *groupInfo) addBucket(bucketID string, binfo *mpb.BucketOptions) error {
 	}
 
 	thisBucket.bops = binfo
+	thisBucket.chunkNum = int(binfo.GetDataCount() + binfo.GetParityCount())
 
 	return nil
 }
@@ -193,6 +197,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 
 		if newcidinfo.storedOn != pid {
 			newcidinfo.storedOn = pid
+			newcidinfo.repair = 0
 		}
 	} else {
 		thisLinfo.blockMap.Store(bid, newcidinfo)
@@ -209,9 +214,13 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 		return nil
 	}
 
+	// change length;store or calculate at startup
 	thisLinfo.maxlength += int64((offset - oldOffset) * int(thisBucket.bops.GetSegmentSize()))
 
 	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
+	if len(bids) < 2 {
+		return role.ErrWrongKey
+	}
 	// key: stripeID_chunkID
 	thisBucket.stripes.Store(bids[1], newcidinfo)
 
@@ -230,6 +239,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	}
 
 	if cnum > thisBucket.chunkNum {
+		utils.MLogger.Warn("chunkID %s is larger than bucket ops %d", cnum, thisBucket.chunkNum)
 		thisBucket.chunkNum = cnum
 	}
 

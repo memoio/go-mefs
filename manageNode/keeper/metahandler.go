@@ -40,11 +40,11 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	case mpb.KeyType_BlockPos:
 		switch opType {
 		case mpb.OpType_Put:
-			go k.handleAddBlockPos(km, metaValue, from)
+			go k.handleAddBlockPos(km, metaValue, sig, from)
 		case mpb.OpType_Get:
 			return k.handleGetKey(km, metaValue, sig, from)
 		case mpb.OpType_Delete:
-			go k.handleDeleteBlockPos(km)
+			go k.handleDeleteBlockPos(km, metaValue, sig, from)
 		}
 	case mpb.KeyType_Challenge:
 		if opType == mpb.OpType_Put {
@@ -188,7 +188,7 @@ func (k *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from str
 
 // key: blockID/"BlockPos"
 // value: pid/offset
-func (k *Info) handleAddBlockPos(km *metainfo.Key, metaValue []byte, from string) {
+func (k *Info) handleAddBlockPos(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleAddBlockPos: ", km.ToString())
 
 	blockID := km.GetMid()
@@ -212,7 +212,7 @@ func (k *Info) handleAddBlockPos(km *metainfo.Key, metaValue []byte, from string
 	return
 }
 
-func (k *Info) handleDeleteBlockPos(km *metainfo.Key) {
+func (k *Info) handleDeleteBlockPos(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleDeleteBlockPos: ", km.ToString())
 	blockID := km.GetMid()
 

@@ -120,7 +120,7 @@ func (k *Info) repairRegular(ctx context.Context) {
 func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	utils.MLogger.Info("Repair blocks:", rBlockID)
 	var response string
-	// uid_qid_bid_sid_bid
+	// uid_qid_bid_sid_cid
 	blkinfo := strings.Split(rBlockID, metainfo.BlockDelimiter)
 	if len(blkinfo) < 5 {
 		return
@@ -216,9 +216,9 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 }
 
 // key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
-// value: "ok" or "fail"/pid/offset
+// value: "ok"/pid/offset or "fail"
 func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider string) {
-	utils.MLogger.Info("handleRepairResult: ", km.ToString(), "From:", provider)
+	utils.MLogger.Info("handleRepairResult: ", km.ToString(), " From:", provider)
 	blockID := km.GetMid()
 	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) != 3 {
@@ -234,11 +234,6 @@ func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider s
 		newOffset, err := strconv.Atoi(splitedValue[2])
 		if err != nil {
 			utils.MLogger.Info("strconv.Atoi offset error: ", err)
-			return
-		}
-
-		splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
-		if len(splitedValue) != 3 {
 			return
 		}
 
