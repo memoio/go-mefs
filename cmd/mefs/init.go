@@ -52,7 +52,7 @@ environment variable:
 	Options: []cmds.Option{
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to load/store the PrivateKey from keyfile").WithDefault(""),
 		cmds.StringOption(secretKeyKwd, "sk", "the privateKey").WithDefault(""),
-		cmds.StringOption("keyfile", "kf", "the path of keyfile").WithDefault(""),
+		cmds.StringOption("keyfile", "kf", "the absolute path of keyfile").WithDefault(""),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 	},
 	PreRun: func(req *cmds.Request, env cmds.Environment) error {
@@ -176,8 +176,8 @@ func CheckRepo(repoRoot string) error {
 	}
 
 	if fsrepo.IsInitialized(repoRoot) {
-		fmt.Println(repoRoot, "already exists, reinitializing need to delete this directory")
-		fmt.Printf("delete (y/n): ")
+		fmt.Println(repoRoot, "already exists, reinitializing need to delete files in this directory")
+		fmt.Printf("delete (y/N): ")
 		var deleteCmd string
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		go func() {
@@ -185,7 +185,6 @@ func CheckRepo(repoRoot string) error {
 			input := bufio.NewScanner(os.Stdin)
 			ok := input.Scan()
 			if ok {
-				fmt.Println(input.Text())
 				deleteCmd = input.Text()
 			}
 		}()
@@ -195,7 +194,8 @@ func CheckRepo(repoRoot string) error {
 		}
 
 		if deleteCmd == "y" {
-			return os.RemoveAll(repoRoot)
+			return os.Rename(repoRoot, repoRoot+".bak")
+			//return os.RemoveAll(repoRoot)
 		}
 		return errRepoExists
 	}

@@ -1,8 +1,12 @@
 package commands
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"io"
+	"os"
+	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	id "github.com/memoio/go-mefs/crypto/identity"
@@ -20,6 +24,30 @@ type UserPrivMessage struct {
 	Sk      string
 }
 
+func GetPassWord() string {
+	var password string
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	go func() {
+		defer cancel()
+		fmt.Printf("Please input your password: ")
+		input := bufio.NewScanner(os.Stdin)
+		ok := input.Scan()
+		if ok {
+			password = input.Text()
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+	}
+
+	if password == "" {
+		fmt.Println("\nuse default password: ", utils.DefaultPassword)
+		password = utils.DefaultPassword
+	}
+	return password
+}
+
 var CreateCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "create user.",
@@ -31,15 +59,44 @@ var CreateCmd = &cmds.Command{
 	Arguments: []cmds.Argument{},
 	Options: []cmds.Option{
 		cmds.StringOption(SecreteKey, "sk", "The practice user's privatekey that you want to create").WithDefault(""),
-		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(""),
+		cmds.StringOption("keyfile", "kf", "the absolute path of keyfile").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		kf, ok := req.Options["keyfile"].(string)
+		if ok && kf != "" {
+			password, ok := req.Options[PassWord].(string)
+			if !ok || password == "" {
+				password = GetPassWord()
+			}
+			hexsk, err := id.GetPrivateKey("", password, kf)
+			if err != nil {
+				fmt.Println("load keyfile fails:", err)
+				return err
+			}
+
+			pub, err := id.GetPubByte(hexsk)
+			if err != nil {
+				return err
+			}
+			pid, err := id.GetIDFromPubKey(pub)
+			if err != nil {
+				return err
+			}
+
+			err = fsrepo.PutPrivateKeyToKeystore(hexsk, pid, password)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
 		pwd, found := req.Options[PassWord].(string)
-		if pwd == "" || !found {
-			pwd = utils.DefaultPassword
+		if !found || pwd == "" {
+			pwd = GetPassWord()
 		}
 		sk, found := req.Options[SecreteKey].(string)
-		if sk == "" || !found {
+		if !found || sk == "" {
 			tsk, err := id.Create()
 			if err != nil {
 				return err
