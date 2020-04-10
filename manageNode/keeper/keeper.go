@@ -55,7 +55,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		sk:      sk,
 		state:   false,
 		ds:      d,
-		repch:   make(chan string, 1024),
+		repch:   make(chan string, 100),
 		netIDs:  make(map[string]struct{}),
 		context: ctx,
 	}

@@ -50,28 +50,29 @@ func (k *Info) checkLedger(ctx context.Context) {
 						continue
 					}
 
-					pre := pu.uid + metainfo.BlockDelimiter + pu.qid
+					nowtime := time.Now().Unix()
+					pre := pu.uid + metainfo.BlockDelimiter + pu.qid + metainfo.BlockDelimiter
 					thislinfo.blockMap.Range(func(key, value interface{}) bool {
 						thisinfo := value.(*blockInfo)
-						eclasped := time.Now().Unix() - thisinfo.availtime
+						eclasped := nowtime - thisinfo.availtime
 						switch thisinfo.repair {
 						case 0:
 							if expireTime < eclasped {
-								cid := pre + metainfo.BlockDelimiter + key.(string)
+								cid := pre + key.(string)
 								utils.MLogger.Info("Need repair cid first time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 1:
 							if 4*expireTime < eclasped {
-								cid := pre + metainfo.BlockDelimiter + key.(string)
+								cid := pre + key.(string)
 								utils.MLogger.Info("Need repair cid second time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
 							}
 						case 2:
 							if 16*expireTime < eclasped {
-								cid := pre + metainfo.BlockDelimiter + key.(string)
+								cid := pre + key.(string)
 								utils.MLogger.Info("Need repair cid third time: ", cid)
 								thisinfo.repair++
 								k.repch <- cid
@@ -81,7 +82,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 							if 480*expireTime >= eclasped {
 								// try every 32 hours
 								if int64(64*thisinfo.repair-2)*expireTime < eclasped {
-									cid := pre + metainfo.BlockDelimiter + key.(string)
+									cid := pre + key.(string)
 									utils.MLogger.Info("Need repair cid tried: ", cid)
 									thisinfo.repair++
 									k.repch <- cid
@@ -103,8 +104,7 @@ func (k *Info) repairRegular(ctx context.Context) {
 		for {
 			select {
 			case cid := <-k.repch:
-				utils.MLogger.Info("repairing cid: ", cid)
-				k.repairBlock(ctx, cid)
+				go k.repairBlock(ctx, cid)
 			case <-ctx.Done():
 				return
 			}
@@ -142,6 +142,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	}
 
 	count := int(thisbucket.chunkNum)
+	utils.MLogger.Infof("blockID has %d chunks", thisbucket.chunkNum)
 
 	cpids := make([]string, count)
 	ugid := make([]string, count)
