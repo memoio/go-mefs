@@ -158,14 +158,14 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 	return thisIb.(*bucketInfo)
 }
 
-func (g *groupInfo) addBucket(bucketID string, binfo *mpb.BucketOptions) error {
+func (g *groupInfo) addBucket(bucketID string, binfo *mpb.BucketInfo) error {
 	thisBucket := g.getBucketInfo(bucketID, true)
 	if thisBucket == nil {
 		return nil
 	}
 
-	thisBucket.bops = binfo
-	thisBucket.chunkNum = int(binfo.GetDataCount() + binfo.GetParityCount())
+	thisBucket.bops = binfo.GetBOpts()
+	thisBucket.chunkNum = int(binfo.GetBOpts().GetDataCount() + binfo.GetBOpts().GetParityCount())
 
 	return nil
 }
@@ -239,7 +239,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	}
 
 	if cnum > thisBucket.chunkNum {
-		utils.MLogger.Warn("chunkID %s is larger than bucket ops %d", cnum, thisBucket.chunkNum)
+		utils.MLogger.Warn("chunkID %d is larger than bucket ops %d", cnum, thisBucket.chunkNum)
 		thisBucket.chunkNum = cnum
 	}
 

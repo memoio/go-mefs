@@ -154,6 +154,13 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	bucket.dirty = true
 	bucket.Unlock()
 
+	bk, _ := metainfo.NewKey(l.fsID, mpb.KeyType_Bucket, l.userID, strconv.FormatInt(bucket.GetBucketID(), 10))
+
+	val, err := proto.Marshal(&bucket.BucketInfo)
+	if err == nil {
+		l.gInfo.putDataToKeepers(ctx, bk.ToString(), val)
+	}
+
 	return &bucket.BucketInfo, nil
 }
 

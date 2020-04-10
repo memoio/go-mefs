@@ -165,7 +165,7 @@ func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from str
 		return
 	}
 
-	binfo := new(mpb.BucketOptions)
+	binfo := new(mpb.BucketInfo)
 	err := proto.Unmarshal(metaValue, binfo)
 	if err != nil {
 		return

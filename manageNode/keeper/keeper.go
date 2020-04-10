@@ -374,7 +374,7 @@ func (k *Info) loadUserBucket(uid, qid string) error {
 			continue
 		}
 
-		binfo := new(mpb.BucketOptions)
+		binfo := new(mpb.BucketInfo)
 		err = proto.Unmarshal(rec.GetValue(), binfo)
 		if err != nil {
 			continue
@@ -913,7 +913,11 @@ func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
 	return gp.getBlockAvail(bid)
 }
 
-func (k *Info) addBucket(qid, bid string, binfo *mpb.BucketOptions) error {
+func (k *Info) addBucket(qid, bid string, binfo *mpb.BucketInfo) error {
+	if binfo.GetDeletion() {
+		utils.MLogger.Info("add bucket: ", bid, " for query: ", qid, " is deleted")
+		return nil
+	}
 	utils.MLogger.Info("add bucket: ", bid, " for query: ", qid)
 
 	gp := k.getGroupInfo(qid, qid, false)
