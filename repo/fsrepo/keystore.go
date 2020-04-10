@@ -11,17 +11,20 @@ import (
 
 // PutPrivateKeyToKeystore puts to keystore
 func PutPrivateKeyToKeystore(privatekey string, peerID string, password string) error {
-	rootpath, _ := BestKnownPath()
-	keypath, _ := config.Path(rootpath, Keystore)
+	dir := GetKeyStore()
 
-	return id.StorePrivateKey(keypath, privatekey, peerID, password)
+	peerAddr, err := address.GetAddressFromID(peerID)
+	if err != nil {
+		return err
+	}
+
+	return id.StorePrivateKey(dir, privatekey, peerAddr.String(), password)
 }
 
 //GetPrivateKeyFromKeystore 是从keystore中获得ethereum格式的私钥, 没有"0x"前缀
 func GetPrivateKeyFromKeystore(peerID string, password string) (privateKey string, err error) {
 	//get privatekey's filepath, the dafault is "~/.mefs/keystore/peerID"
-	fsrepoPath, err := BestKnownPath()
-	dir, err := config.Path(fsrepoPath, Keystore)
+	dir := GetKeyStore()
 	filePath, err := config.Path(dir, peerID)
 	if err != nil {
 		return "", err
@@ -34,6 +37,7 @@ func GetPrivateKeyFromKeystore(peerID string, password string) (privateKey strin
 		if err != nil {
 			return "", err
 		}
+
 		filePath, err = config.Path(dir, peerAddr.String())
 		if err != nil {
 			return "", err
@@ -58,4 +62,10 @@ func joinPath(dir string, filename string) (path string) {
 		return filename
 	}
 	return filepath.Join(dir, filename)
+}
+
+func GetKeyStore() string {
+	fsrepoPath, _ := BestKnownPath()
+	dir, _ := config.Path(fsrepoPath, Keystore)
+	return dir
 }

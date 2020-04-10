@@ -17,7 +17,6 @@ import (
 	logging "github.com/ipfs/go-log"
 	config "github.com/memoio/go-mefs/config"
 	serialize "github.com/memoio/go-mefs/config/serialize"
-	id "github.com/memoio/go-mefs/crypto/identity"
 	repo "github.com/memoio/go-mefs/repo"
 	"github.com/memoio/go-mefs/repo/common"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
@@ -260,7 +259,7 @@ func initKeyStore(path, privateKey, peerID, password string) error {
 		return err
 	}
 
-	return id.StorePrivateKey(dir, privateKey, peerID, password)
+	return PutPrivateKeyToKeystore(privateKey, peerID, password)
 }
 
 // Init initializes a new FSRepo at the given path with the provided config.
