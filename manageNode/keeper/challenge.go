@@ -329,6 +329,10 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		slength += int64(segNum * 4096)
 		electedOffset = chal.Seed % segNum
 
+		buf.Reset()
+		buf.WriteString(qid)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(blockID)
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(electedOffset))
 		chal.Indices = append(chal.Indices, buf.String())
@@ -349,11 +353,10 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 			stripeNum += chalResult.GetStripeNum()[j-1] * int64(chalResult.GetChunkNum()[j-1])
 		}
 
-		buf.Reset()
 		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
 		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
-		buf.WriteString(qid)
-		buf.WriteString(metainfo.BlockDelimiter)
+
+		buf.Reset()
 		buf.WriteString(strconv.Itoa(bucketID))
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(stripeID))
@@ -382,8 +385,12 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
 		electedOffset = chal.Seed % segNum
 
+		buf.Reset()
+		buf.WriteString(qid)
 		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(segNum))
+		buf.WriteString(blockID)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(electedOffset))
 		chal.Indices = append(chal.Indices, buf.String())
 
 		if count > totalNum/100 {
