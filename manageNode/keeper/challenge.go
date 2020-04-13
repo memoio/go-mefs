@@ -400,7 +400,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	// recheck the status again
 	if len(chal.Indices) == 0 {
-		utils.MLogger.Warnf("handleProof: %s fails: chal empty", km.ToString(), err)
+		utils.MLogger.Warnf("handleProof: %s fails: chal empty", km.ToString())
 		return
 	}
 
