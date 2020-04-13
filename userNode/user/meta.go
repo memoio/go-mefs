@@ -559,7 +559,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 	ctx := l.context
 	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
 	if err == nil && b != nil {
-		_, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
+		_, _, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
 		if ok {
 			data = append(data, b.RawData()...)
 		}
@@ -583,7 +583,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 
 			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
 			if err == nil && b != nil { //获取到有效数据块，跳出
-				_, _, ok := enc.VerifyBlock(b.RawData(), ncid)
+				_, _, _, ok := enc.VerifyBlock(b.RawData(), ncid)
 				if ok {
 					data = append(data, b.RawData()...)
 					utils.MLogger.Warn("Load superblock in block: ", ncid, " from provider: ", provider)

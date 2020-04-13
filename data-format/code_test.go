@@ -112,7 +112,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 
 	for i := 0; i < opt.blockCount; i++ {
 		bid := "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0_" + strconv.Itoa(i)
-		_, _, ok := opt.VerifyBlock(datas[i], bid)
+		_, _, _, ok := opt.VerifyBlock(datas[i], bid)
 		if !ok {
 			log.Fatal("tag is wrong for: ", bid)
 		}

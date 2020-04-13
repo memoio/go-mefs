@@ -277,24 +277,24 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		}
 	}
 
-	var chal mcl.Challenge
-	var slength, chalLength int64 //success length
-	var electedOffset int
-	var buf strings.Builder
-
-	chal.Seed = mcl.GenChallenge(chalResult)
-
 	err := bset.UnmarshalBinary(chalResult.ChunkMap)
 	if err != nil {
 		utils.MLogger.Warnf("handleProof: %s fails: %s", km.ToString(), err)
 		return
 	}
 
+	var chal mcl.Challenge
+	chal.Seed = mcl.GenChallenge(chalResult)
+
 	totalNum := bset.Count()
 	startPos := uint(chal.Seed) % bset.Len()
 	if startPos < uint(chalResult.GetBucketNum()+1)*3 {
 		startPos = uint(chalResult.GetBucketNum()+1) * 3
 	}
+
+	var slength, chalLength int64 //success length
+	var electedOffset int
+	var buf strings.Builder
 
 	bucketID := 0
 	stripeID := 1
@@ -394,6 +394,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	// recheck the status again
 	if len(chal.Indices) == 0 {
 		utils.MLogger.Warnf("handleProof: %s fails: chal empty", km.ToString(), err)
+		return
 	}
 
 	muByte, err := b58.Decode(spliteProof[0])

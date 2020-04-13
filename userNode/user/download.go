@@ -422,7 +422,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 				return
 			}
 
-			_, _, ok = do.decoder.VerifyBlock(blkData, chunkid)
+			_, _, _, ok = do.decoder.VerifyBlock(blkData, chunkid)
 			if !ok {
 				utils.MLogger.Warn("Fail to verify block: ", chunkid, " from:", provider)
 				pinfo.Unlock()
