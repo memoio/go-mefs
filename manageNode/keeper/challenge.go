@@ -270,10 +270,12 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	fset := bitset.New(0)
 	bset := bitset.New(0)
+	flength := uint(0)
 	if len(spliteProof) == 4 {
 		fmap, err := b58.Decode(spliteProof[3])
 		if err == nil {
 			fset.UnmarshalBinary(fmap)
+			flength = fset.Len()
 		}
 	}
 
@@ -318,7 +320,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		}
 		chalLength += int64(segNum * 4096)
 
-		if !fset.Test(i) {
+		if flength != 0 && !fset.Test(i) {
 			failset[blockID] = struct{}{}
 			continue
 		}
@@ -373,7 +375,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 		chalLength += int64(segNum * int(bi.bops.GetSegmentSize()))
 
-		if !fset.Test(i) {
+		if flength != 0 && !fset.Test(i) {
 			failset[blockID] = struct{}{}
 			continue
 		}
