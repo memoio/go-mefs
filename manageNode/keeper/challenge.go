@@ -158,7 +158,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 	}
 
 	thischalresult := &mpb.ChalInfo{
-		Policy:      "100",
+		Policy:      "100", // use different policy; such as "1%"
 		KeeperID:    localID,
 		ProviderID:  proID,
 		QueryID:     qid,
@@ -305,14 +305,11 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		bucketID = -int(i / 3)
 		stripeID = 0
 		chunkID = int(i % 3)
-		buf.WriteString(qid)
-		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(bucketID))
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(stripeID))
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(chunkID))
-		buf.WriteString(metainfo.BlockDelimiter)
 		blockID := buf.String()
 
 		segNum, ok := thisLinfo.chalCid[blockID]
@@ -362,7 +359,6 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		buf.WriteString(strconv.Itoa(stripeID))
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(chunkID))
-		buf.WriteString(metainfo.BlockDelimiter)
 		blockID := buf.String()
 
 		segNum, ok := thisLinfo.chalCid[blockID]
