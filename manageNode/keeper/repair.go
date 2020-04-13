@@ -35,7 +35,7 @@ func (k *Info) checkLedger(ctx context.Context) {
 					continue
 				}
 
-				utils.MLogger.Info("check repair for user: ", pu.uid)
+				utils.MLogger.Infof("check repair for user %s fsID ", pu.uid, pu.qid)
 
 				for _, proID := range gp.providers {
 					// only master repair
@@ -119,7 +119,7 @@ func (k *Info) repairRegular(ctx context.Context) {
 // value: chunkID1_pid1/chunkID2_pid2/...
 func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	utils.MLogger.Info("Repair blocks:", rBlockID)
-	var response string
+	var response, oldpid string
 	// uid_qid_bid_sid_cid
 	blkinfo := strings.Split(rBlockID, metainfo.BlockDelimiter)
 	if len(blkinfo) < 5 {
@@ -170,6 +170,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 				return
 			}
 			response = pid
+			oldpid = pid
 		}
 
 		res.WriteString(pid)
@@ -178,7 +179,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	}
 
 	if len(ugid) == 0 {
-		utils.MLogger.Info("Repair: no enough informations")
+		utils.MLogger.Infof("Repair %s: no enough informations", rBlockID)
 		return
 	}
 
@@ -212,7 +213,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 		return
 	}
 
-	utils.MLogger.Info("cpids: ", cpids, ",repairs on: ", response)
+	utils.MLogger.Infof("%s has cpids: %s on %s repairs on %s", rBlockID, cpids, oldpid, response)
 	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Get), km.ToString(), []byte(metaValue), nil, response)
 }
 

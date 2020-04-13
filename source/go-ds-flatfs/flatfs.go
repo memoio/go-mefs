@@ -755,7 +755,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 	case 4:
 		bkey = datastore.NewKey(sval[0])
 
-		segStart, err := strconv.Atoi(sval[2])
+		segStart, err := strconv.ParseInt(sval[2], 10, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -798,7 +798,16 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 		tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
 		fieldSize := int(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
 
-		start := preLen + segStart*fieldSize
+		segs := (fileSize - int64(preLen)) / int64(fieldSize)
+
+		// for challenge
+		if segLength == 1 {
+			if segStart > segs {
+				segStart %= segs
+			}
+		}
+
+		start := preLen + int(segStart)*fieldSize
 		if fileSize < int64(start+fieldSize*segLength) {
 			return nil, dataformat.ErrDataTooShort
 		}

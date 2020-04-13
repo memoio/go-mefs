@@ -70,6 +70,14 @@ func (g *groupInfo) loadContracts(mode bool) error {
 		g.upkeeping = &uItem
 	}
 
+	if g.rootID == "" || mode {
+		rootID, err := role.GetRoot(g.userID, g.groupID)
+		if err != nil {
+			return err
+		}
+		g.rootID = rootID
+	}
+
 	return nil
 }
 

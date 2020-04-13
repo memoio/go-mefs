@@ -29,8 +29,10 @@ type groupInfo struct {
 	bft          bool
 	keepers      []string
 	providers    []string
+	rootID       string
 	upkeeping    *role.UpKeepingItem
 	query        *role.QueryItem
+	bucketNum    int64
 	buckets      sync.Map // key:bucketID(string); value: *bucketInfo
 	ledgerMap    sync.Map // key:proID，value:*chalInfo
 }
@@ -159,9 +161,18 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 }
 
 func (g *groupInfo) addBucket(bucketID string, binfo *mpb.BucketInfo) error {
+	bucketNum, err := strconv.ParseInt(bucketID, 10, 0)
+	if err != nil {
+		return err
+	}
+
 	thisBucket := g.getBucketInfo(bucketID, true)
 	if thisBucket == nil {
 		return nil
+	}
+
+	if g.bucketNum < bucketNum {
+		g.bucketNum = bucketNum
 	}
 
 	thisBucket.bops = binfo.GetBOpts()
@@ -311,10 +322,10 @@ type bucketInfo struct {
 
 //lInfo
 type lInfo struct {
-	chalMap      sync.Map // key:challenge time,value:*chalresult
-	blockMap     sync.Map // key:bucketid_stripeid_blockid, value: *blockInfo
-	chalCid      []string // value is []bucketid_stripeid_blockid
-	inChallenge  bool     // during challenge or not
+	chalMap      sync.Map       // key:challenge time,value:*chalresult
+	blockMap     sync.Map       // key:bucketid_stripeid_blockid, value: *blockInfo
+	chalCid      map[string]int // value is []bucketid_stripeid_blockid
+	inChallenge  bool           // during challenge or not
 	maxlength    int64
 	lastChalTime int64
 	lastPay      *chalpay // stores result of last pay

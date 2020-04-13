@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"math/rand"
 	"strconv"
-	"strings"
 
 	mpb "github.com/memoio/go-mefs/proto"
 	"golang.org/x/crypto/blake2b"
@@ -301,20 +300,25 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 
 // GenChallenge 根据时间随机选取的待挑战segments由随机数c对各offset取模而得
 func GenChallenge(chal *mpb.ChalInfo) int {
-	var nb strings.Builder
-	nb.WriteString(chal.QueryID)
-	nb.WriteString(chal.UserID)
-	nb.WriteString(chal.KeeperID)
-	nb.WriteString(chal.ProviderID)
-	nb.WriteString(strconv.FormatInt(chal.ChalTime, 10))
-	nb.WriteString(strconv.FormatInt(chal.TotalLength, 10))
-	nb.WriteString(strconv.FormatInt(chal.ChalLength, 10))
+	newHash, err := blake2b.New256(nil)
+	if err != nil {
+		return 0
+	}
+	newHash.Write([]byte(chal.QueryID))
+	newHash.Write([]byte(chal.UserID))
+	newHash.Write([]byte(chal.ProviderID))
+	newHash.Write([]byte(chal.KeeperID))
 
-	for i := 0; i < len(chal.Blocks); i++ {
-		nb.WriteString(chal.Blocks[i])
+	newHash.Write([]byte(strconv.FormatInt(chal.ChalTime, 10)))
+	newHash.Write([]byte(strconv.FormatInt(chal.TotalLength, 10)))
+	newHash.Write([]byte(strconv.FormatInt(chal.BucketNum, 10)))
+
+	for _, stripeNum := range chal.StripeNum {
+		newHash.Write([]byte(strconv.FormatInt(stripeNum, 10)))
 	}
 
-	hashValue := blake2b.Sum256([]byte(nb.String()))
+	hashValue := newHash.Sum(chal.ChunkMap)
+
 	k := new(big.Int).SetBytes(hashValue[:])
 	rand.Seed(k.Int64())
 	var c int

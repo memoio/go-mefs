@@ -204,6 +204,11 @@ message ChalInfo{
     repeated string FaultBlocks = 10;
     string BlsProof = 11;
     bool Res = 12;
+    string Policy =20;
+    int64 BucketNum = 21;
+    repeated int64 StripeNum = 22;
+    repeated int32 ChunkNum = 23;
+    bytes ChunkMap = 24;
 }
 
 message ChannelSign {

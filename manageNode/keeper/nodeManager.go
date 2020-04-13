@@ -73,7 +73,7 @@ func (p *pInfo) setOffer(flag bool) error {
 	if p.proItem == nil || flag {
 		proItem, err := role.GetProviderInfo(p.providerID, p.providerID)
 		if err != nil {
-			utils.MLogger.Infof("%s is not a provider", p.providerID)
+			utils.MLogger.Infof("%s is not a provider: %s", p.providerID, err)
 			return err
 		}
 		p.proItem = &proItem

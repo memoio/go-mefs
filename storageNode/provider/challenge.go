@@ -9,6 +9,7 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"
 )
@@ -36,71 +37,135 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return nil
 	}
 
-	hProto := &mpb.ChalInfo{}
-	err = proto.Unmarshal(metaValue, hProto)
+	chalInfo := &mpb.ChalInfo{}
+	err = proto.Unmarshal(metaValue, chalInfo)
 	if err != nil {
 		utils.MLogger.Error("unmarshal h failed: ", err)
+		return err
 	}
 
 	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(hProto)
+	chal.Seed = mcl.GenChallenge(chalInfo)
 
-	// 聚合
+	bset := bitset.New(uint(chalInfo.GetBucketNum()))
+	err = bset.UnmarshalBinary(chalInfo.GetChunkMap())
+	if err != nil {
+		return err
+	}
+
+	totalNum := bset.Count()
+	startPos := uint(chal.Seed) % bset.Len()
+	if startPos < uint(chalInfo.GetBucketNum()+1)*3 {
+		startPos = uint(chalInfo.GetBucketNum()+1) * 3
+	}
+
 	var data, tag [][]byte
-	var faultBlocks []string
-	var electedOffset int
 	var buf, cbuf strings.Builder
+	failchunk := false
 	ctx := p.context
-	for _, index := range hProto.Blocks {
-		if len(index) == 0 {
-			continue
-		}
+	for i, e := bset.NextSet(0); e && i <= uint(chalInfo.BucketNum)*3; i, e = bset.NextSet(i + 1) {
 		buf.Reset()
-		bid, off, err := utils.SplitIndex(index)
-		if err != nil {
-			continue
-		}
-		if off < 0 {
-			faultBlocks = append(faultBlocks, index)
-			continue
-		} else if off > 0 {
-			electedOffset = chal.Seed % off
-		} else {
-			electedOffset = 0
-		}
 		buf.WriteString(fsID)
 		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(bid)
-		blockID := buf.String()
+		buf.WriteString(strconv.Itoa(-int(i / 3)))
 		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(electedOffset))
-		electedIndex := buf.String()
+		buf.WriteString("0")
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(int(i % 3)))
+		blockID := buf.String()
 
 		cbuf.Reset()
 		cbuf.WriteString(blockID)
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
 		cbuf.WriteString(metainfo.DELIMITER)
-		cbuf.WriteString(strconv.Itoa(electedOffset))
+		cbuf.WriteString(strconv.Itoa(chal.Seed))
 		cbuf.WriteString(metainfo.DELIMITER)
-		cbuf.WriteString("1")
+		cbuf.WriteString("1") // length
 
 		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
 		if err != nil {
-			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
-			faultBlocks = append(faultBlocks, index)
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, chal.Seed, err)
+			bset.SetTo(i, false)
+			failchunk = true
 			continue
 		}
 
-		tmpseg, tmptag, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
+		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
 		if !isTrue {
 			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
-			faultBlocks = append(faultBlocks, index)
+			bset.SetTo(i, false)
+			failchunk = true
 			continue
 		}
+
 		data = append(data, tmpseg[0])
 		tag = append(tag, tmptag[0])
-		chal.Indices = append(chal.Indices, electedIndex)
+
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(segStart))
+		chal.Indices = append(chal.Indices, buf.String())
+	}
+
+	count := uint(0)
+	bucket := 1
+	chunkNum := chalInfo.GetChunkNum()[0]
+	stripeNum := 3 * (chalInfo.GetBucketNum() + 1)
+	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
+		count++
+		for j := bucket; j < int(chalInfo.GetBucketNum()); j++ {
+			if stripeNum+chalInfo.GetStripeNum()[j-1]*int64(chalInfo.GetChunkNum()[j-1]) < int64(i) {
+				break
+			}
+			bucket = j
+			chunkNum = chalInfo.GetChunkNum()[j-1]
+			stripeNum += chalInfo.GetStripeNum()[j-1] * int64(chalInfo.GetChunkNum()[j-1])
+		}
+
+		buf.Reset()
+		buf.WriteString(fsID)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(bucket))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.FormatInt((int64(i)-stripeNum)/int64(chunkNum), 10))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.FormatInt((int64(i)-stripeNum)%int64(chunkNum), 10))
+		blockID := buf.String()
+
+		cbuf.Reset()
+		cbuf.WriteString(blockID)
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(chal.Seed))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString("1") // length
+
+		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
+		if err != nil {
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, chal.Seed, err)
+			bset.SetTo(i, false)
+			failchunk = true
+			continue
+		}
+
+		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
+		if !isTrue {
+			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
+			bset.SetTo(i, false)
+			failchunk = true
+			continue
+		}
+
+		data = append(data, tmpseg[0])
+		tag = append(tag, tmptag[0])
+
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(segStart))
+		chal.Indices = append(chal.Indices, buf.String())
+		if count > totalNum/100 {
+			break
+		}
 	}
 
 	if len(chal.Indices) == 0 {
@@ -116,15 +181,9 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 	// 在发送之前检查生成的proof
 	boo, err := blskey.VerifyProof(chal, proof, true)
-	if err != nil {
-		utils.MLogger.Error("verify proof failed, err is: ", err)
-		utils.MLogger.Error("gen proof for blocks: ", chal.Indices)
+	if err != nil || !boo {
+		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
 		return err
-	}
-
-	if !boo {
-		utils.MLogger.Warn("proof is false")
-		return mcl.ErrProofVerifyInProvider
 	}
 
 	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
@@ -135,8 +194,12 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr
 
-	if len(faultBlocks) > 0 {
-		retValue = retValue + metainfo.DELIMITER + b58.Encode([]byte(strings.Join(faultBlocks, metainfo.DELIMITER)))
+	if failchunk {
+		failMap, err := bset.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		retValue = retValue + metainfo.DELIMITER + b58.Encode(failMap)
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回

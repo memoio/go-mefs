@@ -82,15 +82,15 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 
 //VerifyBlock is 传进来一个带前缀的完整块
 //模拟挑战证明聚合验证，0.04s一个块
-func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, bool) {
+func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, int, bool) {
 	if data == nil || len(data) == 0 {
-		return nil, nil, false
+		return nil, nil, 0, false
 	}
 
 	pre, preLen, err := bf.PrefixDecode(data)
 	if err != nil || pre.GetBopts().GetVersion() == 0 || pre.GetBopts().GetDataCount() == 0 {
 		utils.MLogger.Error("prefix is not good: ", pre)
-		return nil, nil, false
+		return nil, nil, 0, false
 	}
 
 	d.Prefix = pre
@@ -113,9 +113,9 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, b
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
 	if !ok || err != nil {
 		//utils.MLogger.Error("Tag is wrong: ", err)
-		return nil, nil, false
+		return nil, nil, 0, false
 	}
-	return segments, tags, true
+	return segments, tags, int(pre.Start), true
 }
 
 func VerifyBlock(data []byte, ncid string, k *mcl.KeySet) bool {
@@ -127,13 +127,13 @@ func VerifyBlock(data []byte, ncid string, k *mcl.KeySet) bool {
 		BlsKey: k,
 	}
 
-	_, _, ok := d.VerifyBlock(data, ncid)
+	_, _, _, ok := d.VerifyBlock(data, ncid)
 	return ok
 }
 
-func GetSegAndTag(data []byte, ncid string, k *mcl.KeySet) ([][]byte, [][]byte, bool) {
+func GetSegAndTag(data []byte, ncid string, k *mcl.KeySet) ([][]byte, [][]byte, int, bool) {
 	if data == nil || len(data) == 0 || k == nil || k.Pk == nil {
-		return nil, nil, false
+		return nil, nil, 0, false
 	}
 
 	d := &DataCoder{
