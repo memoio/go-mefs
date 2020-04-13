@@ -32,9 +32,10 @@ import (
 )
 
 var (
-	errNoRouting = errors.New("routing is not running")
-	ErrRetry     = errors.New("ReTry Later")
-	errKey       = errors.New("Key and value are mismatched")
+	errNoRouting    = errors.New("routing is not running")
+	errNoConnection = errors.New("connection is offline")
+	ErrRetry        = errors.New("ReTry Later")
+	errKey          = errors.New("Key and value are mismatched")
 )
 
 type impl struct {
@@ -90,7 +91,9 @@ func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data,
 		return err
 	}
 
-	n.Connect(ctx, to)
+	if !n.Connect(ctx, to) {
+		return errNoConnection
+	}
 
 	return n.rt.(*dht.KadDHT).SendMessage(ctx, typ, key, data, sig, p)
 }
@@ -110,7 +113,9 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 		return nil, err
 	}
 
-	n.Connect(ctx, to)
+	if !n.Connect(ctx, to) {
+		return nil, errNoConnection
+	}
 
 	res, err := n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
 	if err != nil {
@@ -212,7 +217,9 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 	}
 
 	if to != "" {
-		n.Connect(ctx, to)
+		if !n.Connect(ctx, to) {
+			return nil, errNoConnection
+		}
 	}
 
 	return n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, to)
@@ -241,7 +248,9 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 	}
 
 	if to != "" {
-		n.Connect(ctx, to)
+		if !n.Connect(ctx, to) {
+			return errNoConnection
+		}
 	}
 
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, data, sig, to)

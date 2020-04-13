@@ -393,7 +393,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	// recheck the status again
 	if len(chal.Indices) == 0 {
-		return
+		utils.MLogger.Warnf("handleProof: %s fails: chal empty", km.ToString(), err)
 	}
 
 	muByte, err := b58.Decode(spliteProof[0])
