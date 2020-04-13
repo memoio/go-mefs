@@ -144,8 +144,8 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	count := int(thisbucket.chunkNum)
 	utils.MLogger.Infof("blockID has %d chunks", thisbucket.chunkNum)
 
-	cpids := make([]string, count)
-	ugid := make([]string, count)
+	cpids := make([]string, 0, count)
+	ugid := make([]string, 0, count)
 
 	var res strings.Builder
 	for i := 0; i < count; i++ {

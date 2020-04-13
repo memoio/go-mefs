@@ -38,7 +38,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 						continue
 					}
 					utils.MLogger.Debug("Challenge: ", key)
-					go k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
+					k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 				}
 
 				// in case povider cannot get it
@@ -306,7 +306,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	res, err := blsKey.VerifyProof(chal, pf, true)
 	if err != nil {
-		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, "verify fails: ", err)
+		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, " verify fails: ", err)
 		utils.MLogger.Warn("verify blocks: ", chal.Indices)
 		return
 	}
