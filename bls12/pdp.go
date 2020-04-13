@@ -304,6 +304,7 @@ func GenChallenge(chal *mpb.ChalInfo) int {
 	if err != nil {
 		return 0
 	}
+	newHash.Write([]byte(chal.GetPolicy()))
 	newHash.Write([]byte(chal.QueryID))
 	newHash.Write([]byte(chal.UserID))
 	newHash.Write([]byte(chal.ProviderID))

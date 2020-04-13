@@ -158,6 +158,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 	}
 
 	thischalresult := &mpb.ChalInfo{
+		Policy:      "100",
 		KeeperID:    localID,
 		ProviderID:  proID,
 		QueryID:     qid,
@@ -220,22 +221,26 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	kid := ops[2]
 	chaltime := ops[3]
 	if kid != k.localID {
+		utils.MLogger.Warnf("handleProof: %s fails: wrong keeperID", km.ToString())
 		return
 	}
 
 	proInfo, ok := k.providers.Load(proID)
 	if !ok {
+		utils.MLogger.Warnf("handleProof: %s fails: no proInfoD", km.ToString())
 		return
 	}
 	proInfo.(*pInfo).credit--
 
 	thisGroup := k.getGroupInfo(userID, qid, false)
 	if thisGroup == nil {
+		utils.MLogger.Warnf("handleProof: %s fails: no groupinfo", km.ToString())
 		return
 	}
 
 	thisLinfo := thisGroup.getLInfo(proID, false)
 	if thisLinfo == nil {
+		utils.MLogger.Warnf("handleProof: %s fails: no legerinfo", km.ToString())
 		return
 	}
 
@@ -245,11 +250,13 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	challengetime := utils.StringToUnix(chaltime)
 	if thisLinfo.lastChalTime != challengetime {
+		utils.MLogger.Warnf("handleProof: %s fails: no challengetime", km.ToString())
 		return
 	}
 
 	thischalresult, ok := thisLinfo.chalMap.Load(challengetime)
 	if !ok {
+		utils.MLogger.Warnf("handleProof: %s fails: no challenge result", km.ToString())
 		return
 	}
 
@@ -257,6 +264,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	spliteProof := strings.Split(string(value), metainfo.DELIMITER)
 	if len(spliteProof) < 3 {
+		utils.MLogger.Warnf("handleProof: %s fails: proof is too short", km.ToString())
 		return
 	}
 
@@ -278,6 +286,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	err := bset.UnmarshalBinary(chalResult.ChunkMap)
 	if err != nil {
+		utils.MLogger.Warnf("handleProof: %s fails: %s", km.ToString(), err)
 		return
 	}
 
