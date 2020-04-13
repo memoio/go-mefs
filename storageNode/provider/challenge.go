@@ -63,7 +63,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	var buf, cbuf strings.Builder
 	failchunk := false
 	ctx := p.context
-	for i, e := bset.NextSet(0); e && i <= uint(chalInfo.BucketNum)*3; i, e = bset.NextSet(i + 1) {
+	for i, e := bset.NextSet(0); e && i < uint(chalInfo.BucketNum+1)*3; i, e = bset.NextSet(i + 1) {
 		buf.Reset()
 		buf.WriteString(fsID)
 		buf.WriteString(metainfo.BlockDelimiter)

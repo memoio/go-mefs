@@ -300,7 +300,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	stripeID := 1
 	chunkID := 0
 	failset := make(map[string]struct{})
-	for i, e := bset.NextSet(0); e && i <= uint(chalResult.BucketNum)*3; i, e = bset.NextSet(i + 1) {
+	for i, e := bset.NextSet(0); e && i < uint(chalResult.BucketNum+1)*3; i, e = bset.NextSet(i + 1) {
 		buf.Reset()
 		bucketID = -int(i / 3)
 		stripeID = 0
