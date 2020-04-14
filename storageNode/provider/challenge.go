@@ -79,7 +79,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
 		cbuf.WriteString(metainfo.DELIMITER)
-		cbuf.WriteString(strconv.Itoa(chal.Seed))
+		cbuf.WriteString(strconv.Itoa(chal.Seed + int(i)))
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString("1") // length
 
@@ -137,7 +137,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
 		cbuf.WriteString(metainfo.DELIMITER)
-		cbuf.WriteString(strconv.Itoa(chal.Seed))
+		cbuf.WriteString(strconv.Itoa(chal.Seed + int(i)))
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString("1") // length
 

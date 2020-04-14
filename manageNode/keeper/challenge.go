@@ -326,7 +326,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		}
 
 		slength += int64(segNum * 4096)
-		electedOffset = chal.Seed % segNum
+		electedOffset = (chal.Seed + int(i)) % segNum
 
 		buf.Reset()
 		buf.WriteString(qid)
@@ -381,7 +381,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		}
 
 		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
-		electedOffset = chal.Seed % segNum
+		electedOffset = (chal.Seed + int(i)) % segNum
 
 		buf.Reset()
 		buf.WriteString(qid)

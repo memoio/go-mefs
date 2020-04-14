@@ -204,6 +204,7 @@ message ChalInfo{
     repeated string FaultBlocks = 10;
     string BlsProof = 11;
     bool Res = 12;
+    int64 RootTime = 19;
     string Policy =20;
     int64 BucketNum = 21;
     repeated int64 StripeNum = 22;
