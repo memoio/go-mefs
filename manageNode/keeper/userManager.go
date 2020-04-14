@@ -365,11 +365,11 @@ func (k *Info) getQUKeys() []quKey {
 		value := v.(*groupInfo)
 		// filter test user
 		if value.upkeeping == nil {
-			//return true
+			return true
 		}
 
 		if key == value.userID {
-			//return true
+			return true
 		}
 
 		tmpUQ := quKey{

@@ -33,6 +33,8 @@ func (k *Info) challengeRegular(ctx context.Context) {
 					continue
 				}
 
+				utils.MLogger.Infof("Challenge for user %s fsID %s", pu.uid, pu.qid)
+
 				chalTime := time.Now().Unix()
 				var rootHash []byte
 				if thisGroup.rootID != "" {
@@ -51,9 +53,10 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				for _, proID := range thisGroup.providers {
 					key, value, err := thisGroup.genChallengeBLS(k.localID, pu.uid, pu.qid, proID, rootHash)
 					if err != nil {
+						utils.MLogger.Infof("Challenge for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
 						continue
 					}
-					utils.MLogger.Debug("Challenge: ", key)
+					utils.MLogger.Infof("Challenge for user %s fsID %s at provoder %s", pu.uid, pu.qid, proID)
 					k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 				}
 
