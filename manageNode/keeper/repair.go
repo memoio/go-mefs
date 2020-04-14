@@ -35,7 +35,7 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 					continue
 				}
 
-				utils.MLogger.Infof("check repair for user %s fsID ", pu.uid, pu.qid)
+				utils.MLogger.Infof("check repair for user %s fsID %s", pu.uid, pu.qid)
 
 				pre := pu.uid + metainfo.BlockDelimiter + pu.qid + metainfo.BlockDelimiter
 				bucketNum := gp.bucketNum
@@ -142,7 +142,7 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 									if expireTime < eclasped {
 										res.Reset()
 										res.WriteString(pre)
-										res.WriteString(strconv.Itoa(-i))
+										res.WriteString(strconv.Itoa(i))
 										res.WriteString(metainfo.BlockDelimiter)
 										res.WriteString(scid)
 										cid := res.String()
@@ -154,7 +154,7 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 									if 4*expireTime < eclasped {
 										res.Reset()
 										res.WriteString(pre)
-										res.WriteString(strconv.Itoa(-i))
+										res.WriteString(strconv.Itoa(i))
 										res.WriteString(metainfo.BlockDelimiter)
 										res.WriteString(scid)
 										cid := res.String()
@@ -166,7 +166,7 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 									if 16*expireTime < eclasped {
 										res.Reset()
 										res.WriteString(pre)
-										res.WriteString(strconv.Itoa(-i))
+										res.WriteString(strconv.Itoa(i))
 										res.WriteString(metainfo.BlockDelimiter)
 										res.WriteString(scid)
 										cid := res.String()
@@ -181,7 +181,7 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 										if int64(64*thisinfo.repair-2)*expireTime < eclasped {
 											res.Reset()
 											res.WriteString(pre)
-											res.WriteString(strconv.Itoa(-i))
+											res.WriteString(strconv.Itoa(i))
 											res.WriteString(metainfo.BlockDelimiter)
 											res.WriteString(scid)
 											cid := res.String()
