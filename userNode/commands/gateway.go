@@ -79,15 +79,21 @@ var gwStartCmd = &cmds.Command{
 		if !ok {
 			return ErrNotReady
 		}
-		var uid string
+
+		var uid, addr string
 		if len(req.Arguments) > 0 {
-			addr := req.Arguments[0]
+			addr = req.Arguments[0]
 			uid, err = address.GetIDFromAddress(addr)
 			if err != nil {
 				return err
 			}
 		} else {
 			uid = node.Identity.Pretty()
+			gotaddr, err := address.GetAddressFromID(uid)
+			if err != nil {
+				return err
+			}
+			addr = gotaddr.String()
 		}
 
 		lfs := userIns.GetUser(uid)
@@ -109,17 +115,12 @@ var gwStartCmd = &cmds.Command{
 			return errWrongInput
 		}
 
-		addr, err := address.GetAddressFromID(uid)
-		if err != nil {
-			return err
-		}
-
-		err = miniogw.Start(addr.String(), pwd, ep)
+		err = miniogw.Start(addr, pwd, ep)
 		if err != nil {
 			return err
 		}
 		list := &StringList{
-			ChildLists: []string{"Gateway of " + addr.String() + " started at: " + ep},
+			ChildLists: []string{"Gateway of " + addr + " started at: " + ep},
 		}
 		return cmds.EmitOnce(res, list)
 	},
