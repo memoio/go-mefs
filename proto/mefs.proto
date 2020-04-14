@@ -210,6 +210,7 @@ message ChalInfo{
     repeated int64 StripeNum = 22;
     repeated int32 ChunkNum = 23;
     bytes ChunkMap = 24;
+    bytes FailMap = 25;
 }
 
 message ChannelSign {

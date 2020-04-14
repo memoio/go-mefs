@@ -281,6 +281,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		if err == nil {
 			fset.UnmarshalBinary(fmap)
 			flength = fset.Len()
+			chalResult.FailMap = fmap
 		}
 	}
 
