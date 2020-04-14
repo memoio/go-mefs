@@ -89,7 +89,12 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 	// challenge superbucket
 	for i := 0; i <= int(bucketNum); i++ {
 		// superbucket 3 chunks and 4k segment
-		for j := 0; j < 3; j++ {
+		binfo := g.getBucketInfo(strconv.Itoa(-i), true)
+		if binfo == nil {
+			utils.MLogger.Infof("missing bucket %d info", -i)
+			continue
+		}
+		for j := 0; j < binfo.chunkNum; j++ {
 			res.Reset()
 			res.WriteString(strconv.Itoa(-i))
 			res.WriteString(metainfo.BlockDelimiter)
@@ -99,7 +104,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 			cInfo, ok := thisLinfo.blockMap.Load(res.String())
 			if ok {
 				bset.Set(uint(i)*3 + uint(j))
-				psum += (cInfo.(*blockInfo).offset * 4096)
+				psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
 				cset[res.String()] = cInfo.(*blockInfo).offset
 				break
 			}

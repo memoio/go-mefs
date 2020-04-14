@@ -43,9 +43,9 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 				var res strings.Builder
 				// superbucket
 				for i := 0; i <= int(bucketNum); i++ {
-					binfo := gp.getBucketInfo(strconv.Itoa(-i), false)
+					binfo := gp.getBucketInfo(strconv.Itoa(-i), true)
 					if binfo == nil {
-						utils.MLogger.Infof("missing bucket %d info", i)
+						utils.MLogger.Infof("missing bucket %d info", -i)
 						continue
 					}
 					// superbucket 3 chunks and 4k segment
