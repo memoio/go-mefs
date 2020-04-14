@@ -55,7 +55,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		sk:      sk,
 		state:   false,
 		ds:      d,
-		repch:   make(chan string, 100),
+		repch:   make(chan string, 1024),
 		netIDs:  make(map[string]struct{}),
 		context: ctx,
 	}
@@ -97,7 +97,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.persistRegular(ctx)
 	go m.challengeRegular(ctx)
 	go m.cleanTestUsersRegular(ctx)
-	go m.checkLedger(ctx)
+	go m.checkLedgerV2(ctx)
 	go m.repairRegular(ctx)
 	go m.stPayRegular(ctx)
 	go m.checkPeers(ctx)
@@ -945,6 +945,31 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 					utils.MLogger.Info("Add block: ", blockID, " error:", err)
 				}
 			}
+		}
+
+		bucketID, _, _, err := metainfo.GetIDsFromBlock(bid)
+		if err != nil {
+			return err
+		}
+		binfo := gp.getBucketInfo(bucketID, false)
+		if binfo == nil {
+			bk, err := metainfo.NewKey(qid, mpb.KeyType_Bucket, gp.userID, bucketID)
+			if err != nil {
+				utils.MLogger.Infof("%s has no: %s", qid, bucketID)
+				return err
+			}
+			res, err := k.ds.GetKey(k.context, bk.ToString(), "local")
+			if err != nil {
+				utils.MLogger.Infof("%s has no bucketinfo: %s", qid, bucketID)
+				return err
+			}
+			binfo := new(mpb.BucketInfo)
+			err = proto.Unmarshal(res, binfo)
+			if err != nil {
+				utils.MLogger.Infof("%s Unmarshal bucketinfo: %s fail: ", qid, bucketID, err)
+				return err
+			}
+			gp.addBucket(bucketID, binfo)
 		}
 
 		return gp.addBlockMeta(bid, pid, offset)

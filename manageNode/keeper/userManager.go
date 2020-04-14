@@ -145,7 +145,14 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 	thisIb, ok := g.buckets.Load(bucketID)
 	if !ok {
 		if mode {
-			bop := df.DefaultBucketOptions()
+			bop := df.DefaultSuperBucketOptions()
+			bid, err := strconv.ParseInt(bucketID, 10, 0)
+			if err != nil {
+				return nil
+			}
+			if bid > 0 {
+				bop = df.DefaultBucketOptions()
+			}
 			tempInfo := &bucketInfo{
 				bops:       bop,
 				curStripes: -1,
@@ -251,7 +258,7 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 
 	if cnum > thisBucket.chunkNum {
 		utils.MLogger.Warn("chunkID %d is larger than bucket ops %d", cnum, thisBucket.chunkNum)
-		thisBucket.chunkNum = cnum
+		//thisBucket.chunkNum = cnum
 	}
 
 	return nil

@@ -48,6 +48,20 @@ func DefaultBucketOptions() *mpb.BucketOptions {
 	}
 }
 
+// DefaultSuperBucketOptions is default supberbucket option
+func DefaultSuperBucketOptions() *mpb.BucketOptions {
+	return &mpb.BucketOptions{
+		Version:      1,
+		Policy:       MulPolicy,
+		DataCount:    1,
+		ParityCount:  2,
+		SegmentSize:  DefaultSegmentSize,
+		TagFlag:      BLS12,
+		SegmentCount: DefaultSegmentCount,
+		Encryption:   0,
+	}
+}
+
 //VerifyBlockLength verify blocks length
 func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 	if data == nil {
