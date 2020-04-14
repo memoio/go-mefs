@@ -216,46 +216,47 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 		kpids = string(res)
 	}
 
-	splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
+	if userID == groupID {
+		splitedMeta := strings.Split(kpids, metainfo.DELIMITER)
 
-	has := false
-	if len(splitedMeta) == 2 {
-		kps := splitedMeta[0]
-		for i := 0; i < len(kps)/utils.IDLength; i++ {
-			kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-			_, err := peer.IDB58Decode(kid)
-			if err != nil {
-				continue
+		has := false
+		if len(splitedMeta) == 2 {
+			kps := splitedMeta[0]
+			for i := 0; i < len(kps)/utils.IDLength; i++ {
+				kid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+				_, err := peer.IDB58Decode(kid)
+				if err != nil {
+					continue
+				}
+				tmpKps = append(tmpKps, kid)
 			}
-			tmpKps = append(tmpKps, kid)
+
+			kps = splitedMeta[1]
+			for i := 0; i < len(kps)/utils.IDLength; i++ {
+				pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
+				_, err := peer.IDB58Decode(pid)
+				if err != nil {
+					continue
+				}
+
+				if pid == p.localID {
+					has = true
+				}
+
+				tmpPros = append(tmpPros, pid)
+			}
 		}
 
-		kps = splitedMeta[1]
-		for i := 0; i < len(kps)/utils.IDLength; i++ {
-			pid := string(kps[i*utils.IDLength : (i+1)*utils.IDLength])
-			_, err := peer.IDB58Decode(pid)
-			if err != nil {
-				continue
-			}
+		if len(tmpKps) == 0 || len(tmpPros) == 0 {
+			utils.MLogger.Warn(groupID, " has no keeper or providers")
+			return nil
+		}
 
-			if pid == p.localID {
-				has = true
-			}
-
-			tmpPros = append(tmpPros, pid)
+		if !has {
+			utils.MLogger.Warn(groupID, " is not my user")
+			return nil
 		}
 	}
-
-	if len(tmpKps) == 0 || len(tmpPros) == 0 {
-		utils.MLogger.Warn(groupID, " has no keeper or providers")
-		return nil
-	}
-
-	if !has {
-		utils.MLogger.Warn(groupID, " is not my user")
-		return nil
-	}
-
 	gp := newGroup(p.localID, userID, groupID, tmpKps, tmpPros)
 	if gp != nil {
 		p.fsGroup.Store(groupID, gp)
