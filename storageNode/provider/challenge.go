@@ -168,6 +168,66 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		}
 	}
 
+	for i, e := bset.NextSet(uint(chalInfo.BucketNum+1) * 3); e && i < startPos; i, e = bset.NextSet(i + 1) {
+		if count > totalNum/100 {
+			break
+		}
+		count++
+		for j := bucket; j < int(chalInfo.GetBucketNum()); j++ {
+			if stripeNum+chalInfo.GetStripeNum()[j-1]*int64(chalInfo.GetChunkNum()[j-1]) < int64(i) {
+				break
+			}
+			bucket = j
+			chunkNum = chalInfo.GetChunkNum()[j-1]
+			stripeNum += chalInfo.GetStripeNum()[j-1] * int64(chalInfo.GetChunkNum()[j-1])
+		}
+
+		buf.Reset()
+		buf.WriteString(fsID)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(bucket))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.FormatInt((int64(i)-stripeNum)/int64(chunkNum), 10))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.FormatInt((int64(i)-stripeNum)%int64(chunkNum), 10))
+		blockID := buf.String()
+
+		cbuf.Reset()
+		cbuf.WriteString(blockID)
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.FormatInt(chal.Seed+int64(i), 10))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString("1") // length
+
+		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
+		if err != nil {
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, chal.Seed, err)
+			bset.SetTo(i, false)
+			failchunk = true
+			continue
+		}
+
+		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
+		if !isTrue {
+			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
+			bset.SetTo(i, false)
+			failchunk = true
+			continue
+		}
+
+		data = append(data, tmpseg[0])
+		tag = append(tag, tmptag[0])
+
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(segStart))
+		chal.Indices = append(chal.Indices, buf.String())
+		if count > totalNum/100 {
+			break
+		}
+	}
+
 	if len(chal.Indices) == 0 {
 		utils.MLogger.Errorf("GenProof for %s fails due to no available data", fsID)
 		return nil

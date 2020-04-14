@@ -408,6 +408,64 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		}
 	}
 
+	for i, e := bset.NextSet(uint(chalResult.BucketNum+1) * 3); e && i < startPos; i, e = bset.NextSet(i + 1) {
+		if count > totalNum/100 {
+			break
+		}
+		count++
+		for j := bucketID; j < int(chalResult.GetBucketNum()); j++ {
+			if stripeNum+chalResult.GetStripeNum()[j-1]*int64(chalResult.GetChunkNum()[j-1]) < int64(i) {
+				break
+			}
+			bucketID = j
+			chunkNum = chalResult.GetChunkNum()[j-1]
+			stripeNum += chalResult.GetStripeNum()[j-1] * int64(chalResult.GetChunkNum()[j-1])
+		}
+
+		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
+		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
+
+		buf.Reset()
+		buf.WriteString(strconv.Itoa(bucketID))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(stripeID))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(chunkID))
+		blockID := buf.String()
+
+		segNum, ok := thisLinfo.chalCid[blockID]
+		if !ok {
+			continue
+		}
+
+		bi := thisGroup.getBucketInfo(strconv.Itoa(bucketID), false)
+		if bi == nil {
+			continue
+		}
+
+		chalLength += int64(segNum * int(bi.bops.GetSegmentSize()))
+
+		if flength != 0 && !fset.Test(i) {
+			failset[blockID] = struct{}{}
+			continue
+		}
+
+		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
+		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+
+		buf.Reset()
+		buf.WriteString(qid)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(blockID)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(electedOffset))
+		chal.Indices = append(chal.Indices, buf.String())
+
+		if count > totalNum/100 {
+			break
+		}
+	}
+
 	// recheck the status again
 	if len(chal.Indices) == 0 {
 		utils.MLogger.Warnf("handleProof: %s fails: chal empty", km.ToString())
