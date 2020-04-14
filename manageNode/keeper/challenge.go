@@ -36,22 +36,21 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				utils.MLogger.Infof("Challenge for user %s fsID %s", pu.uid, pu.qid)
 
 				chalTime := time.Now().Unix()
-				var rootHash []byte
+				mtime := thisGroup.upkeeping.StartTime
 				if thisGroup.rootID != "" {
-					mtime, mroot, err := role.GetLatestMerkleRoot(thisGroup.rootID)
-					if err != nil {
-						continue
+					gottime, _, err := role.GetLatestMerkleRoot(thisGroup.rootID)
+					if err == nil {
+						if chalTime < gottime {
+							// maybe user can set large mtime
+							utils.MLogger.Infof("latest merkle root time %d but chal time is %d", mtime, chalTime)
+						} else {
+							mtime = gottime
+						}
 					}
-
-					if chalTime < mtime {
-						// maybe user can set large mtime
-						utils.MLogger.Infof("latest merkle root time %d but chal time is %d", mtime, chalTime)
-					}
-					rootHash = mroot[:]
 				}
 
 				for _, proID := range thisGroup.providers {
-					key, value, err := thisGroup.genChallengeBLS(k.localID, pu.uid, pu.qid, proID, rootHash)
+					key, value, err := thisGroup.genChallengeBLS(k.localID, pu.uid, pu.qid, proID, mtime)
 					if err != nil {
 						utils.MLogger.Infof("Challenge for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
 						continue
@@ -67,10 +66,10 @@ func (k *Info) challengeRegular(ctx context.Context) {
 	}
 }
 
-func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []byte) (string, []byte, error) {
+func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime int64) (string, []byte, error) {
 	thisLinfo := g.getLInfo(proID, false)
 	if thisLinfo == nil {
-		return "", nil, role.ErrEmptyData
+		return "", nil, role.ErrNotMyProvider
 	}
 
 	// last chanllenge has not complete
@@ -178,6 +177,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 		QueryID:     qid,
 		UserID:      userID,
 		ChalTime:    challengetime,
+		RootTime:    rootTime,
 		TotalLength: thisLinfo.maxlength,
 		BucketNum:   bucketNum,
 		StripeNum:   stripes,

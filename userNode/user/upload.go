@@ -458,8 +458,11 @@ func (u *uploadTask) Start(ctx context.Context) error {
 				copy(data, crypted)
 			}
 
+			// transfer to different providers
+			newpro := utils.DisorderArray(pros)
+
 			wg.Add(1)
-			go func(data []byte, stripeID, start int) {
+			go func(data []byte, stripeID, start int, proIDs []string) {
 				defer wg.Done()
 				defer sm.Release(1)
 
@@ -470,8 +473,8 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					bm.SetCid(strconv.Itoa(i))
 					ncid := bm.ToString()
 					blockMetas[i].cid = ncid
-					if i < len(pros) {
-						blockMetas[i].provider = pros[i]
+					if i < len(proIDs) {
+						blockMetas[i].provider = proIDs[i]
 					} else {
 						blockMetas[i].provider = u.gInfo.groupID
 					}
@@ -575,7 +578,7 @@ func (u *uploadTask) Start(ctx context.Context) error {
 					errc <- ErrNoEnoughBlockUpload
 					return
 				}
-			}(data, curStripe, curOffset)
+			}(data, curStripe, curOffset, newpro)
 
 			if endOffset == int(u.encoder.Prefix.Bopts.GetSegmentCount()) { //如果写满了一个stripe
 				curStripe++

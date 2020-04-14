@@ -308,20 +308,21 @@ func GenChallenge(chal *mpb.ChalInfo) int64 {
 		return 0
 	}
 	newHash.Write([]byte(chal.GetPolicy()))
-	newHash.Write([]byte(chal.QueryID))
-	newHash.Write([]byte(chal.UserID))
-	newHash.Write([]byte(chal.ProviderID))
-	newHash.Write([]byte(chal.KeeperID))
+	newHash.Write([]byte(chal.GetQueryID()))
+	newHash.Write([]byte(chal.GetUserID()))
+	newHash.Write([]byte(chal.GetProviderID()))
+	newHash.Write([]byte(chal.GetKeeperID()))
 
-	newHash.Write([]byte(strconv.FormatInt(chal.ChalTime, 10)))
-	newHash.Write([]byte(strconv.FormatInt(chal.TotalLength, 10)))
-	newHash.Write([]byte(strconv.FormatInt(chal.BucketNum, 10)))
+	newHash.Write([]byte(strconv.FormatInt(chal.GetRootTime(), 10)))
+	newHash.Write([]byte(strconv.FormatInt(chal.GetChalTime(), 10)))
+	newHash.Write([]byte(strconv.FormatInt(chal.GetTotalLength(), 10)))
+	newHash.Write([]byte(strconv.FormatInt(chal.GetBucketNum(), 10)))
 
-	for _, stripeNum := range chal.StripeNum {
+	for _, stripeNum := range chal.GetStripeNum() {
 		newHash.Write([]byte(strconv.FormatInt(stripeNum, 10)))
 	}
 
-	hashValue := newHash.Sum(chal.ChunkMap)
+	hashValue := newHash.Sum(chal.GetChunkMap())
 
 	k := new(big.Int).SetBytes(hashValue[:])
 	rand.Seed(k.Int64())
