@@ -107,6 +107,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	l.meta.buckets[bucket.Name] = bucket
 	l.meta.bucketIDToName[bucketID] = bucketName
 	l.meta.sb.Unlock()
+	l.meta.dirty = true
 
 	bk, _ := metainfo.NewKey(l.fsID, mpb.KeyType_Bucket, l.userID, strconv.FormatInt(bucketID, 10))
 
@@ -153,6 +154,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
 	bucket.dirty = true
 	bucket.Unlock()
+	l.meta.dirty = true
 
 	bk, _ := metainfo.NewKey(l.fsID, mpb.KeyType_Bucket, l.userID, strconv.FormatInt(bucket.GetBucketID(), 10))
 

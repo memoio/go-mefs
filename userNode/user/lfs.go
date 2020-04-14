@@ -184,6 +184,7 @@ func initLfs() (*lfsMeta, error) {
 func initLogs() (*lfsMeta, error) {
 	sb := newSuperBlock()
 	return &lfsMeta{
+		dirty:          true,
 		sb:             sb,
 		bucketIDToName: make(map[int64]string),
 		buckets:        make(map[string]*superBucket),
@@ -290,12 +291,17 @@ func (l *LfsInfo) persistRoot(ctx context.Context) error {
 }
 
 func (l *LfsInfo) genRoot() {
+	if !l.meta.dirty {
+		return
+	}
 	l.meta.sb.RLock()
 	bucketNum := l.meta.sb.GetNextBucketID() - 1
-	if bucketNum == 0 {
+	if bucketNum < 0 {
+		l.meta.sb.RUnlock()
 		return
 	}
 	ctime := time.Now().Unix()
+	l.meta.dirty = false
 
 	lr := &mpb.LfsRoot{
 		BRoots: make([]*mpb.BucketRoot, bucketNum),

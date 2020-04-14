@@ -78,6 +78,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	}
 	bucket.mtree.Push(tag)
 	bucket.Root = bucket.mtree.Root()
+	l.meta.dirty = true
 
 	l.flushObjectMeta(bucket, false, op)
 	bucket.NextOpID++

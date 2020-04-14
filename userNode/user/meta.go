@@ -29,6 +29,7 @@ const maxCacheSize = 4 * 1024
 
 // Logs records lfs metainfo
 type lfsMeta struct {
+	dirty          bool
 	sb             *superBlock
 	bucketIDToName map[int64]string        //bucketID-> bucketName
 	buckets        map[string]*superBucket //bucketName -> bucket

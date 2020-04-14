@@ -161,6 +161,8 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		bucket.mtree.Push(tag)
 		bucket.Root = bucket.mtree.Root()
 		bucket.dirty = true
+
+		l.meta.dirty = true
 		utils.MLogger.Infof("Upload create object: %s in bucket: %s", objectName, bucketName)
 		return bucket, object, nil
 	}
@@ -265,6 +267,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	}
 	bucket.mtree.Push(tag)
 	bucket.Root = bucket.mtree.Root()
+	l.meta.dirty = true
 
 	bucket.dirty = true
 	utils.MLogger.Infof("Add data to object: %s in bucket: %s end, length is: %d", object.GetInfo().GetName(), bucket.GetName(), opart.Length)
