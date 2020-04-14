@@ -189,7 +189,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
 	chal := Challenge{
-		Seed:    int(time.Now().Unix()),
+		Seed:    time.Now().Unix(),
 		Indices: blocks,
 	}
 
@@ -270,7 +270,7 @@ func TestVerifyProof(t *testing.T) {
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
 	chal := Challenge{
-		Seed:    int(time.Now().Unix()),
+		Seed:    time.Now().Unix(),
 		Indices: blocks,
 	}
 
@@ -286,7 +286,7 @@ func TestVerifyProof(t *testing.T) {
 	// generate the proof
 	proof, err := keySet.GenProof(chal, segments, tags, 32)
 	if err != nil {
-		panic("Error")
+		panic(err)
 	}
 
 	// -------------- TPA --------------- //

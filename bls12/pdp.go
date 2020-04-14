@@ -2,7 +2,9 @@ package mcl
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
+	"log"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -22,6 +24,7 @@ var (
 
 	ErrInvalidSettings       = errors.New("setting is invalid")
 	ErrNumOutOfRange         = errors.New("numOfAtoms is out of range")
+	ErrChalOutOfRange        = errors.New("numOfAtoms is out of chal range")
 	ErrSegmentSize           = errors.New("the size of the segment is wrong")
 	ErrGenTag                = errors.New("GenTag failed")
 	ErrOffsetIsNegative      = errors.New("offset is negative")
@@ -71,7 +74,7 @@ type KeySet struct {
 
 // Challenge gives
 type Challenge struct {
-	Seed    int
+	Seed    int64
 	Indices []string
 }
 
@@ -299,7 +302,7 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 }
 
 // GenChallenge 根据时间随机选取的待挑战segments由随机数c对各offset取模而得
-func GenChallenge(chal *mpb.ChalInfo) int {
+func GenChallenge(chal *mpb.ChalInfo) int64 {
 	newHash, err := blake2b.New256(nil)
 	if err != nil {
 		return 0
@@ -322,9 +325,9 @@ func GenChallenge(chal *mpb.ChalInfo) int {
 
 	k := new(big.Int).SetBytes(hashValue[:])
 	rand.Seed(k.Int64())
-	var c int
+	var c int64
 	for {
-		c = rand.Int()
+		c = rand.Int63()
 		if c != 0 {
 			break
 		}
@@ -408,34 +411,18 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 			FrAdd(&sums[j], &sums[j], &m)
 		}
 	}
-
-	c := chal.Seed % (k.Pk.Count - k.Pk.TagCount)
-
-	if len(k.Pk.ElemG2s) < tagNum+c || len(k.Pk.ElemG1s) < tagNum {
+	if len(k.Pk.ElemG1s) < tagNum {
 		return nil, ErrNumOutOfRange
 	}
-	// 计算h_j = u_(c+j), j = 0, 1, ..., k-1
-	// 对于BLS12_381,h_j = w_(c+j)
-
-	h := make([]G2, tagNum)
-	for j := 0; j < tagNum; j++ {
-		h[j] = k.Pk.ElemG2s[c+j]
-	}
 	// muProd = Prod(u_j^sums_j)
-	// nuProd = Prod(h_j^sums_j)
 	mu := make([]G1, tagNum)
-	nu := make([]G2, tagNum)
 	var muProd G1
-	var nuProd G2
 	muProd.Clear()
-	nuProd.Clear()
 	for j, sum := range sums {
 		G1Mul(&mu[j], &(k.Pk.ElemG1s[j]), &sum) // mu_j = U_j ^ sum_j
 		G1Add(&muProd, &muProd, &mu[j])         // mu = Prod(U_j^sum_j)
-
-		G2Mul(&nu[j], &h[j], &sum)      // nu_j = h_j ^ sum_j
-		G2Add(&nuProd, &nuProd, &nu[j]) // nu = Prod(h_j^sum_j)
 	}
+
 	// delta = Prod(tag_i)
 	var delta G1
 	delta.Clear()
@@ -446,6 +433,31 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 			return nil, err
 		}
 		G1Add(&delta, &delta, &t)
+	}
+
+	// need modify according to (mu and delta), make sure c is unpredictable
+	newHash := sha256.New()
+	newHash.Write(delta.Serialize())
+	newHash.Write(muProd.Serialize())
+
+	hashValue := newHash.Sum(nil)
+	cmix := binary.LittleEndian.Uint64(hashValue[:])
+	rand.Seed(chal.Seed + int64(cmix))
+	c := rand.Intn(k.Pk.Count - k.Pk.TagCount)
+
+	log.Println(c)
+	if len(k.Pk.ElemG2s) < tagNum+c {
+		return nil, ErrChalOutOfRange
+	}
+	// 计算h_j = u_(c+j), j = 0, 1, ..., k-1
+	// 对于BLS12_381,h_j = w_(c+j)
+	// nuProd = Prod(h_j^sums_j)
+	nu := make([]G2, tagNum)
+	var nuProd G2
+	nuProd.Clear()
+	for j, sum := range sums {
+		G2Mul(&nu[j], &k.Pk.ElemG2s[c+j], &sum) // nu_j = h_j ^ sum_j
+		G2Add(&nuProd, &nuProd, &nu[j])         // nu = Prod(h_j^sum_j)
 	}
 
 	return &Proof{
@@ -503,7 +515,15 @@ func (k *KeySet) VerifyProof(chal Challenge, pf *Proof, mode bool) (bool, error)
 	if mode {
 		// 第二步：验证mu与nu是对应的
 		// lhs = e(mu, h0)
-		c := chal.Seed % (k.Pk.Count - k.Pk.TagCount)
+		newHash := sha256.New()
+		newHash.Write(pf.Delta)
+		newHash.Write(pf.Mu)
+
+		hashValue := newHash.Sum(nil)
+		cmix := binary.LittleEndian.Uint64(hashValue[:])
+		rand.Seed(chal.Seed + int64(cmix))
+		c := rand.Intn(k.Pk.Count - k.Pk.TagCount)
+
 		Pairing(&lhs2, &mu, &k.Pk.ElemG2s[c])
 		// rhs = e(u, nu)
 		Pairing(&rhs2, &k.Pk.ElemG1s[0], &nu)
