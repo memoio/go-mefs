@@ -86,6 +86,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 	cset := make(map[string]int)
 	bset := bitset.New(uint(stripeNum))
 	psum := 0
+	bitLen := uint(0)
 	// challenge superbucket
 	for i := 0; i <= int(bucketNum); i++ {
 		// superbucket 3 chunks and 4k segment
@@ -104,8 +105,10 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 			cInfo, ok := thisLinfo.blockMap.Load(res.String())
 			if ok {
 				bset.Set(uint(i)*3 + uint(j))
+				bitLen = uint(i)*3 + uint(j)
 				psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
 				cset[res.String()] = cInfo.(*blockInfo).offset
+				bitLen = uint(i)*3 + uint(j)
 				break
 			}
 		}
@@ -133,6 +136,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 				cInfo, ok := thisLinfo.blockMap.Load(res.String())
 				if ok {
 					bset.Set(uint(stripeNum) + uint(j*binfo.chunkNum) + uint(k))
+					bitLen = uint(stripeNum) + uint(j*binfo.chunkNum) + uint(k)
 					psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
 					cset[res.String()] = cInfo.(*blockInfo).offset
 					break
@@ -153,6 +157,8 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 
 	challengetime := time.Now().Unix()
 
+	bset.Shrink(bitLen)
+
 	chunkMap, err := bset.MarshalBinary()
 	if err != nil {
 		return "", nil, err
@@ -163,7 +169,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, root []b
 	}
 
 	thischalresult := &mpb.ChalInfo{
-		Policy:      "100", // use different policy; such as "1%"
+		Policy:      "1%", // use different policy; such as "1%"
 		KeeperID:    localID,
 		ProviderID:  proID,
 		QueryID:     qid,
