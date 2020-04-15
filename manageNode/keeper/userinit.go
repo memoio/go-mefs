@@ -139,7 +139,7 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 // key: queryID/"UserNotify"/userID/keepercount/providercount;
 // value: kid1kid2../pid1pid2..
 func (k *Info) handleUserNotify(km *metainfo.Key, metaValue []byte, from string) ([]byte, error) {
-	utils.MLogger.Info("handleUserNotify: ", km.ToString(), "From:", from)
+	utils.MLogger.Info("handleUserNotify: ", km.ToString(), " from:", from)
 
 	splited := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splited) < 2 {

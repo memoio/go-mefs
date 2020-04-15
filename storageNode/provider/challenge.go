@@ -106,10 +106,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		count++
 		for j := bucketID; j < bucketNum; j++ {
 			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+				bucketID = j
+				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
 			}
-			bucketID = j
-			chunkNum = int(cr.Buckets[j].GetChunkNum())
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
@@ -182,10 +182,11 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		count++
 		for j := bucketID; j < bucketNum; j++ {
 			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+				bucketID = j
+				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
 			}
-			bucketID = j
-			chunkNum = int(cr.Buckets[j].GetChunkNum())
+
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 

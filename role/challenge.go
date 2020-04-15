@@ -76,10 +76,10 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		count++
 		for j := bucketID; j < int(bucketNum); j++ {
 			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+				bucketID = j
+				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
 			}
-			bucketID = j
-			chunkNum = int(cr.Buckets[j].GetChunkNum())
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
@@ -139,10 +139,11 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		count++
 		for j := bucketID; j < int(bucketNum); j++ {
 			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+				bucketID = j
+				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
 			}
-			bucketID = j
-			chunkNum = int(cr.Buckets[j].GetChunkNum())
+
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
