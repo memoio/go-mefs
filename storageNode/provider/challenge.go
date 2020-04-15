@@ -53,7 +53,21 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return err
 	}
 
-	totalNum := bset.Count()
+	chalNum := bset.Count()
+
+	switch chalInfo.GetPolicy() {
+	case "100":
+		chalNum = 100
+	case "1%":
+		chalNum = chalNum / 100
+	case "smart":
+		if chalNum/100 < 100 {
+			chalNum = 100
+		} else {
+			chalNum = chalNum / 100
+		}
+	default:
+	}
 	startPos := uint(chal.Seed) % bset.Len()
 	if startPos < uint(chalInfo.GetBucketNum()+1)*3 {
 		startPos = uint(chalInfo.GetBucketNum()+1) * 3
@@ -167,13 +181,13 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(segStart))
 		chal.Indices = append(chal.Indices, buf.String())
-		if count > totalNum/100 {
+		if count > chalNum {
 			break
 		}
 	}
 
 	for i, e := bset.NextSet(uint(chalInfo.BucketNum+1) * 3); e && i < startPos; i, e = bset.NextSet(i + 1) {
-		if count > totalNum/100 {
+		if count > chalNum {
 			break
 		}
 		count++
@@ -231,7 +245,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(segStart))
 		chal.Indices = append(chal.Indices, buf.String())
-		if count > totalNum/100 {
+		if count > chalNum {
 			break
 		}
 	}

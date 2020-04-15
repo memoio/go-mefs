@@ -177,7 +177,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime
 	}
 
 	thischalresult := &mpb.ChalInfo{
-		Policy:      "1%", // use different policy; such as "1%"
+		Policy:      "smart", // use different policy; such as "1%"
 		KeeperID:    localID,
 		ProviderID:  proID,
 		QueryID:     qid,
@@ -309,7 +309,22 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	var chal mcl.Challenge
 	chal.Seed = mcl.GenChallenge(chalResult)
 
-	totalNum := bset.Count()
+	chalNum := bset.Count()
+
+	switch chalResult.GetPolicy() {
+	case "100":
+		chalNum = 100
+	case "1%":
+		chalNum = chalNum / 100
+	case "smart":
+		if chalNum/100 < 100 {
+			chalNum = 100
+		} else {
+			chalNum = chalNum / 100
+		}
+	default:
+	}
+
 	startPos := uint(chal.Seed) % bset.Len()
 	if startPos < uint(chalResult.GetBucketNum()+1)*3 {
 		startPos = uint(chalResult.GetBucketNum()+1) * 3
@@ -416,13 +431,13 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		buf.WriteString(strconv.Itoa(electedOffset))
 		chal.Indices = append(chal.Indices, buf.String())
 
-		if count > totalNum/100 {
+		if count > chalNum {
 			break
 		}
 	}
 
 	for i, e := bset.NextSet(uint(chalResult.BucketNum+1) * 3); e && i < startPos; i, e = bset.NextSet(i + 1) {
-		if count > totalNum/100 {
+		if count > chalNum {
 			break
 		}
 		count++
@@ -478,7 +493,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		buf.WriteString(strconv.Itoa(electedOffset))
 		chal.Indices = append(chal.Indices, buf.String())
 
-		if count > totalNum/100 {
+		if count > chalNum {
 			break
 		}
 	}

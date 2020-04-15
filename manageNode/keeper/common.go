@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	expireTime       = int64(30 * 60) //超过这个时间，触发修复，单位：秒
+	expireTime       = int64(60 * 60) //超过这个时间，触发修复，单位：秒
+	rafiTime         = int64(10 * 60)
 	chalTime         = 5 * time.Minute
 	chalRepairTime   = 7 * time.Minute
 	persistTime      = 3 * time.Minute

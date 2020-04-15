@@ -12,6 +12,262 @@ import (
 	"github.com/memoio/go-mefs/utils/pos"
 )
 
+func (k *Info) checkLedgerRafi(ctx context.Context) {
+	utils.MLogger.Info("Check Ledger Rafi start!")
+	time.Sleep(2 * chalTime)
+	ticker := time.NewTicker(chalRepairTime)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			utils.MLogger.Info("Rafi Repair starts!")
+			pus := k.getQUKeys()
+			for _, pu := range pus {
+				// not repair pos blocks
+				if pu.uid == pos.GetPosId() {
+					continue
+				}
+
+				gp := k.getGroupInfo(pu.uid, pu.qid, false)
+				if gp == nil || gp.upkeeping == nil {
+					continue
+				}
+
+				if gp.upkeeping.EndTime < time.Now().Unix() {
+					utils.MLogger.Infof("Repair for user %s fsID %s upkeeping has expired", pu.uid, pu.qid)
+					continue
+				}
+
+				utils.MLogger.Infof("check repair for user %s fsID %s", pu.uid, pu.qid)
+
+				pre := pu.uid + metainfo.BlockDelimiter + pu.qid + metainfo.BlockDelimiter
+				bucketNum := gp.bucketNum
+
+				var res strings.Builder
+				var repairCid string
+				multipleLost := 0
+				// superbucket
+				for i := 0; i <= int(bucketNum); i++ {
+					binfo := gp.getBucketInfo(strconv.Itoa(-i), true)
+					if binfo == nil {
+						utils.MLogger.Infof("missing bucket %d info", -i)
+						continue
+					}
+
+					nowtime := time.Now().Unix()
+					multipleLost = 0
+					for j := 0; j < binfo.chunkNum; j++ {
+						res.Reset()
+						res.WriteString("0")
+						res.WriteString(metainfo.BlockDelimiter)
+						res.WriteString(strconv.Itoa(j))
+						scid := res.String()
+						cInfo, ok := binfo.stripes.Load(scid)
+						if ok {
+							thisinfo := cInfo.(*blockInfo)
+							eclasped := nowtime - thisinfo.availtime
+							switch thisinfo.repair {
+							case 0:
+								if expireTime < eclasped {
+									res.Reset()
+									res.WriteString(pre)
+									res.WriteString(strconv.Itoa(-i))
+									res.WriteString(metainfo.BlockDelimiter)
+									res.WriteString(scid)
+									cid := res.String()
+									utils.MLogger.Info("Need repair cid first time: ", cid)
+									thisinfo.repair++
+									k.repch <- cid
+								}
+							case 1:
+								if 4*expireTime < eclasped {
+									res.Reset()
+									res.WriteString(pre)
+									res.WriteString(strconv.Itoa(-i))
+									res.WriteString(metainfo.BlockDelimiter)
+									res.WriteString(scid)
+									cid := res.String()
+									utils.MLogger.Info("Need repair cid second time: ", cid)
+									thisinfo.repair++
+									k.repch <- cid
+								}
+							case 2:
+								if 16*expireTime < eclasped {
+									res.Reset()
+									res.WriteString(pre)
+									res.WriteString(strconv.Itoa(-i))
+									res.WriteString(metainfo.BlockDelimiter)
+									res.WriteString(scid)
+									cid := res.String()
+									utils.MLogger.Info("Need repair cid third time: ", cid)
+									thisinfo.repair++
+									k.repch <- cid
+								}
+							default:
+								// > 30 days; we donnot repair
+								if 480*expireTime >= eclasped {
+									// try every 32 hours
+									if int64(64*thisinfo.repair-2)*expireTime < eclasped {
+										res.Reset()
+										res.WriteString(pre)
+										res.WriteString(strconv.Itoa(-i))
+										res.WriteString(metainfo.BlockDelimiter)
+										res.WriteString(scid)
+										cid := res.String()
+										utils.MLogger.Info("Need repair cid tried: ", cid)
+										thisinfo.repair++
+										k.repch <- cid
+									}
+								}
+							}
+
+							if nowtime-thisinfo.availtime > rafiTime && thisinfo.repair <= 1 {
+								if multipleLost == 0 {
+									repairCid = scid
+								}
+								multipleLost++
+							}
+						}
+					}
+
+					// if
+					if multipleLost > int(binfo.bops.GetParityCount()/2) {
+						cInfo, ok := binfo.stripes.Load(repairCid)
+						if ok {
+							res.Reset()
+							res.WriteString(pre)
+							res.WriteString(strconv.Itoa(-i))
+							res.WriteString(metainfo.BlockDelimiter)
+							res.WriteString(repairCid)
+							cid := res.String()
+							if cInfo.(*blockInfo).repair > 1 {
+								continue
+							}
+							utils.MLogger.Info("Need rafi repair cid: ", cid)
+							cInfo.(*blockInfo).repair = 1
+							k.repch <- cid
+						}
+
+					}
+
+				}
+
+				// challenge buckets
+				for i := 1; i <= int(bucketNum); i++ {
+					binfo := gp.getBucketInfo(strconv.Itoa(i), false)
+					if binfo == nil {
+						utils.MLogger.Infof("missing bucket %d info", i)
+						continue
+					}
+
+					count := binfo.curStripes
+					for j := 0; j <= count; j++ {
+						nowtime := time.Now().Unix()
+						multipleLost = 0
+						for l := 0; l < binfo.chunkNum; l++ {
+							res.Reset()
+							res.WriteString(strconv.Itoa(j))
+							res.WriteString(metainfo.BlockDelimiter)
+							res.WriteString(strconv.Itoa(l))
+							scid := res.String()
+							cInfo, ok := binfo.stripes.Load(scid)
+							if ok {
+								thisinfo := cInfo.(*blockInfo)
+								eclasped := nowtime - thisinfo.availtime
+								switch thisinfo.repair {
+								case 0:
+									if expireTime < eclasped {
+										res.Reset()
+										res.WriteString(pre)
+										res.WriteString(strconv.Itoa(i))
+										res.WriteString(metainfo.BlockDelimiter)
+										res.WriteString(scid)
+										cid := res.String()
+										utils.MLogger.Info("Need repair cid first time: ", cid)
+										thisinfo.repair++
+										k.repch <- cid
+									}
+								case 1:
+									if 4*expireTime < eclasped {
+										res.Reset()
+										res.WriteString(pre)
+										res.WriteString(strconv.Itoa(i))
+										res.WriteString(metainfo.BlockDelimiter)
+										res.WriteString(scid)
+										cid := res.String()
+										utils.MLogger.Info("Need repair cid second time: ", cid)
+										thisinfo.repair++
+										k.repch <- cid
+									}
+								case 2:
+									if 16*expireTime < eclasped {
+										res.Reset()
+										res.WriteString(pre)
+										res.WriteString(strconv.Itoa(i))
+										res.WriteString(metainfo.BlockDelimiter)
+										res.WriteString(scid)
+										cid := res.String()
+										utils.MLogger.Info("Need repair cid third time: ", cid)
+										thisinfo.repair++
+										k.repch <- cid
+									}
+								default:
+									// > 30 days; we donnot repair
+									if 480*expireTime >= eclasped {
+										// try every 32 hours
+										if int64(64*thisinfo.repair-2)*expireTime < eclasped {
+											res.Reset()
+											res.WriteString(pre)
+											res.WriteString(strconv.Itoa(i))
+											res.WriteString(metainfo.BlockDelimiter)
+											res.WriteString(scid)
+											cid := res.String()
+											utils.MLogger.Info("Need repair cid tried: ", cid)
+											thisinfo.repair++
+											k.repch <- cid
+										}
+									}
+								}
+
+								if eclasped > rafiTime && thisinfo.repair <= 1 {
+									if multipleLost == 0 {
+										// repair first one
+										repairCid = scid
+									}
+									multipleLost++
+								}
+							}
+						}
+
+						// lost multiple chunks
+						if multipleLost > int(binfo.bops.GetParityCount()/2) {
+							cInfo, ok := binfo.stripes.Load(repairCid)
+							if ok {
+								res.Reset()
+								res.WriteString(pre)
+								res.WriteString(strconv.Itoa(i))
+								res.WriteString(metainfo.BlockDelimiter)
+								res.WriteString(repairCid)
+								cid := res.String()
+								// enter into single lost
+								if cInfo.(*blockInfo).repair > 1 {
+									continue
+								}
+								utils.MLogger.Info("Need rafi repair cid: ", cid)
+								cInfo.(*blockInfo).repair = 1
+								k.repch <- cid
+							}
+						}
+
+					}
+				}
+			}
+		}
+	}
+}
+
 func (k *Info) checkLedgerV2(ctx context.Context) {
 	utils.MLogger.Info("Check Ledger start!")
 	time.Sleep(2 * chalTime)
