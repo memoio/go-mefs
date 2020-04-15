@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
-	"log"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -449,7 +448,6 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	rand.Seed(chal.Seed + int64(cmix))
 	c := rand.Intn(k.Pk.Count - k.Pk.TagCount)
 
-	log.Println(c)
 	if len(k.Pk.ElemG2s) < tagNum+c {
 		return nil, ErrChalOutOfRange
 	}

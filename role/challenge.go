@@ -84,7 +84,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
-		if int64(i) < stripeNum {
+		if int64(i) < stripeNum || chunkNum == 0 {
 			break
 		}
 
@@ -149,7 +149,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
-		if int64(i) < stripeNum {
+		if int64(i) < stripeNum || chunkNum == 0 {
 			break
 		}
 

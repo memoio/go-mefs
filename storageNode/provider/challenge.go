@@ -113,7 +113,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
-		if int64(i) < stripeNum {
+		if int64(i) < stripeNum || chunkNum == 0 {
 			break
 		}
 
@@ -191,7 +191,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
-		if int64(i) < stripeNum {
+		if int64(i) < stripeNum || chunkNum == 0 {
 			break
 		}
 
