@@ -7,6 +7,8 @@ echo -e "mefs challenge test"
 echo -e "\nstep 1,mefs init\n"
 mefs-user init --netKey=$1
 
+mefs-user config Eth $2
+
 echo -e "\nstep 2,run mefs daemon\n"
 mefs-user daemon --netKey=$1 >> ~/daemon.stdout 2>&1 &
 echo -e "\ndaemon is ready wait 1min to connect"
