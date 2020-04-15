@@ -45,6 +45,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 	chal.Seed = mcl.GenChallenge(cr)
 
 	chalNum := bset.Count()
+	startPos := uint(chal.Seed) % bset.Len()
 	meta := false
 
 	switch cr.GetPolicy() {
@@ -63,7 +64,6 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 	default:
 	}
 
-	startPos := uint(chal.Seed) % bset.Len()
 	qid := cr.GetQueryID()
 	bucketID := 0
 	stripeID := 0
@@ -75,7 +75,8 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
 		count++
 		for j := bucketID; j < int(bucketNum); j++ {
-			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+			if int64(i) >= stripeNum && int64(i) <
+				stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) {
 				bucketID = j
 				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
@@ -138,7 +139,8 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		}
 		count++
 		for j := bucketID; j < int(bucketNum); j++ {
-			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+			if int64(i) >= stripeNum && int64(i) <
+				stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) {
 				bucketID = j
 				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break

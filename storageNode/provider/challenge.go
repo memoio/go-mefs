@@ -70,6 +70,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return err
 	}
 
+	startPos := uint(chal.Seed) % bset.Len()
 	chalNum := bset.Count()
 	meta := false
 
@@ -89,8 +90,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	default:
 	}
 
-	startPos := uint(chal.Seed) % bset.Len()
-
 	ctx := p.context
 
 	bucketNum := len(cr.GetBuckets())
@@ -105,7 +104,8 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
 		count++
 		for j := bucketID; j < bucketNum; j++ {
-			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+			if int64(i) >= stripeNum && int64(i) <
+				stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) {
 				bucketID = j
 				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
@@ -181,7 +181,8 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		}
 		count++
 		for j := bucketID; j < bucketNum; j++ {
-			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
+			if int64(i) >= stripeNum && int64(i) <
+				stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) {
 				bucketID = j
 				chunkNum = int(cr.Buckets[j].GetChunkNum())
 				break
