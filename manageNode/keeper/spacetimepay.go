@@ -42,15 +42,22 @@ func (k *Info) stPayRegular(ctx context.Context) {
 					continue
 				}
 
+				expireCount := 0
 				for _, proID := range thisGroup.providers {
 					err := thisGroup.spaceTimePay(k.context, proID, k.sk, k.localID, k.ds)
 					if err != nil {
+						if err.Error() == role.ErrUkExpire.Error() {
+							expireCount++
+						}
 						continue
 					}
-
 					k.savePay(uq.uid, qid, proID)
 				}
 
+				if expireCount == len(thisGroup.providers) {
+					// all pay ends;
+					k.ukpGroup.Delete(qid)
+				}
 			}
 		}
 	}
@@ -66,7 +73,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 	if g.upkeeping == nil {
 		return nil
 	}
-	utils.MLogger.Infof("SpaceTimePay start for %s", proID)
+
 	// TODO: exit when balance is too low
 
 	price := g.upkeeping.Price
@@ -103,6 +110,13 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 	if thisLinfo.lastPay != nil {
 		startTime = thisLinfo.lastPay.GetStart() + thisLinfo.lastPay.GetLength()
 	}
+
+	if startTime > g.upkeeping.EndTime && g.userID != pos.GetPosId() {
+		utils.MLogger.Infof("SpaceTimePay expired for user %s fsID %s at %s", g.userID, g.groupID, proID)
+		return role.ErrUkExpire
+	}
+
+	utils.MLogger.Infof("SpaceTimePay start for user %s fsID %s at %s", g.userID, g.groupID, proID)
 
 	if thisLinfo.currentPay == nil {
 		amount, lastTime, mroot := thisLinfo.resultSummary(price, startTime, time.Now().Unix())
@@ -158,9 +172,9 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 				go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, hash, sign, kid)
 			}
 
-			utils.MLogger.Infof("SpaceTimePay start for %s at %d ", proID, thisLinfo.currentPay.Start)
+			utils.MLogger.Infof("SpaceTimePay start for user %s fsID %s for provider %s at %d ", g.userID, g.groupID, proID, thisLinfo.currentPay.Start)
 		} else {
-			utils.MLogger.Infof("SpaceTimePay start for %s at zero", proID)
+			utils.MLogger.Infof("SpaceTimePay start for user %s fsID %s for provider %s at zero ", g.userID, g.groupID, proID)
 		}
 		return role.ErrEmptyData
 	}
@@ -179,11 +193,11 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		copy(root[:], thisLinfo.currentPay.Root[:32])
 		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, thisLinfo.currentPay.Share, thisLinfo.currentPay.Sign)
 		if err != nil {
-			utils.MLogger.Infof("SpaceTimePay start pay for %s from %s, length %s value %s failed %s", proID, st.String(), sl.String(), sv.String(), err)
+			utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s failed %s", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String(), err)
 			return err
 		}
 
-		utils.MLogger.Infof("SpaceTimePay start pay for %s from %s, length %s value %s success", proID, st.String(), sl.String(), sv.String())
+		utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
 
 		thisLinfo.currentPay.Status = 0
 		thisLinfo.lastPay = thisLinfo.currentPay

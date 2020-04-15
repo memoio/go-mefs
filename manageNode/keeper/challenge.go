@@ -29,13 +29,19 @@ func (k *Info) challengeRegular(ctx context.Context) {
 			pus := k.getQUKeys()
 			for _, pu := range pus {
 				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
-				if thisGroup == nil {
+				if thisGroup == nil || thisGroup.upkeeping == nil {
+					continue
+				}
+
+				chalTime := time.Now().Unix()
+
+				if thisGroup.upkeeping.EndTime < chalTime {
+					utils.MLogger.Infof("Challenge for user %s fsID %s upkeeping has expired", pu.uid, pu.qid)
 					continue
 				}
 
 				utils.MLogger.Infof("Challenge for user %s fsID %s", pu.uid, pu.qid)
 
-				chalTime := time.Now().Unix()
 				mtime := thisGroup.upkeeping.StartTime
 				if thisGroup.rootID != "" {
 					gottime, _, err := role.GetLatestMerkleRoot(thisGroup.rootID)

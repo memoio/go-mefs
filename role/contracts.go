@@ -49,7 +49,7 @@ type UpKeepingItem struct {
 	Price       int64 // 部署的价格: wei/(MB*h)
 	StartTime   int64 // 部署的时间: second
 	Money       *big.Int
-	EndDate     int64 // second
+	EndTime     int64 // second
 	Cycle       int64 // 设置周期
 	NeedPay     int64
 	Proofs      []upKeeping.UpKeepingProof
@@ -630,7 +630,7 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 			Capacity:    capacity.Int64(),
 			Price:       price.Int64(),
 			StartTime:   startTime.Int64(),
-			EndDate:     endDate.Int64(),
+			EndTime:     endDate.Int64(),
 			Cycle:       cycle.Int64(),
 			NeedPay:     needPay.Int64(),
 			Proofs:      proofs,
@@ -709,7 +709,7 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			Capacity:    capacity.Int64(),
 			Price:       price.Int64(),
 			StartTime:   startTime.Int64(),
-			EndDate:     endDate.Int64(),
+			EndTime:     endDate.Int64(),
 			Cycle:       cycle.Int64(),
 			NeedPay:     needPay.Int64(),
 			Proofs:      proofs,

@@ -16,6 +16,8 @@ var (
 	ErrNotProvider      = errors.New("Role is not a provider")
 	ErrNotUser          = errors.New("Role is not a user")
 
+	ErrUkExpire = errors.New("Upkeeping is expired")
+
 	ErrWrongMoney           = errors.New("money is not right")
 	ErrWrongSign            = errors.New("signature is not right")
 	ErrWrongContarctContent = errors.New("Contract content is wrong")

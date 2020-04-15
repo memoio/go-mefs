@@ -33,6 +33,11 @@ func (g *groupInfo) loadContracts(mode bool) error {
 			return err
 		}
 
+		if uItem.EndTime < time.Now().Unix() {
+			// not load expire uk
+			return role.ErrUkExpire
+		}
+
 		var keepers []string
 		var providers []string
 		for _, keeper := range uItem.Keepers {

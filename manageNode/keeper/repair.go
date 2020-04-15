@@ -31,7 +31,12 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 				}
 
 				gp := k.getGroupInfo(pu.uid, pu.qid, false)
-				if gp == nil {
+				if gp == nil || gp.upkeeping == nil {
+					continue
+				}
+
+				if gp.upkeeping.EndTime < time.Now().Unix() {
+					utils.MLogger.Infof("Repair for user %s fsID %s upkeeping has expired", pu.uid, pu.qid)
 					continue
 				}
 
