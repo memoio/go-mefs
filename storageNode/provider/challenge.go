@@ -113,13 +113,17 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	stripeNum := 3 * (chalInfo.GetBucketNum() + 1)
 	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
 		count++
-		for j := bucket; j < int(chalInfo.GetBucketNum()); j++ {
+		for j := bucket; j <= int(chalInfo.GetBucketNum()); j++ {
 			if stripeNum+chalInfo.GetStripeNum()[j-1]*int64(chalInfo.GetChunkNum()[j-1]) < int64(i) {
 				break
 			}
 			bucket = j
 			chunkNum = chalInfo.GetChunkNum()[j-1]
 			stripeNum += chalInfo.GetStripeNum()[j-1] * int64(chalInfo.GetChunkNum()[j-1])
+		}
+
+		if int64(i) < stripeNum {
+			break
 		}
 
 		buf.Reset()
@@ -173,13 +177,17 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 			break
 		}
 		count++
-		for j := bucket; j < int(chalInfo.GetBucketNum()); j++ {
+		for j := bucket; j <= int(chalInfo.GetBucketNum()); j++ {
 			if stripeNum+chalInfo.GetStripeNum()[j-1]*int64(chalInfo.GetChunkNum()[j-1]) < int64(i) {
 				break
 			}
 			bucket = j
 			chunkNum = chalInfo.GetChunkNum()[j-1]
 			stripeNum += chalInfo.GetStripeNum()[j-1] * int64(chalInfo.GetChunkNum()[j-1])
+		}
+
+		if int64(i) < stripeNum {
+			break
 		}
 
 		buf.Reset()

@@ -364,13 +364,17 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	stripeNum := 3 * (chalResult.GetBucketNum() + 1)
 	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
 		count++
-		for j := bucketID; j < int(chalResult.GetBucketNum()); j++ {
+		for j := bucketID; j <= int(chalResult.GetBucketNum()); j++ {
 			if stripeNum+chalResult.GetStripeNum()[j-1]*int64(chalResult.GetChunkNum()[j-1]) < int64(i) {
 				break
 			}
 			bucketID = j
 			chunkNum = chalResult.GetChunkNum()[j-1]
 			stripeNum += chalResult.GetStripeNum()[j-1] * int64(chalResult.GetChunkNum()[j-1])
+		}
+
+		if int64(i) < stripeNum {
+			break
 		}
 
 		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
@@ -422,13 +426,17 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 			break
 		}
 		count++
-		for j := bucketID; j < int(chalResult.GetBucketNum()); j++ {
+		for j := bucketID; j <= int(chalResult.GetBucketNum()); j++ {
 			if stripeNum+chalResult.GetStripeNum()[j-1]*int64(chalResult.GetChunkNum()[j-1]) < int64(i) {
 				break
 			}
 			bucketID = j
 			chunkNum = chalResult.GetChunkNum()[j-1]
 			stripeNum += chalResult.GetStripeNum()[j-1] * int64(chalResult.GetChunkNum()[j-1])
+		}
+
+		if int64(i) < stripeNum {
+			break
 		}
 
 		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
