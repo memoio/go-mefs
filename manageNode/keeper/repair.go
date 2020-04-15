@@ -564,11 +564,12 @@ func (k *Info) repairRegular(ctx context.Context) {
 // repairBlock works in 3 steps:
 // 1.search a new provider,we do it in func SearchNewProvider
 // 2.put chunk to this provider
-// key: queryID_bucketID_stripeID_chunkID/"Repair"/uid
+// key: queryID_bucketID_stripeID_chunkID/"Repair"/uid/"offset"
 // value: chunkID1_pid1/chunkID2_pid2/...
 func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	utils.MLogger.Info("Repair blocks:", rBlockID)
 	var response, oldpid string
+	var offset int
 	// uid_qid_bid_sid_cid
 	blkinfo := strings.Split(rBlockID, metainfo.BlockDelimiter)
 	if len(blkinfo) < 5 {
@@ -591,7 +592,6 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	}
 
 	count := int(thisbucket.chunkNum)
-	utils.MLogger.Infof("blockID has %d chunks", thisbucket.chunkNum)
 
 	cpids := make([]string, 0, count)
 	ugid := make([]string, 0, count)
@@ -620,6 +620,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 			}
 			response = pid
 			oldpid = pid
+			offset = thisinfo.(*blockInfo).offset
 		}
 
 		res.WriteString(pid)
@@ -656,7 +657,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	// cid1_pid1/cid2_pid2
 	metaValue := strings.Join(cpids, metainfo.DELIMITER)
 
-	km, err := metainfo.NewKey(blockID, mpb.KeyType_Repair, uid)
+	km, err := metainfo.NewKey(blockID, mpb.KeyType_Repair, uid, strconv.Itoa(offset))
 	if err != nil {
 		utils.MLogger.Info("construct repair KV error: ", err)
 		return
@@ -678,9 +679,8 @@ func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider s
 	splitedKey := strings.SplitN(blockID, metainfo.BlockDelimiter, 2)
 	qid := splitedKey[0]
 	bid := splitedKey[1]
-
 	if strings.Compare(splitedValue[0], "ok") == 0 {
-		utils.MLogger.Info("repair success, cid is: ", blockID)
+		utils.MLogger.Info("repair success, block is: ", blockID)
 		newPid := splitedValue[1]
 		newOffset, err := strconv.Atoi(splitedValue[2])
 		if err != nil {
@@ -693,8 +693,6 @@ func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider s
 
 		return
 	}
-
-	utils.MLogger.Info("repair failed, block is: ", blockID)
 
 	return
 

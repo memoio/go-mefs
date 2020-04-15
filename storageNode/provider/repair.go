@@ -16,20 +16,15 @@ import (
 func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error {
 	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
-	var nbid int
-	sig, err := role.BuildSignMessage()
-	if err != nil {
-		return err
-	}
-
 	blockID := km.GetMid()
 	ops := km.GetOptions()
-	if len(ops) < 1 {
-		return nil
+	if len(ops) < 2 {
+		return role.ErrWrongKey
 	}
+
 	blkInfo := strings.Split(blockID, metainfo.BlockDelimiter)
 	if len(blkInfo) < 4 {
-		return nil
+		return role.ErrWrongKey
 	}
 
 	userID := ops[0]
@@ -43,6 +38,30 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	}
 
 	ctx := p.context
+
+	bid, err := metainfo.NewKey(blockID, mpb.KeyType_Block, "0", ops[1])
+	if err != nil {
+		return err
+	}
+
+	block, err := p.ds.GetBlock(ctx, bid.ToString(), nil, "local")
+	if err == nil {
+		ok := df.VerifyBlock(block.RawData(), blockID, pubKey)
+		if ok {
+			retMetaValue := "ok" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + ops[1]
+			_, err = p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
+			if err != nil {
+				utils.MLogger.Error("repair response err :", err)
+				return err
+			}
+		}
+	}
+
+	var nbid int
+	sig, err := role.BuildSignMessage()
+	if err != nil {
+		return err
+	}
 
 	cpids := strings.Split(string(rpids), metainfo.DELIMITER)
 	stripe := make([][]byte, len(cpids)+1)
@@ -122,7 +141,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	utils.MLogger.Info("repair success: ", blockID)
 
 	retMetaValue := "ok" + metainfo.DELIMITER + p.localID + metainfo.DELIMITER + strconv.Itoa(off)
-	_, err = p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
+	_, err = p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), km.ToString(), []byte(retMetaValue), nil, keeper)
 	if err != nil {
 		utils.MLogger.Error("repair response err :", err)
 		return err

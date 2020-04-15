@@ -337,7 +337,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	bucketID := 0
 	stripeID := 1
 	chunkID := 0
-	failset := make(map[string]struct{})
+	failThenSucset := make(map[string]struct{})
 	for i, e := bset.NextSet(0); e && i < uint(chalResult.BucketNum+1)*3; i, e = bset.NextSet(i + 1) {
 		buf.Reset()
 		bucketID = -int(i / 3)
@@ -357,8 +357,13 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		chalLength += int64(segNum * 4096)
 
 		if flength != 0 && !fset.Test(i) {
-			failset[blockID] = struct{}{}
+			thisLinfo.faultCid.Store(blockID, struct{}{})
 			continue
+		}
+
+		_, ok = thisLinfo.faultCid.Load(blockID)
+		if ok {
+			failThenSucset[blockID] = struct{}{}
 		}
 
 		slength += int64(segNum * 4096)
@@ -416,8 +421,13 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		chalLength += int64(segNum * int(bi.bops.GetSegmentSize()))
 
 		if flength != 0 && !fset.Test(i) {
-			failset[blockID] = struct{}{}
+			thisLinfo.faultCid.Store(blockID, struct{}{})
 			continue
+		}
+
+		_, ok = thisLinfo.faultCid.Load(blockID)
+		if ok {
+			failThenSucset[blockID] = struct{}{}
 		}
 
 		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
@@ -478,8 +488,13 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		chalLength += int64(segNum * int(bi.bops.GetSegmentSize()))
 
 		if flength != 0 && !fset.Test(i) {
-			failset[blockID] = struct{}{}
+			thisLinfo.faultCid.Store(blockID, struct{}{})
 			continue
+		}
+
+		_, ok = thisLinfo.faultCid.Load(blockID)
+		if ok {
+			failThenSucset[blockID] = struct{}{}
 		}
 
 		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
@@ -540,15 +555,22 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
 
-		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
-			_, ok := failset[k.(string)]
+		for key := range failThenSucset {
+			_, ok := thisLinfo.faultCid.Load(key)
 			if ok {
-				utils.MLogger.Debugf("do not change %s availtime for %s", k.(string), qid)
+				thisLinfo.faultCid.Delete(key)
+			}
+		}
+
+		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
+			_, ok = thisLinfo.faultCid.Load(k.(string))
+			if ok {
+				utils.MLogger.Debugf("do not change faulted %s availtime for %s", k.(string), qid)
 				return true
 			}
-			cInfo := v.(*blockInfo)
-			cInfo.repair = 0
-			cInfo.availtime = challengetime
+
+			v.(*blockInfo).repair = 0
+			v.(*blockInfo).availtime = challengetime
 			return true
 		})
 

@@ -286,6 +286,7 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 		thisCid := thisICid.(*blockInfo)
 		thisLinfo.maxlength -= int64(thisCid.offset * segSize)
 		thisLinfo.blockMap.Delete(bid)
+		thisLinfo.faultCid.Delete(bid)
 	}
 
 	return
@@ -332,7 +333,8 @@ type lInfo struct {
 	chalMap      sync.Map       // key:challenge time,value:*chalresult
 	blockMap     sync.Map       // key:bucketid_stripeid_blockid, value: *blockInfo
 	chalCid      map[string]int // value is []bucketid_stripeid_blockid
-	inChallenge  bool           // during challenge or not
+	faultCid     sync.Map
+	inChallenge  bool // during challenge or not
 	maxlength    int64
 	lastChalTime int64
 	lastPay      *chalpay // stores result of last pay
