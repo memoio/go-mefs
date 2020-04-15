@@ -121,10 +121,13 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 			continue
 		}
 
-		bc[i].ChunkNum = int32(binfo.chunkNum)
-		bc[i].StripeNum = int64(count)
-		bc[i].SegCount = binfo.bops.GetSegmentCount()
-		bc[i].SegSize = binfo.bops.GetSegmentSize()
+		bi := &mpb.BucketContent{
+			ChunkNum:  int32(binfo.chunkNum),
+			StripeNum: int64(count),
+			SegCount:  binfo.bops.GetSegmentCount(),
+			SegSize:   binfo.bops.GetSegmentSize(),
+		}
+		bc[i] = bi
 
 		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
 		for j := 0; j < count; j++ {
@@ -232,10 +235,14 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 			continue
 		}
 
-		bc[i].ChunkNum = int32(binfo.chunkNum)
-		bc[i].StripeNum = int64(count)
-		bc[i].SegCount = binfo.bops.GetSegmentCount()
-		bc[i].SegSize = binfo.bops.GetSegmentSize()
+		bi := &mpb.BucketContent{
+			ChunkNum:  int32(binfo.chunkNum),
+			StripeNum: int64(count),
+			SegCount:  binfo.bops.GetSegmentCount(),
+			SegSize:   binfo.bops.GetSegmentSize(),
+		}
+
+		bc[i] = bi
 
 		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
 		for j := 0; j < count; j++ {
