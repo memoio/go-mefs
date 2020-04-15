@@ -98,8 +98,18 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 
 	thisLinfo.inChallenge = true
 
-	bucketNum := g.bucketNum + 1
+	bucketNum := int(g.bucketNum + 1)
 	bc := make([]*mpb.BucketContent, bucketNum)
+	for i := 0; i < bucketNum; i++ {
+		bi := &mpb.BucketContent{
+			ChunkNum:  0,
+			StripeNum: 0,
+			SegCount:  0,
+			SegSize:   0,
+		}
+
+		bc[i] = bi
+	}
 
 	var res strings.Builder
 	cset := make(map[string]int)
@@ -108,7 +118,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 	stripeNum := int64(0)
 
 	// challenge buckets
-	for i := 1; i < int(bucketNum); i++ {
+	for i := 1; i < bucketNum; i++ {
 		binfo := g.getBucketInfo(strconv.Itoa(i), false)
 		if binfo == nil {
 			utils.MLogger.Infof("missing bucket %d info", i)
@@ -213,8 +223,18 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 
 	thisLinfo.inChallenge = true
 
-	bucketNum := g.bucketNum + 1
+	bucketNum := int(g.bucketNum + 1)
 	bc := make([]*mpb.BucketContent, bucketNum)
+	for i := 0; i < bucketNum; i++ {
+		bi := &mpb.BucketContent{
+			ChunkNum:  0,
+			StripeNum: 0,
+			SegCount:  0,
+			SegSize:   0,
+		}
+
+		bc[i] = bi
+	}
 
 	var res strings.Builder
 	cset := make(map[string]int)
@@ -223,7 +243,7 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 	stripeNum := int64(0)
 
 	// challenge buckets
-	for i := 0; i < int(bucketNum); i++ {
+	for i := 0; i < bucketNum; i++ {
 		binfo := g.getBucketInfo(strconv.Itoa(-i), true)
 		if binfo == nil {
 			utils.MLogger.Infof("missing bucket %d info", -i)

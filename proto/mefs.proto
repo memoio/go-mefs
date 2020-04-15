@@ -25,6 +25,7 @@ enum KeyType {
     Pos = 13;
     Bucket = 14;
     Session = 15;
+    LastStripe = 16; // record latest stripe in buckets
 	
     HeartBeat = 20;
     UserInit = 21;
