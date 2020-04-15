@@ -951,6 +951,16 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 		if err != nil {
 			return err
 		}
+
+		bucketNum, err := strconv.Atoi(bucketID)
+		if err != nil {
+			return err
+		}
+
+		if bucketNum <= 0 {
+			return gp.addBlockMeta(bid, pid, offset)
+		}
+
 		binfo := gp.getBucketInfo(bucketID, false)
 		if binfo == nil {
 			bk, err := metainfo.NewKey(qid, mpb.KeyType_Bucket, gp.userID, bucketID)

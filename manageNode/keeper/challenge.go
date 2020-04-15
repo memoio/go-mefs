@@ -244,7 +244,7 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 
 	// challenge buckets
 	for i := 0; i < bucketNum; i++ {
-		binfo := g.getBucketInfo(strconv.Itoa(-i), true)
+		binfo := g.getBucketInfo(strconv.Itoa(-i), false)
 		if binfo == nil {
 			utils.MLogger.Infof("missing bucket %d info", -i)
 			continue
