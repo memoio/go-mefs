@@ -61,7 +61,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 						utils.MLogger.Infof("Challenge for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
 						continue
 					}
-					utils.MLogger.Infof("Challenge for user %s fsID %s at provoder %s", pu.uid, pu.qid, proID)
+					utils.MLogger.Infof("Challenge: %s", key)
 					k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 				}
 
