@@ -35,27 +35,18 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return role.ErrWrongKey
 	}
 
-	chalInfo := &mpb.ChalInfo{}
-	err := proto.Unmarshal(metaValue, chalInfo)
+	cr := &mpb.ChalInfo{}
+	err := proto.Unmarshal(metaValue, cr)
 	if err != nil {
 		utils.MLogger.Error("unmarshal h failed: ", err)
 		return err
 	}
 
-	if chalInfo.GetUserID() != userID {
+	if cr.GetUserID() != userID {
 		return role.ErrInvalidInput
 	}
 
-	if chalInfo.GetQueryID() != fsID {
-		return role.ErrInvalidInput
-	}
-
-	bucketNum := int(chalInfo.GetBucketNum())
-	if bucketNum != len(chalInfo.GetChunkNum()) {
-		return role.ErrInvalidInput
-	}
-
-	if bucketNum != len(chalInfo.GetStripeNum()) {
+	if cr.GetQueryID() != fsID {
 		return role.ErrInvalidInput
 	}
 
@@ -71,10 +62,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(chalInfo)
+	chal.Seed = mcl.GenChallenge(cr)
 
 	bset := bitset.New(0)
-	err = bset.UnmarshalBinary(chalInfo.GetChunkMap())
+	err = bset.UnmarshalBinary(cr.GetChunkMap())
 	if err != nil {
 		return err
 	}
@@ -82,7 +73,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	chalNum := bset.Count()
 	meta := false
 
-	switch chalInfo.GetPolicy() {
+	switch cr.GetPolicy() {
 	case "100":
 		chalNum = 100
 	case "1%":
@@ -102,21 +93,24 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 	ctx := p.context
 
+	bucketNum := len(cr.GetBuckets())
 	bucketID := 0
 	stripeID := 0
 	chunkID := 0
 	stripeNum := int64(0)
-	chunkNum := int(chalInfo.GetChunkNum()[0])
+	chunkNum := 0
 	count := uint(0)
+	electedOffset := 0
+
 	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
 		count++
-		for j := bucketID; j < int(chalInfo.GetBucketNum()); j++ {
-			if stripeNum+chalInfo.GetStripeNum()[j]*int64(chalInfo.GetChunkNum()[j]) < int64(i) {
+		for j := bucketID; j < bucketNum; j++ {
+			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
 				break
 			}
 			bucketID = j
-			chunkNum = int(chalInfo.GetChunkNum()[j])
-			stripeNum += chalInfo.GetStripeNum()[j] * int64(chalInfo.GetChunkNum()[j])
+			chunkNum = int(cr.Buckets[j].GetChunkNum())
+			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
 		if int64(i) < stripeNum {
@@ -139,12 +133,15 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(strconv.Itoa(chunkID))
 		blockID := buf.String()
 
+		segNum := int(cr.Buckets[bucketID].GetSegCount())
+		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+
 		cbuf.Reset()
 		cbuf.WriteString(blockID)
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
 		cbuf.WriteString(metainfo.DELIMITER)
-		cbuf.WriteString(strconv.FormatInt(chal.Seed+int64(i), 10))
+		cbuf.WriteString(strconv.Itoa(electedOffset))
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString("1") // length
 
@@ -183,13 +180,13 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 			break
 		}
 		count++
-		for j := bucketID; j < int(chalInfo.GetBucketNum()); j++ {
-			if stripeNum+chalInfo.GetStripeNum()[j]*int64(chalInfo.GetChunkNum()[j]) < int64(i) {
+		for j := bucketID; j < bucketNum; j++ {
+			if stripeNum+cr.Buckets[j].GetStripeNum()*int64(cr.Buckets[j].GetChunkNum()) < int64(i) {
 				break
 			}
 			bucketID = j
-			chunkNum = int(chalInfo.GetChunkNum()[j])
-			stripeNum += chalInfo.GetStripeNum()[j] * int64(chalInfo.GetChunkNum()[j])
+			chunkNum = int(cr.Buckets[j].GetChunkNum())
+			stripeNum += cr.Buckets[j].GetStripeNum() * int64(cr.Buckets[j].GetChunkNum())
 		}
 
 		if int64(i) < stripeNum {
@@ -213,12 +210,15 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(strconv.Itoa(chunkID))
 		blockID := buf.String()
 
+		segNum := int(cr.Buckets[bucketID].GetSegCount())
+		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+
 		cbuf.Reset()
 		cbuf.WriteString(blockID)
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
 		cbuf.WriteString(metainfo.DELIMITER)
-		cbuf.WriteString(strconv.FormatInt(chal.Seed+int64(i), 10))
+		cbuf.WriteString(strconv.Itoa(electedOffset))
 		cbuf.WriteString(metainfo.DELIMITER)
 		cbuf.WriteString("1") // length
 

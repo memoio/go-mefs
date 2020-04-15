@@ -99,17 +99,13 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 	thisLinfo.inChallenge = true
 
 	bucketNum := g.bucketNum + 1
-	stripeNum := int64(0)
-	stripes := make([]int64, bucketNum)
-	chunks := make([]int32, bucketNum)
-
-	stripes[0] = 0
-	chunks[0] = 0
+	bc := make([]*mpb.BucketContent, bucketNum)
 
 	var res strings.Builder
 	cset := make(map[string]int)
 	bset := bitset.New(0)
 	psum := 0
+	stripeNum := int64(0)
 
 	// challenge buckets
 	for i := 1; i < int(bucketNum); i++ {
@@ -118,14 +114,17 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 			utils.MLogger.Infof("missing bucket %d info", i)
 			continue
 		}
-		chunks[i] = int32(binfo.chunkNum)
 
 		// not challenge last one
 		count := binfo.curStripes
 		if count <= 0 {
-			stripes[0] = 0
 			continue
 		}
+
+		bc[i].ChunkNum = int32(binfo.chunkNum)
+		bc[i].StripeNum = int64(count)
+		bc[i].SegCount = binfo.bops.GetSegmentCount()
+		bc[i].SegSize = binfo.bops.GetSegmentSize()
 
 		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
 		for j := 0; j < count; j++ {
@@ -147,7 +146,6 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 		}
 
 		bset.SetTo(uint(stripeNum)+uint(count*binfo.chunkNum), false)
-		stripes[i] = int64(count)
 		stripeNum += int64(count * binfo.chunkNum)
 	}
 
@@ -177,9 +175,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 		ChalTime:    challengetime,
 		RootTime:    rootTime,
 		TotalLength: thisLinfo.maxlength,
-		BucketNum:   bucketNum,
-		StripeNum:   stripes,
-		ChunkNum:    chunks,
+		Buckets:     bc,
 		ChunkMap:    chunkMap,
 	}
 
@@ -215,30 +211,31 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 	thisLinfo.inChallenge = true
 
 	bucketNum := g.bucketNum + 1
-	stripeNum := int64(0)
-	stripes := make([]int64, bucketNum)
-	chunks := make([]int32, bucketNum)
+	bc := make([]*mpb.BucketContent, bucketNum)
 
 	var res strings.Builder
 	cset := make(map[string]int)
 	bset := bitset.New(0)
 	psum := 0
+	stripeNum := int64(0)
 
 	// challenge buckets
 	for i := 0; i < int(bucketNum); i++ {
-		binfo := g.getBucketInfo(strconv.Itoa(-i), false)
+		binfo := g.getBucketInfo(strconv.Itoa(-i), true)
 		if binfo == nil {
-			utils.MLogger.Infof("missing bucket %d info", i)
+			utils.MLogger.Infof("missing bucket %d info", -i)
 			continue
 		}
-		chunks[i] = int32(binfo.chunkNum)
 
-		// not challenge last one
 		count := binfo.curStripes + 1
 		if count <= 0 {
-			stripes[0] = 0
 			continue
 		}
+
+		bc[i].ChunkNum = int32(binfo.chunkNum)
+		bc[i].StripeNum = int64(count)
+		bc[i].SegCount = binfo.bops.GetSegmentCount()
+		bc[i].SegSize = binfo.bops.GetSegmentSize()
 
 		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
 		for j := 0; j < count; j++ {
@@ -260,7 +257,6 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 		}
 
 		bset.SetTo(uint(stripeNum)+uint(count*binfo.chunkNum), false)
-		stripes[i] = int64(count)
 		stripeNum += int64(count * binfo.chunkNum)
 	}
 
@@ -290,9 +286,7 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 		ChalTime:    challengetime,
 		RootTime:    rootTime,
 		TotalLength: thisLinfo.maxlength,
-		BucketNum:   bucketNum,
-		StripeNum:   stripes,
-		ChunkNum:    chunks,
+		Buckets:     bc,
 		ChunkMap:    chunkMap,
 	}
 
@@ -407,25 +401,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
-	var bops []*mpb.BucketOptions
-	for i := 0; i < int(chalResult.GetBucketNum()); i++ {
-		if chalResult.GetPolicy() == "meta" {
-			bi := thisGroup.getBucketInfo(strconv.Itoa(-i), false)
-			if bi == nil {
-				return
-			}
-			bops = append(bops, bi.bops)
-		} else {
-			bi := thisGroup.getBucketInfo(strconv.Itoa(i), false)
-			if bi == nil {
-				return
-			}
-			bops = append(bops, bi.bops)
-		}
-	}
-
-	sizeMap := thisLinfo.chalCid
-	res, sucCids, faultCids, err := role.VerifyChallenge(chalResult, blsKey, sizeMap, bops, false)
+	res, sucCids, faultCids, err := role.VerifyChallenge(chalResult, blsKey, false)
 	if err != nil {
 		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, " verify fails: ", err)
 		return

@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"strconv"
 
+	"github.com/gogo/protobuf/proto"
 	mpb "github.com/memoio/go-mefs/proto"
 	"golang.org/x/crypto/blake2b"
 )
@@ -316,10 +317,13 @@ func GenChallenge(chal *mpb.ChalInfo) int64 {
 	newHash.Write([]byte(strconv.FormatInt(chal.GetRootTime(), 10)))
 	newHash.Write([]byte(strconv.FormatInt(chal.GetChalTime(), 10)))
 	newHash.Write([]byte(strconv.FormatInt(chal.GetTotalLength(), 10)))
-	newHash.Write([]byte(strconv.FormatInt(chal.GetBucketNum(), 10)))
 
-	for _, stripeNum := range chal.GetStripeNum() {
-		newHash.Write([]byte(strconv.FormatInt(stripeNum, 10)))
+	for _, bu := range chal.GetBuckets() {
+		budata, err := proto.Marshal(bu)
+		if err != nil {
+			continue
+		}
+		newHash.Write(budata)
 	}
 
 	hashValue := newHash.Sum(chal.GetChunkMap())
