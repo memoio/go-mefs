@@ -1,0 +1,319 @@
+package role
+
+import (
+	"strconv"
+	"strings"
+
+	mcl "github.com/memoio/go-mefs/bls12"
+	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/utils/bitset"
+	"github.com/memoio/go-mefs/utils/metainfo"
+	b58 "github.com/mr-tron/base58/base58"
+)
+
+// VerifyChallenge verifies ChalInfo
+func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, sizeMap map[string]int, bops []*mpb.BucketOptions, strict bool) (bool, []string, []string, error) {
+	var sucCid, faultCid []string
+	var slength, chalLength int64 //success length
+	var electedOffset int
+	var buf strings.Builder
+
+	bucketNum := int(cr.GetBucketNum())
+	if bucketNum != len(cr.GetChunkNum()) {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+
+	if bucketNum != len(cr.GetStripeNum()) {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+
+	if bucketNum < len(bops) {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+
+	spliteProof := strings.Split(cr.GetBlsProof(), metainfo.DELIMITER)
+	if len(spliteProof) != 3 {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+
+	fset := bitset.New(0)
+	bset := bitset.New(0)
+	flength := uint(0)
+	if cr.GetFailMap() != nil {
+		fset.UnmarshalBinary(cr.GetFailMap())
+		flength = fset.Len()
+	}
+
+	err := bset.UnmarshalBinary(cr.ChunkMap)
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+
+	var chal mcl.Challenge
+	chal.Seed = mcl.GenChallenge(cr)
+
+	chalNum := bset.Count()
+	meta := false
+
+	switch cr.GetPolicy() {
+	case "100":
+		chalNum = 100
+	case "1%":
+		chalNum = chalNum / 100
+	case "smart":
+		if chalNum/100 < 100 {
+			chalNum = 100
+		} else {
+			chalNum = chalNum / 100
+		}
+	case "meta":
+		meta = true
+	default:
+	}
+
+	startPos := uint(chal.Seed) % bset.Len()
+	qid := cr.GetQueryID()
+	bucketID := 0
+	stripeID := 0
+	chunkID := 0
+	stripeNum := int64(0)
+	chunkNum := int(cr.GetChunkNum()[0])
+	count := uint(0)
+
+	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
+		count++
+		for j := bucketID; j < int(bucketNum); j++ {
+			if stripeNum+cr.StripeNum[j]*int64(cr.ChunkNum[j]) < int64(i) {
+				break
+			}
+			bucketID = j
+			chunkNum = int(cr.ChunkNum[j])
+			stripeNum += cr.StripeNum[j] * int64(cr.ChunkNum[j])
+		}
+
+		if int64(i) < stripeNum {
+			break
+		}
+
+		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
+		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
+
+		buf.Reset()
+		if meta {
+			buf.WriteString(strconv.Itoa(-bucketID))
+		} else {
+			buf.WriteString(strconv.Itoa(bucketID))
+		}
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(stripeID))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(chunkID))
+		blockID := buf.String()
+
+		segNum, ok := sizeMap[blockID]
+		if !ok {
+			if meta {
+				segNum = 1 // most likely
+			} else {
+				segNum = int(bops[bucketID].GetSegmentCount())
+			}
+		}
+
+		if strict {
+			if meta {
+				segNum = 1 // most likely
+			} else {
+				segNum = int(bops[bucketID].GetSegmentCount())
+			}
+		}
+
+		chalLength += int64(segNum * int(bops[bucketID].GetSegmentSize()))
+
+		if flength != 0 && !fset.Test(i) {
+			faultCid = append(faultCid, blockID)
+			continue
+		}
+
+		sucCid = append(sucCid, blockID)
+
+		slength += int64(segNum * int(bops[bucketID].GetSegmentSize()))
+		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+
+		buf.Reset()
+		buf.WriteString(qid)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(blockID)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(electedOffset))
+		chal.Indices = append(chal.Indices, buf.String())
+
+		if count > chalNum {
+			break
+		}
+	}
+
+	bucketID = 0
+	stripeNum = 0
+	for i, e := bset.NextSet(0); e && i < startPos; i, e = bset.NextSet(i + 1) {
+		if count > chalNum {
+			break
+		}
+		count++
+		for j := bucketID; j < bucketNum; j++ {
+			if stripeNum+cr.StripeNum[j]*int64(cr.ChunkNum[j]) < int64(i) {
+				break
+			}
+			bucketID = j
+			chunkNum = int(cr.ChunkNum[j])
+			stripeNum += cr.StripeNum[j] * int64(cr.ChunkNum[j])
+		}
+
+		if int64(i) < stripeNum {
+			break
+		}
+
+		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
+		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
+
+		buf.Reset()
+		if meta {
+			buf.WriteString(strconv.Itoa(-bucketID))
+		} else {
+			buf.WriteString(strconv.Itoa(bucketID))
+		}
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(stripeID))
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(chunkID))
+		blockID := buf.String()
+
+		segNum, ok := sizeMap[blockID]
+		if !ok {
+			if meta {
+				segNum = 1 // most likely
+			} else {
+				segNum = int(bops[bucketID].GetSegmentCount())
+			}
+		}
+
+		if strict {
+			if meta {
+				segNum = 1 // most likely
+			} else {
+				segNum = int(bops[bucketID].GetSegmentCount())
+			}
+		}
+
+		chalLength += int64(segNum * int(bops[bucketID].GetSegmentSize()))
+
+		if flength != 0 && !fset.Test(i) {
+			faultCid = append(faultCid, blockID)
+			continue
+		}
+
+		sucCid = append(sucCid, blockID)
+
+		slength += int64(segNum * int(bops[bucketID].GetSegmentSize()))
+		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+
+		buf.Reset()
+		buf.WriteString(qid)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(blockID)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(electedOffset))
+		chal.Indices = append(chal.Indices, buf.String())
+
+		if count > chalNum {
+			break
+		}
+	}
+
+	// recheck the status again
+	if len(chal.Indices) == 0 {
+		return false, sucCid, faultCid, nil
+	}
+
+	muByte, err := b58.Decode(spliteProof[0])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+	nuByte, err := b58.Decode(spliteProof[1])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+	deltaByte, err := b58.Decode(spliteProof[2])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+
+	pf := &mcl.Proof{
+		Mu:    muByte,
+		Nu:    nuByte,
+		Delta: deltaByte,
+	}
+
+	// verify totalLength
+	if strict {
+		bucketID = 0
+		stripeNum = 0
+		totalLength := int64(0)
+		for i, e := bset.NextSet(0); e; i, e = bset.NextSet(i + 1) {
+			for j := bucketID; j < bucketNum; j++ {
+				if stripeNum+cr.StripeNum[j]*int64(cr.ChunkNum[j]) < int64(i) {
+					break
+				}
+				bucketID = j
+				chunkNum = int(cr.ChunkNum[j])
+				stripeNum += cr.StripeNum[j] * int64(cr.ChunkNum[j])
+			}
+
+			if int64(i) < stripeNum {
+				break
+			}
+
+			stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
+			chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
+
+			buf.Reset()
+			if meta {
+				buf.WriteString(strconv.Itoa(-bucketID))
+			} else {
+				buf.WriteString(strconv.Itoa(bucketID))
+			}
+			buf.WriteString(metainfo.BlockDelimiter)
+			buf.WriteString(strconv.Itoa(stripeID))
+			buf.WriteString(metainfo.BlockDelimiter)
+			buf.WriteString(strconv.Itoa(chunkID))
+			blockID := buf.String()
+
+			segNum, ok := sizeMap[blockID]
+			if !ok {
+				if meta {
+					segNum = 1 // most likely
+				} else {
+					segNum = int(bops[bucketID].GetSegmentCount())
+				}
+			}
+
+			totalLength += int64(segNum * int(bops[bucketID].GetSegmentSize()))
+		}
+
+		if totalLength+int64(bucketNum*2*4096) < cr.GetTotalLength() || totalLength > cr.GetTotalLength() {
+			return false, sucCid, faultCid, ErrInvalidLength
+		}
+	}
+
+	res, err := blsKey.VerifyProof(chal, pf, true)
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+
+	if res {
+		cr.Res = true
+		cr.ChalLength = chalLength
+		cr.SuccessLength = int64((float64(slength) / float64(chalLength)) * float64(cr.TotalLength))
+		return true, sucCid, faultCid, nil
+	}
+	return false, sucCid, faultCid, nil
+}

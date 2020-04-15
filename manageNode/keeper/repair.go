@@ -561,6 +561,8 @@ func (k *Info) repairRegular(ctx context.Context) {
 	}()
 }
 
+// todo: consensus before repair
+
 // repairBlock works in 3 steps:
 // 1.search a new provider,we do it in func SearchNewProvider
 // 2.put chunk to this provider

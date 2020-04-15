@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
@@ -19,6 +18,7 @@ import (
 func (k *Info) challengeRegular(ctx context.Context) {
 	utils.MLogger.Info("Challenge service start!")
 	ticker := time.NewTicker(chalTime)
+	cdata := int64(0)
 	defer ticker.Stop()
 	for {
 		select {
@@ -56,23 +56,36 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				}
 
 				for _, proID := range thisGroup.providers {
-					key, value, err := thisGroup.genChallengeBLS(k.localID, pu.uid, pu.qid, proID, mtime)
-					if err != nil {
-						utils.MLogger.Infof("Challenge for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
-						continue
+					if cdata%2 == 0 {
+						key, value, err := thisGroup.genChallengeData(k.localID, pu.uid, pu.qid, proID, mtime)
+						if err != nil {
+							utils.MLogger.Infof("Challenge data for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
+							continue
+						}
+						utils.MLogger.Infof("Challenge data: %s", key)
+						k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
+					} else {
+						key, value, err := thisGroup.genChallengeMeta(k.localID, pu.uid, pu.qid, proID, mtime)
+						if err != nil {
+							utils.MLogger.Infof("Challenge meta for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
+							continue
+						}
+						utils.MLogger.Infof("Challenge meta: %s", key)
+						k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 					}
-					utils.MLogger.Infof("Challenge: %s", key)
-					k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
+
 				}
 
 				// in case povider cannot get it
 				go k.getUserBLS12Config(pu.uid, pu.qid)
+
+				cdata++
 			}
 		}
 	}
 }
 
-func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime int64) (string, []byte, error) {
+func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTime int64) (string, []byte, error) {
 	thisLinfo := g.getLInfo(proID, false)
 	if thisLinfo == nil {
 		return "", nil, role.ErrNotMyProvider
@@ -85,53 +98,35 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime
 
 	thisLinfo.inChallenge = true
 
-	bucketNum := g.bucketNum
-	stripeNum := (bucketNum + 1) * 3
+	bucketNum := g.bucketNum + 1
+	stripeNum := int64(0)
 	stripes := make([]int64, bucketNum)
 	chunks := make([]int32, bucketNum)
 
+	stripes[0] = 0
+	chunks[0] = 0
+
 	var res strings.Builder
 	cset := make(map[string]int)
-	bset := bitset.New(uint(stripeNum))
+	bset := bitset.New(0)
 	psum := 0
-	bitLen := uint(0)
-	// challenge superbucket
-	for i := 0; i <= int(bucketNum); i++ {
-		// superbucket 3 chunks and 4k segment
-		binfo := g.getBucketInfo(strconv.Itoa(-i), true)
-		if binfo == nil {
-			utils.MLogger.Infof("missing bucket %d info", -i)
-			continue
-		}
-		for j := 0; j < binfo.chunkNum; j++ {
-			res.Reset()
-			res.WriteString(strconv.Itoa(-i))
-			res.WriteString(metainfo.BlockDelimiter)
-			res.WriteString("0")
-			res.WriteString(metainfo.BlockDelimiter)
-			res.WriteString(strconv.Itoa(j))
-			cInfo, ok := thisLinfo.blockMap.Load(res.String())
-			if ok {
-				bset.Set(uint(i)*3 + uint(j))
-				bitLen = uint(i)*3 + uint(j)
-				psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
-				cset[res.String()] = cInfo.(*blockInfo).offset
-				bitLen = uint(i)*3 + uint(j)
-				break
-			}
-		}
-	}
 
 	// challenge buckets
-	for i := 1; i <= int(bucketNum); i++ {
+	for i := 1; i < int(bucketNum); i++ {
 		binfo := g.getBucketInfo(strconv.Itoa(i), false)
 		if binfo == nil {
 			utils.MLogger.Infof("missing bucket %d info", i)
 			continue
 		}
+		chunks[i] = int32(binfo.chunkNum)
+
 		// not challenge last one
 		count := binfo.curStripes
-		chunks[i-1] = int32(binfo.chunkNum)
+		if count <= 0 {
+			stripes[0] = 0
+			continue
+		}
+
 		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
 		for j := 0; j < count; j++ {
 			for k := 0; k < binfo.chunkNum; k++ {
@@ -144,7 +139,6 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime
 				cInfo, ok := thisLinfo.blockMap.Load(res.String())
 				if ok {
 					bset.Set(uint(stripeNum) + uint(j*binfo.chunkNum) + uint(k))
-					bitLen = uint(stripeNum) + uint(j*binfo.chunkNum) + uint(k)
 					psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
 					cset[res.String()] = cInfo.(*blockInfo).offset
 					break
@@ -153,7 +147,7 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime
 		}
 
 		bset.SetTo(uint(stripeNum)+uint(count*binfo.chunkNum), false)
-		stripes[i-1] = int64(count)
+		stripes[i] = int64(count)
 		stripeNum += int64(count * binfo.chunkNum)
 	}
 
@@ -164,8 +158,6 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime
 	}
 
 	challengetime := time.Now().Unix()
-
-	bset.Shrink(bitLen)
 
 	chunkMap, err := bset.MarshalBinary()
 	if err != nil {
@@ -178,6 +170,119 @@ func (g *groupInfo) genChallengeBLS(localID, userID, qid, proID string, rootTime
 
 	thischalresult := &mpb.ChalInfo{
 		Policy:      "smart", // use different policy; such as "1%"
+		KeeperID:    localID,
+		ProviderID:  proID,
+		QueryID:     qid,
+		UserID:      userID,
+		ChalTime:    challengetime,
+		RootTime:    rootTime,
+		TotalLength: thisLinfo.maxlength,
+		BucketNum:   bucketNum,
+		StripeNum:   stripes,
+		ChunkNum:    chunks,
+		ChunkMap:    chunkMap,
+	}
+
+	hByte, err := proto.Marshal(thischalresult)
+	if err != nil {
+		thisLinfo.inChallenge = false
+		return "", nil, err
+	}
+
+	thisLinfo.chalMap.Store(challengetime, thischalresult)
+	thisLinfo.lastChalTime = challengetime
+	thisLinfo.chalCid = cset
+
+	// key: qid/"Challenge"/uid/pid/kid/chaltime
+	km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, localID, utils.UnixToString(challengetime))
+	if err != nil {
+		return "", nil, err
+	}
+	return km.ToString(), hByte, nil
+}
+
+func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTime int64) (string, []byte, error) {
+	thisLinfo := g.getLInfo(proID, false)
+	if thisLinfo == nil {
+		return "", nil, role.ErrNotMyProvider
+	}
+
+	// last chanllenge has not complete
+	if thisLinfo.inChallenge {
+		thisLinfo.cleanLastChallenge()
+	}
+
+	thisLinfo.inChallenge = true
+
+	bucketNum := g.bucketNum + 1
+	stripeNum := int64(0)
+	stripes := make([]int64, bucketNum)
+	chunks := make([]int32, bucketNum)
+
+	var res strings.Builder
+	cset := make(map[string]int)
+	bset := bitset.New(0)
+	psum := 0
+
+	// challenge buckets
+	for i := 0; i < int(bucketNum); i++ {
+		binfo := g.getBucketInfo(strconv.Itoa(-i), false)
+		if binfo == nil {
+			utils.MLogger.Infof("missing bucket %d info", i)
+			continue
+		}
+		chunks[i] = int32(binfo.chunkNum)
+
+		// not challenge last one
+		count := binfo.curStripes + 1
+		if count <= 0 {
+			stripes[0] = 0
+			continue
+		}
+
+		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
+		for j := 0; j < count; j++ {
+			for k := 0; k < binfo.chunkNum; k++ {
+				res.Reset()
+				res.WriteString(strconv.Itoa(-i))
+				res.WriteString(metainfo.BlockDelimiter)
+				res.WriteString(strconv.Itoa(j))
+				res.WriteString(metainfo.BlockDelimiter)
+				res.WriteString(strconv.Itoa(k))
+				cInfo, ok := thisLinfo.blockMap.Load(res.String())
+				if ok {
+					bset.Set(uint(stripeNum) + uint(j*binfo.chunkNum) + uint(k))
+					psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
+					cset[res.String()] = cInfo.(*blockInfo).offset
+					break
+				}
+			}
+		}
+
+		bset.SetTo(uint(stripeNum)+uint(count*binfo.chunkNum), false)
+		stripes[i] = int64(count)
+		stripeNum += int64(count * binfo.chunkNum)
+	}
+
+	// no data
+	if psum == 0 {
+		thisLinfo.inChallenge = false
+		return "", nil, role.ErrEmptyData
+	}
+
+	challengetime := time.Now().Unix()
+
+	chunkMap, err := bset.MarshalBinary()
+	if err != nil {
+		return "", nil, err
+	}
+
+	if thisLinfo.maxlength < int64(psum) {
+		thisLinfo.maxlength = int64(psum)
+	}
+
+	thischalresult := &mpb.ChalInfo{
+		Policy:      "meta", // use different policy; such as "1%"
 		KeeperID:    localID,
 		ProviderID:  proID,
 		QueryID:     qid,
@@ -288,253 +393,13 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
-	fset := bitset.New(0)
-	bset := bitset.New(0)
-	flength := uint(0)
+	chalResult.BlsProof = strings.Join(spliteProof[:3], metainfo.DELIMITER)
+
 	if len(spliteProof) == 4 {
 		fmap, err := b58.Decode(spliteProof[3])
 		if err == nil {
-			fset.UnmarshalBinary(fmap)
-			flength = fset.Len()
 			chalResult.FailMap = fmap
 		}
-	}
-
-	err := bset.UnmarshalBinary(chalResult.ChunkMap)
-	if err != nil {
-		utils.MLogger.Warnf("handleProof: %s fails: %s", km.ToString(), err)
-		return
-	}
-
-	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(chalResult)
-
-	chalNum := bset.Count()
-
-	switch chalResult.GetPolicy() {
-	case "100":
-		chalNum = 100
-	case "1%":
-		chalNum = chalNum / 100
-	case "smart":
-		if chalNum/100 < 100 {
-			chalNum = 100
-		} else {
-			chalNum = chalNum / 100
-		}
-	default:
-	}
-
-	startPos := uint(chal.Seed) % bset.Len()
-	if startPos < uint(chalResult.GetBucketNum()+1)*3 {
-		startPos = uint(chalResult.GetBucketNum()+1) * 3
-	}
-
-	var slength, chalLength int64 //success length
-	var electedOffset int
-	var buf strings.Builder
-
-	bucketID := 0
-	stripeID := 1
-	chunkID := 0
-	failThenSucset := make(map[string]struct{})
-	for i, e := bset.NextSet(0); e && i < uint(chalResult.BucketNum+1)*3; i, e = bset.NextSet(i + 1) {
-		buf.Reset()
-		bucketID = -int(i / 3)
-		stripeID = 0
-		chunkID = int(i % 3)
-		buf.WriteString(strconv.Itoa(bucketID))
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(stripeID))
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(chunkID))
-		blockID := buf.String()
-
-		segNum, ok := thisLinfo.chalCid[blockID]
-		if !ok {
-			continue
-		}
-		chalLength += int64(segNum * 4096)
-
-		if flength != 0 && !fset.Test(i) {
-			thisLinfo.faultCid.Store(blockID, struct{}{})
-			continue
-		}
-
-		_, ok = thisLinfo.faultCid.Load(blockID)
-		if ok {
-			failThenSucset[blockID] = struct{}{}
-		}
-
-		slength += int64(segNum * 4096)
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
-
-		buf.Reset()
-		buf.WriteString(qid)
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(blockID)
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(electedOffset))
-		chal.Indices = append(chal.Indices, buf.String())
-	}
-
-	count := uint(0)
-	bucketID = 1
-	chunkNum := chalResult.GetChunkNum()[0]
-	stripeNum := 3 * (chalResult.GetBucketNum() + 1)
-	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
-		count++
-		for j := bucketID; j <= int(chalResult.GetBucketNum()); j++ {
-			if stripeNum+chalResult.GetStripeNum()[j-1]*int64(chalResult.GetChunkNum()[j-1]) < int64(i) {
-				break
-			}
-			bucketID = j
-			chunkNum = chalResult.GetChunkNum()[j-1]
-			stripeNum += chalResult.GetStripeNum()[j-1] * int64(chalResult.GetChunkNum()[j-1])
-		}
-
-		if int64(i) < stripeNum {
-			break
-		}
-
-		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
-		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
-
-		buf.Reset()
-		buf.WriteString(strconv.Itoa(bucketID))
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(stripeID))
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(chunkID))
-		blockID := buf.String()
-
-		segNum, ok := thisLinfo.chalCid[blockID]
-		if !ok {
-			continue
-		}
-
-		bi := thisGroup.getBucketInfo(strconv.Itoa(bucketID), false)
-		if bi == nil {
-			continue
-		}
-
-		chalLength += int64(segNum * int(bi.bops.GetSegmentSize()))
-
-		if flength != 0 && !fset.Test(i) {
-			thisLinfo.faultCid.Store(blockID, struct{}{})
-			continue
-		}
-
-		_, ok = thisLinfo.faultCid.Load(blockID)
-		if ok {
-			failThenSucset[blockID] = struct{}{}
-		}
-
-		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
-
-		buf.Reset()
-		buf.WriteString(qid)
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(blockID)
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(electedOffset))
-		chal.Indices = append(chal.Indices, buf.String())
-
-		if count > chalNum {
-			break
-		}
-	}
-
-	for i, e := bset.NextSet(uint(chalResult.BucketNum+1) * 3); e && i < startPos; i, e = bset.NextSet(i + 1) {
-		if count > chalNum {
-			break
-		}
-		count++
-		for j := bucketID; j <= int(chalResult.GetBucketNum()); j++ {
-			if stripeNum+chalResult.GetStripeNum()[j-1]*int64(chalResult.GetChunkNum()[j-1]) < int64(i) {
-				break
-			}
-			bucketID = j
-			chunkNum = chalResult.GetChunkNum()[j-1]
-			stripeNum += chalResult.GetStripeNum()[j-1] * int64(chalResult.GetChunkNum()[j-1])
-		}
-
-		if int64(i) < stripeNum {
-			break
-		}
-
-		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
-		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
-
-		buf.Reset()
-		buf.WriteString(strconv.Itoa(bucketID))
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(stripeID))
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(chunkID))
-		blockID := buf.String()
-
-		segNum, ok := thisLinfo.chalCid[blockID]
-		if !ok {
-			continue
-		}
-
-		bi := thisGroup.getBucketInfo(strconv.Itoa(bucketID), false)
-		if bi == nil {
-			continue
-		}
-
-		chalLength += int64(segNum * int(bi.bops.GetSegmentSize()))
-
-		if flength != 0 && !fset.Test(i) {
-			thisLinfo.faultCid.Store(blockID, struct{}{})
-			continue
-		}
-
-		_, ok = thisLinfo.faultCid.Load(blockID)
-		if ok {
-			failThenSucset[blockID] = struct{}{}
-		}
-
-		slength += int64(segNum * int(bi.bops.GetSegmentSize()))
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
-
-		buf.Reset()
-		buf.WriteString(qid)
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(blockID)
-		buf.WriteString(metainfo.BlockDelimiter)
-		buf.WriteString(strconv.Itoa(electedOffset))
-		chal.Indices = append(chal.Indices, buf.String())
-
-		if count > chalNum {
-			break
-		}
-	}
-
-	// recheck the status again
-	if len(chal.Indices) == 0 {
-		utils.MLogger.Warnf("handleProof: %s fails: chal empty", km.ToString())
-		return
-	}
-
-	muByte, err := b58.Decode(spliteProof[0])
-	if err != nil {
-		return
-	}
-	nuByte, err := b58.Decode(spliteProof[1])
-	if err != nil {
-		return
-	}
-	deltaByte, err := b58.Decode(spliteProof[2])
-	if err != nil {
-		return
-	}
-	pf := &mcl.Proof{
-		Mu:    muByte,
-		Nu:    nuByte,
-		Delta: deltaByte,
 	}
 
 	blsKey, err := k.getUserBLS12Config(userID, qid)
@@ -542,10 +407,27 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
-	res, err := blsKey.VerifyProof(chal, pf, true)
+	var bops []*mpb.BucketOptions
+	for i := 0; i < int(chalResult.GetBucketNum()); i++ {
+		if chalResult.GetPolicy() == "meta" {
+			bi := thisGroup.getBucketInfo(strconv.Itoa(-i), false)
+			if bi == nil {
+				return
+			}
+			bops = append(bops, bi.bops)
+		} else {
+			bi := thisGroup.getBucketInfo(strconv.Itoa(i), false)
+			if bi == nil {
+				return
+			}
+			bops = append(bops, bi.bops)
+		}
+	}
+
+	sizeMap := thisLinfo.chalCid
+	res, sucCids, faultCids, err := role.VerifyChallenge(chalResult, blsKey, sizeMap, bops, false)
 	if err != nil {
 		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, " verify fails: ", err)
-		utils.MLogger.Warn("verify blocks: ", chal.Indices)
 		return
 	}
 
@@ -555,11 +437,15 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
 
-		for key := range failThenSucset {
+		for _, key := range sucCids {
 			_, ok := thisLinfo.faultCid.Load(key)
 			if ok {
 				thisLinfo.faultCid.Delete(key)
 			}
+		}
+
+		for _, key := range faultCids {
+			thisLinfo.faultCid.Store(key, struct{}{})
 		}
 
 		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
@@ -574,22 +460,15 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 			return true
 		})
 
-		chalResult.Res = true
-		chalResult.ChalLength = chalLength
-		chalResult.SuccessLength = int64((float64(slength) / float64(chalLength)) * float64(chalResult.TotalLength))
 		proInfo.(*pInfo).credit += 2
 		if proInfo.(*pInfo).credit > 100 {
 			proInfo.(*pInfo).credit = 100
 		}
 	} else {
-		chalResult.Res = false
-		chalResult.SuccessLength = 0
 		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
 	}
 
 	//update thischalinfo.chalMap
-	chalResult.BlsProof = strings.Join(spliteProof[:3], metainfo.DELIMITER)
-
 	hByte, err := proto.Marshal(chalResult)
 	if err != nil {
 		return

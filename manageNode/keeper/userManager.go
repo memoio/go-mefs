@@ -150,6 +150,7 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 			if err != nil {
 				return nil
 			}
+
 			if bid > 0 {
 				bop = df.DefaultBucketOptions()
 			}

@@ -36,5 +36,8 @@ var (
 	ErrEmptyPrivateKey = errors.New("Empty private key")
 	ErrEmptyBlsKey     = errors.New("Empty blskey")
 
+	ErrInvalidInput  = errors.New("Input is invalid")
+	ErrInvalidLength = errors.New("Length is invalid")
+
 	ErrTestUser = errors.New("Test user")
 )
