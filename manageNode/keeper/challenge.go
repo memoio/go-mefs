@@ -55,6 +55,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 					}
 				}
 
+				utils.MLogger.Infof("Challenge for user %s fsID %s at rootTime %d", pu.uid, pu.qid, mtime)
 				for _, proID := range thisGroup.providers {
 					if cdata%2 == 0 {
 						key, value, err := thisGroup.genChallengeData(k.localID, pu.uid, pu.qid, proID, mtime)
@@ -78,9 +79,8 @@ func (k *Info) challengeRegular(ctx context.Context) {
 
 				// in case povider cannot get it
 				go k.getUserBLS12Config(pu.uid, pu.qid)
-
-				cdata++
 			}
+			cdata++
 		}
 	}
 }

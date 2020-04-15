@@ -313,7 +313,6 @@ func GenChallenge(chal *mpb.ChalInfo) int64 {
 	newHash.Write([]byte(chal.GetUserID()))
 	newHash.Write([]byte(chal.GetProviderID()))
 	newHash.Write([]byte(chal.GetKeeperID()))
-
 	newHash.Write([]byte(strconv.FormatInt(chal.GetRootTime(), 10)))
 	newHash.Write([]byte(strconv.FormatInt(chal.GetChalTime(), 10)))
 	newHash.Write([]byte(strconv.FormatInt(chal.GetTotalLength(), 10)))
