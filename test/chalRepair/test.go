@@ -233,7 +233,7 @@ func challengeTest() error {
 		return err
 	}
 
-	log.Println("successfully delete block :", cid, " in provider: ", pro[0])
+	log.Println("successfully delete block :", cid[0], " in provider: ", pro[0])
 
 	// read whole file again
 	outer, err := sh.GetObject(objectName, bucketName, shell.SetAddress(addr))
