@@ -149,7 +149,7 @@ func challengeTest() error {
 
 	qid := uid
 	if flag {
-		log.Println("conatracts has endpoint: ")
+		log.Println("conatracts has endpoint: ", contracts.EndPoint)
 		qItem, err := role.GetLatestQuery(uid)
 		if err != nil {
 			log.Println("got query from", uid, "fails: ", err)
@@ -183,6 +183,7 @@ func challengeTest() error {
 			resPid, err := sh.GetFrom(blockMeta, keeper)
 			if err == nil {
 				provider = strings.Split(resPid.Extra, metainfo.DELIMITER)[0]
+				pro[i] = provider
 				log.Println("provider is: ", provider)
 				break
 			} else {

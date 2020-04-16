@@ -19,6 +19,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 	utils.MLogger.Info("Challenge service start!")
 	ticker := time.NewTicker(chalTime)
 	cdata := int64(0)
+	count := 0
 	defer ticker.Stop()
 	for {
 		select {
@@ -56,6 +57,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				}
 
 				utils.MLogger.Infof("Challenge for user %s fsID %s at rootTime %d", pu.uid, pu.qid, mtime)
+				count = 0
 				for _, proID := range thisGroup.providers {
 					if cdata%2 == 0 {
 						key, value, err := thisGroup.genChallengeData(k.localID, pu.uid, pu.qid, proID, mtime)
@@ -63,6 +65,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 							utils.MLogger.Infof("Challenge data for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
 							continue
 						}
+						count++
 						utils.MLogger.Infof("Challenge data: %s", key)
 						k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 					} else {
@@ -71,14 +74,17 @@ func (k *Info) challengeRegular(ctx context.Context) {
 							utils.MLogger.Infof("Challenge meta for user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
 							continue
 						}
+						count++
 						utils.MLogger.Infof("Challenge meta: %s", key)
 						k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 					}
 
 				}
 
-				// in case povider cannot get it
-				go k.getUserBLS12Config(pu.uid, pu.qid)
+				if count > 0 {
+					// in case povider cannot get it
+					go k.getUserBLS12Config(pu.uid, pu.qid)
+				}
 			}
 			cdata++
 		}

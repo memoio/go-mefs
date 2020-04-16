@@ -268,6 +268,7 @@ func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (l *LfsInfo) persistRoot(ctx context.Context) error {
 	utils.MLogger.Infof("Persist Lfs root %s is ready for: %s", l.fsID, l.userID)
+	l.genRoot()
 	tick := time.NewTicker(30 * time.Minute)
 	defer tick.Stop()
 	for {
@@ -422,7 +423,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	}
 
 	if !l.writable {
-		return nil
+		return ErrLfsReadOnly
 	}
 
 	err := l.flushSuperBlock(isForce)

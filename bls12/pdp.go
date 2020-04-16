@@ -140,10 +140,10 @@ func GenKeySetWithSeed(seed []byte, tagCount, count int) (*KeySet, error) {
 // GenKeySet create instance
 func GenKeySet() (*KeySet, error) {
 	pk := &PublicKey{
-		Count:    PDPCount,
-		TagCount: TagAtomNum,
-		ElemG1s:  make([]G1, TagAtomNum),
-		ElemG2s:  make([]G2, PDPCount),
+		Count:    PDPCountV1,
+		TagCount: TagAtomNumV1,
+		ElemG1s:  make([]G1, TagAtomNumV1),
+		ElemG2s:  make([]G2, PDPCountV1),
 	}
 	sk := new(SecretKey)
 	ks := &KeySet{pk, sk}

@@ -148,7 +148,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
 		if err != nil {
-			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, chal.Seed, err)
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
 			bset.SetTo(i, false)
 			failchunk = true
 			continue
@@ -227,7 +227,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
 		if err != nil {
-			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, chal.Seed, err)
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
 			bset.SetTo(i, false)
 			failchunk = true
 			continue

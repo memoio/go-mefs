@@ -98,7 +98,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	bucket := newsuperBucket(binfo, true)
 
 	bucket.mtree.SetIndex(0)
-	bucket.mtree.Push([]byte(l.fsID + bucketName))
+	bucket.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
 
 	//将此Bucket信息添加到LFS中
 	l.meta.sb.NextBucketID++
