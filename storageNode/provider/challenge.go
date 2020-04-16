@@ -50,6 +50,14 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return role.ErrInvalidInput
 	}
 
+	// incase get block has no group info
+	go func() {
+		_, ok := p.fsGroup.Load(fsID)
+		if !ok {
+			p.getGroupInfo(userID, fsID, true)
+		}
+	}()
+
 	blskey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {
 		utils.MLogger.Warnf("get new user %s config from failed: %s ", fsID, err)
