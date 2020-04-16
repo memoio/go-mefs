@@ -149,7 +149,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
 		if err != nil {
 			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
-			bset.SetTo(i, false)
 			failchunk = true
 			continue
 		}
@@ -157,7 +156,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
 		if !isTrue {
 			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
-			bset.SetTo(i, false)
 			failchunk = true
 			continue
 		}
@@ -168,6 +166,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(segStart))
 		chal.Indices = append(chal.Indices, buf.String())
+		bset.SetTo(i, false)
 		if count > chalNum {
 			break
 		}
@@ -228,7 +227,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
 		if err != nil {
 			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
-			bset.SetTo(i, false)
 			failchunk = true
 			continue
 		}
@@ -236,7 +234,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
 		if !isTrue {
 			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
-			bset.SetTo(i, false)
 			failchunk = true
 			continue
 		}
@@ -247,6 +244,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		buf.WriteString(metainfo.BlockDelimiter)
 		buf.WriteString(strconv.Itoa(segStart))
 		chal.Indices = append(chal.Indices, buf.String())
+		bset.SetTo(i, false)
 		if count > chalNum {
 			break
 		}
@@ -287,7 +285,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
+	_, err = p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
 	if err != nil {
 		utils.MLogger.Info("send proof err: ", err)
 	}

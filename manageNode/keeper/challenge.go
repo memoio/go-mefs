@@ -354,6 +354,29 @@ func (l *lInfo) cleanLastChallenge() {
 
 	chalResult := thischalresult.(*mpb.ChalInfo)
 	chalResult.Res = false
+	chalResult.FailMap = chalResult.ChunkMap
+	_, sucCids, faultCids, err := role.VerifyChallenge(chalResult, nil, false)
+	if err != nil {
+		faultCids = append(faultCids, sucCids...)
+		sucCids = nil
+	}
+
+	if len(sucCids) > 0 {
+		utils.MLogger.Debugf("proof of %s has sucCids: %s", chalResult.GetQueryID(), sucCids)
+		for _, key := range sucCids {
+			_, ok := l.faultCid.Load(key)
+			if ok {
+				l.faultCid.Delete(key)
+			}
+		}
+	}
+
+	if len(faultCids) > 0 {
+		utils.MLogger.Debugf("proof of %s has faultCids: %s", chalResult.GetQueryID(), faultCids)
+		for _, key := range faultCids {
+			l.faultCid.Store(key, struct{}{})
+		}
+	}
 
 	l.inChallenge = false
 }
@@ -437,15 +460,26 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	res, sucCids, faultCids, err := role.VerifyChallenge(chalResult, blsKey, false)
 	if err != nil {
 		utils.MLogger.Error("proof of ", qid, " from provider: ", proID, " verify fails: ", err)
-		return
-	}
-
-	if len(faultCids) > 0 {
-		utils.MLogger.Debug("proof of %s has faultCids: %s", km.ToString(), faultCids)
+		faultCids = append(faultCids, sucCids...)
+		sucCids = nil
 	}
 
 	if len(sucCids) > 0 {
-		utils.MLogger.Debug("proof of %s has sucCids: %s", km.ToString(), sucCids)
+		utils.MLogger.Debugf("proof of %s has sucCids: %s", km.ToString(), sucCids)
+		for _, key := range sucCids {
+			_, ok := thisLinfo.faultCid.Load(key)
+			if ok {
+				thisLinfo.faultCid.Delete(key)
+			}
+		}
+	}
+
+	if len(faultCids) > 0 {
+		utils.MLogger.Debugf("proof of %s has faultCids: %s", km.ToString(), faultCids)
+		for _, key := range faultCids {
+			thisLinfo.faultCid.Store(key, struct{}{})
+		}
+
 	}
 
 	if res {
@@ -453,18 +487,6 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 		// update thischalinfo.cidMap;
 		// except fault blocks, others are considered as "good"
-
-		for _, key := range sucCids {
-			_, ok := thisLinfo.faultCid.Load(key)
-			if ok {
-				thisLinfo.faultCid.Delete(key)
-			}
-		}
-
-		for _, key := range faultCids {
-			thisLinfo.faultCid.Store(key, struct{}{})
-		}
-
 		thisLinfo.blockMap.Range(func(k, v interface{}) bool {
 			_, ok = thisLinfo.faultCid.Load(k.(string))
 			if ok {

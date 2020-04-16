@@ -548,6 +548,10 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 				continue
 			}
 
+			if !chalRes.Res {
+				continue
+			}
+
 			utils.MLogger.Infof("Found chalresult at %s", time.Unix(chalTime, 0).Format(utils.BASETIME))
 
 			// only need successLength for stpay

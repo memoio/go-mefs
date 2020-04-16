@@ -23,17 +23,10 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		return false, sucCid, faultCid, ErrInvalidInput
 	}
 
-	spliteProof := strings.Split(cr.GetBlsProof(), metainfo.DELIMITER)
-	if len(spliteProof) != 3 {
-		return false, sucCid, faultCid, ErrInvalidInput
-	}
-
 	fset := bitset.New(0)
 	bset := bitset.New(0)
-	flength := uint(0)
 	if cr.GetFailMap() != nil {
 		fset.UnmarshalBinary(cr.GetFailMap())
-		flength = fset.Len()
 	}
 
 	err := bset.UnmarshalBinary(cr.ChunkMap)
@@ -108,7 +101,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 
 		chalLength += chunkSize
 
-		if flength != 0 && !fset.Test(i) {
+		if fset.Test(i) {
 			faultCid = append(faultCid, blockID)
 			continue
 		}
@@ -173,7 +166,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 
 		chalLength += chunkSize
 
-		if flength != 0 && !fset.Test(i) {
+		if fset.Test(i) {
 			faultCid = append(faultCid, blockID)
 			continue
 		}
@@ -198,26 +191,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 
 	// recheck the status again
 	if len(chal.Indices) == 0 {
-		return false, sucCid, faultCid, nil
-	}
-
-	muByte, err := b58.Decode(spliteProof[0])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-	nuByte, err := b58.Decode(spliteProof[1])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-	deltaByte, err := b58.Decode(spliteProof[2])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-
-	pf := &mcl.Proof{
-		Mu:    muByte,
-		Nu:    nuByte,
-		Delta: deltaByte,
+		return false, sucCid, faultCid, ErrEmptyData
 	}
 
 	// verify totalLength
@@ -247,6 +221,33 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		}
 	}
 
+	if blsKey == nil {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+
+	spliteProof := strings.Split(cr.GetBlsProof(), metainfo.DELIMITER)
+	if len(spliteProof) != 3 {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+	muByte, err := b58.Decode(spliteProof[0])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+	nuByte, err := b58.Decode(spliteProof[1])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+	deltaByte, err := b58.Decode(spliteProof[2])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+
+	pf := &mcl.Proof{
+		Mu:    muByte,
+		Nu:    nuByte,
+		Delta: deltaByte,
+	}
+
 	res, err := blsKey.VerifyProof(chal, pf, true)
 	if err != nil {
 		return false, sucCid, faultCid, err
@@ -258,5 +259,10 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		cr.SuccessLength = int64((float64(slength) / float64(chalLength)) * float64(cr.TotalLength))
 		return true, sucCid, faultCid, nil
 	}
+
+	cr.Res = false
+	cr.SuccessLength = 0
+	faultCid = append(faultCid, sucCid...)
+	sucCid = nil
 	return false, sucCid, faultCid, nil
 }
