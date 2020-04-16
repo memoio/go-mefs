@@ -35,6 +35,10 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 					continue
 				}
 
+				if !gp.isMaster(pu.qid) {
+					return
+				}
+
 				if gp.upkeeping.EndTime < time.Now().Unix() {
 					utils.MLogger.Infof("Repair for user %s fsID %s upkeeping has expired", pu.uid, pu.qid)
 					continue

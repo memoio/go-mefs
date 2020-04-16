@@ -54,6 +54,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 				utils.MLogger.Error("repair response err :", err)
 				return err
 			}
+			return nil
 		}
 	}
 
