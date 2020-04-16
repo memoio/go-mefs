@@ -441,7 +441,11 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	}
 
 	if len(faultCids) > 0 {
-		utils.MLogger.Info("proof of %s has faultcid: %s", km.ToString(), faultCids)
+		utils.MLogger.Debug("proof of %s has faultCids: %s", km.ToString(), faultCids)
+	}
+
+	if len(sucCids) > 0 {
+		utils.MLogger.Debug("proof of %s has sucCids: %s", km.ToString(), sucCids)
 	}
 
 	if res {
