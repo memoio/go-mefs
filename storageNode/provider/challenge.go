@@ -87,6 +87,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		}
 	case "meta":
 		meta = true
+		utils.MLogger.Info("handle meta challenge: ", km.ToString(), " from: ", from)
 	default:
 	}
 

@@ -258,7 +258,7 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 		bi := &mpb.BucketContent{
 			ChunkNum:  int32(binfo.chunkNum),
 			StripeNum: int64(count),
-			SegCount:  binfo.bops.GetSegmentCount(),
+			SegCount:  1, // only challenge first seg?
 			SegSize:   binfo.bops.GetSegmentSize(),
 		}
 

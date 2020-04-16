@@ -798,15 +798,6 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 		tagNum := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
 		fieldSize := int(pre.Bopts.SegmentSize + tagNum*int32(tagSize))
 
-		segs := (fileSize - int64(preLen)) / int64(fieldSize)
-
-		// for challenge
-		if segLength == 1 {
-			if segStart > segs {
-				segStart %= segs
-			}
-		}
-
 		start := preLen + int(segStart)*fieldSize
 		if fileSize < int64(start+fieldSize*segLength) {
 			return nil, dataformat.ErrDataTooShort
