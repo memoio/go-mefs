@@ -440,6 +440,10 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
+	if len(faultCids) > 0 {
+		utils.MLogger.Info("proof of %s has faultcid: %s", km.ToString(), faultCids)
+	}
+
 	if res {
 		utils.MLogger.Info("proof of ", qid, " from provider: ", proID, " verify success.")
 
