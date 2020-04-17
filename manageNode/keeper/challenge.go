@@ -117,6 +117,8 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 		bc[i] = bi
 	}
 
+	challengetime := time.Now().Unix()
+
 	var res strings.Builder
 	cset := make(map[string]int)
 	bset := bitset.New(0)
@@ -135,6 +137,26 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 		count := binfo.curStripes
 		if count <= 0 {
 			continue
+		}
+
+		for k := 0; k < binfo.chunkNum; k++ {
+			res.Reset()
+			res.WriteString(strconv.Itoa(i))
+			res.WriteString(metainfo.BlockDelimiter)
+			res.WriteString(strconv.Itoa(count))
+			res.WriteString(metainfo.BlockDelimiter)
+			res.WriteString(strconv.Itoa(k))
+			cInfo, ok := thisLinfo.blockMap.Load(res.String())
+			if ok {
+				if cInfo.(*blockInfo).offset != int(binfo.bops.GetSegmentCount()) {
+					cInfo.(*blockInfo).availtime = challengetime
+				} else {
+					// segment is full
+					if k == 0 {
+						count++
+					}
+				}
+			}
 		}
 
 		bi := &mpb.BucketContent{
@@ -173,8 +195,6 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 		thisLinfo.inChallenge = false
 		return "", nil, role.ErrEmptyData
 	}
-
-	challengetime := time.Now().Unix()
 
 	chunkMap, err := bset.MarshalBinary()
 	if err != nil {
@@ -479,7 +499,6 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		for _, key := range faultCids {
 			thisLinfo.faultCid.Store(key, struct{}{})
 		}
-
 	}
 
 	if res {

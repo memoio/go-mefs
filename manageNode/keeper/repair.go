@@ -36,7 +36,7 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 				}
 
 				if !gp.isMaster(pu.qid) {
-					return
+					continue
 				}
 
 				if gp.upkeeping.EndTime < time.Now().Unix() {
