@@ -10,6 +10,7 @@ import (
 	"io"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	mcl "github.com/memoio/go-mefs/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/utils/address"
@@ -26,6 +27,37 @@ var TestCmd = &cmds.Command{
 		"helloworld":  helloWorldCmd, //命令行操作写法示例
 		"localinfo":   infoCmd,
 		"showBalance": showBalanceCmd, //用于测试，查看自己的余额或者指定账户的余额
+		"mcl":         mclCmd,
+	},
+}
+
+var mclCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "test mcl lib",
+		ShortDescription: `test mcl lib
+	`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Options:   []cmds.Option{},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+
+		err := mcl.Init(mcl.BLS12_381)
+		if err != nil {
+			panic(err)
+		}
+
+		list := &StringList{
+			ChildLists: []string{"mcl is ok!"},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
 	},
 }
 

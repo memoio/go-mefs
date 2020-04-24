@@ -6,6 +6,7 @@
 package commands
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"math/big"
@@ -25,6 +26,15 @@ const (
 
 type StringList struct {
 	ChildLists []string
+}
+
+func (fl StringList) String() string {
+	var buffer bytes.Buffer
+	for i := 0; i < len(fl.ChildLists); i++ {
+		buffer.WriteString(fl.ChildLists[i])
+		buffer.WriteString("\n")
+	}
+	return buffer.String()
 }
 
 var ContractCmd = &cmds.Command{
