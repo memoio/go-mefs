@@ -125,7 +125,10 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 		QueryID: sl.QueryID,
 	}
 
-	decoder := dataformat.NewDataCoderWithPrefix(sul.keySet, bopt)
+	decoder, err := dataformat.NewDataCoderWithPrefix(sul.keySet, bopt)
+	if err != nil {
+		return err
+	}
 
 	dl := &downloadTask{
 		bucketID:     sl.BucketID,

@@ -501,7 +501,10 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 }
 
 func (l *LfsInfo) putDataToBlocks(data []byte, metaBackupCount int, buc, stripe string) error {
-	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
+	enc, err := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
+	if err != nil {
+		return err
+	}
 
 	bm, err := metainfo.NewBlockMeta(l.fsID, buc, stripe, "0")
 	if err != nil {
@@ -547,10 +550,12 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 		return nil, role.ErrEmptyBlsKey
 	}
 
-	enc := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
+	enc, err := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
+	if err != nil {
+		return nil, err
+	}
 
 	var data []byte
-
 	bm, err := metainfo.NewBlockMeta(l.fsID, buc, stripe, "0")
 	if err != nil {
 		return nil, err

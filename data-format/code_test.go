@@ -33,7 +33,10 @@ func BenchmarkEncode(b *testing.B) {
 		log.Fatal(err)
 	}
 
-	opt := NewDataCoderWithDefault(keyset, RsPolicy, 3, 2, userID, userID)
+	opt, err := NewDataCoderWithDefault(keyset, RsPolicy, 3, 2, userID, userID)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	data := make([]byte, 4096*3)
 	fillRandom(data)
@@ -58,7 +61,10 @@ func CodeAndRepair(policy, dc, pc, size int) {
 		log.Fatal(err)
 	}
 
-	opt := NewDataCoderWithDefault(keyset, policy, dc, pc, userID, userID)
+	opt, err := NewDataCoderWithDefault(keyset, policy, dc, pc, userID, userID)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	dlen := size
 

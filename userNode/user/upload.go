@@ -188,7 +188,10 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		QueryID: l.fsID,
 	}
 
-	encoder := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
+	encoder, err := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
+	if err != nil {
+		return nil, err
+	}
 
 	//append Object
 	opart := &mpb.ObjectPart{
@@ -214,7 +217,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 		ul.sKey = aes.CreateAesKey([]byte(l.privateKey), []byte(l.fsID), bucket.BucketID, object.GetInfo().GetObjectID())
 	}
 
-	err := ul.Start(ctx)
+	err = ul.Start(ctx)
 	if err != nil {
 		utils.MLogger.Infof("Add data to object: %s in bucket: %s fails %s", object.GetInfo().GetName(), bucket.GetName(), err)
 		return &object.ObjectInfo, err

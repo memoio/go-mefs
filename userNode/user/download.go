@@ -106,7 +106,10 @@ func (l *LfsInfo) GetObject(ctx context.Context, bucketName, objectName string, 
 		QueryID: l.fsID,
 	}
 
-	decoder := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
+	decoder, err := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
+	if err != nil {
+		return err
+	}
 
 	dl := &downloadTask{
 		bucketID:     bucket.BucketID,

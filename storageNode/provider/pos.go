@@ -250,14 +250,14 @@ func (p *Info) doGenerateOrDelete() {
 
 // generatePosBlocks generate block accoding to the free space
 func (p *Info) generatePosBlocks(increaseSpace uint64) {
-	utils.MLogger.Info("generate pos blcoks")
+	utils.MLogger.Info("generate pos blocks for space: %d", increaseSpace)
 
 	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
 	if err != nil {
 		return
 	}
 
-	var totalIncreased uint64
+	totalIncreased := uint64(0)
 	for {
 		if totalIncreased >= increaseSpace {
 			break
@@ -276,7 +276,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
 		data, offset, err := opt.Encode(tmpData, posCidPrefix, 0)
 		if err != nil {
-			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error :", err)
+			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error: ", err)
 			continue
 		}
 
@@ -326,7 +326,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 }
 
 func (p *Info) deletePosBlocks(decreseSpace uint64) {
-	utils.MLogger.Info("data is about to exceed the space limit, delete pos blcoks")
+	utils.MLogger.Info("data is about to exceed the space limit, delete pos blocks")
 
 	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
 	if err != nil {
