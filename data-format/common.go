@@ -113,7 +113,11 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, i
 
 	noPreRawdata := data[preLen:]
 
-	count := 1 + (len(noPreRawdata)-1)/d.fieldSize
+	count := len(noPreRawdata) / d.fieldSize
+	if count <= 0 {
+		utils.MLogger.Errorf("%s has short len: %d", ncid, len(noPreRawdata))
+		return nil, nil, 0, false
+	}
 
 	segments := make([][]byte, count)
 	tags := make([][]byte, count)
@@ -126,7 +130,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, i
 
 	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
 	if !ok || err != nil {
-		//utils.MLogger.Error("Tag is wrong: ", err)
+		utils.MLogger.Error("Tag is wrong: ", err)
 		return nil, nil, 0, false
 	}
 	return segments, tags, int(pre.Start), true
