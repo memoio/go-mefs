@@ -435,7 +435,7 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	}
 
 	if !l.writable {
-		// load meta from remote
+		// update meta from remote for readonly
 		l.loadMeta(true)
 		return ErrLfsReadOnly
 	}

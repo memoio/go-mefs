@@ -49,7 +49,8 @@ type superBucket struct {
 	Objects       *rbtree.Tree
 	DeletedObject []*ObjectInfo
 	obMetaCache   []byte
-	obCacheSize   int //obMetaCache 已经用了多少
+	obCacheSize   int //obMetaCintache 已经用了多少
+	applyOpID     int64
 	dirty         bool
 	sync.RWMutex
 	mtree *mt.Tree
@@ -173,43 +174,53 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 func (l *LfsInfo) loadSuperBlock(update bool) error {
 	utils.MLogger.Info("Load superblock: ", l.fsID, " for user:", l.userID)
 
-	data, _ := readFromMeta(l.fsID, "0")
-	datagot, _ := l.getDataFromBlock(int(defaultMetaBackupCount), "0", "0")
-	if len(datagot) > len(data) {
-		data = datagot
-		writeToMeta(data, l.fsID, "0")
-	} else {
-		// no update data
-		if update {
-			return nil
+	localSb := mpb.SuperBlockInfo{}
+	lm := &lfsMeta{
+		sb: &superBlock{
+			SuperBlockInfo: localSb,
+			dirty:          false,
+		},
+		buckets:        make(map[string]*superBucket),
+		bucketIDToName: make(map[int64]string),
+	}
+
+	if !update {
+		l.meta = lm
+		// read from local at start
+		ldata, _ := readFromMeta(l.fsID, "0")
+		if len(ldata) > 0 {
+			sdReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
+			err := sdReader.ReadMsg(&localSb)
+			if err != nil {
+				utils.MLogger.Info("Protobuf ReadMsg local fail: ", err)
+			}
 		}
 	}
 
-	if len(data) > 0 {
-		pbSuperBlock := mpb.SuperBlockInfo{}
-		SbBuffer := bytes.NewBuffer(data)
-		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, len(data))
-		err := SbDelimitedReader.ReadMsg(&pbSuperBlock)
+	remoteSb := mpb.SuperBlockInfo{}
+	rdata, _ := l.getDataFromBlock(int(defaultMetaBackupCount), "0", "0")
+	if len(rdata) > 0 {
+		sdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
+		err := sdReader.ReadMsg(&remoteSb)
 		if err != nil {
-			utils.MLogger.Info("Protobuf ReadMsg fail: ", err)
-			return err
+			utils.MLogger.Info("Protobuf ReadMsg remote fail: ", err)
 		}
+	}
 
-		lm := &lfsMeta{
-			sb: &superBlock{
-				SuperBlockInfo: pbSuperBlock,
-				dirty:          false,
-			},
-			buckets:        make(map[string]*superBucket),
-			bucketIDToName: make(map[int64]string),
-		}
+	if l.meta.sb.GetNextBucketID() < remoteSb.GetNextBucketID() {
+		// remote has newer
+		l.meta.sb.SuperBlockInfo = remoteSb
+		writeToMeta(rdata, l.fsID, "0")
+	}
 
+	// verify at start
+	if !update && lm.sb.GetNextBucketID() > 0 {
 		utils.MLogger.Infof("%s has %d buckets", l.fsID, lm.sb.GetNextBucketID()-1)
 		if l.userID != l.gInfo.rootID {
 			gotTime, gotRoot, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
 			if err == nil {
 				has := false
-				for _, lr := range lm.sb.LRoot {
+				for _, lr := range lm.sb.GetLRoot() {
 					if lr.CTime == gotTime && bytes.Compare(lr.Root, gotRoot[:]) == 0 {
 						has = true
 					}
@@ -221,10 +232,8 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 				}
 			}
 		}
-
-		l.meta = lm
-		return nil
 	}
+
 	utils.MLogger.Warn("Cannot load Lfs superblock.")
 	return ErrCannotLoadSuperBlock
 }
@@ -241,78 +250,80 @@ func (l *LfsInfo) loadBucketInfo(update bool) error {
 }
 
 func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
-	data, _ := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
-
-	datagot, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
-	if len(datagot) > len(data) {
-		data = datagot
-		writeToMeta(data, l.fsID, strconv.FormatInt(bucketID, 10))
-	} else {
-		// no update data
-		if update {
-			return nil
-		}
-	}
-
-	if len(data) > 0 {
-		bucket := mpb.BucketInfo{}
-		BucketBuffer := bytes.NewBuffer(data)
-		BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, len(data))
-		err := BucketDelimitedReader.ReadMsg(&bucket)
-		if err != nil {
-			utils.MLogger.Info("Protobuf ReadMsg fail: ", err)
-			return err
-		}
-
-		tsb := newsuperBucket(bucket, false)
-
-		tsb.mtree.SetIndex(0)
-		tsb.mtree.Push([]byte(l.fsID + bucket.Name))
-
-		bname := bucket.Name
-		if bucket.Deletion {
-			l.meta.deletedBuckets = append(l.meta.deletedBuckets, tsb)
-		} else {
-			l.meta.buckets[bname] = tsb
-			l.meta.bucketIDToName[bucketID] = bname
-		}
-		return nil
-	}
-
-	utils.MLogger.Info("Construct delete buckets: ", bucketID)
-	binfo := mpb.BucketInfo{
+	localbucket := mpb.BucketInfo{
 		Name:     strconv.FormatInt(bucketID, 10),
 		BucketID: bucketID,
 		Deletion: true,
 	}
 
-	bucket := newsuperBucket(binfo, true)
+	var tsb *superBucket
+	if !update {
+		ldata, _ := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
+		if len(ldata) > 0 {
+			bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
+			err := bdReader.ReadMsg(&localbucket)
+			if err != nil {
+				utils.MLogger.Info("Protobuf ReadMsg local fail: ", err)
+			}
+		}
+		tsb = newsuperBucket(localbucket, false)
+		tsb.mtree.SetIndex(0)
+		tsb.mtree.Push([]byte(l.fsID + tsb.GetName()))
+		tsb.Root = tsb.mtree.Root()
+	} else {
+		bname, ok := l.meta.bucketIDToName[bucketID]
+		if !ok {
+			return nil
+		}
+		tsb, ok = l.meta.buckets[bname]
+		if !ok {
+			return nil
+		}
+	}
 
-	bucket.mtree.SetIndex(0)
-	bucket.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
-	bucket.Root = bucket.mtree.Root()
-	l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
+	remotebucket := mpb.BucketInfo{}
+	rdata, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
+	if len(rdata) > 0 {
+		bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
+		err := bdReader.ReadMsg(&remotebucket)
+		if err != nil {
+			utils.MLogger.Info("Protobuf ReadMsg remote fail: ", err)
+		}
+	}
+
+	if tsb.GetNextOpID() < remotebucket.GetNextOpID() {
+		tsb = newsuperBucket(remotebucket, false)
+		tsb.mtree.SetIndex(0)
+		tsb.mtree.Push([]byte(l.fsID + tsb.GetName()))
+		tsb.Root = tsb.mtree.Root()
+		if update {
+			if !tsb.GetDeletion() {
+				l.meta.buckets[tsb.GetName()] = tsb
+			}
+			writeToMeta(rdata, l.fsID, strconv.FormatInt(bucketID, 10))
+			return nil
+		}
+	}
+
+	if !update {
+		if tsb.GetDeletion() {
+			l.meta.deletedBuckets = append(l.meta.deletedBuckets, tsb)
+		} else {
+			l.meta.buckets[tsb.GetName()] = tsb
+			l.meta.bucketIDToName[bucketID] = tsb.GetName()
+		}
+		if tsb.GetName() == strconv.FormatInt(bucketID, 10) && tsb.GetDeletion() {
+			utils.MLogger.Info("Construct delete buckets: ", bucketID)
+		}
+	}
+
 	return nil
 }
 
 //-------------------------Load Objectinfo----------------------------
 //填充Entries字段，传入参数为bucket,记录传入bucket的数据信息
 func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
-	//先从metapath找，是否需要一个验证版本的方法？
-	objectsBlockSize := bucket.ObjectsBlockSize
-
-	data, _ := readFromMeta(l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
-
-	datagot, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-	if len(datagot) > len(data) {
-		data = datagot
-		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
-	} else {
-		// no update data
-		if update {
-			return nil
-		}
-	}
+	obSize := bucket.ObjectsBlockSize
 
 	broot := new(mpb.BucketRoot)
 	if len(l.meta.sb.GetLRoot()) > 0 {
@@ -324,25 +335,74 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 		}
 	}
 
-	if int64(len(data)) >= objectsBlockSize {
-		data = data[:objectsBlockSize]
-		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
-		objectsBuffer := bytes.NewBuffer(data)
-		objectsDelimitedReader := ggio.NewDelimitedReader(objectsBuffer, len(data))
-		op := mpb.OpRecord{}
-		var opNum int64
+	utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
+
+	var localOps, remoteOps int64
+	var data []byte
+	op := mpb.OpRecord{}
+	if !update {
+		ldata, _ := readFromMeta(l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+		if len(ldata) > 0 {
+			data = ldata
+			odReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
+			for {
+				err := odReader.ReadMsg(&op)
+				if err != nil {
+					break
+				}
+				localOps++
+			}
+		}
+	} else {
+		localOps = bucket.applyOpID + 1
+	}
+
+	rdata, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
+	if len(rdata) > 0 {
+		odReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
 		for {
-			err := objectsDelimitedReader.ReadMsg(&op)
+			err := odReader.ReadMsg(&op)
 			if err != nil {
 				break
 			}
-			err = applyOp(bucket, &op)
+			remoteOps++
+		}
+	}
+
+	if localOps < remoteOps {
+		data = rdata
+		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+	}
+
+	if len(data) > 0 && (!update || localOps < remoteOps) {
+		if int64(len(data)) >= obSize {
+			data = data[:obSize]
+		} else {
+			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " miss some objects")
+		}
+
+		odReader := ggio.NewDelimitedReader(bytes.NewBuffer(data), len(data))
+		var opNum int64
+		for {
+			err := odReader.ReadMsg(&op)
 			if err != nil {
-				continue
+				break
 			}
+
+			if opNum > bucket.applyOpID {
+				err = applyOp(bucket, &op)
+				if err != nil {
+					continue
+				}
+
+				if opNum != op.GetOpID() {
+					utils.MLogger.Errorf("ops store %d and calc %d in bucketID %d are mismatch", op.GetOpID(), opNum, bucket.GetBucketID())
+				}
+				tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), op.GetPayload()...)
+				bucket.mtree.Push(tag)
+			}
+
 			opNum++
-			tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), op.GetPayload()...)
-			bucket.mtree.Push(tag)
 			if opNum == broot.GetOpCount() {
 				if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) != 0 {
 					utils.MLogger.Errorf("bucket %s at ops %d expect root %s, but got %s", bucket.Name, opNum, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(bucket.mtree.Root()))
@@ -388,6 +448,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 				Parts:     make([]*mpb.ObjectPart, 0, 1),
 			},
 		})
+		bucket.applyOpID = op.GetOpID()
 		utils.MLogger.Info("Add Object-", info.GetName(), " in bucket: ", bucket.Name)
 	case mpb.LfsOp_OpAppend:
 		part := mpb.ObjectPart{}
@@ -413,6 +474,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		ob.Length += part.Length
 		ob.MTime = part.GetCTime()
 		ob.Unlock()
+		bucket.applyOpID = op.GetOpID()
 	case mpb.LfsOp_OpDelete:
 		mes := mpb.DeleteObject{}
 		err = proto.Unmarshal(payload, &mes)
@@ -430,6 +492,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		bucket.Objects.Delete(MetaName(mes.GetName()))
 		bucket.DeletedObject = append(bucket.DeletedObject, ob)
 		ob.Unlock()
+		bucket.applyOpID = op.GetOpID()
 	case mpb.LfsOp_OpCancel:
 		return errors.New("Undefined")
 		//这里暂时不实现

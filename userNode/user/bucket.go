@@ -24,6 +24,7 @@ func newsuperBucket(binfo mpb.BucketInfo, dirty bool) *superBucket {
 		Objects:     rbtree.NewTree(),
 		obMetaCache: make([]byte, maxCacheSize),
 		obCacheSize: 0,
+		applyOpID:   -1,
 		mtree:       mt.New(sha256.New()),
 	}
 }

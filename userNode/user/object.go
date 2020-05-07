@@ -81,6 +81,7 @@ func (l *LfsInfo) DeleteObject(ctx context.Context, bucketName, objectName strin
 	l.meta.dirty = true
 
 	l.flushObjectMeta(bucket, false, op)
+	bucket.applyOpID = op.GetOpID()
 	bucket.NextOpID++
 
 	object.Deletion = true

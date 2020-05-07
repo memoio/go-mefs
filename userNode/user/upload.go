@@ -151,6 +151,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		}
 
 		l.flushObjectMeta(bucket, false, op)
+		bucket.applyOpID = op.GetOpID()
 		bucket.NextOpID++
 
 		//gen_root
@@ -261,6 +262,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	}
 
 	l.flushObjectMeta(bucket, false, op)
+	bucket.applyOpID = op.GetOpID()
 	bucket.NextOpID++
 
 	// leaf is OpID + PayLoad
