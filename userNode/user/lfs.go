@@ -129,47 +129,59 @@ func (l *LfsInfo) startLfs() error {
 	if err != nil {
 		return err
 	}
-	l.meta, err = l.loadSuperBlock() //先加载超级块
-	if err != nil || l.meta == nil {
+
+	err = l.loadMeta(false) //先加载超级块
+	if err != nil {
 		//启动失败，证明本地无metablock
-		utils.MLogger.Warn("Load superblock fail, so begin to init Lfs :", l.fsID)
+		utils.MLogger.Warn("Load meta fail, so begin to init Lfs :", l.fsID)
 		l.meta, err = initLfs() //初始化
 		if err != nil {
 			return err
 		}
-	} else {
-		err = l.loadBucketInfo() //再加载Group元数据
-		if err != nil {          //*错误处理
-			utils.MLogger.Info("Load bucket info fail: ", err)
-			return err
-		}
-		//优先加载没被删除的
-		for _, bucket := range l.meta.buckets {
-			bucket.Lock()
-			err = l.loadObjectsInfo(bucket) //再加载Object元数据
-			bucket.Unlock()
-			if err != nil {
-				utils.MLogger.Error("Load objects in bucket: ", bucket.Name, " fail: ", err)
-				continue
-			}
-			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
-		}
-
-		for _, bucket := range l.meta.deletedBuckets {
-			bucket.Lock()
-			err = l.loadObjectsInfo(bucket) //再加载Object元数据
-			bucket.Unlock()
-			if err != nil {
-				utils.MLogger.Error("Load objects in deleted bucket: ", bucket.Name, " fail: ", err)
-				continue
-			}
-			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
-		}
 	}
-	utils.MLogger.Infof("Lfs Service %s is ready for: %s", l.fsID, l.userID)
 	go l.persistMetaBlock(l.context)
 	go l.persistRoot(l.context)
 	go l.sendHeartBeat(l.context)
+	return nil
+}
+
+func (l *LfsInfo) loadMeta(update bool) error {
+	err := l.loadSuperBlock(update) //先加载超级块
+	if err != nil {
+		//启动失败，证明本地无metablock
+		utils.MLogger.Warn("Load superblock fail, so begin to init Lfs :", l.fsID)
+		return err
+	}
+
+	err = l.loadBucketInfo(update) //再加载Group元数据
+	if err != nil {                //*错误处理
+		utils.MLogger.Info("Load bucket info fail: ", err)
+		return err
+	}
+	//优先加载没被删除的
+	for _, bucket := range l.meta.buckets {
+		bucket.Lock()
+		err = l.loadObjectsInfo(bucket, update) //再加载Object元数据
+		bucket.Unlock()
+		if err != nil {
+			utils.MLogger.Error("Load objects in bucket: ", bucket.Name, " fail: ", err)
+			continue
+		}
+		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
+	}
+
+	for _, bucket := range l.meta.deletedBuckets {
+		bucket.Lock()
+		err = l.loadObjectsInfo(bucket, update) //再加载Object元数据
+		bucket.Unlock()
+		if err != nil {
+			utils.MLogger.Error("Load objects in deleted bucket: ", bucket.Name, " fail: ", err)
+			continue
+		}
+		utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " is loaded as name: ", bucket.Name)
+	}
+
+	utils.MLogger.Infof("Lfs Service %s is ready for: %s", l.fsID, l.userID)
 	return nil
 }
 
@@ -423,6 +435,8 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	}
 
 	if !l.writable {
+		// load meta from remote
+		l.loadMeta(true)
 		return ErrLfsReadOnly
 	}
 

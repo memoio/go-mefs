@@ -170,18 +170,18 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 //--------------------Load superBlock--------------------------
 //lfs启动时加载超级块操作，返回结构体Meta,主要填充其中的superblock字段
 //先从本地查找超级快信息，若没找到，就找自己的provider获取
-func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
+func (l *LfsInfo) loadSuperBlock(update bool) error {
 	utils.MLogger.Info("Load superblock: ", l.fsID, " for user:", l.userID)
 
-	data, err := readFromMeta(l.fsID, "0")
-	if err != nil || len(data) == 0 {
-		datagot, err := l.getDataFromBlock(int(defaultMetaBackupCount), "0", "0")
-		if err != nil {
-			return nil, err
-		}
-		if len(datagot) > len(data) {
-			data = datagot
-			writeToMeta(data, l.fsID, "0")
+	data, _ := readFromMeta(l.fsID, "0")
+	datagot, _ := l.getDataFromBlock(int(defaultMetaBackupCount), "0", "0")
+	if len(datagot) > len(data) {
+		data = datagot
+		writeToMeta(data, l.fsID, "0")
+	} else {
+		// no update data
+		if update {
+			return nil
 		}
 	}
 
@@ -189,10 +189,10 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 		pbSuperBlock := mpb.SuperBlockInfo{}
 		SbBuffer := bytes.NewBuffer(data)
 		SbDelimitedReader := ggio.NewDelimitedReader(SbBuffer, len(data))
-		err = SbDelimitedReader.ReadMsg(&pbSuperBlock)
+		err := SbDelimitedReader.ReadMsg(&pbSuperBlock)
 		if err != nil {
 			utils.MLogger.Info("Protobuf ReadMsg fail: ", err)
-			return nil, err
+			return err
 		}
 
 		lm := &lfsMeta{
@@ -222,17 +222,17 @@ func (l *LfsInfo) loadSuperBlock() (*lfsMeta, error) {
 			}
 		}
 
-		return lm, nil
+		l.meta = lm
+		return nil
 	}
 	utils.MLogger.Warn("Cannot load Lfs superblock.")
-	return nil, ErrCannotLoadSuperBlock
+	return ErrCannotLoadSuperBlock
 }
 
 //lfs启动进行元数据的加载，对Log中的字段进行初始化 填充除superblock、Entries字段之外的字段
-func (l *LfsInfo) loadBucketInfo() error {
-	var err error
+func (l *LfsInfo) loadBucketInfo(update bool) error {
 	for bucketID := int64(1); bucketID < l.meta.sb.NextBucketID; bucketID++ {
-		err = l.loadSingleBucketInfo(bucketID)
+		err := l.loadSingleBucketInfo(bucketID, update)
 		if err != nil {
 			utils.MLogger.Errorf("Load BucketInfo %d failed: %s", bucketID, err)
 		}
@@ -240,13 +240,17 @@ func (l *LfsInfo) loadBucketInfo() error {
 	return nil
 }
 
-func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
-	data, err := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
-	if err != nil || len(data) == 0 {
-		datagot, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
-		if len(datagot) > len(data) {
-			data = datagot
-			writeToMeta(data, l.fsID, strconv.FormatInt(bucketID, 10))
+func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
+	data, _ := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
+
+	datagot, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
+	if len(datagot) > len(data) {
+		data = datagot
+		writeToMeta(data, l.fsID, strconv.FormatInt(bucketID, 10))
+	} else {
+		// no update data
+		if update {
+			return nil
 		}
 	}
 
@@ -254,7 +258,7 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
 		bucket := mpb.BucketInfo{}
 		BucketBuffer := bytes.NewBuffer(data)
 		BucketDelimitedReader := ggio.NewDelimitedReader(BucketBuffer, len(data))
-		err = BucketDelimitedReader.ReadMsg(&bucket)
+		err := BucketDelimitedReader.ReadMsg(&bucket)
 		if err != nil {
 			utils.MLogger.Info("Protobuf ReadMsg fail: ", err)
 			return err
@@ -293,20 +297,20 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64) error {
 
 //-------------------------Load Objectinfo----------------------------
 //填充Entries字段，传入参数为bucket,记录传入bucket的数据信息
-func (l *LfsInfo) loadObjectsInfo(bucket *superBucket) error {
+func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 	//先从metapath找，是否需要一个验证版本的方法？
 	objectsBlockSize := bucket.ObjectsBlockSize
 
-	data, err := readFromMeta(l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
-	if err != nil || int64(len(data)) < objectsBlockSize {
-		datagot, err := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-		if err != nil {
-			return err
-		}
+	data, _ := readFromMeta(l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
 
-		if len(datagot) > len(data) {
-			data = datagot
-			writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+	datagot, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
+	if len(datagot) > len(data) {
+		data = datagot
+		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+	} else {
+		// no update data
+		if update {
+			return nil
 		}
 	}
 
