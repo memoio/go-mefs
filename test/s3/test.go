@@ -23,13 +23,35 @@ var writeurl = "39.100.146.21:5080"
 var account = "0xC2b27Aa18A1930D5b403b2021D8f52044C7B092B"
 var pwd = "memoriae"
 var bucketName = "test"
-var objectName = "vlc-3.0.8-win64.exe"
+var objectName = "test.go"
 
 func main() {
-	list()
+	listBuckets()
 }
 
-func list() {
+func listBuckets() {
+	// Initialize minio client object.
+	mc, err := minio.New(readurl, account, pwd, ssl)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	log.Println("Successfully link client.")
+
+	buckets, err := mc.ListBuckets()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	for _, buc := range buckets {
+		log.Println(buc)
+	}
+
+	return
+}
+
+func listObjects() {
 	// Initialize minio client object.
 	mc, err := minio.New(readurl, account, pwd, ssl)
 	if err != nil {
@@ -69,29 +91,7 @@ func list() {
 	return
 }
 
-func head() (minio.ObjectInfo, error) {
-	var obj minio.ObjectInfo
-
-	// Initialize minio client object.
-	mc, err := minio.New(readurl, account, pwd, ssl)
-	if err != nil {
-		log.Fatal(err)
-		return obj, err
-	}
-
-	log.Println("Successfully link client.")
-
-	objInfo, err := mc.StatObject(bucketName, objectName, minio.StatObjectOptions{})
-	if err != nil {
-		log.Println(err)
-		return objInfo, err
-	}
-	log.Println(objInfo)
-
-	return objInfo, err
-}
-
-func read() error {
+func readObject() error {
 	// Initialize minio client object.
 	mc, err := minio.New(readurl, account, pwd, ssl)
 	if err != nil {
@@ -129,13 +129,13 @@ func read() error {
 	return nil
 }
 
-func write() {
+func writeObject() error {
 
 	// Initialize minio client object.
-	minioClient, err := minio.New(readurl, account, pwd, ssl)
+	minioClient, err := minio.New(writeurl, account, pwd, ssl)
 	if err != nil {
 		log.Fatal(err)
-		return
+		return err
 	}
 
 	log.Println("Successfully link client.")
@@ -143,37 +143,54 @@ func write() {
 	found, err := minioClient.BucketExists(bucketName)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	if !found {
-		err = minioClient.MakeBucket(bucketName, "us-east-1")
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		log.Println("Successfully created mybucket.")
+		return nil
 	}
 
 	file, err := os.Open("./test.go")
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 	defer file.Close()
 
 	fileStat, err := file.Stat()
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
-	n, err := minioClient.PutObject("mybucket", "myobject", file, fileStat.Size(), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	n, err := minioClient.PutObject(bucketName, objectName, file, fileStat.Size(), minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 	log.Println("Successfully uploaded bytes: ", n)
 
-	return
+	return nil
+}
+
+func headObject() (minio.ObjectInfo, error) {
+	var obj minio.ObjectInfo
+
+	// Initialize minio client object.
+	mc, err := minio.New(readurl, account, pwd, ssl)
+	if err != nil {
+		log.Fatal(err)
+		return obj, err
+	}
+
+	log.Println("Successfully link client.")
+
+	objInfo, err := mc.StatObject(bucketName, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		log.Println(err)
+		return objInfo, err
+	}
+	log.Println(objInfo)
+
+	return objInfo, err
 }
