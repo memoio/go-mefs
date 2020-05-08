@@ -11,8 +11,6 @@ func main() {
 	// Use a secure connection.
 	ssl := false
 
-	bucketName := "mybucket"
-
 	// Initialize minio client object.
 	minioClient, err := minio.New("127.0.0.1:5080", "0xe95c4F0eb00256a9Ffac626f135D466CA28586ba", "123456789", ssl)
 	if err != nil {
@@ -22,6 +20,7 @@ func main() {
 
 	log.Println("Successfully link client.")
 
+	bucketName := "test"
 	found, err := minioClient.BucketExists(bucketName)
 	if err != nil {
 		log.Println(err)

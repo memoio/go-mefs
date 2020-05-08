@@ -78,12 +78,11 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 		return nil
 	}
 
-	sb := l.meta.sb
 	sbBuffer := bytes.NewBuffer(nil)
 	sbDelimitedWriter := ggio.NewDelimitedWriter(sbBuffer)
 	defer sbDelimitedWriter.Close()
 
-	err := sbDelimitedWriter.WriteMsg(&sb.SuperBlockInfo)
+	err := sbDelimitedWriter.WriteMsg(&l.meta.sb.SuperBlockInfo)
 	if err != nil {
 		return err
 	}
@@ -95,10 +94,8 @@ func (l *LfsInfo) flushSuperBlock(isForce bool) error {
 
 	writeToMeta(data, l.fsID, "0")
 
-	err = l.putDataToBlocks(data, int(defaultMetaBackupCount), "0", "0")
-	if err != nil {
-		return err
-	}
+	l.putDataToBlocks(data, int(defaultMetaBackupCount), "0", "0")
+
 	utils.MLogger.Infof("user %s lfs %s superblock persist. ", l.userID, l.fsID)
 	l.meta.sb.dirty = false
 	return nil
@@ -142,7 +139,9 @@ func (l *LfsInfo) flushBucketInfo(bucket *superBucket) error {
 
 	writeToMeta(data, l.fsID, strconv.Itoa(int(bucket.BucketID)))
 
-	return l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "0")
+	l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "0")
+
+	return nil
 }
 
 //---------------------Flush objects' Meta for given superBucket--------
@@ -165,7 +164,9 @@ func (l *LfsInfo) flushObjectsInfo(bucket *superBucket) error {
 		return nil
 	}
 
-	return l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
+	l.putDataToBlocks(data, int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
+
+	return nil
 }
 
 //--------------------Load superBlock--------------------------
@@ -177,23 +178,25 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 	localSb := mpb.SuperBlockInfo{}
 	lm := &lfsMeta{
 		sb: &superBlock{
-			SuperBlockInfo: localSb,
-			dirty:          false,
+			dirty: false,
 		},
 		buckets:        make(map[string]*superBucket),
 		bucketIDToName: make(map[int64]string),
 	}
 
+	localHas := false
 	if !update {
 		l.meta = lm
 		// read from local at start
 		ldata, _ := readFromMeta(l.fsID, "0")
 		if len(ldata) > 0 {
+			localHas = true
 			sdReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
 			err := sdReader.ReadMsg(&localSb)
 			if err != nil {
 				utils.MLogger.Info("Protobuf ReadMsg local fail: ", err)
 			}
+			l.meta.sb.SuperBlockInfo = localSb
 		}
 	}
 
@@ -207,15 +210,16 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 		}
 	}
 
-	if l.meta.sb.GetNextBucketID() < remoteSb.GetNextBucketID() {
+	if l.meta.sb.GetNextBucketID() < remoteSb.GetNextBucketID() || (l.meta.sb.GetNextBucketID() == remoteSb.GetNextBucketID() && len(l.meta.sb.GetLRoot()) < len(remoteSb.GetLRoot())) {
 		// remote has newer
+		utils.MLogger.Info("remote superblock has newer buckets: ", remoteSb.GetNextBucketID()-1)
 		l.meta.sb.SuperBlockInfo = remoteSb
-		writeToMeta(rdata, l.fsID, "0")
+		l.meta.sb.dirty = true
 	}
 
 	// verify at start
-	if !update && lm.sb.GetNextBucketID() > 0 {
-		utils.MLogger.Infof("%s has %d buckets", l.fsID, lm.sb.GetNextBucketID()-1)
+	if !update && l.meta.sb.GetNextBucketID() > 0 {
+		utils.MLogger.Infof("%s has %d buckets", l.fsID, l.meta.sb.GetNextBucketID()-1)
 		if l.userID != l.gInfo.rootID {
 			gotTime, gotRoot, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
 			if err == nil {
@@ -226,7 +230,7 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 					}
 				}
 				if has {
-					utils.MLogger.Infof("local fs contais contract merkle root: %s at %d", hex.EncodeToString(gotRoot[:]), gotTime)
+					utils.MLogger.Infof("local fs contains contract merkle root: %s at %d", hex.EncodeToString(gotRoot[:]), gotTime)
 				} else {
 					utils.MLogger.Info("local fs has not contract merkle root")
 				}
@@ -234,13 +238,16 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 		}
 	}
 
-	utils.MLogger.Warn("Cannot load Lfs superblock.")
-	return ErrCannotLoadSuperBlock
+	if !localHas && len(rdata) == 0 {
+		utils.MLogger.Warn("Cannot load Lfs superblock.")
+		return ErrCannotLoadSuperBlock
+	}
+	return nil
 }
 
 //lfs启动进行元数据的加载，对Log中的字段进行初始化 填充除superblock、Entries字段之外的字段
 func (l *LfsInfo) loadBucketInfo(update bool) error {
-	for bucketID := int64(1); bucketID < l.meta.sb.NextBucketID; bucketID++ {
+	for bucketID := int64(1); bucketID < l.meta.sb.GetNextBucketID(); bucketID++ {
 		err := l.loadSingleBucketInfo(bucketID, update)
 		if err != nil {
 			utils.MLogger.Errorf("Load BucketInfo %d failed: %s", bucketID, err)
@@ -256,7 +263,7 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		Deletion: true,
 	}
 
-	var tsb *superBucket
+	tsb := &superBucket{}
 	if !update {
 		ldata, _ := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
 		if len(ldata) > 0 {
@@ -268,16 +275,15 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		}
 		tsb = newsuperBucket(localbucket, false)
 		tsb.mtree.SetIndex(0)
-		tsb.mtree.Push([]byte(l.fsID + tsb.GetName()))
+		tsb.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
 		tsb.Root = tsb.mtree.Root()
 	} else {
 		bname, ok := l.meta.bucketIDToName[bucketID]
-		if !ok {
-			return nil
-		}
-		tsb, ok = l.meta.buckets[bname]
-		if !ok {
-			return nil
+		if ok {
+			sb, ok := l.meta.buckets[bname]
+			if ok {
+				tsb = sb
+			}
 		}
 	}
 
@@ -291,30 +297,24 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		}
 	}
 
-	if tsb.GetNextOpID() < remotebucket.GetNextOpID() {
+	if tsb.GetNextOpID() < remotebucket.GetNextOpID() || tsb.GetName() != remotebucket.GetName() {
 		tsb = newsuperBucket(remotebucket, false)
 		tsb.mtree.SetIndex(0)
-		tsb.mtree.Push([]byte(l.fsID + tsb.GetName()))
+		tsb.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
 		tsb.Root = tsb.mtree.Root()
-		if update {
-			if !tsb.GetDeletion() {
-				l.meta.buckets[tsb.GetName()] = tsb
-			}
-			writeToMeta(rdata, l.fsID, strconv.FormatInt(bucketID, 10))
-			return nil
-		}
+		tsb.dirty = true
+		utils.MLogger.Infof("remote has newer ops %d for bucket %d", remotebucket.GetNextOpID()-1, tsb.GetBucketID())
 	}
 
-	if !update {
-		if tsb.GetDeletion() {
-			l.meta.deletedBuckets = append(l.meta.deletedBuckets, tsb)
-		} else {
-			l.meta.buckets[tsb.GetName()] = tsb
-			l.meta.bucketIDToName[bucketID] = tsb.GetName()
-		}
-		if tsb.GetName() == strconv.FormatInt(bucketID, 10) && tsb.GetDeletion() {
-			utils.MLogger.Info("Construct delete buckets: ", bucketID)
-		}
+	if tsb.GetDeletion() {
+		l.meta.deletedBuckets = append(l.meta.deletedBuckets, tsb)
+	} else {
+		l.meta.buckets[tsb.GetName()] = tsb
+		l.meta.bucketIDToName[bucketID] = tsb.GetName()
+	}
+
+	if tsb.GetName() == strconv.FormatInt(bucketID, 10) && tsb.GetDeletion() {
+		utils.MLogger.Info("Construct delete buckets: ", bucketID)
 	}
 
 	return nil
@@ -329,7 +329,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 	if len(l.meta.sb.GetLRoot()) > 0 {
 		lroot := l.meta.sb.GetLRoot()[len(l.meta.sb.GetLRoot())-1]
 		if len(lroot.GetBRoots()) < int(bucket.BucketID) {
-			utils.MLogger.Error("Objects in bucket: ", bucket.BucketID, " has inconsistent objects")
+			utils.MLogger.Error("bucket: ", bucket.BucketID, " may has inconsistent objects or is newly created")
 		} else {
 			broot = lroot.GetBRoots()[bucket.BucketID-1]
 		}
@@ -350,6 +350,11 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 				if err != nil {
 					break
 				}
+
+				// filter invalid reccord
+				if op.GetOpType() == mpb.LfsOp_OpErr {
+					continue
+				}
 				localOps++
 			}
 		}
@@ -365,19 +370,27 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 			if err != nil {
 				break
 			}
+
+			if op.GetOpType() == mpb.LfsOp_OpErr {
+				continue
+			}
+
 			remoteOps++
 		}
 	}
 
 	if localOps < remoteOps {
 		data = rdata
-		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+		utils.MLogger.Infof("remote has newer objects at ops %d in bucket: %d", remoteOps-1, bucket.GetBucketID())
+		bucket.dirty = true
+	}
+
+	if len(data) == 0 && bucket.GetNextOpID() > 0 {
+		return ErrCannotLoadMetaBlock
 	}
 
 	if len(data) > 0 && (!update || localOps < remoteOps) {
-		if int64(len(data)) >= obSize {
-			data = data[:obSize]
-		} else {
+		if int64(len(data)) < obSize {
 			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " miss some objects")
 		}
 
@@ -395,15 +408,25 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 					continue
 				}
 
+				l.flushObjectMeta(bucket, false, &op)
+
 				if opNum != op.GetOpID() {
 					utils.MLogger.Errorf("ops store %d and calc %d in bucketID %d are mismatch", op.GetOpID(), opNum, bucket.GetBucketID())
 				}
-				tag := append([]byte(strconv.FormatInt(op.GetOpID(), 10)), op.GetPayload()...)
+				tag, err := proto.Marshal(&op)
+				if err != nil {
+					continue
+				}
 				bucket.mtree.Push(tag)
 			}
 
 			opNum++
-			if opNum == broot.GetOpCount() {
+
+			if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) == 0 {
+				utils.MLogger.Infof("bucket %s at ops %d store op %d expect root %s", bucket.Name, opNum, broot.GetOpCount(), hex.EncodeToString(broot.GetRoot()))
+			}
+
+			if broot.GetBucketID() != 0 && opNum == broot.GetOpCount() {
 				if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) != 0 {
 					utils.MLogger.Errorf("bucket %s at ops %d expect root %s, but got %s", bucket.Name, opNum, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(bucket.mtree.Root()))
 				}
@@ -415,11 +438,14 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 		// verify ops
 		if opNum != bucket.GetNextOpID() {
 			utils.MLogger.Errorf("Load ops is not correct, expect: %d, but got %d", bucket.GetNextOpID(), opNum)
+			if opNum > bucket.GetNextOpID() {
+				bucket.NextOpID = opNum
+				bucket.dirty = true
+			}
 		}
-
-		return nil
 	}
-	return ErrCannotLoadMetaBlock
+
+	return nil
 }
 
 //applyOp 应用某个操作
@@ -512,10 +538,7 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 	obpath := path.Join(metapath, strconv.FormatInt(bucket.BucketID, 10)+".object")
 	_, err = os.Stat(obpath)
 	if err != nil {
-		// 本地这个文件被删了，要先读取回来
-		data, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-		// data nil -> create
-		writeToMeta(data, l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+		os.Create(obpath)
 	}
 
 	if len(ops) == 0 && bucket.obCacheSize == 0 {
@@ -568,6 +591,10 @@ func (l *LfsInfo) flushObjectMeta(bucket *superBucket, force bool, ops ...*mpb.O
 }
 
 func (l *LfsInfo) putDataToBlocks(data []byte, metaBackupCount int, buc, stripe string) error {
+	if !l.writable {
+		return ErrLfsReadOnly
+	}
+
 	enc, err := dataformat.NewDataCoderWithDefault(l.keySet, dataformat.MulPolicy, 1, metaBackupCount-1, l.userID, l.fsID)
 	if err != nil {
 		return err
@@ -623,45 +650,50 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 	}
 
 	var data []byte
+	ctx := l.context
+
 	bm, err := metainfo.NewBlockMeta(l.fsID, buc, stripe, "0")
 	if err != nil {
 		return nil, err
 	}
-	ncidlocal := bm.ToString()
-	km, _ := metainfo.NewKey(ncidlocal, mpb.KeyType_Block)
-	ctx := l.context
-	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
-	if err == nil && b != nil {
-		_, _, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
-		if ok {
-			data = append(data, b.RawData()...)
-		}
+
+	sig, err := role.BuildSignMessage()
+	if err != nil {
+		return nil, err
 	}
-	if len(data) == 0 {
-		sig, err := role.BuildSignMessage()
-		if err != nil {
-			return nil, err
+
+	for j := 0; j < metaBackupCount; j++ {
+		bm.SetCid(strconv.Itoa(j))
+		ncid := bm.ToString()
+		provider, _, err := l.gInfo.getBlockProviders(ctx, ncid) //获取数据块的保存位置
+		if err != nil || provider == "" {
+			continue
 		}
-		utils.MLogger.Info("Try to get: ", ncidlocal, " from remote servers")
 
-		for j := 0; j < metaBackupCount; j++ {
-			bm.SetCid(strconv.Itoa(j))
-			ncid := bm.ToString()
-			provider, _, err := l.gInfo.getBlockProviders(ctx, ncid) //获取数据块的保存位置
-			if err != nil || provider == "" {
-				continue
-			}
+		km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
 
-			km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
-
-			b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
-			if err == nil && b != nil { //获取到有效数据块，跳出
-				_, _, _, ok := enc.VerifyBlock(b.RawData(), ncid)
-				if ok {
-					data = append(data, b.RawData()...)
-					utils.MLogger.Warn("Load superblock in block: ", ncid, " from provider: ", provider)
+		b, err := l.ds.GetBlock(ctx, km.ToString(), sig, provider)
+		if err == nil && b != nil { //获取到有效数据块，跳出
+			_, _, _, ok := enc.VerifyBlock(b.RawData(), ncid)
+			if ok {
+				data = b.RawData()
+				if len(data) > 0 {
+					utils.MLogger.Info("Load meta in block: ", ncid, " from provider: ", provider)
 					break
 				}
+			}
+		}
+	}
+
+	if len(data) == 0 {
+		bm.SetCid(strconv.Itoa(0))
+		ncidlocal := bm.ToString()
+		km, _ := metainfo.NewKey(ncidlocal, mpb.KeyType_Block)
+		b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
+		if err == nil && b != nil {
+			_, _, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
+			if ok {
+				data = b.RawData()
 			}
 		}
 	}

@@ -405,14 +405,14 @@ func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
 	for {
 		select {
 		case <-tick.C:
-			if l.Online() && l.writable { //LFS没启动不刷新
+			if l.Online() { //LFS没启动不刷新
 				err := l.Fsync(false)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
 				}
 			}
 		case <-ctx.Done():
-			if l.Online() && l.writable { //LFS没启动不刷新
+			if l.Online() { //LFS没启动不刷新
 				err := l.Fsync(true)
 				if err != nil {
 					utils.MLogger.Warn("Cannot Persist MetaBlock: ", err)
@@ -437,7 +437,6 @@ func (l *LfsInfo) Fsync(isForce bool) error {
 	if !l.writable {
 		// update meta from remote for readonly
 		l.loadMeta(true)
-		return ErrLfsReadOnly
 	}
 
 	err := l.flushSuperBlock(isForce)
