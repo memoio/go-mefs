@@ -20,8 +20,11 @@ import (
 type pInfoOutput struct {
 	DepositCapacity uint64
 	UsedCapacity    uint64
+	DownloadIncome  *big.Int
+	StorageIncome   *big.Int
 	TotalIncome     *big.Int
 	DailyIncome     *big.Int
+	Balance         *big.Int
 }
 
 var InfoCmd = &cmds.Command{
@@ -39,10 +42,19 @@ var InfoCmd = &cmds.Command{
 			return err
 		}
 
+		localAddr, err := address.GetAddressFromID(node.Identity.Pretty())
+		if err != nil {
+			return err
+		}
+
 		var depositCapacity int64
 		var usedCapacity uint64
 		totalIncome := big.NewInt(0)
 		dailyIncome := big.NewInt(0)
+		balance, err := contracts.QueryBalance(localAddr.String())
+		if err != nil {
+			return err
+		}
 
 		providerIns, ok := node.Inst.(*provider.Info)
 
@@ -62,10 +74,6 @@ var InfoCmd = &cmds.Command{
 			depositCapacity, usedCapacity = providerIns.GetStorageInfo()
 			ukAddress, channelAddress := providerIns.GetIncomeInfo()
 
-			localAddr, err := address.GetAddressFromID(node.Identity.Pretty())
-			if err != nil {
-				return err
-			}
 			totalIncome, dailyIncome, err = contracts.GetStorageIncome(ukAddress, localAddr) //income for storage
 			if err != nil {
 				return err
@@ -84,6 +92,7 @@ var InfoCmd = &cmds.Command{
 			UsedCapacity:    usedCapacity,
 			TotalIncome:     totalIncome,
 			DailyIncome:     dailyIncome,
+			Balance:         balance,
 		}
 		return cmds.EmitOnce(res, output)
 	},
