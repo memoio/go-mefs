@@ -328,7 +328,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 	broot := new(mpb.BucketRoot)
 	if len(l.meta.sb.GetLRoot()) > 0 {
 		lroot := l.meta.sb.GetLRoot()[len(l.meta.sb.GetLRoot())-1]
-		if len(lroot.GetBRoots()) < int(bucket.BucketID) {
+		if len(lroot.GetBRoots()) < int(bucket.BucketID) || bucket.BucketID == 0 {
 			utils.MLogger.Error("bucket: ", bucket.BucketID, " may has inconsistent objects or is newly created")
 		} else {
 			broot = lroot.GetBRoots()[bucket.BucketID-1]
