@@ -117,7 +117,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		userNum:     metrics.New("provider.user_num", "User number").Gauge(),
 		keeperNum:   metrics.New("provider.keeper_num", "Keeper number").Gauge(),
 		providerNum: metrics.New("provider.provider_num", "Providers number").Gauge(),
-		storageUsed: metrics.New("provider.storage_used", "Storage used").Gauge(),
+		storageUsed: metrics.New("provider.storage_used", "Storage used(bytes)").Gauge(),
 	}
 
 	m := &Info{
@@ -306,6 +306,11 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 
 		for _, pid := range gp.providers {
 			p.getProInfo(pid)
+		}
+
+		ui := p.getUserInfo(userID)
+		if ui != nil {
+			ui.setQuery(gp.groupID)
 		}
 	}
 
