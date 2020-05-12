@@ -49,8 +49,6 @@ var InfoCmd = &cmds.Command{
 
 		var depositCapacity int64
 		var usedCapacity uint64
-		totalIncome := big.NewInt(0)
-		dailyIncome := big.NewInt(0)
 		balance, err := contracts.QueryBalance(localAddr.String())
 		if err != nil {
 			return err
@@ -72,26 +70,28 @@ var InfoCmd = &cmds.Command{
 			fmt.Println("if you want to see the real income, please run 'mefs-provider daemon' first")
 		} else {
 			depositCapacity, usedCapacity = providerIns.GetStorageInfo()
-			ukAddress, channelAddress := providerIns.GetIncomeInfo()
 
-			totalIncome, dailyIncome, err = contracts.GetStorageIncome(ukAddress, localAddr) //income for storage
-			if err != nil {
-				return err
-			}
-			t, d, err := contracts.GetDownloadIncome(channelAddress, localAddr)
-			if err != nil {
-				return err
-			}
+			/*
+				// need test
+				ukAddress, channelAddress := providerIns.GetIncomeInfo()
 
-			totalIncome.Add(totalIncome, t)
-			dailyIncome.Add(dailyIncome, d)
+				totalIncome, dailyIncome, err = contracts.GetStorageIncome(ukAddress, localAddr) //income for storage
+				if err != nil {
+					return err
+				}
+				t, d, err := contracts.GetDownloadIncome(channelAddress, localAddr)
+				if err != nil {
+					return err
+				}
+
+				totalIncome.Add(totalIncome, t)
+				dailyIncome.Add(dailyIncome, d)
+			*/
 		}
 
 		output := &pInfoOutput{
 			DepositCapacity: uint64(depositCapacity),
 			UsedCapacity:    usedCapacity,
-			TotalIncome:     totalIncome,
-			DailyIncome:     dailyIncome,
 			Balance:         balance,
 		}
 		return cmds.EmitOnce(res, output)
