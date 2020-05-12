@@ -71,7 +71,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		userNum:     metrics.New("keeper.user_num", "User number").Gauge(),
 		keeperNum:   metrics.New("keeper.keeper_num", "Keeper number").Gauge(),
 		providerNum: metrics.New("keeper.provider_num", "Providers number").Gauge(),
-		storageUsed: metrics.New("keeper.storage_used", "storage used").Gauge(),
+		storageUsed: metrics.New("keeper.storage_used", "Storage used(bytes)").Gauge(),
 		repairNum:   metrics.New("keeper.repair_num", "Repair number").Gauge(),
 		faultNum:    metrics.New("keeper.fault_num", "Fault block number").Gauge(),
 	}

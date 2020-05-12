@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,6 +36,7 @@ type Info struct {
 	fsGroup      sync.Map // key: queryID, value: *groupInfo
 	users        sync.Map // key: userID, value: *uInfo
 	keepers      sync.Map // key: keeperID, value: *kInfo
+	providers    sync.Map // key: proID, value: *kInfo
 	offers       []*role.OfferItem
 	proContract  *role.ProviderItem
 	userConfigs  *lru.ARCCache
@@ -42,9 +44,12 @@ type Info struct {
 }
 
 type measure struct {
-	storageUsed metrics.Histogram
-	balance     metrics.Histogram
-	groups      metrics.Counter
+	balance     metrics.Gauge
+	storageUsed metrics.Gauge
+	groupNum    metrics.Gauge
+	userNum     metrics.Gauge
+	providerNum metrics.Gauge
+	keeperNum   metrics.Gauge
 }
 
 type groupInfo struct {
@@ -98,13 +103,29 @@ type kInfo struct {
 	keepItem  *role.KeeperItem
 }
 
+type pInfo struct {
+	providerID string
+	online     bool
+	availTime  int64
+}
+
 //New start provider service
 func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price, depositSize int64, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
+	mea := &measure{
+		balance:     metrics.New("provider.balance", "Balance of this provider").Gauge(),
+		groupNum:    metrics.New("provider.group_num", "Group number").Gauge(),
+		userNum:     metrics.New("provider.user_num", "User number").Gauge(),
+		keeperNum:   metrics.New("provider.keeper_num", "Keeper number").Gauge(),
+		providerNum: metrics.New("provider.provider_num", "Providers number").Gauge(),
+		storageUsed: metrics.New("provider.storage_used", "Storage used").Gauge(),
+	}
+
 	m := &Info{
 		localID: id,
 		sk:      sk,
 		ds:      ds,
 		context: ctx,
+		ms:      mea,
 		offers:  make([]*role.OfferItem, 0, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
@@ -119,6 +140,17 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		return nil, err
 	}
 	m.userConfigs = ucache
+
+	balance := role.GetBalance(m.localID)
+	ba, _ := new(big.Float).SetInt(balance).Float64()
+	m.ms.balance.Set(ba)
+
+	usedCapacity, err := m.getDiskUsage()
+	if err == nil {
+		m.ms.storageUsed.Set(float64(usedCapacity))
+	}
+
+	m.ms.providerNum.Inc()
 
 	err = m.loadContracts(capacity, duration, price, depositSize, reDeployOffer)
 	if err != nil {
@@ -265,10 +297,18 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 	}
 	gp := newGroup(p.localID, userID, groupID, tmpKps, tmpPros)
 	if gp != nil {
+		p.ms.groupNum.Inc()
 		p.fsGroup.Store(groupID, gp)
+		p.loadChannelValue(userID, groupID)
+		for _, kid := range gp.keepers {
+			p.getKeeperInfo(kid)
+		}
+
+		for _, pid := range gp.providers {
+			p.getProInfo(pid)
+		}
 	}
 
-	p.loadChannelValue(userID, groupID)
 	return gp
 }
 
@@ -282,6 +322,78 @@ func (p *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 	}
 
 	return groupI.(*groupInfo)
+}
+
+func (p *Info) getUserInfo(pid string) *uInfo {
+	ui, ok := p.users.Load(pid)
+	if !ok {
+		ui := &uInfo{
+			userID: pid,
+		}
+
+		p.ms.userNum.Inc()
+		p.users.Store(pid, ui)
+		return ui
+	}
+
+	return ui.(*uInfo)
+}
+
+func (p *Info) getKeeperInfo(pid string) *kInfo {
+	ui, ok := p.keepers.Load(pid)
+	if !ok {
+
+		has, err := role.IsKeeper(pid)
+		if err != nil || !has {
+			return nil
+		}
+
+		kItem, err := role.GetKeeperInfo(p.localID, pid)
+		if err != nil {
+			return nil
+		}
+
+		ui := &kInfo{
+			keeperID: pid,
+			keepItem: &kItem,
+		}
+
+		if p.ds.Connect(p.context, pid) {
+			ui.availTime = time.Now().Unix()
+			ui.online = true
+		}
+
+		p.ms.keeperNum.Inc()
+		p.keepers.Store(pid, ui)
+		return ui
+	}
+
+	return ui.(*kInfo)
+}
+
+func (p *Info) getProInfo(pid string) *pInfo {
+	ui, ok := p.providers.Load(pid)
+	if !ok {
+		has, err := role.IsProvider(pid)
+		if err != nil || !has {
+			return nil
+		}
+
+		ui := &pInfo{
+			providerID: pid,
+		}
+
+		if p.ds.Connect(p.context, pid) {
+			ui.availTime = time.Now().Unix()
+			ui.online = true
+		}
+
+		p.ms.providerNum.Inc()
+		p.providers.Store(pid, ui)
+		return ui
+	}
+
+	return ui.(*pInfo)
 }
 
 type quKey struct {
@@ -337,12 +449,7 @@ func (p *Info) load(ctx context.Context) error {
 				continue
 			}
 
-			if p.ds.Connect(ctx, tmpKid) {
-				thisKinfo := &kInfo{
-					keeperID: tmpKid,
-				}
-				p.keepers.Store(tmpKid, thisKinfo)
-			}
+			p.getKeeperInfo(tmpKid)
 		}
 	}
 
@@ -376,11 +483,10 @@ func (p *Info) load(ctx context.Context) error {
 					return
 				}
 
-				ui := &uInfo{
-					userID: userID,
+				ui := p.getUserInfo(userID)
+				if ui == nil {
+					return
 				}
-
-				p.users.Store(userID, ui)
 
 				for i := 0; i < len(qs)/utils.IDLength; i++ {
 					qid := string(qs[i*utils.IDLength : (i+1)*utils.IDLength])
@@ -512,18 +618,22 @@ func (p *Info) sendStorageRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			go func() {
-				p.storageSync(ctx)
-			}()
+			p.storageSync(ctx)
 		}
 	}
 }
 
 func (p *Info) storageSync(ctx context.Context) error {
+	balance := role.GetBalance(p.localID)
+	ba, _ := new(big.Float).SetInt(balance).Float64()
+	p.ms.balance.Set(ba)
+
 	actulDataSpace, err := p.getDiskUsage()
 	if err != nil {
 		return err
 	}
+
+	p.ms.storageUsed.Set(float64(actulDataSpace))
 
 	maxSpace := p.getDiskTotal()
 
