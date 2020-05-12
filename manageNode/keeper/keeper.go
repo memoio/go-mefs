@@ -57,6 +57,7 @@ type measure struct {
 	providerNum metrics.Gauge
 	storageUsed metrics.Gauge
 	repairNum   metrics.Gauge
+	faultNum    metrics.Gauge
 }
 
 // New is
@@ -70,6 +71,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		providerNum: metrics.New("keeper.provider_num", "Providers number").Gauge(),
 		storageUsed: metrics.New("keeper.storage_used", "storage used").Gauge(),
 		repairNum:   metrics.New("keeper.repair_num", "Repair number").Gauge(),
+		faultNum:    metrics.New("keeper.fault_num", "Fault block number").Gauge(),
 	}
 
 	m := &Info{

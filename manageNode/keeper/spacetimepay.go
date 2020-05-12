@@ -59,6 +59,13 @@ func (k *Info) stPayRegular(ctx context.Context) {
 					k.ukpGroup.Delete(qid)
 				}
 			}
+
+			balance := role.GetBalance(k.localID)
+			bf, ok := new(big.Float).SetString(balance.String())
+			if ok {
+				ba, _ := bf.Float64()
+				k.ms.balance.Set(ba)
+			}
 		}
 	}
 }

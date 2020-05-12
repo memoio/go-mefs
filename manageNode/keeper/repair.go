@@ -574,6 +574,8 @@ func (k *Info) repairRegular(ctx context.Context) {
 // value: chunkID1_pid1/chunkID2_pid2/...
 func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 	utils.MLogger.Info("Repair blocks:", rBlockID)
+	k.ms.repairNum.Inc()
+	k.ms.faultNum.Inc()
 	var response, oldpid string
 	var offset int
 	// uid_qid_bid_sid_cid
@@ -687,6 +689,7 @@ func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider s
 	bid := splitedKey[1]
 	if strings.Compare(splitedValue[0], "ok") == 0 {
 		utils.MLogger.Info("repair success, block is: ", blockID)
+		k.ms.faultNum.Dec()
 		newPid := splitedValue[1]
 		newOffset, err := strconv.Atoi(splitedValue[2])
 		if err != nil {
