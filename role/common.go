@@ -15,6 +15,7 @@ var (
 	ErrNotKeeper        = errors.New("Role is not a keeper")
 	ErrNotProvider      = errors.New("Role is not a provider")
 	ErrNotUser          = errors.New("Role is not a user")
+	ErrNotConnectd      = errors.New("Role is not connected")
 
 	ErrUkExpire = errors.New("Upkeeping is expired")
 

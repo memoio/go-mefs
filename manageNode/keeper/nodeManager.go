@@ -6,11 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/mgutz/ansi"
 )
@@ -97,6 +95,7 @@ func (k *Info) getUInfo(pid string) (*uInfo, error) {
 		tempInfo := &uInfo{
 			userID: pid,
 		}
+		k.ms.userNum.Inc()
 		k.users.Store(pid, tempInfo)
 		return tempInfo, nil
 	}
@@ -111,10 +110,26 @@ func (k *Info) getKInfo(pid string) (*kInfo, error) {
 
 	thisInfoI, ok := k.keepers.Load(pid)
 	if !ok {
+		has, err := role.IsKeeper(pid)
+		if err != nil {
+			return nil, err
+		}
+
+		if !has {
+			return nil, role.ErrNotKeeper
+		}
+
 		tempInfo := &kInfo{
 			keeperID: pid,
 		}
-		k.keepers.Store(pid, tempInfo)
+
+		if k.ds.Connect(k.context, pid) {
+			tempInfo.availTime = time.Now().Unix()
+			tempInfo.online = true
+			k.ms.keeperNum.Inc()
+			k.keepers.Store(pid, tempInfo)
+		}
+
 		return tempInfo, nil
 	}
 
@@ -124,15 +139,32 @@ func (k *Info) getKInfo(pid string) (*kInfo, error) {
 func (k *Info) getPInfo(pid string) (*pInfo, error) {
 	thisInfoI, ok := k.providers.Load(pid)
 	if !ok {
+		has, err := role.IsProvider(pid)
+		if err != nil {
+			return nil, err
+		}
+
+		if !has {
+			return nil, role.ErrNotProvider
+		}
+
 		tempInfo := &pInfo{
 			providerID: pid,
 			credit:     50,
 		}
-		err := tempInfo.setOffer(false)
+
+		err = tempInfo.setOffer(false)
 		if err != nil {
 			return nil, err
 		}
-		k.providers.Store(pid, tempInfo)
+
+		if k.ds.Connect(k.context, pid) {
+			tempInfo.availTime = time.Now().Unix()
+			tempInfo.online = true
+			k.ms.providerNum.Inc()
+			k.providers.Store(pid, tempInfo)
+		}
+
 		return tempInfo, nil
 	}
 
@@ -161,7 +193,6 @@ func (k *Info) checkPeers(ctx context.Context) {
 func (k *Info) checkLocalPeers(ctx context.Context) {
 	tmpKeepers, _ := k.GetKeepers()
 
-	ntime := time.Now().Unix()
 	for _, kid := range tmpKeepers {
 		thisInfoI, ok := k.keepers.Load(kid)
 		if !ok {
@@ -170,6 +201,7 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 
 		thisInfo := thisInfoI.(*kInfo)
 
+		ntime := time.Now().Unix()
 		if k.ds.Connect(ctx, kid) {
 			thisInfo.online = true
 			thisInfo.availTime = ntime
@@ -190,6 +222,7 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 
 		thisInfo := thisInfoI.(*pInfo)
 
+		ntime := time.Now().Unix()
 		if k.ds.Connect(ctx, pid) {
 			thisInfo.online = true
 			thisInfo.availTime = ntime
@@ -203,7 +236,8 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 }
 
 func (k *Info) checkConnectedPeer(ctx context.Context) error {
-	connPeers, err := k.ds.GetPeers() //the list of peers we are connected to
+	//the list of peers we are connected to
+	connPeers, err := k.ds.GetPeers()
 	if err != nil {
 		return err
 	}
@@ -247,32 +281,11 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 
 		utils.MLogger.Infof("get %s role: %s from net", id, string(val))
 		if string(val) == metainfo.RoleKeeper {
-			addr, err := address.GetAddressFromID(id)
-			if err != nil {
-				return err
-			}
-			isKeeper, err := contracts.IsKeeper(addr)
-			if err != nil {
-				return err
-			}
-			if isKeeper {
-				utils.MLogger.Info("Connect to new keeper: ", id)
-				thiskInfo, err := k.getKInfo(id)
-				if err != nil {
-					continue
-				}
-				thiskInfo.online = true
-				thiskInfo.availTime = time.Now().Unix()
-			}
+			utils.MLogger.Info("Connect to new keeper: ", id)
+			k.getKInfo(id)
 		} else if string(val) == metainfo.RoleProvider {
 			utils.MLogger.Info("Connect to new provider: ", id)
-			thispInfo, err := k.getPInfo(id)
-			if err != nil {
-				continue
-			}
-
-			thispInfo.online = true
-			thispInfo.availTime = time.Now().Unix()
+			k.getPInfo(id)
 		} else {
 			k.netIDs[id] = struct{}{}
 		}

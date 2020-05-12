@@ -7,12 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/memoio/go-mefs/utils/address"
-
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru"
+	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	mpb "github.com/memoio/go-mefs/proto"
@@ -21,6 +19,7 @@ import (
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -39,6 +38,13 @@ type Info struct {
 	offers       []*role.OfferItem
 	proContract  *role.ProviderItem
 	userConfigs  *lru.ARCCache
+	ms           *measure
+}
+
+type measure struct {
+	storageUsed metrics.Histogram
+	balance     metrics.Histogram
+	groups      metrics.Counter
 }
 
 type groupInfo struct {

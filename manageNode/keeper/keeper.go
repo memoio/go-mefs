@@ -10,6 +10,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	lru "github.com/hashicorp/golang-lru"
+	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/lni/dragonboat/v3"
@@ -45,11 +46,32 @@ type Info struct {
 	netIDs      map[string]struct{}
 	userConfigs *lru.ARCCache
 	kItem       *role.KeeperItem
+	ms          *measure
+}
+
+type measure struct {
+	balance     metrics.Gauge
+	groupNum    metrics.Gauge
+	userNum     metrics.Gauge
+	keeperNum   metrics.Gauge
+	providerNum metrics.Gauge
+	storageUsed metrics.Gauge
+	repairNum   metrics.Gauge
 }
 
 // New is
 // TODO:Keeper出问题重启后，应该能自动将所有user的信息恢复到内存中
 func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing) (instance.Service, error) {
+	mea := &measure{
+		balance:     metrics.New("keeper.balance", "Balance of this keeper").Gauge(),
+		groupNum:    metrics.New("keeper.group_num", "Group number").Gauge(),
+		userNum:     metrics.New("keeper.user_num", "User number").Gauge(),
+		keeperNum:   metrics.New("keeper.keeper_num", "Keeper number").Gauge(),
+		providerNum: metrics.New("keeper.provider_num", "Providers number").Gauge(),
+		storageUsed: metrics.New("keeper.storage_used", "storage used").Gauge(),
+		repairNum:   metrics.New("keeper.repair_num", "Repair number").Gauge(),
+	}
+
 	m := &Info{
 		localID: nid,
 		sk:      sk,
@@ -58,6 +80,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		repch:   make(chan string, 1024),
 		netIDs:  make(map[string]struct{}),
 		context: ctx,
+		ms:      mea,
 	}
 
 	err := m.loadContract(true)
@@ -583,14 +606,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 			if err != nil {
 				continue
 			}
-			thisKinfo, err := k.getKInfo(tmpKid)
-			if err != nil {
-				continue
-			}
-			if k.ds.Connect(ctx, tmpKid) {
-				thisKinfo.availTime = time.Now().Unix()
-				thisKinfo.online = true
-			}
+			k.getKInfo(tmpKid)
 		}
 	}
 
@@ -609,15 +625,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 				continue
 			}
 
-			thisPinfo, err := k.getPInfo(tmpKid)
-			if err != nil {
-				continue
-			}
-
-			if k.ds.Connect(ctx, tmpKid) {
-				thisPinfo.availTime = time.Now().Unix()
-				thisPinfo.online = true
-			}
+			k.getPInfo(tmpKid)
 		}
 	}
 
@@ -769,6 +777,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 			}
 		}
 
+		k.ms.groupNum.Inc()
 		k.ukpGroup.Store(qid, gInfo)
 
 		retry := 0
@@ -894,6 +903,7 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 	}
 
 	// delete group
+	k.ms.groupNum.Dec()
 	k.ukpGroup.Delete(qid)
 }
 
