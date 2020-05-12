@@ -79,7 +79,7 @@ type groupInfo struct {
 	queryItem     *role.QueryItem
 }
 
-func newGroup(uid, shareTo, sk string, duration, capacity, price int64, ks, ps int, d data.Service) *groupInfo {
+func newGroup(uid, shareTo, sk string, capacity, duration, price int64, ks, ps int, d data.Service) *groupInfo {
 	return &groupInfo{
 		userID:      uid,
 		rootID:      uid,
@@ -878,6 +878,13 @@ func (g *groupInfo) CheckKeepersConn(ctx context.Context) (int, error) {
 		}
 	}
 	return count, nil
+}
+
+func (g *groupInfo) GetUk() *role.UpKeepingItem {
+	if g == nil {
+		return nil
+	}
+	return g.upKeepingItem
 }
 
 func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []string, error) {

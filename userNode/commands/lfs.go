@@ -3,9 +3,11 @@ package commands
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path"
 	"path/filepath"
@@ -199,6 +201,7 @@ var LfsCmd = &cmds.Command{
 		"start":          lfsStartUserCmd,
 		"kill":           lfsKillUserCmd,
 		"show_storage":   lfsShowStorageCmd,
+		"info":           lfsInfoCmd,
 		"get_share":      lfsGetShareCmd,
 		"gen_share":      lfsGenShareCmd,
 	},
@@ -1648,6 +1651,7 @@ var lfsOnlineCmd = &cmds.Command{
 		}),
 	},
 }
+
 var lfsShowStorageCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "show the storage space used",
@@ -1715,6 +1719,134 @@ mefs lfs show_storage show the storage space used(kb)
 			OutStorage = fmt.Sprintf("%.2f", FloatStorage/1073741824) + "GB"
 		}
 		return cmds.EmitOnce(res, OutStorage)
+	},
+}
+
+type infoOutput struct {
+	UserAddr      string
+	Balance       *big.Int
+	UkBalance     *big.Int
+	TotalBytes    uint64
+	UsedBytes     uint64
+	StartTime     string
+	EndTime       string
+	Duration      int64
+	Price         int64
+	UpKeepingAddr string
+	QueryAddr     string
+	KeeperAddrs   []string
+	ProviderAddrs []string
+}
+
+var lfsInfoCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "show info of user",
+		ShortDescription: `'mefs lfs info' shows the infomation of the user`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Options: []cmds.Option{
+		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
+		var userid string
+		addressid, found := req.Options[AddressID].(string)
+		if addressid == "" || !found {
+			userid = node.Identity.Pretty()
+		} else {
+			userid, err = address.GetIDFromAddress(addressid)
+			if err != nil {
+				return err
+			}
+		}
+
+		lfs := userIns.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
+			return errLfsServiceNotReady
+		}
+
+		storageSize, err := lfs.ShowStorage(req.Context)
+		if err != nil {
+			return err
+		}
+
+		gp := lfs.(*user.LfsInfo).GetGroup()
+		if gp == nil {
+			return errLfsServiceNotReady
+		}
+
+		uk := gp.GetUk()
+		if uk == nil {
+			return role.ErrEmptyData
+		}
+
+		balance, err := role.QueryBalance(userid)
+		if err != nil {
+			return err
+		}
+
+		useraddr, err := address.GetAddressFromID(userid)
+		if err != nil {
+			return err
+		}
+
+		ukaddr, err := address.GetAddressFromID(uk.UpKeepingID)
+		if err != nil {
+			return err
+		}
+
+		queryaddr, err := address.GetAddressFromID(uk.QueryID)
+		if err != nil {
+			return err
+		}
+
+		var keepers, providers []string
+		for _, ki := range uk.Keepers {
+			keepers = append(keepers, ki.Addr.String())
+		}
+
+		for _, ki := range uk.Providers {
+			providers = append(providers, ki.Addr.String())
+		}
+
+		output := &infoOutput{
+			UserAddr:      useraddr.String(),
+			StartTime:     time.Unix(uk.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+			EndTime:       time.Unix(uk.EndTime, 0).In(time.Local).Format(utils.SHOWTIME),
+			TotalBytes:    uint64(uk.Capacity * 1024 * 1024),
+			UsedBytes:     storageSize,
+			Balance:       balance,
+			UkBalance:     uk.Money,
+			KeeperAddrs:   keepers,
+			ProviderAddrs: providers,
+			UpKeepingAddr: ukaddr.String(),
+			QueryAddr:     queryaddr.String(),
+			Duration:      uk.Duration,
+			Price:         uk.Price,
+		}
+		return cmds.EmitOnce(res, output)
+	},
+	Type: infoOutput{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, output *infoOutput) error {
+			marshaled, err := json.MarshalIndent(output, "", "\t")
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(w, string(marshaled))
+			return nil
+		}),
 	},
 }
 
