@@ -390,7 +390,9 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			utils.MLogger.Warn("uuid ParseBytes: ", string(resp), "  err: ", err)
 			continue
 		}
-		kinfo.sessionID = uuidtmp
+		if uuidtmp != uuid.Nil {
+			kinfo.sessionID = uuidtmp
+		}
 	}
 
 	for _, pinfo := range g.providers {
@@ -405,7 +407,9 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			utils.MLogger.Warn("uuid ParseBytes: ", string(resp), "  err: ", err)
 			continue
 		}
-		pinfo.sessionID = uuidtmp
+		if uuidtmp != uuid.Nil {
+			pinfo.sessionID = uuidtmp
+		}
 	}
 
 	utils.MLogger.Info("Group Service is ready for: ", g.userID)

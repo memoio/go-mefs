@@ -7,8 +7,6 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
-	blocks "github.com/memoio/go-mefs/source/go-block-format"
-	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
@@ -154,13 +152,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 		return nil
 	}
 
-	ncid := cid.NewCidV2([]byte(blockID))
-	newblk, err := blocks.NewBlockWithCid(newstripe[nbid], ncid)
-	if err != nil {
-		utils.MLogger.Error("New block failed, error:", err)
-		return err
-	}
-	err = p.ds.BlockStore().Put(newblk)
+	err = p.ds.PutBlock(p.context, blockID, newstripe[nbid], "local")
 	if err != nil {
 		utils.MLogger.Error("put block to local failed, error : ", err)
 		return err

@@ -11,7 +11,6 @@ import (
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
-	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -194,7 +193,7 @@ func (p *Info) traversePath(gc bool) {
 
 				if exist {
 					if gc {
-						p.ds.BlockStore().DeleteBlock(ncid)
+						p.ds.DeleteBlock(p.context, res.String(), "local")
 					}
 				} else {
 					break
@@ -285,19 +284,12 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		//做成块，放到本地
 		for i, dataBlock := range data {
 			blockID := posCidPrefix + "_" + strconv.Itoa(i)
-			ncid := cid.NewCidV2([]byte(blockID))
-			newblk, err := blocks.NewBlockWithCid(dataBlock, ncid)
-			if err != nil {
-				utils.MLogger.Info("New block failed, error :", err)
-				continue
-			}
-			utils.MLogger.Info("New block success :", newblk.Cid())
-			err = p.ds.BlockStore().Put(newblk)
+
+			err := p.ds.PutBlock(p.context, blockID, dataBlock, "local")
 			if err != nil {
 				utils.MLogger.Info("add block failed, error :", err)
 			}
-
-			boff := blockID + "_" + strconv.Itoa(offset)
+			boff := blockID + metainfo.BlockDelimiter + strconv.Itoa(offset)
 
 			blockList = append(blockList, boff)
 		}
@@ -347,9 +339,8 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		deleteBlocks := []string{}
 		j := 0
 		for i := 0; i < rep; i++ {
-			blockID := posCidPrefix + "_" + strconv.Itoa(i)
-			ncid := cid.NewCidV2([]byte(blockID))
-			err := p.ds.BlockStore().DeleteBlock(ncid)
+			blockID := posCidPrefix + metainfo.BlockDelimiter + strconv.Itoa(i)
+			err := p.ds.DeleteBlock(p.context, blockID, "local")
 			if err != nil {
 				utils.MLogger.Info("delete block: ", blockID, " error :", err)
 				j++
