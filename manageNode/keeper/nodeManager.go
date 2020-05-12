@@ -8,6 +8,7 @@ import (
 
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
+	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/mgutz/ansi"
@@ -185,6 +186,10 @@ func (k *Info) checkPeers(ctx context.Context) {
 		case <-ticker.C:
 			k.checkLocalPeers(ctx)
 			k.checkConnectedPeer(ctx)
+			usedCapacity, err := datastore.DiskUsage(k.ds.DataStore())
+			if err == nil {
+				k.ms.storageUsed.Set(float64(usedCapacity))
+			}
 		}
 	}
 }

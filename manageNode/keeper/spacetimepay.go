@@ -61,11 +61,8 @@ func (k *Info) stPayRegular(ctx context.Context) {
 			}
 
 			balance := role.GetBalance(k.localID)
-			bf, ok := new(big.Float).SetString(balance.String())
-			if ok {
-				ba, _ := bf.Float64()
-				k.ms.balance.Set(ba)
-			}
+			ba, _ := new(big.Float).SetInt(balance).Float64()
+			k.ms.balance.Set(ba)
 		}
 	}
 }

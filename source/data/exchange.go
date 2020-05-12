@@ -10,6 +10,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	lru "github.com/hashicorp/golang-lru"
+	metrics "github.com/ipfs/go-metrics-interface"
 	p2phost "github.com/libp2p/go-libp2p-core/host"
 	inet "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -32,6 +33,14 @@ import (
 )
 
 var (
+	// sort latencies in buckets with following upper bounds in seconds
+	latencyBuckets = []float64{1e-4, 1e-3, 1e-2, 1e-1, 1}
+
+	// sort sizes in buckets with following upper bounds in bytes
+	sizeBuckets = []float64{1 << 6, 1 << 8, 1 << 12, 1 << 16, 1 << 20, 1 << 24}
+)
+
+var (
 	errNoRouting    = errors.New("routing is not running")
 	errNoConnection = errors.New("connection is offline")
 	ErrRetry        = errors.New("ReTry Later")
@@ -46,6 +55,41 @@ type impl struct {
 	rt      routing.Routing
 	ph      p2phost.Host
 	pubKeys *lru.ARCCache
+	ms      *measure
+}
+
+type measure struct {
+	getBlock    metrics.Counter
+	putBlock    metrics.Counter
+	appendBlock metrics.Counter
+	delBlock    metrics.Counter
+	getKey      metrics.Counter
+	putKey      metrics.Counter
+	appendKey   metrics.Counter
+	delKey      metrics.Counter
+
+	getLocalBlock    metrics.Counter
+	putLocalBlock    metrics.Counter
+	appendLocalBlock metrics.Counter
+	delLocalBlock    metrics.Counter
+	getLocalKey      metrics.Counter
+	putLocalKey      metrics.Counter
+	appendLocalKey   metrics.Counter
+	delLocalKey      metrics.Counter
+
+	getBlockErr    metrics.Counter
+	putBlockErr    metrics.Counter
+	appendBlockErr metrics.Counter
+	delBlockErr    metrics.Counter
+	getKeyErr      metrics.Counter
+	putKeyErr      metrics.Counter
+	appendKeyErr   metrics.Counter
+	delKeyErr      metrics.Counter
+
+	putLatency metrics.Histogram
+	getLatency metrics.Histogram
+	putSize    metrics.Histogram
+	getSize    metrics.Histogram
 }
 
 // New returns data.Service
@@ -61,6 +105,49 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 		return nil
 	}
 
+	mea := &measure{
+		putKey:      metrics.New("data.putRemoteKey_total", "Total number of Data.PutRemoteKey calls").Counter(),
+		putLocalKey: metrics.New("data.putLocalKey_total", "Total number of Data.PutLocalKey calls").Counter(),
+		putKeyErr:   metrics.New("data.putKeyErr_total", "Total number of Data.PutKey errors").Counter(),
+
+		getKey:      metrics.New("data.getRemoteKey_total", "Total number of Data.GetRemoteKey calls").Counter(),
+		getLocalKey: metrics.New("data.getLocalKey_total", "Total number of Data.GetLocalKey calls").Counter(),
+		getKeyErr:   metrics.New("data.getKeyErr_total", "Total number of Data.GetKey errors").Counter(),
+
+		appendKey:      metrics.New("data.appendRemoteKey_total", "Total number of Data.AppendRemoteKey calls").Counter(),
+		appendLocalKey: metrics.New("data.appendLocalKey_total", "Total number of Data.AppendLocalKey calls").Counter(),
+		appendKeyErr:   metrics.New("data.appendKeyErr_total", "Total number of Data.AppendKey errors").Counter(),
+
+		delKey:      metrics.New("data.delRemoteKey_total", "Total number of Data.DelRemoteKey calls").Counter(),
+		delLocalKey: metrics.New("data.delLocalKey_total", "Total number of Data.DelLocalKey calls").Counter(),
+		delKeyErr:   metrics.New("data.delKeyErr_total", "Total number of Data.DelKey errors").Counter(),
+
+		putBlock:      metrics.New("data.putRemoteBlock_total", "Total number of Data.PutRemoteBlock calls").Counter(),
+		putLocalBlock: metrics.New("data.putLocalBlock_total", "Total number of Data.PutLocalBlock calls").Counter(),
+		putBlockErr:   metrics.New("data.putBlockErr_total", "Total number of Data.PutBlock errors").Counter(),
+
+		getBlock:      metrics.New("data.getRemoteBlock_total", "Total number of Data.GetRemoteBlock calls").Counter(),
+		getLocalBlock: metrics.New("data.getLocalBlock_total", "Total number of Data.GetLocalBlock calls").Counter(),
+		getBlockErr:   metrics.New("data.getBlockErr_total", "Total number of Data.GetBlock errors").Counter(),
+
+		appendBlock:      metrics.New("data.appendRemoteBlock_total", "Total number of Data.AppendRemoteBlock calls").Counter(),
+		appendLocalBlock: metrics.New("data.appendLocalBlock_total", "Total number of Data.AppendLocalBlock calls").Counter(),
+		appendBlockErr:   metrics.New("data.appendBlockErr_total", "Total number of Data.AppendBlock errors").Counter(),
+
+		delBlock:      metrics.New("data.delRemoteBlock_total", "Total number of Data.DelRemoteBlock calls").Counter(),
+		delLocalBlock: metrics.New("data.delLocalBlock_total", "Total number of Data.DelLocalBlock calls").Counter(),
+		delBlockErr:   metrics.New("data.delBlockErr_total", "Total number of Data.DelBlock errors").Counter(),
+
+		putLatency: metrics.New("data.put.latency_seconds",
+			"Latency distribution of Data.Put calls").Histogram(latencyBuckets),
+		getLatency: metrics.New("data.put.latency_seconds",
+			"Latency distribution of Data.Put calls").Histogram(latencyBuckets),
+		getSize: metrics.New("data.put.size_bytes",
+			"Latency distribution of Data.Put calls").Histogram(sizeBuckets),
+		putSize: metrics.New("data.get.size_bytes",
+			"Latency distribution of Data.Put calls").Histogram(sizeBuckets),
+	}
+
 	return &impl{
 		netID:   id,
 		rt:      r,
@@ -69,11 +156,17 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 		bstore:  b,
 		aCache:  NewCache(b),
 		pubKeys: pcache,
+		ms:      mea,
 	}
 }
 
 func (n *impl) GetNetAddr() string {
 	return n.netID
+}
+
+func recordLatency(h metrics.Histogram, start time.Time) {
+	elapsed := time.Since(start)
+	h.Observe(elapsed.Seconds())
 }
 
 func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data, sig []byte, to string) error {
@@ -201,8 +294,10 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 	utils.MLogger.Debug("GetKey: ", key, " from: ", to)
 
 	if to == "local" {
+		n.ms.getLocalKey.Inc()
 		recByte, err := n.dstore.Get(ds.NewKey(key))
 		if err != nil {
+			n.ms.getKeyErr.Inc()
 			return nil, err
 		}
 		rec := new(recpb.Record)
@@ -211,8 +306,8 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 			return nil, err
 		}
 
-		// verify sig
-
+		// todo:verify sig
+		n.ms.getSize.Observe(float64(len(rec.GetValue())))
 		return rec.GetValue(), nil
 	}
 
@@ -222,7 +317,16 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 		}
 	}
 
-	return n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, to)
+	n.ms.getKey.Inc()
+	defer recordLatency(n.ms.getLatency, time.Now())
+	res, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, to)
+	if err != nil {
+		n.ms.getKeyErr.Inc()
+		return nil, err
+	}
+	n.ms.getSize.Observe(float64(len(res)))
+	return res, nil
+
 }
 
 func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to string) error {
@@ -232,7 +336,10 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 
 	utils.MLogger.Debug("PutKey: ", key, " to: ", to)
 
+	n.ms.putSize.Observe(float64(len(data)))
+
 	if to == "local" {
+		n.ms.putLocalKey.Inc()
 		rec := &recpb.Record{
 			Key:       []byte(key),
 			Value:     data,
@@ -244,7 +351,13 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 			return err
 		}
 
-		return n.dstore.Put(ds.NewKey(key), recByte)
+		err = n.dstore.Put(ds.NewKey(key), recByte)
+		if err != nil {
+			n.ms.putKeyErr.Inc()
+			return err
+		}
+
+		return nil
 	}
 
 	if to != "" {
@@ -253,9 +366,15 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 		}
 	}
 
+	n.ms.putKey.Inc()
+	defer recordLatency(n.ms.putLatency, time.Now())
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, data, sig, to)
+	if err != nil {
+		n.ms.putKeyErr.Inc()
+		return err
+	}
 
-	return err
+	return nil
 }
 
 // to modify
@@ -265,8 +384,9 @@ func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string
 	}
 
 	utils.MLogger.Debug("AppendKey: ", key, " to: ", to)
-
+	n.ms.putSize.Observe(float64(len(data)))
 	if to == "local" {
+		n.ms.appendLocalKey.Inc()
 		skey := strings.Split(key, metainfo.DELIMITER)
 		if len(skey) < 4 {
 			return metainfo.ErrIllegalKey
@@ -284,10 +404,23 @@ func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string
 
 		bstr := strings.Join(skey[:2], metainfo.DELIMITER)
 
-		return n.dstore.Append(ds.NewKey(bstr), data, s, len)
+		err = n.dstore.Append(ds.NewKey(bstr), data, s, len)
+		if err != nil {
+			n.ms.appendKeyErr.Inc()
+			return err
+		}
+
+		return nil
 	}
 
-	return n.SendMetaMessage(ctx, int32(mpb.OpType_Append), key, data, nil, to)
+	n.ms.appendKey.Inc()
+	err := n.SendMetaMessage(ctx, int32(mpb.OpType_Append), key, data, nil, to)
+	if err != nil {
+		n.ms.appendKeyErr.Inc()
+		return err
+	}
+
+	return nil
 }
 
 func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
@@ -298,10 +431,22 @@ func (n *impl) DeleteKey(ctx context.Context, key string, to string) error {
 	utils.MLogger.Debug("DeleteKey: ", key, " from: ", to)
 
 	if to == "local" {
-		return n.dstore.Delete(ds.NewKey(key))
+		n.ms.delKey.Inc()
+		err := n.dstore.Delete(ds.NewKey(key))
+		if err != nil {
+			n.ms.delKeyErr.Inc()
+			return err
+		}
+		return nil
 	}
 
-	return n.SendMetaMessage(ctx, int32(mpb.OpType_Delete), key, nil, nil, to)
+	n.ms.delKey.Inc()
+	err := n.SendMetaMessage(ctx, int32(mpb.OpType_Delete), key, nil, nil, to)
+	if err != nil {
+		n.ms.delKeyErr.Inc()
+		return err
+	}
+	return nil
 }
 
 // GetBlock retrieves a particular partial block from the service,
@@ -315,6 +460,7 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	skey := strings.Split(key, metainfo.DELIMITER)
 	utils.MLogger.Debug("GetBlock: ", key, " from: ", to)
 	if to == "local" {
+		n.ms.getLocalBlock.Inc()
 		if len(skey) == 4 {
 			s, err := strconv.Atoi(skey[2])
 			if err != nil {
@@ -339,11 +485,13 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 
 		block, err := n.bstore.Get(cid.NewCidV2([]byte(key)))
 		if err == nil {
+			n.ms.getSize.Observe(float64(len(block.RawData())))
 			return block, nil
 		}
 		if err.Error() == dataformat.ErrDataTooShort.Error() {
 			go n.aCache.Summit(skey[0])
 		}
+		n.ms.getBlockErr.Inc()
 		return nil, err
 	}
 
@@ -352,6 +500,8 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		key = km.ToString()
 	}
 
+	n.ms.getBlock.Inc()
+	defer recordLatency(n.ms.getLatency, time.Now())
 	retry := 0
 	for {
 		retry++
@@ -371,8 +521,10 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 		c := cid.NewCidV2([]byte(key))
 		b, err := blocks.NewBlockWithCid(bdata, c)
 		if err != nil {
+			n.ms.getBlockErr.Inc()
 			return nil, err
 		}
+		n.ms.getSize.Observe(float64(len(b.RawData())))
 		return b, nil
 	}
 }
@@ -385,8 +537,11 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 
 	utils.MLogger.Debug("PutBlock: ", key, " to: ", to)
 
+	n.ms.putSize.Observe(float64(len(data)))
+
 	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
+		n.ms.putLocalBlock.Inc()
 		bcid := cid.NewCidV2([]byte(bids[0]))
 		b, err := blocks.NewBlockWithCid(data, bcid)
 		if err != nil {
@@ -394,6 +549,7 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 		}
 		err = n.bstore.Put(b)
 		if err != nil {
+			n.ms.putBlockErr.Inc()
 			return err
 		}
 		return nil
@@ -404,8 +560,12 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 		key = km.ToString()
 	}
 
+	n.ms.putBlock.Inc()
+	defer recordLatency(n.ms.putLatency, time.Now())
+
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, data, nil, to)
 	if err != nil {
+		n.ms.putBlockErr.Inc()
 		return err
 	}
 
@@ -420,11 +580,14 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 
 	utils.MLogger.Debug("AppendBlock: ", key, " to: ", to)
 
+	n.ms.putSize.Observe(float64(len(data)))
+
 	skey := strings.Split(key, metainfo.DELIMITER)
 	if len(skey) < 4 {
 		return metainfo.ErrIllegalKey
 	}
 	if to == "local" {
+		n.ms.appendLocalBlock.Inc()
 		s, err := strconv.Atoi(skey[2])
 		if err != nil {
 			return err
@@ -443,13 +606,16 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 		err = n.bstore.Append(bcid, data, s, len)
 		if err != nil {
 			utils.MLogger.Infof("AppendBlock %s to local fails %s", key, err)
+			n.ms.appendBlockErr.Inc()
 			return n.aCache.Set(skey[0], data, s, len)
 		}
 		return nil
 	}
 
+	n.ms.appendBlock.Inc()
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Append), key, data, nil, to)
 	if err != nil {
+		n.ms.appendBlockErr.Inc()
 		return err
 	}
 
@@ -466,8 +632,14 @@ func (n *impl) DeleteBlock(ctx context.Context, key, to string) error {
 
 	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
+		n.ms.delLocalBlock.Inc()
 		bcid := cid.NewCidV2([]byte(bids[0]))
-		return n.bstore.DeleteBlock(bcid)
+		err := n.bstore.DeleteBlock(bcid)
+		if err != nil {
+			n.ms.delBlockErr.Inc()
+			return err
+		}
+		return nil
 	}
 
 	if len(bids) == 1 {
@@ -475,8 +647,10 @@ func (n *impl) DeleteBlock(ctx context.Context, key, to string) error {
 		key = km.ToString()
 	}
 
+	n.ms.delBlock.Inc()
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Delete), key, nil, nil, to)
 	if err != nil {
+		n.ms.delBlockErr.Inc()
 		return err
 	}
 

@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"context"
+	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
+	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/source/instance"
@@ -85,7 +87,18 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		ms:      mea,
 	}
 
-	err := m.loadContract(true)
+	balance := role.GetBalance(m.localID)
+	ba, _ := new(big.Float).SetInt(balance).Float64()
+	m.ms.balance.Set(ba)
+
+	usedCapacity, err := datastore.DiskUsage(m.ds.DataStore())
+	if err == nil {
+		m.ms.storageUsed.Set(float64(usedCapacity))
+	}
+
+	m.ms.keeperNum.Inc() // add self
+
+	err = m.loadContract(true)
 	if err != nil {
 		return nil, err
 	}
