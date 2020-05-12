@@ -440,7 +440,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 				pinfo.chanItem.Dirty = true
 				utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
 				pinfo.Unlock()
-				key, err := metainfo.NewKey(pinfo.chanItem.ChannelID, mpb.KeyType_Channel)
+				key, err := metainfo.NewKey(pinfo.providerID, mpb.KeyType_Channel, pinfo.chanItem.ChannelID)
 				if err == nil {
 					do.group.ds.PutKey(ctx, key.ToString(), mes, nil, "local")
 				}

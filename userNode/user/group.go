@@ -1147,7 +1147,7 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 			if cItem != nil {
 				if time.Now().Unix()-cItem.StartTime < cItem.Duration {
 					if cItem.Money.Cmp(big.NewInt(0)) != 0 {
-						km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
+						km, err := metainfo.NewKey(pInfo.providerID, mpb.KeyType_Channel, cItem.ChannelID)
 						if err != nil {
 							return
 						}
@@ -1238,7 +1238,7 @@ func (g *groupInfo) loadChannelValue(ctx context.Context) error {
 			defer wg.Done()
 			if proInfo.chanItem != nil {
 				proID := proInfo.providerID
-				km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, mpb.KeyType_Channel)
+				km, err := metainfo.NewKey(proInfo.providerID, mpb.KeyType_Channel, proInfo.chanItem.ChannelID)
 				if err != nil {
 					return
 				}
@@ -1296,7 +1296,7 @@ func (g *groupInfo) saveChannelValue(ctx context.Context) error {
 
 	for _, proInfo := range g.providers {
 		if proInfo.chanItem != nil && proInfo.chanItem.Sig != nil && proInfo.chanItem.Dirty {
-			km, err := metainfo.NewKey(proInfo.chanItem.ChannelID, mpb.KeyType_Channel)
+			km, err := metainfo.NewKey(proInfo.providerID, mpb.KeyType_Channel, proInfo.chanItem.ChannelID)
 			if err != nil {
 				continue
 			}

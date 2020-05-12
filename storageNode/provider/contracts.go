@@ -94,18 +94,35 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 	if gp != nil && gp.userID != gp.groupID {
 		ctx := p.context
 
-		gp.channel.Range(func(key, value interface{}) bool {
-			cItem, ok := value.(*role.ChannelItem)
+		chs := gp.getChannels()
+		for _, ch := range chs {
+			ci, ok := gp.channel.Load(ch)
 			if !ok {
-				return true
+				continue
 			}
-			km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
+			cItem := ci.(*role.ChannelItem)
+			km, err := metainfo.NewKey(p.localID, mpb.KeyType_Channel, cItem.ChannelID)
 			if err != nil {
-				return true
+				continue
 			}
 			p.ds.PutKey(ctx, km.ToString(), cItem.Sig, nil, "local")
-			return true
-		})
+
+			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) {
+				cSign := new(mpb.ChannelSign)
+				err = proto.Unmarshal(cItem.Sig, cSign)
+				if err != nil {
+					continue
+				}
+
+				// need verify value again;
+				err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
+				if err != nil {
+					continue
+				}
+
+				cItem.Money = role.GetBalance(cItem.ChannelID)
+			}
+		}
 	}
 
 	return nil
@@ -118,32 +135,34 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.userID != gp.groupID {
 		ctx := p.context
-		gp.channel.Range(func(key, v interface{}) bool {
-			cItem, ok := v.(*role.ChannelItem)
+
+		chs := gp.getChannels()
+		for _, ch := range chs {
+			ci, ok := gp.channel.Load(ch)
 			if !ok {
-				return true
+				continue
 			}
-
+			cItem := ci.(*role.ChannelItem)
 			if cItem.Money.Cmp(big.NewInt(0)) == 0 {
-				return true
+				continue
 			}
 
-			km, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
+			km, err := metainfo.NewKey(p.localID, mpb.KeyType_Channel, cItem.ChannelID)
 			if err != nil {
-				return true
+				continue
 			}
 
 			valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
 			if err != nil {
 				utils.MLogger.Error("get channel value from local fails: ", err)
-				return true
+				continue
 			}
 
 			cSign := &mpb.ChannelSign{}
 			err = proto.Unmarshal(valueByte, cSign)
 			if err != nil {
 				utils.MLogger.Error("proto.Unmarshal channelSign err:", err)
-				return true
+				continue
 			}
 
 			value := new(big.Int).SetBytes(cSign.GetValue())
@@ -158,20 +177,18 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				cSign := new(mpb.ChannelSign)
 				err = proto.Unmarshal(cItem.Sig, cSign)
 				if err != nil {
-					return true
+					continue
 				}
 
 				// need verify value again;
 				err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
 				if err != nil {
-					return true
+					continue
 				}
 
 				cItem.Money = role.GetBalance(cItem.ChannelID)
 			}
-
-			return true
-		})
+		}
 	}
 
 	return nil
@@ -229,6 +246,15 @@ func (g *groupInfo) loadContracts(proID string, mode bool) error {
 	}
 
 	return nil
+}
+
+func (g *groupInfo) getChannels() []string {
+	var res []string
+	g.channel.Range(func(key, value interface{}) bool {
+		res = append(res, key.(string))
+		return true
+	})
+	return res
 }
 
 func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {

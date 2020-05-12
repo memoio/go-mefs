@@ -142,7 +142,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 				cItem.Value = value
 				cItem.Sig = sig
 
-				key, err := metainfo.NewKey(cItem.ChannelID, mpb.KeyType_Channel)
+				key, err := metainfo.NewKey(p.localID, mpb.KeyType_Channel, cItem.ChannelID)
 				if err != nil {
 					return nil, err
 				}
