@@ -426,7 +426,7 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 		defaultMux("/debug/vars"),
 		defaultMux("/debug/pprof/"),
 		corehttp.MutexFractionOption("/debug/pprof-mutex/"),
-		corehttp.MetricsScrapingOption("/debug/metrics"),
+		corehttp.MetricsScrapingOption("/metrics"),
 		corehttp.LogOption(),
 		corehttp.MLog(),
 	}
