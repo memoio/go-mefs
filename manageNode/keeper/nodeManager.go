@@ -104,7 +104,7 @@ func (k *Info) getUInfo(pid string) (*uInfo, error) {
 	return thisInfoI.(*uInfo), nil
 }
 
-func (k *Info) getKInfo(pid string) (*kInfo, error) {
+func (k *Info) getKInfo(pid string, managed bool) (*kInfo, error) {
 	if k.localID == pid {
 		return nil, role.ErrNotMyKeeper
 	}
@@ -129,15 +129,21 @@ func (k *Info) getKInfo(pid string) (*kInfo, error) {
 			tempInfo.online = true
 			k.ms.keeperNum.Inc()
 			k.keepers.Store(pid, tempInfo)
+			return tempInfo, nil
 		}
 
-		return tempInfo, nil
+		if managed {
+			k.ms.keeperNum.Inc()
+			k.keepers.Store(pid, tempInfo)
+			return tempInfo, nil
+		}
+		return nil, role.ErrServiceNotReady
 	}
 
 	return thisInfoI.(*kInfo), nil
 }
 
-func (k *Info) getPInfo(pid string) (*pInfo, error) {
+func (k *Info) getPInfo(pid string, managed bool) (*pInfo, error) {
 	thisInfoI, ok := k.providers.Load(pid)
 	if !ok {
 		has, err := role.IsProvider(pid)
@@ -159,14 +165,28 @@ func (k *Info) getPInfo(pid string) (*pInfo, error) {
 			return nil, err
 		}
 
+		pItem, err := role.GetProviderInfo(k.localID, pid)
+		if err != nil {
+			return nil, err
+		}
+
+		tempInfo.proItem = &pItem
+
 		if k.ds.Connect(k.context, pid) {
 			tempInfo.availTime = time.Now().Unix()
 			tempInfo.online = true
 			k.ms.providerNum.Inc()
 			k.providers.Store(pid, tempInfo)
+			return tempInfo, nil
 		}
 
-		return tempInfo, nil
+		if managed {
+			k.ms.providerNum.Inc()
+			k.providers.Store(pid, tempInfo)
+			return tempInfo, nil
+		}
+
+		return nil, role.ErrServiceNotReady
 	}
 
 	return thisInfoI.(*pInfo), nil
@@ -287,10 +307,10 @@ func (k *Info) checkConnectedPeer(ctx context.Context) error {
 		utils.MLogger.Infof("get %s role: %s from net", id, string(val))
 		if string(val) == metainfo.RoleKeeper {
 			utils.MLogger.Info("Connect to new keeper: ", id)
-			k.getKInfo(id)
+			k.getKInfo(id, false)
 		} else if string(val) == metainfo.RoleProvider {
 			utils.MLogger.Info("Connect to new provider: ", id)
-			k.getPInfo(id)
+			k.getPInfo(id, false)
 		} else {
 			k.netIDs[id] = struct{}{}
 		}
@@ -335,9 +355,7 @@ func (k *Info) GetProviders() ([]string, error) {
 
 	var res []string
 	k.providers.Range(func(k, v interface{}) bool {
-		if v.(*pInfo).online && v.(*pInfo).credit > 0 {
-			res = append(res, k.(string))
-		}
+		res = append(res, k.(string))
 		return true
 	})
 

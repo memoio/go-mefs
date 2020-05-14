@@ -83,7 +83,7 @@ var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
 	"info":      KeeperCmd,
 	"bootstrap": newcmd.BootstrapCmd,
-	"config":    newcmd.ConfigCmd,
+	"config":    ConfigCmd,
 	"dht":       newcmd.DhtCmd,
 	"id":        newcmd.IDCmd,
 	"swarm":     newcmd.SwarmCmd,

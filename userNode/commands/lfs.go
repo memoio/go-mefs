@@ -303,7 +303,7 @@ var lfsStartUserCmd = &cmds.Command{
 		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(""),
 		cmds.StringOption("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(""),
 		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(utils.DefaultDuration),
-		cmds.Int64Option("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.StringOption("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(""),
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(utils.KeeperSLA),
 		cmds.IntOption("providerSla", "ps", "implement user needs how many providers").WithDefault(utils.ProviderSLA),
 		cmds.BoolOption("reDeployQuery", "rdo", "reDeploy query contract if user has not deploy upkeeping contract").WithDefault(false),
@@ -401,11 +401,20 @@ var lfsStartUserCmd = &cmds.Command{
 			fmt.Println("input wrong duration.")
 			return errWrongInput
 		}
-		price, ok := req.Options["storedPrice"].(int64) //user签署合约时指定的需求存储价格
-		if !ok || price <= 0 {
-			fmt.Println("input wrong price.")
-			return errWrongInput
+		price := big.NewInt(0)
+		priceStr, ok := req.Options["storedPrice"].(string) //user签署合约时指定的需求存储价格
+		if !ok || len(priceStr) == 0 {
+			price.SetInt64(utils.STOREPRICEPEDOLLAR)
 		}
+
+		if len(priceStr) > 0 {
+			price.SetString(priceStr, 10)
+			if price.Cmp(big.NewInt(0)) <= 0 {
+				fmt.Println("input wrong price: ", priceStr)
+				return errWrongInput
+			}
+		}
+
 		ks, ok := req.Options["keeperSla"].(int) //user签署合约时指定的需求keeper数量
 		if !ok || ks <= 0 {
 			fmt.Println("input wrong keeper nums.")
@@ -1731,7 +1740,7 @@ type infoOutput struct {
 	StartTime     string
 	EndTime       string
 	Duration      int64
-	Price         int64
+	Price         *big.Int
 	UpKeepingAddr string
 	QueryAddr     string
 	KeeperAddrs   []string

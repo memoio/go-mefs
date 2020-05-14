@@ -44,14 +44,14 @@ type UpKeepingItem struct {
 	Providers   []upKeeping.UpKeepingKPInfo
 	KeeperSLA   int32
 	ProviderSLA int32
-	Duration    int64 //存储时间，单位second
-	Capacity    int64 // MB
-	Price       int64 // 部署的价格: wei/(MB*h)
-	StartTime   int64 // 部署的时间: second
+	Duration    int64    //存储时间，单位second
+	Capacity    int64    // MB
+	Price       *big.Int // 部署的价格: wei/(MB*h)
+	StartTime   int64    // 部署的时间: second
 	Money       *big.Int
 	EndTime     int64 // second
 	Cycle       int64 // 设置周期
-	NeedPay     int64
+	NeedPay     *big.Int
 	Proofs      []upKeeping.UpKeepingProof
 }
 
@@ -61,8 +61,8 @@ type OfferItem struct {
 	OfferID    string // offer address : id format
 	Capacity   int64
 	Duration   int64
-	Price      int64 //合约给出的单价
-	CreateDate int64 //合约创建时间
+	Price      *big.Int //合约给出的单价
+	CreateDate int64    //合约创建时间
 }
 
 // ChannelItem has channel information
@@ -85,7 +85,7 @@ type QueryItem struct {
 	QueryID      string
 	Capacity     int64
 	Duration     int64
-	Price        int64 // 合约给出的单价
+	Price        *big.Int // 合约给出的单价
 	KeeperNums   int32
 	ProviderNums int32
 	Completed    bool
@@ -257,7 +257,7 @@ func IsProvider(userID string) (bool, error) {
 }
 
 // DeployOffer is
-func DeployOffer(localID, sk string, capacity, duration, price int64, redo bool) (offerID string, err error) {
+func DeployOffer(localID, sk string, capacity, duration int64, price *big.Int, redo bool) (offerID string, err error) {
 	utils.MLogger.Info("Begin to deploy offer contract...")
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
@@ -321,7 +321,7 @@ func GetOfferInfo(localID, offerID string) (OfferItem, error) {
 		item = OfferItem{
 			Capacity:   capacity.Int64(),
 			Duration:   duration.Int64(),
-			Price:      price.Int64(),
+			Price:      price,
 			OfferID:    offerID,
 			CreateDate: createDate.Int64(),
 		}
@@ -364,7 +364,7 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 }
 
 // DeployQuery is
-func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, ps int, rdo bool) (queryID string, err error) {
+func DeployQuery(userID, sk string, storeDays, storeSize int64, storePrice *big.Int, ks, ps int, rdo bool) (queryID string, err error) {
 	utils.MLogger.Info("Begin to deploy query contract...")
 	uaddr, err := address.GetAddressFromID(userID)
 	if err != nil {
@@ -378,7 +378,7 @@ func DeployQuery(userID, sk string, storeDays, storeSize, storePrice int64, ks, 
 	}
 
 	//balance >? query + upKeeping + channel cost
-	moneyAccount := new(big.Int).Mul(big.NewInt(storePrice), big.NewInt(storeSize))
+	moneyAccount := new(big.Int).Mul(storePrice, big.NewInt(storeSize))
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 	// upKeeping cost
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(600000000)))
@@ -497,7 +497,7 @@ func GetQueryInfo(localID, queryID string) (QueryItem, error) {
 		item = QueryItem{
 			Capacity:     capacity.Int64(),
 			Duration:     duration.Int64(),
-			Price:        price.Int64(),
+			Price:        price,
 			KeeperNums:   int32(ks.Int64()),
 			ProviderNums: int32(ps.Int64()),
 			Completed:    completed,
@@ -508,7 +508,7 @@ func GetQueryInfo(localID, queryID string) (QueryItem, error) {
 }
 
 // DeployUpKeeping is
-func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, storeSize, storePrice, stPayCycle int64, redo bool) (ukID string, err error) {
+func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, storeSize int64, storePrice *big.Int, stPayCycle int64, redo bool) (ukID string, err error) {
 	localAddress, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return ukID, err
@@ -538,7 +538,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 
 	var moneyPerDay = new(big.Int)
 	var moneyAccount = new(big.Int)
-	moneyPerDay = moneyPerDay.Mul(big.NewInt(storePrice), big.NewInt(storeSize))
+	moneyPerDay = moneyPerDay.Mul(storePrice, big.NewInt(storeSize))
 	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(storeDays))
 
 	utils.MLogger.Info("Begin to deploy upkeeping contract...")
@@ -628,11 +628,11 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 			ProviderSLA: int32(len(providers)),
 			Duration:    duration.Int64(),
 			Capacity:    capacity.Int64(),
-			Price:       price.Int64(),
+			Price:       price,
 			StartTime:   startTime.Int64(),
 			EndTime:     endDate.Int64(),
 			Cycle:       cycle.Int64(),
-			NeedPay:     needPay.Int64(),
+			NeedPay:     needPay,
 			Proofs:      proofs,
 		}
 		return item, nil
@@ -707,11 +707,11 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			ProviderSLA: int32(len(providers)),
 			Duration:    duration.Int64(),
 			Capacity:    capacity.Int64(),
-			Price:       price.Int64(),
+			Price:       price,
 			StartTime:   startTime.Int64(),
 			EndTime:     endDate.Int64(),
 			Cycle:       cycle.Int64(),
-			NeedPay:     needPay.Int64(),
+			NeedPay:     needPay,
 			Proofs:      proofs,
 		}
 		return item, nil

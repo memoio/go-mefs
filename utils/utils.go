@@ -22,6 +22,9 @@ const (
 	//SHOWTIME 用于输出给使用者
 	SHOWTIME = "2006-01-02 Mon 15:04:05 MST"
 
+	// Eth2Wei is 1eth = !wei
+	Eth2Wei int64 = 1000000000000000000
+
 	//IDLength  目前ID的长度
 	IDLength = 30
 
@@ -54,13 +57,13 @@ const (
 	//READPRICE 读支付中1MB内容需要支付的金额; wei/MB
 	READPRICE int64 = 1024 * 1024 * 1024
 
-	// Stored price 3$/TB*Month
+	// STOREPRICEPEDOLLAR is stored price 3$/TB*Month
 	// 1 eth=0.01$
 	// wei/MB*hour
 	STOREPRICEPEDOLLAR int64 = 400000000000
 )
 
-//false 意味着有，true表示无重复
+//CheckDup checks duplicate, false 意味着有，true表示无重复
 func CheckDup(strs []string, s string) bool {
 	for _, str := range strs {
 		if strings.Compare(str, s) == 0 {

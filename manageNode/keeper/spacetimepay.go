@@ -35,11 +35,14 @@ func (k *Info) stPayRegular(ctx context.Context) {
 				if uq.qid == uq.uid {
 					continue
 				}
-				qid := uq.qid
 
-				thisGroup := k.getGroupInfo(uq.uid, qid, false)
+				thisGroup := k.getGroupInfo(uq.uid, uq.qid, false)
 				if thisGroup == nil {
 					continue
+				}
+
+				if uq.uid == pos.GetPosId() && thisGroup.upkeeping != nil {
+					thisGroup.upkeeping.Price = k.getPosPrice()
 				}
 
 				expireCount := 0
@@ -51,12 +54,12 @@ func (k *Info) stPayRegular(ctx context.Context) {
 						}
 						continue
 					}
-					k.savePay(uq.uid, qid, proID)
+					k.savePay(uq.uid, uq.qid, proID)
 				}
 
 				if expireCount == len(thisGroup.providers) {
 					// all pay ends;
-					k.ukpGroup.Delete(qid)
+					k.ukpGroup.Delete(uq.qid)
 				}
 			}
 
@@ -81,10 +84,6 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 	// TODO: exit when balance is too low
 
 	price := g.upkeeping.Price
-	if g.userID == pos.GetPosId() {
-		// todo, price depends on total pledge data
-		price = pos.GetPosPrice()
-	}
 
 	// check again
 	found := false
@@ -201,7 +200,11 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 			return err
 		}
 
-		utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
+		if g.userID == pos.GetPosId() {
+			utils.MLogger.Infof("SpaceTimePay start pay for pos user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
+		} else {
+			utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
+		}
 
 		thisLinfo.currentPay.Status = 0
 		thisLinfo.lastPay = thisLinfo.currentPay
@@ -220,7 +223,7 @@ type timeValue struct {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func (l *lInfo) resultSummary(price, start, end int64) (*big.Int, int64, []byte) {
+func (l *lInfo) resultSummary(price *big.Int, start, end int64) (*big.Int, int64, []byte) {
 	spacetime := big.NewInt(0)
 	var tsl []timeValue //用来对挑战时间排序
 
@@ -273,7 +276,7 @@ func (l *lInfo) resultSummary(price, start, end int64) (*big.Int, int64, []byte)
 		utils.MLogger.Info("error spacetime<=0")
 	}
 
-	spacetime.Mul(spacetime, big.NewInt(price))
+	spacetime.Mul(spacetime, price)
 	spacetime.Quo(spacetime, big.NewInt(1024*1024*60*60))
 	if spacetime.Sign() <= 0 {
 		utils.MLogger.Info("error!amount:", spacetime, "price:", price)

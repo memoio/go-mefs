@@ -110,7 +110,7 @@ type pInfo struct {
 }
 
 //New start provider service
-func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, price, depositSize int64, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
+func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, depositSize int64, price *big.Int, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
 	mea := &measure{
 		balance:     metrics.New("provider.balance", "Balance of this provider").Gauge(),
 		groupNum:    metrics.New("provider.group_num", "Group number").Gauge(),
@@ -152,7 +152,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	m.ms.providerNum.Inc()
 
-	err = m.loadContracts(capacity, duration, price, depositSize, reDeployOffer)
+	err = m.loadContracts(capacity, duration, depositSize, price, reDeployOffer)
 	if err != nil {
 		utils.MLogger.Error("provider load contarct failed: ", err)
 		return nil, err
@@ -160,7 +160,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
 
-	go m.getKpMapRegular(ctx)
+	go m.getFromChainRegular(ctx)
 	go m.sendStorageRegular(ctx)
 	go m.saveRegular(ctx)
 
@@ -301,11 +301,11 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 		p.fsGroup.Store(groupID, gp)
 		p.loadChannelValue(userID, groupID)
 		for _, kid := range gp.keepers {
-			p.getKeeperInfo(kid)
+			p.getKInfo(kid, true)
 		}
 
 		for _, pid := range gp.providers {
-			p.getProInfo(pid)
+			p.getPInfo(pid, true)
 		}
 
 		ui := p.getUserInfo(userID)
@@ -344,7 +344,7 @@ func (p *Info) getUserInfo(pid string) *uInfo {
 	return ui.(*uInfo)
 }
 
-func (p *Info) getKeeperInfo(pid string) *kInfo {
+func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 	ui, ok := p.keepers.Load(pid)
 	if !ok {
 
@@ -366,17 +366,24 @@ func (p *Info) getKeeperInfo(pid string) *kInfo {
 		if p.ds.Connect(p.context, pid) {
 			ui.availTime = time.Now().Unix()
 			ui.online = true
+			p.ms.keeperNum.Inc()
+			p.keepers.Store(pid, ui)
+			return ui
 		}
 
-		p.ms.keeperNum.Inc()
-		p.keepers.Store(pid, ui)
-		return ui
+		if managed {
+			p.ms.keeperNum.Inc()
+			p.keepers.Store(pid, ui)
+			return ui
+		}
+
+		return nil
 	}
 
 	return ui.(*kInfo)
 }
 
-func (p *Info) getProInfo(pid string) *pInfo {
+func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 	ui, ok := p.providers.Load(pid)
 	if !ok {
 		has, err := role.IsProvider(pid)
@@ -391,11 +398,18 @@ func (p *Info) getProInfo(pid string) *pInfo {
 		if p.ds.Connect(p.context, pid) {
 			ui.availTime = time.Now().Unix()
 			ui.online = true
+			p.ms.providerNum.Inc()
+			p.providers.Store(pid, ui)
+			return ui
 		}
 
-		p.ms.providerNum.Inc()
-		p.providers.Store(pid, ui)
-		return ui
+		if managed {
+			p.ms.providerNum.Inc()
+			p.providers.Store(pid, ui)
+			return ui
+		}
+
+		return nil
 	}
 
 	return ui.(*pInfo)
@@ -454,7 +468,7 @@ func (p *Info) load(ctx context.Context) error {
 				continue
 			}
 
-			p.getKeeperInfo(tmpKid)
+			p.getKInfo(tmpKid, false)
 		}
 	}
 
@@ -594,10 +608,34 @@ func (p *Info) save(ctx context.Context) error {
 	return nil
 }
 
-func (p *Info) getKpMapRegular(ctx context.Context) {
-	utils.MLogger.Info("Get kpMap from chain start!")
-	peerID := p.localID
-	role.SaveKpMap(peerID)
+func (p *Info) loadPeersFromChain() error {
+	keepers, _, err := role.GetAllKeepers(p.localID)
+	if err != nil {
+		return err
+	}
+
+	for _, kItem := range keepers {
+		p.getKInfo(kItem.KeeperID, false)
+	}
+
+	pros, _, err := role.GetAllProviders(p.localID)
+	if err != nil {
+		return err
+	}
+
+	for _, pItem := range pros {
+		p.getPInfo(pItem.ProviderID, false)
+	}
+
+	role.SaveKpMap(p.localID)
+
+	return nil
+}
+
+func (p *Info) getFromChainRegular(ctx context.Context) {
+	utils.MLogger.Info("Get infos from chain start!")
+
+	p.loadPeersFromChain()
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -605,9 +643,7 @@ func (p *Info) getKpMapRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			go func() {
-				role.SaveKpMap(peerID)
-			}()
+			p.loadPeersFromChain()
 		}
 	}
 }

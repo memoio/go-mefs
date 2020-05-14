@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 
 	uid := options[0]
 	qid := km.GetMid()
-	price := int64(utils.STOREPRICEPEDOLLAR)
+	price := big.NewInt(utils.STOREPRICEPEDOLLAR)
 	var response string
 	if qid != uid {
 		utils.MLogger.Infof("Get k/p numbers from query contract %s of user %s ", qid, uid)
@@ -53,7 +54,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 	}
 
 	if pos.GetPosId() == uid {
-		price = int64(utils.STOREPRICEPEDOLLAR)
+		price = pos.GetPosPrice()
 	}
 
 	response, err = k.initUser(uid, qid, kc, pc, price)
@@ -69,7 +70,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 }
 
 //response: kid1kid2../pid1pid2..
-func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error) {
+func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, error) {
 	var newResponse strings.Builder
 
 	gp := k.getGroupInfo(uid, gid, false)
@@ -79,45 +80,53 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price int64) (string, error
 		newResponse.WriteString(localID)
 		kc--
 		//fill other keepers
-		k.keepers.Range(func(k, v interface{}) bool {
+		keepers, err := k.GetKeepers()
+		if err != nil {
+			return "", err
+		}
+		for _, kid := range keepers {
 			if kc == 0 {
-				return false
+				break
+			}
+			if kid == localID {
+				continue
 			}
 
-			key := k.(string)
-			if key == localID {
-				return true
-			}
-
-			thisinfo := v.(*kInfo)
-			if thisinfo.online == true {
-				newResponse.WriteString(key)
+			thisinfo, ok := k.keepers.Load(kid)
+			if ok && thisinfo.(*kInfo).online == true {
+				newResponse.WriteString(kid)
 				kc--
 			}
-			return true
-		})
+		}
 
 		newResponse.WriteString(metainfo.DELIMITER)
 
+		pros, err := k.GetProviders()
+		if err != nil {
+			return "", err
+		}
 		// fill providers
-		k.providers.Range(func(k, v interface{}) bool {
+		for _, proID := range pros {
 			if pc == 0 {
-				return false
+				break
 			}
-			key := k.(string)
-			thisinfo := v.(*pInfo)
-			if thisinfo.online == true && thisinfo.credit > 0 {
-				if thisinfo.offerItem != nil {
-					if thisinfo.offerItem.Price > price {
-						utils.MLogger.Debugf("provider %s has price %d, need %d; has credit: %d", key, thisinfo.offerItem.Price, price, thisinfo.credit)
-						return true
+			if proID == localID {
+				continue
+			}
+
+			thisinfo, ok := k.providers.Load(proID)
+			if ok {
+				thisP := thisinfo.(*pInfo)
+				if thisP.online && thisP.offerItem != nil {
+					if thisP.offerItem.Price.Cmp(price) <= 0 && thisP.credit > 0 {
+						newResponse.WriteString(proID)
+						kc--
+					} else {
+						utils.MLogger.Debugf("provider %s need price %d, but %d; has credit: %d", proID, thisP.offerItem.Price, price, thisP.credit)
 					}
 				}
-				newResponse.WriteString(key)
-				pc--
 			}
-			return true
-		})
+		}
 
 		return newResponse.String(), nil
 	}

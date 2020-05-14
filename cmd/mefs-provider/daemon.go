@@ -4,6 +4,7 @@ import (
 	"errors"
 	_ "expvar"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -144,7 +145,7 @@ environment variable:
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
 		cmds.StringOption(capacityKwd, "cap", "provider offers how many capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
 		cmds.Int64Option(durationKwd, "dur", "provider offers how much time of storage, uint is day").WithDefault(utils.DefaultOfferDuration),
-		cmds.Int64Option(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(utils.STOREPRICEPEDOLLAR),
+		cmds.StringOption(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(""),
 		cmds.StringOption("depositCapacity", "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
 		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
@@ -427,10 +428,19 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		fmt.Println("input wrong duration.")
 		return errWrongInput
 	}
-	price, ok := req.Options[priceKwd].(int64)
-	if !ok || price <= 0 {
-		fmt.Println("input wrong price.")
-		return errWrongInput
+
+	price := big.NewInt(0)
+	priceStr, ok := req.Options[priceKwd].(string)
+	if !ok || len(priceStr) == 0 {
+		price.SetInt64(utils.STOREPRICEPEDOLLAR)
+	}
+
+	if len(priceStr) > 0 {
+		price.SetString(priceStr, 10)
+		if price.Cmp(big.NewInt(0)) <= 0 {
+			fmt.Println("input wrong price: ", priceStr)
+			return errWrongInput
+		}
 	}
 
 	rdo, ok := req.Options[reDeploy].(bool)
@@ -446,7 +456,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, price, decapacity, rdo, pos, gc)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc)
 		if err != nil {
 			fmt.Println("Start provider Service failed:", err)
 			return err

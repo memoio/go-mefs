@@ -27,28 +27,30 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 //Info implements user service
 type Info struct {
-	localID     string
-	role        string
-	sk          string
-	state       bool
-	enableBft   bool
-	context     context.Context
-	dnh         *dragonboat.NodeHost
-	raftNodeID  uint64
-	repch       chan string
-	ds          data.Service
-	keepers     sync.Map // keepers except self; value: *kInfo
-	providers   sync.Map // value: *pInfo
-	users       sync.Map // value: *uInfo
-	ukpGroup    sync.Map // manage user-keeper-provider group, value: *group
-	netIDs      map[string]struct{}
-	userConfigs *lru.ARCCache
-	kItem       *role.KeeperItem
-	ms          *measure
+	localID       string
+	role          string
+	sk            string
+	state         bool
+	enableBft     bool
+	context       context.Context
+	dnh           *dragonboat.NodeHost
+	raftNodeID    uint64
+	repch         chan string
+	ds            data.Service
+	pledgeStorage *big.Int
+	keepers       sync.Map // keepers except self; value: *kInfo
+	providers     sync.Map // value: *pInfo
+	users         sync.Map // value: *uInfo
+	ukpGroup      sync.Map // manage user-keeper-provider group, value: *group
+	netIDs        map[string]struct{}
+	userConfigs   *lru.ARCCache
+	kItem         *role.KeeperItem
+	ms            *measure
 }
 
 type measure struct {
@@ -77,14 +79,15 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	}
 
 	m := &Info{
-		localID: nid,
-		sk:      sk,
-		state:   false,
-		ds:      d,
-		repch:   make(chan string, 1024),
-		netIDs:  make(map[string]struct{}),
-		context: ctx,
-		ms:      mea,
+		localID:       nid,
+		sk:            sk,
+		state:         false,
+		ds:            d,
+		repch:         make(chan string, 1024),
+		netIDs:        make(map[string]struct{}),
+		context:       ctx,
+		ms:            mea,
+		pledgeStorage: big.NewInt(0),
 	}
 
 	balance := role.GetBalance(m.localID)
@@ -139,8 +142,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.repairRegular(ctx)
 	go m.stPayRegular(ctx)
 	go m.checkPeers(ctx)
-	go m.getKpMapRegular(ctx)
-	go m.getOfferRegular(ctx)
+	go m.getFromChainRegular(ctx)
 	m.state = true
 	utils.MLogger.Info("Keeper Service is ready")
 	return m, nil
@@ -156,7 +158,7 @@ func (k *Info) GetRole() string {
 	return metainfo.RoleKeeper
 }
 
-// Stop is
+// Close is
 func (k *Info) Close() error {
 	err := k.save(k.context)
 	if k.dnh != nil {
@@ -318,6 +320,7 @@ func (k *Info) savePay(userID, qid, pid string) error {
 
 func (k *Info) load(ctx context.Context) error {
 	k.loadPeers(ctx)
+	k.loadPeersFromChain()
 	k.loadUser(ctx)
 	return nil
 }
@@ -609,7 +612,6 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	// load keepers
 	kmKID, err := metainfo.NewKey(localID, mpb.KeyType_Keepers)
 	if err != nil {
-
 		return err
 	}
 
@@ -621,7 +623,7 @@ func (k *Info) loadPeers(ctx context.Context) error {
 			if err != nil {
 				continue
 			}
-			k.getKInfo(tmpKid)
+			k.getKInfo(tmpKid, true)
 		}
 	}
 
@@ -640,11 +642,53 @@ func (k *Info) loadPeers(ctx context.Context) error {
 				continue
 			}
 
-			k.getPInfo(tmpKid)
+			k.getPInfo(tmpKid, true)
 		}
 	}
 
 	return nil
+}
+
+func (k *Info) loadPeersFromChain() error {
+	keepers, _, err := role.GetAllKeepers(k.localID)
+	if err != nil {
+		return err
+	}
+
+	for _, kItem := range keepers {
+		k.getKInfo(kItem.KeeperID, false)
+	}
+
+	pros, totalStorage, err := role.GetAllProviders(k.localID)
+	if err != nil {
+		return err
+	}
+
+	for _, pItem := range pros {
+		pInfo, err := k.getPInfo(pItem.ProviderID, false)
+		if err != nil {
+			continue
+		}
+
+		pInfo.setOffer(true)
+	}
+
+	k.pledgeStorage = totalStorage
+
+	role.SaveKpMap(k.localID)
+
+	return nil
+}
+
+func (k *Info) getPosPrice() *big.Int {
+	if k.pledgeStorage.Cmp(big.NewInt(0)) > 0 {
+		mm := big.NewInt(MarketingMoney)
+		mm.Mul(mm, big.NewInt(utils.Eth2Wei))
+		mm.Div(mm, big.NewInt(24)) // per hour
+		return mm.Div(mm, k.pledgeStorage)
+	}
+
+	return pos.GetPosPrice()
 }
 
 /*====================Key Ops========================*/

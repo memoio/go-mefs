@@ -12,7 +12,7 @@ import (
 )
 
 //DeployOffer provider use it to deploy offer-contract
-func DeployOffer(localAddress common.Address, hexKey string, capacity int64, duration int64, price int64, redo bool) (common.Address, error) {
+func DeployOffer(localAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, redo bool) (common.Address, error) {
 	log.Println("begin to deploy offer-contract...")
 	var offerAddr common.Address
 	t := duration * 24 * 60 * 60
@@ -43,7 +43,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity int64, dur
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(t), big.NewInt(price)) //提供存储容量 存储时段 存储单价
+		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(t), price) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Offer Err:", err)

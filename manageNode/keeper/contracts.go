@@ -160,36 +160,8 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 	return nil
 }
 
-func (k *Info) getOfferRegular(ctx context.Context) {
-	utils.MLogger.Info("Get kpMap from chain start!")
-
-	ticker := time.NewTicker(time.Hour)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go func() {
-				pros, _ := k.GetProviders()
-
-				for _, pro := range pros {
-					proInfo, ok := k.providers.Load(pro)
-					if !ok {
-						continue
-					}
-					proInfo.(*pInfo).setOffer(true)
-				}
-			}()
-		}
-	}
-}
-
-func (k *Info) getKpMapRegular(ctx context.Context) {
-	utils.MLogger.Info("Get kpMap from chain start!")
-
-	peerID := k.localID
-	role.SaveKpMap(peerID)
+func (k *Info) getFromChainRegular(ctx context.Context) {
+	utils.MLogger.Info("Get infos from chain start!")
 	ticker := time.NewTicker(kpMapTime)
 	defer ticker.Stop()
 	for {
@@ -197,9 +169,7 @@ func (k *Info) getKpMapRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			go func() {
-				role.SaveKpMap(peerID)
-			}()
+			k.loadPeersFromChain()
 		}
 	}
 }

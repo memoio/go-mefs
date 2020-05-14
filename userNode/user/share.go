@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"io"
+	"math/big"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -100,7 +101,7 @@ func (u *Info) GetShareObject(ctx context.Context, writer io.Writer, completeFun
 		}
 	}
 
-	su, err := u.NewFS(sl.UserID, uid, sl.QueryID, localSk, 0, 0, 0, 0, 0, false, false)
+	su, err := u.NewFS(sl.UserID, uid, sl.QueryID, localSk, 0, 0, big.NewInt(0), 0, 0, false, false)
 	if err != nil {
 		utils.MLogger.Errorf("create share user %s error: %s", sl.UserID, err)
 		return err

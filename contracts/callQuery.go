@@ -12,7 +12,7 @@ import (
 )
 
 //DeployQuery user use it to deploy query-contract
-func DeployQuery(userAddress common.Address, hexKey string, capacity int64, duration int64, price int64, ks int, ps int, redo bool) (common.Address, error) {
+func DeployQuery(userAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, ks int, ps int, redo bool) (common.Address, error) {
 	log.Println("begin to deploy query-contract...")
 
 	var queryAddr common.Address
@@ -41,7 +41,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity int64, dura
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), big.NewInt(price), big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), price, big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("deployQueryErr:", err)

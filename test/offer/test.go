@@ -35,7 +35,7 @@ func main() {
 	var (
 		capacity int64 = 1000
 		duration int64 = 10000
-		price    int64 = 100000
+		price          = big.NewInt(100000)
 	)
 
 	//ethEndPoint = *qeth //用正常的链（http://39.100.146.21:8101）给新建账户转账

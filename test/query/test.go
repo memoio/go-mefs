@@ -34,7 +34,7 @@ func main() {
 	var (
 		capacity int64 = 10000
 		duration int64 = 10000
-		price    int64 = 100000
+		price          = big.NewInt(100000)
 		ks             = 3
 		ps             = 5
 		reDeploy       = true
@@ -80,7 +80,7 @@ func main() {
 		log.Fatal("get query fails:", err)
 	}
 
-	if qItem.Capacity != capacity || qItem.Duration != duration || qItem.Price != price || qItem.KeeperNums != int32(ks) || qItem.ProviderNums != int32(ps) {
+	if qItem.Capacity != capacity || qItem.Duration != duration || qItem.Price.Cmp(price) != 0 || qItem.KeeperNums != int32(ks) || qItem.ProviderNums != int32(ps) {
 		log.Fatal("query info is different from set")
 	}
 

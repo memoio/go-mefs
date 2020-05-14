@@ -21,6 +21,9 @@ const (
 	kpMapTime        = 11 * time.Minute
 )
 
+// MarketingMoney is used to
+var MarketingMoney int64 = 1
+
 //---config----
 func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 	value, ok := k.userConfigs.Get(groupID)

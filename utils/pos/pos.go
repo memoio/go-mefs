@@ -2,7 +2,8 @@ package pos
 
 import (
 	"encoding/hex"
-	"fmt"
+	"log"
+	"math/big"
 
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -17,8 +18,8 @@ func GetPosId() string {
 	return id
 }
 
-func GetPosPrice() int64 {
-	return utils.STOREPRICEPEDOLLAR / 10
+func GetPosPrice() *big.Int {
+	return big.NewInt(utils.STOREPRICEPEDOLLAR / 10)
 }
 
 func GetPosSeed() []byte {
@@ -26,6 +27,6 @@ func GetPosSeed() []byte {
 	if err != nil {
 		return nil
 	}
-	fmt.Println("pos seed is: ", hex.EncodeToString(seed[:]))
+	log.Println("pos seed is: ", hex.EncodeToString(seed[:]))
 	return seed
 }

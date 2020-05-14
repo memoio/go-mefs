@@ -245,7 +245,7 @@ func (k *Info) handleStorage(km *metainfo.Key, value []byte, pid string) {
 		return
 	}
 
-	thisInfo, err := k.getPInfo(pid)
+	thisInfo, err := k.getPInfo(pid, false)
 	if err != nil {
 		return
 	}

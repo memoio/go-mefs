@@ -200,6 +200,24 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 	return nil
 }
 
+// GetAllKeepers gets all keepers from chain
+func GetAllKeepers(localAddr common.Address) ([]common.Address, error) {
+	_, keeperContract, err := GetKeeperContractFromIndexer(localAddr)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return nil, err
+	}
+
+	res, err := keeperContract.GetAllAddress(&bind.CallOpts{
+		From: localAddr,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 //---------provider----------//
 
 //DeployProvider deploy a keeper contract
@@ -393,6 +411,24 @@ func PledgeProvider(localAddress common.Address, hexKey string, size *big.Int) (
 	}
 
 	return nil
+}
+
+// GetAllProviders gets all provider addresses from chain
+func GetAllProviders(localAddr common.Address) ([]common.Address, error) {
+	_, proContract, err := GetProviderContractFromIndexer(localAddr)
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return nil, err
+	}
+
+	res, err := proContract.GetAllAddress(&bind.CallOpts{
+		From: localAddr,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 //----------------------kpmap---------------------------//

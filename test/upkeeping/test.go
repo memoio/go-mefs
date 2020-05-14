@@ -87,7 +87,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	}
 
 	log.Println("1.begin to deploy upkeeping first")
-	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr[0], listKeeperAddr, listProviderAddr, 780, 1024, 111, defaultCycle, big.NewInt(moneyToUK), false)
+	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr[0], listKeeperAddr, listProviderAddr, 780, 1024, big.NewInt(111), defaultCycle, big.NewInt(moneyToUK), false)
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err

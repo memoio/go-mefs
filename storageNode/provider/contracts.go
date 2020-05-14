@@ -13,7 +13,7 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func (p *Info) loadContracts(capacity, duration, price, depositSize int64, reDeployOffer bool) error {
+func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.Int, reDeployOffer bool) error {
 	proID := p.localID
 
 	if p.proContract == nil {

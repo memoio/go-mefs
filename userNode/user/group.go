@@ -62,11 +62,11 @@ type groupInfo struct {
 	keepers   map[string]*keeperInfo
 	providers map[string]*providerInfo
 
-	storeDays     int64 //表示部署合约时的存储数据时间，单位是“天”
-	storeSize     int64 //表示部署合约时的存储数据大小，单位是“MB”
-	storePrice    int64 //表示部署合约时的存储价格大小，单位是“wei”
-	keeperSLA     int   //表示部署合约时的keeper参数，目前是keeper数量
-	providerSLA   int   //表示部署合约时的provider参数，目前是provider数量
+	storeDays     int64    //表示部署合约时的存储数据时间，单位是“天”
+	storeSize     int64    //表示部署合约时的存储数据大小，单位是“MB”
+	storePrice    *big.Int //表示部署合约时的存储价格大小，单位是“wei”
+	keeperSLA     int      //表示部署合约时的keeper参数，目前是keeper数量
+	providerSLA   int      //表示部署合约时的provider参数，目前是provider数量
 	stPayCycle    int64
 	reDeploy      bool // 是否重新部署offer
 	force         bool
@@ -79,7 +79,7 @@ type groupInfo struct {
 	queryItem     *role.QueryItem
 }
 
-func newGroup(uid, shareTo, sk string, capacity, duration, price int64, ks, ps int, d data.Service) *groupInfo {
+func newGroup(uid, shareTo, sk string, capacity, duration int64, price *big.Int, ks, ps int, d data.Service) *groupInfo {
 	return &groupInfo{
 		userID:      uid,
 		rootID:      uid,

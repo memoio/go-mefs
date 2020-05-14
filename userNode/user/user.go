@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"math/big"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -67,7 +68,7 @@ func New(ctx context.Context, nid string, d data.Service, rt routing.Routing) (i
 }
 
 // NewFS add a new user
-func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration, price int64, ks, ps int, rdo, force bool) (FileSyetem, error) {
+func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int64, price *big.Int, ks, ps int, rdo, force bool) (FileSyetem, error) {
 	utils.MLogger.Infof("create lfs service: %s for user %s", queryID, userID)
 	if !rdo {
 		// check stats
