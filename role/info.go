@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -102,4 +103,9 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 		return pItems, totalMoney, nil
 	}
 	return pItems, totalMoney, ErrEmptyData
+}
+
+// GetMemoPrice gets memo price
+func GetMemoPrice() *big.Float {
+	return big.NewFloat(utils.Memo2Dollar)
 }

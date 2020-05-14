@@ -219,8 +219,11 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 		}
 
 		cap := utils.DepositCapacity
-		if price.Int64() != 0 {
-			cap = money.Div(money, price).Int64()
+		weiPrice := new(big.Float).SetInt(price)
+		weiPrice.Quo(weiPrice, GetMemoPrice())
+		weiPrice.Int(price)
+		if price.Sign() > 0 {
+			cap = money.Quo(money, price).Int64()
 		}
 
 		if isProvider && !isBanned {
@@ -245,7 +248,17 @@ func PledgeProvider(localID, hexKey string, size *big.Int) error {
 		return err
 	}
 
-	return contracts.PledgeProvider(localAddress, hexKey, size)
+	price, err := contracts.GetProviderPrice(localAddress)
+	if err != nil {
+		return err
+	}
+
+	weiPrice := new(big.Float).SetInt(price)
+	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Int(price)
+	price.Mul(price, size)
+
+	return contracts.PledgeProvider(localAddress, hexKey, price)
 }
 
 func IsProvider(userID string) (bool, error) {
@@ -266,9 +279,11 @@ func DeployOffer(localID, sk string, capacity, duration int64, price *big.Int, r
 
 	//获得用户的账户余额
 	balance, err := contracts.QueryBalance(localAddress.Hex())
-	if err == nil {
-		utils.MLogger.Infof("%s (%s) has balance: %s", localID, localAddress.Hex(), balance)
+	if err != nil {
+		return offerID, err
 	}
+
+	utils.MLogger.Infof("%s (%s) has balance: %s", localID, localAddress.Hex(), balance)
 
 	offerAddr, err := contracts.DeployOffer(localAddress, sk, capacity, duration, price, redo)
 	if err != nil {
@@ -373,18 +388,32 @@ func DeployQuery(userID, sk string, storeDays, storeSize int64, storePrice *big.
 
 	// getbalance
 	balance, err := contracts.QueryBalance(uaddr.String())
-	if err == nil {
-		utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
+	if err != nil {
+		return queryID, err
 	}
 
+	utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
+
 	//balance >? query + upKeeping + channel cost
-	moneyAccount := new(big.Int).Mul(storePrice, big.NewInt(storeSize))
+	weiPrice := new(big.Float).SetInt(storePrice)
+	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Int(storePrice)
+
+	moneyAccount := big.NewInt(24)
+	moneyAccount.Mul(moneyAccount, storePrice)
+	moneyAccount.Mul(moneyAccount, big.NewInt(storeSize))
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 	// upKeeping cost
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(600000000)))
 	moneyAccount.Add(moneyAccount, big.NewInt(1128277))
-	// channel cost; read ps times
-	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE*int64(ps)), big.NewInt(storeSize))
+
+	// channel cost; read 1 times
+	readPrice := big.NewInt(utils.READPRICE)
+	weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
+	weiRPrice.Quo(weiRPrice, GetMemoPrice())
+	weiRPrice.Int(readPrice)
+
+	moneyToChannel := new(big.Int).Mul(readPrice, big.NewInt(storeSize))
 	moneyAccount.Add(moneyAccount, moneyToChannel)
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
 	moneyAccount.Sub(moneyAccount, balance)
@@ -536,10 +565,14 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 		providers = append(providers, providerAddress)
 	}
 
-	var moneyPerDay = new(big.Int)
-	var moneyAccount = new(big.Int)
-	moneyPerDay = moneyPerDay.Mul(storePrice, big.NewInt(storeSize))
-	moneyAccount = moneyAccount.Mul(moneyPerDay, big.NewInt(storeDays))
+	weiPrice := new(big.Float).SetInt(storePrice)
+	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Int(storePrice)
+
+	moneyAccount := big.NewInt(24)
+	moneyAccount.Mul(moneyAccount, storePrice)
+	moneyAccount.Mul(moneyAccount, big.NewInt(storeSize))
+	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 
 	utils.MLogger.Info("Begin to deploy upkeeping contract...")
 
@@ -583,6 +616,11 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 		return item, nil
 	}
 
+	ukMoney, err := contracts.QueryBalance(ukAddr.String())
+	if err != nil {
+		return item, err
+	}
+
 	retryCount := 0
 	for {
 		retryCount++
@@ -596,23 +634,6 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		// var keepers []string
-		// var providers []string
-		// for _, keeper := range keeperAddrs {
-		// 	kid, err := address.GetIDFromAddress(keeper.String())
-		// 	if err != nil {
-		// 		return item, err
-		// 	}
-		// 	keepers = append(keepers, kid)
-		// }
-
-		// for _, provider := range providerAddrs {
-		// 	pid, err := address.GetIDFromAddress(provider.String())
-		// 	if err != nil {
-		// 		return item, err
-		// 	}
-		// 	providers = append(providers, pid)
-		// }
 
 		qid, err := address.GetIDFromAddress(queryAddr.String())
 		if err != nil {
@@ -634,6 +655,7 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 			Cycle:       cycle.Int64(),
 			NeedPay:     needPay,
 			Proofs:      proofs,
+			Money:       ukMoney,
 		}
 		return item, nil
 	}
@@ -669,23 +691,6 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		// var keepers []string
-		// var providers []string
-		// for _, keeper := range keeperAddrs {
-		// 	kid, err := address.GetIDFromAddress(keeper.String())
-		// 	if err != nil {
-		// 		return item, err
-		// 	}
-		// 	keepers = append(keepers, kid)
-		// }
-
-		// for _, provider := range providerAddrs {
-		// 	pid, err := address.GetIDFromAddress(provider.String())
-		// 	if err != nil {
-		// 		return item, err
-		// 	}
-		// 	providers = append(providers, pid)
-		// }
 
 		qid, err := address.GetIDFromAddress(queryAddr.String())
 		if err != nil {
@@ -693,6 +698,11 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 		}
 
 		ukID, err := address.GetIDFromAddress(ukAddr.String())
+		if err != nil {
+			return item, err
+		}
+
+		ukMoney, err := contracts.QueryBalance(ukAddr.String())
 		if err != nil {
 			return item, err
 		}
@@ -713,6 +723,7 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 			Cycle:       cycle.Int64(),
 			NeedPay:     needPay,
 			Proofs:      proofs,
+			Money:       ukMoney,
 		}
 		return item, nil
 	}

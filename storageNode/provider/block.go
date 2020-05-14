@@ -120,7 +120,7 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 			if cItem.Money.Cmp(big.NewInt(0)) == 0 || value.Cmp(cItem.Money) > 0 {
 				utils.MLogger.Errorf("verify sig for block %s failed, money is not enough, has %s, expected %s", splitedNcid[0], cItem.Money.String(), value.String())
 				go p.loadChannelValue(gp.userID, gp.groupID)
-				return nil, role.ErrNotEnoughMoney
+				return nil, role.ErrNotEnoughBalance
 			}
 		}
 
@@ -195,10 +195,17 @@ func verifyChanSign(mes []byte) (bool, string, *big.Int, error) {
 
 func verifyChanValue(oldValue, newValue *big.Int, readLen int) bool {
 	//verify value;： value ?= oldValue + 100
-	addValue := big.NewInt(int64(readLen) * utils.READPRICE / (1024 * 1024 * 1024))
-	addValue.Add(addValue, oldValue)
-	if newValue.Cmp(addValue) < 0 {
-		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", addValue.String())
+	readPrice := big.NewInt(utils.READPRICE)
+	weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
+	weiRPrice.Quo(weiRPrice, role.GetMemoPrice())
+	weiRPrice.Int(readPrice)
+
+	readPrice.Mul(readPrice, big.NewInt(int64(readLen)))
+	readPrice.Quo(readPrice, big.NewInt(1024*1024))
+
+	readPrice.Add(readPrice, oldValue)
+	if newValue.Cmp(readPrice) < 0 {
+		utils.MLogger.Warn(newValue.String(), " received is less than calculated: ", readPrice.String())
 		return false
 	}
 	return true

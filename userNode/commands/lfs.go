@@ -404,7 +404,7 @@ var lfsStartUserCmd = &cmds.Command{
 		price := big.NewInt(0)
 		priceStr, ok := req.Options["storedPrice"].(string) //user签署合约时指定的需求存储价格
 		if !ok || len(priceStr) == 0 {
-			price.SetInt64(utils.STOREPRICEPEDOLLAR)
+			price.SetInt64(utils.STOREPRICE)
 		}
 
 		if len(priceStr) > 0 {

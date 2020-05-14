@@ -7,8 +7,7 @@ import (
 const Debug = false
 
 var (
-	ErrNotEnoughBalance = errors.New("your account's balance is insufficient")
-	ErrNotEnoughMoney   = errors.New("money is not enough")
+	ErrNotEnoughBalance = errors.New("balance is insufficient")
 	ErrNotMyUser        = errors.New("Not my user")
 	ErrNotMyKeeper      = errors.New("Not my keeper")
 	ErrNotMyProvider    = errors.New("Not my provider")

@@ -425,6 +425,10 @@ func (g *groupInfo) connect(ctx context.Context) error {
 // for test: queryID = userID
 func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
+	if g.providerSLA <= 0 || g.keeperSLA <= 0 {
+		return ErrWrongParameters
+	}
+
 	kmInit, err := metainfo.NewKey(g.groupID, mpb.KeyType_UserInit, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA))
 	if err != nil {
 		return err
@@ -726,7 +730,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 				for i := 0; i < 5; i++ {
 					tdelay := rand.Int63n(int64(i+1) * 60000000000)
 					time.Sleep(time.Duration(tdelay))
-					_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+					_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize/int64(g.providerSLA), true)
 					if err != nil {
 						continue
 					}

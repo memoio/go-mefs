@@ -409,7 +409,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 					atomic.AddInt32(&wrongMoney, 1)
 				}
 
-				if err.Error() == role.ErrNotEnoughMoney.Error() {
+				if err.Error() == role.ErrNotEnoughBalance.Error() {
 					atomic.AddInt32(&wrongMoney, 1)
 					do.group.loadContracts(ctx, provider)
 				}
@@ -487,21 +487,28 @@ func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]
 	channelID := do.group.groupID
 
 	if cItem != nil {
-		money := big.NewInt(int64(readLen) * utils.READPRICE / (1024 * 1024 * 1024))
-		money.Add(money, cItem.Value) //100 + valueBase
-		if money.Cmp(cItem.Money) > 0 {
+		readPrice := big.NewInt(utils.READPRICE)
+		weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
+		weiRPrice.Quo(weiRPrice, role.GetMemoPrice())
+		weiRPrice.Int(readPrice)
+
+		readPrice.Mul(readPrice, big.NewInt(int64(readLen)))
+		readPrice.Quo(readPrice, big.NewInt(1024*1024))
+		readPrice.Add(readPrice, cItem.Value) //100 + valueBase
+		if readPrice.Cmp(cItem.Money) > 0 {
 			utils.MLogger.Warn("need to redeploy channel contract for ", cItem.ProID)
+			return nil, nil, role.ErrNotEnoughBalance
 		}
 
 		channelID = cItem.ChannelID
 
-		mes, err := role.SignForChannel(channelID, hexSK, money)
+		mes, err := role.SignForChannel(channelID, hexSK, readPrice)
 		if err != nil {
 			utils.MLogger.Errorf("Signature about channelID %s fails: %s", channelID, err)
 			return nil, nil, err
 		}
 
-		return mes, money, nil
+		return mes, readPrice, nil
 	}
 	return nil, nil, role.ErrTestUser
 }

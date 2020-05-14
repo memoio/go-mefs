@@ -367,18 +367,10 @@ func SetProviderPrice(localAddress common.Address, hexKey string, price *big.Int
 	return nil
 }
 
-func PledgeProvider(localAddress common.Address, hexKey string, size *big.Int) (err error) {
+func PledgeProvider(localAddress common.Address, hexKey string, money *big.Int) (err error) {
 	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
 	if err != nil {
 		log.Println("providerContracterr:", err)
-		return err
-	}
-
-	price, err := providerInstance.GetPrice(&bind.CallOpts{
-		From: localAddress,
-	})
-	if err != nil {
-		log.Println("getProviderPrice err:", err)
 		return err
 	}
 
@@ -390,9 +382,9 @@ func PledgeProvider(localAddress common.Address, hexKey string, size *big.Int) (
 
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.Value = price.Mul(price, size)
+		auth.Value = money
 		auth.GasLimit = defaultGasLimit
-		tx, err := providerInstance.Pledge(auth, size)
+		tx, err := providerInstance.Pledge(auth, big.NewInt(0))
 		if err != nil {
 			return err
 		}

@@ -432,7 +432,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	price := big.NewInt(0)
 	priceStr, ok := req.Options[priceKwd].(string)
 	if !ok || len(priceStr) == 0 {
-		price.SetInt64(utils.STOREPRICEPEDOLLAR)
+		price.SetInt64(utils.STOREPRICE)
 	}
 
 	if len(priceStr) > 0 {

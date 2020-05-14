@@ -22,45 +22,50 @@ const (
 	//SHOWTIME 用于输出给使用者
 	SHOWTIME = "2006-01-02 Mon 15:04:05 MST"
 
-	// Eth2Wei is 1eth = !wei
-	Eth2Wei int64 = 1000000000000000000
-
-	//IDLength  目前ID的长度
+	//IDLength is network ID length
 	IDLength = 30
 
+	// DefaultPassword is default password
 	DefaultPassword = "memoriae"
 
 	// KeeperSLA is keeper needed
 	KeeperSLA = 3
 	// ProviderSLA is provider needed
 	ProviderSLA = 6
-	// DefaultCapacity is default store capacity： 10000 MB
-	DefaultCapacity int64 = 100000 //单位：MB
+
+	// DefaultCapacity is default store capacity： 1GB
+	DefaultCapacity int64 = 1000 //MB
 	// DefaultDuration is default store days： 100 days
-	DefaultDuration int64 = 100
+	DefaultDuration int64 = 100 // day
 	// DefaultCycle is default cycle: 1 day
-	DefaultCycle = 24 * 60 * 60
+	DefaultCycle = 24 * 60 * 60 // seconds
 
 	// offer options
 
-	// DefaultOfferCapacity is provider
-	DefaultOfferCapacity int64 = 1000000 //单位：MB
+	// DefaultOfferCapacity is provider offer capacity
+	DefaultOfferCapacity int64 = 1000000 //MB
 	// DefaultOfferDuration is provider； 100 days
-	DefaultOfferDuration int64 = 100
+	DefaultOfferDuration int64 = 100 // day
+	// DepositCapacity is provider deposit capacity
+	DepositCapacity int64 = 1000000 // MB
 
-	DepositCapacity int64 = 1000000
+	// Token2Wei is 1token = 10^18 wei
+	// samely Dollar is 10^18 WeiDollar
+	Token2Wei = 1000000000000000000
 
-	// Wei/MB
-	ProviderDeposit = 1000000
-	KeeperDeposit   = 1000000000
+	// Memo2Dollar is default Memo token Price, 1 token = 0.01 dollar
+	Memo2Dollar float64 = 0.01
 
-	//READPRICE 读支付中1MB内容需要支付的金额; wei/MB
-	READPRICE int64 = 1024 * 1024 * 1024
+	// ProviderDeposit is provider deposit price, 3 dollar/TB
+	ProviderDeposit = 3000000000000 // 3*10^12 WeiDollar/MB
+	// KeeperDeposit is keeper deposit； 0.01 dollar for now
+	KeeperDeposit = 10000000000000000 // WeiDollar
 
-	// STOREPRICEPEDOLLAR is stored price 3$/TB*Month
-	// 1 eth=0.01$
-	// wei/MB*hour
-	STOREPRICEPEDOLLAR int64 = 400000000000
+	// READPRICE is read price 0.00002 $/GB(0.25 rmb-0.5rmb/GB in aliyun oss)
+	READPRICE int64 = 20000000000 // 2*10^10 WeiDollar/MB
+
+	// STOREPRICE is stored price 3$/TB*Month (33 rmb/TB*Month in aliyun oss)
+	STOREPRICE int64 = 4000000000 // 4 * 10^9 WeiDollar/MB*hour
 )
 
 //CheckDup checks duplicate, false 意味着有，true表示无重复

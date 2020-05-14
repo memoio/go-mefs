@@ -29,6 +29,7 @@ var (
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
 	ErrUpload               = errors.New("upload fails")
 	ErrResourceUnavailable  = errors.New("resource unavailable")
+	ErrWrongParameters      = errors.New("Wrong parameters")
 
 	ErrNoProviders      = errors.New("there is no providers")
 	ErrNoKeepers        = errors.New("there is no keepers")

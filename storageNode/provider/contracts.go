@@ -61,17 +61,22 @@ func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.I
 	}
 
 	//p.offers保存该provider所有的offer合约信息
-save:
 	for _, offAddr := range offers {
 		offerID, err := address.GetIDFromAddress(offAddr.String())
 		if err != nil {
 			continue
 		}
 
+		has := false
 		for _, item := range p.offers {
 			if item.OfferID == offerID {
-				continue save
+				has = true
+				break
 			}
+		}
+
+		if has {
+			continue
 		}
 
 		oItem, err := role.GetOfferInfo(proID, offerID)

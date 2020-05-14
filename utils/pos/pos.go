@@ -19,7 +19,7 @@ func GetPosId() string {
 }
 
 func GetPosPrice() *big.Int {
-	return big.NewInt(utils.STOREPRICEPEDOLLAR / 10)
+	return big.NewInt(utils.STOREPRICE / 10)
 }
 
 func GetPosSeed() []byte {

@@ -278,6 +278,11 @@ func (l *lInfo) resultSummary(price *big.Int, start, end int64) (*big.Int, int64
 
 	spacetime.Mul(spacetime, price)
 	spacetime.Quo(spacetime, big.NewInt(1024*1024*60*60))
+
+	stWei := new(big.Float).SetInt(spacetime)
+	stWei.Quo(stWei, role.GetMemoPrice())
+	stWei.Int(spacetime)
+
 	if spacetime.Sign() <= 0 {
 		utils.MLogger.Info("error!amount:", spacetime, "price:", price)
 	}

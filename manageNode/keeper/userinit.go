@@ -39,7 +39,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 
 	uid := options[0]
 	qid := km.GetMid()
-	price := big.NewInt(utils.STOREPRICEPEDOLLAR)
+	price := big.NewInt(utils.STOREPRICE)
 	var response string
 	if qid != uid {
 		utils.MLogger.Infof("Get k/p numbers from query contract %s of user %s ", qid, uid)
