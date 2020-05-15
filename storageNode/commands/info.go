@@ -107,7 +107,7 @@ var InfoCmd = &cmds.Command{
 			OfferAddress:    oItem.OfferID,
 			OfferDuration:   oItem.Duration,
 			OfferStartTime:  time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
-			OfferCapacity:   oItem.Capacity,
+			OfferCapacity:   oItem.Capacity * 1024 * 1024,
 			OfferPrice:      oItem.Price,
 			Balance:         balance,
 		}
