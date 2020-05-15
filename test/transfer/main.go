@@ -39,11 +39,12 @@ func main() {
 	log.Println("admin has:", num, " transfer: ", moneyTo, " to:", toAddr)
 
 	oldbalance := test.QueryBalance(toAddr, qethEndPoint)
-	test.TransferTo(big.NewInt(eth2Wei), toAddr, ethEndPoint, qethEndPoint)
+	test.TransferTo(moneyTo, toAddr, ethEndPoint, qethEndPoint)
 	balance := test.QueryBalance(toAddr, qethEndPoint)
 	oldbalance.Add(oldbalance, moneyTo)
 	if balance.Cmp(oldbalance) < 0 {
 		log.Println("transfer fails")
+		return
 	}
 
 	log.Println("transfer success")
