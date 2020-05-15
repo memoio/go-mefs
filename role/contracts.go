@@ -837,6 +837,10 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	// read ps times
 	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE), big.NewInt(storeSize))
 
+	weiPrice := new(big.Float).SetInt(moneyToChannel)
+	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Int(moneyToChannel)
+
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return chanAddr, err

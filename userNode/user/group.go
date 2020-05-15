@@ -1222,7 +1222,7 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 
 			// need redeploy
 			utils.MLogger.Infof("redeploy channel contract for %s", proID)
-			_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
+			_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize/int64(g.providerSLA), true)
 			if err != nil {
 				return
 			}
