@@ -15,7 +15,6 @@ import (
 func DeployOffer(localAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, redo bool) (common.Address, error) {
 	log.Println("begin to deploy offer-contract...")
 	var offerAddr common.Address
-	t := duration * 24 * 60 * 60
 
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, localAddress, offerKey, hexKey, true)
 	if err != nil {
@@ -43,7 +42,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(t), price) //提供存储容量 存储时段 存储单价
+		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(duration), price) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("deploy Offer Err:", err)

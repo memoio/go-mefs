@@ -101,7 +101,8 @@ var InfoCmd = &cmds.Command{
 		}
 
 		output := &pInfoOutput{
-			DepositCapacity: uint64(depositCapacity),
+			Address:         localAddr.String(),
+			DepositCapacity: uint64(depositCapacity) * 1024 * 1024,
 			UsedCapacity:    usedCapacity,
 			OfferAddress:    oItem.OfferID,
 			OfferDuration:   oItem.Duration,
