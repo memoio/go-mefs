@@ -1734,17 +1734,34 @@ mefs lfs show_storage show the storage space used(kb)
 type infoOutput struct {
 	UserAddr      string
 	Balance       *big.Int
+	QueryAddr     string
+	UpkeepingInfo ukInfo
+	KeeperInfos   []keeperInfo
+	ProviderInfos []proInfo
+}
+
+type ukInfo struct {
+	UpKeepingAddr string
 	UkBalance     *big.Int
-	TotalBytes    uint64
-	UsedBytes     uint64
 	StartTime     string
 	EndTime       string
 	Duration      int64
 	Price         *big.Int
-	UpKeepingAddr string
-	QueryAddr     string
-	KeeperAddrs   []string
-	ProviderAddrs []string
+	TotalBytes    uint64
+	UsedBytes     uint64
+}
+
+type keeperInfo struct {
+	KeeperAddr string
+}
+
+type proInfo struct {
+	ProviderAddr string
+	ChannelAddr  string
+	StartTime    string
+	Duration     int64
+	Money        *big.Int
+	CostValue    *big.Int
 }
 
 var lfsInfoCmd = &cmds.Command{
@@ -1820,29 +1837,61 @@ var lfsInfoCmd = &cmds.Command{
 			return err
 		}
 
-		var keepers, providers []string
+		var keepers []keeperInfo
 		for _, ki := range uk.Keepers {
-			keepers = append(keepers, ki.Addr.String())
+			kinfo := keeperInfo{
+				KeeperAddr: ki.Addr.String(),
+			}
+			keepers = append(keepers, kinfo)
 		}
 
-		for _, ki := range uk.Providers {
-			providers = append(providers, ki.Addr.String())
+		var providers []proInfo
+		for _, pi := range uk.Providers {
+			pid, err := address.GetIDFromAddress(pi.Addr.String())
+			if err != nil {
+				continue
+			}
+
+			cItem := gp.GetProChannel(pid)
+			if cItem == nil {
+				continue
+			}
+
+			channerAddr, err := address.GetAddressFromID(cItem.ChannelID)
+			if err != nil {
+				continue
+			}
+
+			ci := proInfo{
+				ProviderAddr: pi.Addr.String(),
+				ChannelAddr:  channerAddr.String(),
+				StartTime:    time.Unix(cItem.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+				Duration:     cItem.Duration,
+				Money:        cItem.Money,
+				CostValue:    cItem.Value,
+			}
+
+			providers = append(providers, ci)
+		}
+
+		ui := ukInfo{
+			UpKeepingAddr: ukaddr.String(),
+			StartTime:     time.Unix(uk.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+			EndTime:       time.Unix(uk.EndTime, 0).In(time.Local).Format(utils.SHOWTIME),
+			TotalBytes:    uint64(uk.Capacity * 1024 * 1024),
+			Duration:      uk.Duration,
+			Price:         uk.Price,
+			UkBalance:     uk.Money,
+			UsedBytes:     storageSize,
 		}
 
 		output := &infoOutput{
 			UserAddr:      useraddr.String(),
-			StartTime:     time.Unix(uk.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-			EndTime:       time.Unix(uk.EndTime, 0).In(time.Local).Format(utils.SHOWTIME),
-			TotalBytes:    uint64(uk.Capacity * 1024 * 1024),
-			UsedBytes:     storageSize,
 			Balance:       balance,
-			UkBalance:     uk.Money,
-			KeeperAddrs:   keepers,
-			ProviderAddrs: providers,
-			UpKeepingAddr: ukaddr.String(),
 			QueryAddr:     queryaddr.String(),
-			Duration:      uk.Duration,
-			Price:         uk.Price,
+			UpkeepingInfo: ui,
+			KeeperInfos:   keepers,
+			ProviderInfos: providers,
 		}
 		return cmds.EmitOnce(res, output)
 	},

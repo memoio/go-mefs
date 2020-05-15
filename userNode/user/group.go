@@ -206,7 +206,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		}
 	}
 
-	utils.MLogger.Infof("Initialize user %s and its lfs %s, need keepers %d, providers %d, storesize %d, storadays %d, at price %d, ", g.userID, g.groupID, g.keeperSLA, g.providerSLA, g.storeSize, g.storeSize, g.storePrice)
+	utils.MLogger.Infof("Initialize user %s and its lfs %s, need keepers %d, providers %d, storesize %d, storadays %d, at price %d, ", g.userID, g.groupID, g.keeperSLA, g.providerSLA, g.storeSize, g.storeDays, g.storePrice)
 	err := g.initGroup(ctx)
 	if err != nil {
 		return false, err
@@ -895,6 +895,26 @@ func (g *groupInfo) GetUk() *role.UpKeepingItem {
 	return g.upKeepingItem
 }
 
+func (g *groupInfo) GetKeeperInfos() map[string]*keeperInfo {
+	if g == nil {
+		return nil
+	}
+	return g.keepers
+}
+
+func (g *groupInfo) GetProChannel(proID string) *role.ChannelItem {
+	if g == nil {
+		return nil
+	}
+
+	pInfo, ok := g.providers[proID]
+	if !ok {
+		return nil
+	}
+
+	return pInfo.chanItem
+}
+
 func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []string, error) {
 	if g == nil {
 		return nil, nil, ErrLfsServiceNotReady
@@ -1153,10 +1173,21 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 			proID := pinfo.providerID
 			cItem := pinfo.chanItem
 			if cItem != nil {
-				if pid == proID {
-					cItem.Money = role.GetBalance(cItem.ChannelID)
+				if pid == "" {
+					money, err := role.QueryBalance(cItem.ChannelID)
+					if err != nil {
+						return
+					}
+					cItem.Money = money
 				} else {
-					return
+					if pid != proID {
+						return
+					}
+					money, err := role.QueryBalance(cItem.ChannelID)
+					if err != nil {
+						return
+					}
+					cItem.Money = money
 				}
 			} else {
 				gotItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)

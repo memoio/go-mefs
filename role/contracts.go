@@ -413,13 +413,12 @@ func DeployQuery(userID, sk string, storeDays, storeSize int64, storePrice *big.
 	weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
 	weiRPrice.Quo(weiRPrice, GetMemoPrice())
 	weiRPrice.Int(readPrice)
-
 	moneyToChannel := new(big.Int).Mul(readPrice, big.NewInt(storeSize))
+
 	moneyAccount.Add(moneyAccount, moneyToChannel)
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
-	moneyAccount.Sub(moneyAccount, balance)
 
-	if moneyAccount.Sign() > 0 { //余额不足
+	if moneyAccount.Cmp(balance) > 0 { //余额不足
 		utils.MLogger.Info(uaddr.String(), " need more balance to start: ", moneyAccount.String())
 		return queryID, ErrNotEnoughBalance
 	}
@@ -855,6 +854,17 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	weiPrice.Quo(weiPrice, GetMemoPrice())
 	weiPrice.Int(moneyToChannel)
 
+	balance, err := contracts.QueryBalance(localAddress.Hex())
+	if err != nil {
+		return chanAddr, err
+	}
+
+	utils.MLogger.Infof("%s (%s) has balance: %s", userID, localAddress.Hex(), balance)
+
+	if moneyToChannel.Cmp(balance) > 0 {
+		return chanAddr, ErrNotEnoughBalance
+	}
+
 	proAddress, err := address.GetAddressFromID(proID)
 	if err != nil {
 		return chanAddr, err
@@ -917,6 +927,11 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 			return item, err
 		}
 
+		ba, err := contracts.QueryBalance(chanAddress.String())
+		if err != nil {
+			return item, err
+		}
+
 		item = ChannelItem{
 			StartTime: startDate.Int64(),
 			Duration:  timeOut.Int64(),
@@ -924,6 +939,7 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 			UserID:    uid,
 			ProID:     pid,
 			Value:     big.NewInt(0),
+			Money:     ba,
 		}
 		break
 	}
