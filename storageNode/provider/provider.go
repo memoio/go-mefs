@@ -334,8 +334,10 @@ func (p *Info) getUserInfo(pid string) *uInfo {
 	if !ok {
 		ui := &uInfo{
 			userID: pid,
+			querys: make(map[string]struct{}),
 		}
 
+		utils.MLogger.Infof("add new user %s", pid)
 		p.ms.userNum.Inc()
 		p.users.Store(pid, ui)
 		return ui
@@ -363,6 +365,7 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 			keepItem: &kItem,
 		}
 
+		utils.MLogger.Infof("add new keeper %s", pid)
 		if p.ds.Connect(p.context, pid) {
 			ui.availTime = time.Now().Unix()
 			ui.online = true
@@ -395,6 +398,7 @@ func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 			providerID: pid,
 		}
 
+		utils.MLogger.Infof("add new provider %s", pid)
 		if p.ds.Connect(p.context, pid) {
 			ui.availTime = time.Now().Unix()
 			ui.online = true
