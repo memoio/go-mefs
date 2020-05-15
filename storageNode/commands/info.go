@@ -100,11 +100,16 @@ var InfoCmd = &cmds.Command{
 			*/
 		}
 
+		offerAddr, err := address.GetAddressFromID(oItem.OfferID)
+		if err != nil {
+			return err
+		}
+
 		output := &pInfoOutput{
 			Address:         localAddr.String(),
 			DepositCapacity: uint64(depositCapacity) * 1024 * 1024,
 			UsedCapacity:    usedCapacity,
-			OfferAddress:    oItem.OfferID,
+			OfferAddress:    offerAddr.String(),
 			OfferDuration:   oItem.Duration,
 			OfferStartTime:  time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
 			OfferCapacity:   oItem.Capacity * 1024 * 1024,
