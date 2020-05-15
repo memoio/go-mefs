@@ -17,7 +17,7 @@ const (
 	kpAddr  = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	kpSk    = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
 	adminSk = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
-	moneyTo = 1000000000000000
+	moneyTo = 1000000000000000000
 )
 
 var ethEndPoint, qethEndPoint string
@@ -183,7 +183,8 @@ func testProvider() (err error) {
 	log.Println("pledge provide need price is: ", price)
 	contracts.EndPoint = ethEndPoint
 	log.Println("2. test pledge provider")
-	size := new(big.Int).SetInt64(utils.DepositCapacity)
+	size := new(big.Int).SetInt64(utils.DepositCapacity / 1000)
+	size.Mul(size, price)
 	err = contracts.PledgeProvider(proAddr, userSk, size)
 	if err != nil {
 		return err
@@ -196,7 +197,6 @@ func testProvider() (err error) {
 
 	log.Println("get provider info: ", active, banned, money, time)
 
-	size.Mul(size, price)
 	if money.Cmp(size) != 0 {
 		return errors.New("wrong parameters")
 	}

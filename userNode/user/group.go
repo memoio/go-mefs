@@ -206,7 +206,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		}
 	}
 
-	utils.MLogger.Info("Initialize user:", g.userID, " and its lfs: ", g.groupID)
+	utils.MLogger.Infof("Initialize user %s and its lfs %s, need keepers %d, providers %d, storesize %d, storadays %d, at price %d, ", g.userID, g.groupID, g.keeperSLA, g.providerSLA, g.storeSize, g.storeSize, g.storePrice)
 	err := g.initGroup(ctx)
 	if err != nil {
 		return false, err
@@ -706,11 +706,13 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		ukID, err := role.DeployUpKeeping(g.userID, g.groupID, g.privKey, g.tempKeepers, g.tempProviders, g.storeDays, g.storeSize, g.storePrice, g.stPayCycle, true)
 		if err != nil {
 			utils.MLogger.Error("Deploy UpKeeping failed: ", err)
+			return err
 		}
 
 		uItem, err := role.GetUpkeepingInfo(g.userID, ukID)
 		if err != nil {
 			utils.MLogger.Error("Get UpKeeping failed: ", err)
+			return err
 		}
 
 		g.upKeepingItem = &uItem
@@ -718,6 +720,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 		rootID, err := role.DeployRoot(g.privKey, g.userID, g.groupID, true)
 		if err != nil {
 			utils.MLogger.Error("Deploy root contract failed: ", err)
+			return err
 		}
 
 		g.rootID = rootID
@@ -735,6 +738,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 						continue
 					}
 					utils.MLogger.Infof("deploy channel contract for %s success", proID)
+					break
 				}
 				// need persist
 			}(proID)
@@ -1217,6 +1221,7 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 			}
 
 			// need redeploy
+			utils.MLogger.Infof("redeploy channel contract for %s", proID)
 			_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize, true)
 			if err != nil {
 				return

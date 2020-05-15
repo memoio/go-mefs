@@ -397,10 +397,11 @@ func DeployQuery(userID, sk string, storeDays, storeSize int64, storePrice *big.
 	//balance >? query + upKeeping + channel cost
 	weiPrice := new(big.Float).SetInt(storePrice)
 	weiPrice.Quo(weiPrice, GetMemoPrice())
-	weiPrice.Int(storePrice)
+	newPrice := big.NewInt(0)
+	weiPrice.Int(newPrice)
 
 	moneyAccount := big.NewInt(24)
-	moneyAccount.Mul(moneyAccount, storePrice)
+	moneyAccount.Mul(moneyAccount, newPrice)
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeSize))
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 	// upKeeping cost
@@ -567,10 +568,11 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 
 	weiPrice := new(big.Float).SetInt(storePrice)
 	weiPrice.Quo(weiPrice, GetMemoPrice())
-	weiPrice.Int(storePrice)
+	newPrice := big.NewInt(0)
+	weiPrice.Int(newPrice)
 
 	moneyAccount := big.NewInt(24)
-	moneyAccount.Mul(moneyAccount, storePrice)
+	moneyAccount.Mul(moneyAccount, newPrice)
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeSize))
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 
