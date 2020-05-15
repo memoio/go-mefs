@@ -5,26 +5,32 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-
-	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/utils/address"
-
-	"github.com/memoio/go-mefs/role"
+	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
+	"github.com/memoio/go-mefs/role"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/storageNode/provider"
+	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 type pInfoOutput struct {
+	Address         string
+	Balance         *big.Int
 	DepositCapacity uint64
 	UsedCapacity    uint64
+	OfferAddress    string
+	OfferCapacity   int64
+	OfferPrice      *big.Int
+	OfferDuration   int64
+	OfferStartTime  string
+	TotalIncome     *big.Int
 	DownloadIncome  *big.Int
 	StorageIncome   *big.Int
-	TotalIncome     *big.Int
-	DailyIncome     *big.Int
-	Balance         *big.Int
+	LastDayIncome   *big.Int
 }
 
 var InfoCmd = &cmds.Command{
@@ -42,7 +48,8 @@ var InfoCmd = &cmds.Command{
 			return err
 		}
 
-		localAddr, err := address.GetAddressFromID(node.Identity.Pretty())
+		localID := node.Identity.Pretty()
+		localAddr, err := address.GetAddressFromID(localID)
 		if err != nil {
 			return err
 		}
@@ -54,6 +61,10 @@ var InfoCmd = &cmds.Command{
 			return err
 		}
 
+		oItem, err := role.GetLatestOffer(localID, localID)
+		if err != nil {
+			return err
+		}
 		providerIns, ok := node.Inst.(*provider.Info)
 
 		if !ok || !providerIns.Online() { //service is not ready, 从链上获取depositCapacity
@@ -92,6 +103,11 @@ var InfoCmd = &cmds.Command{
 		output := &pInfoOutput{
 			DepositCapacity: uint64(depositCapacity),
 			UsedCapacity:    usedCapacity,
+			OfferAddress:    oItem.OfferID,
+			OfferDuration:   oItem.Duration,
+			OfferStartTime:  time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
+			OfferCapacity:   oItem.Capacity,
+			OfferPrice:      oItem.Price,
 			Balance:         balance,
 		}
 		return cmds.EmitOnce(res, output)
