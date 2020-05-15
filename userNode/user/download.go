@@ -388,7 +388,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 			pinfo.Lock()
 
 			//user给channel合约签名，发给provider
-			mes, money, err := do.getChannelSign(pinfo.chanItem, eachLen)
+			mes, money, err := do.getChannelSign(pinfo, eachLen)
 			if err != nil {
 				if do.group.userID != do.group.groupID {
 					utils.MLogger.Warnf("get channel fails: %s", err)
@@ -482,7 +482,8 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 	return data, int64(len(data)), nil
 }
 
-func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]byte, *big.Int, error) {
+func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte, *big.Int, error) {
+	cItem := pInfo.chanItem
 	hexSK := do.group.privKey
 	channelID := do.group.groupID
 
@@ -494,10 +495,31 @@ func (do *downloadTask) getChannelSign(cItem *role.ChannelItem, readLen int) ([]
 
 		readPrice.Mul(readPrice, big.NewInt(int64(readLen)))
 		readPrice.Quo(readPrice, big.NewInt(1024*1024))
-		readPrice.Add(readPrice, cItem.Value) //100 + valueBase
-		if readPrice.Cmp(cItem.Money) > 0 {
-			utils.MLogger.Warn("need to redeploy channel contract for ", cItem.ProID)
-			return nil, nil, role.ErrNotEnoughBalance
+
+		newValue := new(big.Int).Add(readPrice, cItem.Value) //100 + valueBase
+		if newValue.Cmp(cItem.Money) > 0 {
+			utils.MLogger.Infof("need to redeploy channel contract for %s, has balance %d, need %d ", cItem.ProID, cItem.Money, newValue)
+
+			err := role.KillChannel(cItem.ChannelID, hexSK)
+			if err != nil {
+				utils.MLogger.Errorf("close channel %s fails: %s", cItem.ChannelID, err)
+			}
+
+			oldChannelID := cItem.ChannelID
+
+			do.group.loadContracts(context.Background(), pInfo.providerID)
+
+			cItem = pInfo.chanItem
+			newValue = readPrice
+
+			if oldChannelID == cItem.ChannelID {
+				utils.MLogger.Infof("fails to change channel from: %s", oldChannelID)
+				return nil, nil, role.ErrNoContract
+			}
+
+			if newValue.Cmp(cItem.Money) > 0 {
+				return nil, nil, role.ErrNotEnoughBalance
+			}
 		}
 
 		channelID = cItem.ChannelID

@@ -1124,6 +1124,10 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 	if g.rootID == g.userID {
 		rID, err := role.GetRoot(g.userID, g.groupID)
 		if err != nil {
+			rID, err = role.DeployRoot(g.privKey, g.userID, g.groupID, false)
+			if err != nil {
+				return err
+			}
 			return err
 		}
 		g.rootID = rID
@@ -1151,6 +1155,8 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 			if cItem != nil {
 				if pid == proID {
 					cItem.Money = role.GetBalance(cItem.ChannelID)
+				} else {
+					return
 				}
 			} else {
 				gotItem, err := role.GetLatestChannel(g.shareToID, g.groupID, proID)
@@ -1162,7 +1168,7 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 			if cItem != nil {
 				if time.Now().Unix()-cItem.StartTime < cItem.Duration {
 					if cItem.Money.Cmp(big.NewInt(0)) != 0 {
-						km, err := metainfo.NewKey(pInfo.providerID, mpb.KeyType_Channel, cItem.ChannelID)
+						km, err := metainfo.NewKey(pinfo.providerID, mpb.KeyType_Channel, cItem.ChannelID)
 						if err != nil {
 							return
 						}

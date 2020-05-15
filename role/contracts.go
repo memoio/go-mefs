@@ -576,6 +576,18 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeSize))
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 
+	// getbalance
+	balance, err := contracts.QueryBalance(localAddress.String())
+	if err != nil {
+		return ukID, err
+	}
+
+	utils.MLogger.Infof("%s (%s) has balance: %s", userID, localAddress.String(), balance)
+
+	if moneyAccount.Cmp(balance) > 0 {
+		return ukID, ErrNotEnoughBalance
+	}
+
 	utils.MLogger.Info("Begin to deploy upkeeping contract...")
 
 	duration := storeDays * 24 * 60 * 60
@@ -746,9 +758,11 @@ func DeployRoot(sk, userID, queryID string, rdo bool) (rootID string, err error)
 
 	// getbalance
 	balance, err := contracts.QueryBalance(uaddr.String())
-	if err == nil {
-		utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
+	if err != nil {
+		return rootID, err
 	}
+
+	utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
 
 	// deploy root
 	rootAddr, err := contracts.DeployRoot(sk, uaddr, queryAddr, rdo)
