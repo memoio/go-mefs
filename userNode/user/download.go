@@ -524,13 +524,13 @@ func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte
 
 		channelID = cItem.ChannelID
 
-		mes, err := role.SignForChannel(channelID, hexSK, readPrice)
+		mes, err := role.SignForChannel(channelID, hexSK, newValue)
 		if err != nil {
 			utils.MLogger.Errorf("Signature about channelID %s fails: %s", channelID, err)
 			return nil, nil, err
 		}
 
-		return mes, readPrice, nil
+		return mes, newValue, nil
 	}
 	return nil, nil, role.ErrTestUser
 }
