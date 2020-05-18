@@ -135,6 +135,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		TotalIncome:   big.NewInt(0),
 		ReadIncome:    big.NewInt(0),
 		StorageIncome: big.NewInt(0),
+		PosIncome:     big.NewInt(0),
 		offers:        make([]*role.OfferItem, 0, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)

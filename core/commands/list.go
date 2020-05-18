@@ -1,8 +1,3 @@
-/*
-命令行 mefs test命令的操作，用于对系统做出各样的测试
-包括测试特定的函数，显示当前节点的各项参数等
-*/
-
 package commands
 
 import (
@@ -85,6 +80,7 @@ var keeperCmd = &cmds.Command{
 			if ki.PledgeMoney.Sign() <= 0 {
 				continue
 			}
+
 			kaddr, err := address.GetAddressFromID(ki.KeeperID)
 			if err != nil {
 				continue

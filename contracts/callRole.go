@@ -88,6 +88,7 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 		log.Println("keeperContracterr:", err)
 		return false, err
 	}
+
 	isKeeper, _, _, _, err := keeperContract.Info(&bind.CallOpts{
 		From: localAddress,
 	}, localAddress)
