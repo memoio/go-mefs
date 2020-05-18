@@ -66,10 +66,8 @@ func (p *Info) getDiskUsage() (uint64, error) {
 // default is 1TB
 func (p *Info) getDiskTotal() uint64 {
 	maxSpaceInByte := uint64(1024 * 1024 * 1024 * 1024)
-	if p.proContract != nil {
-		if p.proContract.Capacity != 0 {
-			maxSpaceInByte = uint64(p.proContract.Capacity) * 1024 * 1024
-		}
+	if p.proContract != nil && p.proContract.Capacity != 0 {
+		maxSpaceInByte = uint64(p.proContract.Capacity) * 1024 * 1024
 	}
 	return maxSpaceInByte
 }

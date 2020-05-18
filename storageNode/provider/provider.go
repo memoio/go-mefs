@@ -207,8 +207,8 @@ func (p *Info) Close() error {
 	return p.save(p.context)
 }
 
-func (p *Info) GetStorageInfo() (int64, uint64) {
-	return p.proContract.Capacity, p.storageUsed
+func (p *Info) GetStorageInfo() (uint64, uint64, uint64) {
+	return uint64(p.proContract.Capacity), p.storageUsed, p.posUsed
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {

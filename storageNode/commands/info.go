@@ -20,8 +20,9 @@ import (
 type pInfoOutput struct {
 	Address        string
 	Balance        *big.Int
-	PledgeCapacity uint64
-	UsedCapacity   uint64
+	PledgeBytes    uint64
+	UsedBytes      uint64
+	PosBytes       uint64
 	OfferAddress   string
 	OfferCapacity  int64
 	OfferPrice     *big.Int
@@ -54,8 +55,7 @@ var InfoCmd = &cmds.Command{
 			return err
 		}
 
-		var depositCapacity int64
-		var usedCapacity uint64
+		var depositCapacity, usedCapacity, posCapacity uint64
 		balance, err := contracts.QueryBalance(localAddr.String())
 		if err != nil {
 			return err
@@ -77,7 +77,7 @@ var InfoCmd = &cmds.Command{
 			if err != nil {
 				return err
 			}
-			depositCapacity = providerItem.Capacity
+			depositCapacity = uint64(providerItem.Capacity)
 
 			usedCapacity, err = datastore.DiskUsage(node.Data.DataStore())
 			if err != nil {
@@ -85,7 +85,7 @@ var InfoCmd = &cmds.Command{
 			}
 			fmt.Println("if you want to see the real income, please run 'mefs-provider daemon' first")
 		} else {
-			depositCapacity, usedCapacity = providerIns.GetStorageInfo()
+			depositCapacity, usedCapacity, posCapacity = providerIns.GetStorageInfo()
 
 			ti = providerIns.TotalIncome
 			si = providerIns.StorageIncome
@@ -100,8 +100,9 @@ var InfoCmd = &cmds.Command{
 
 		output := &pInfoOutput{
 			Address:        localAddr.String(),
-			PledgeCapacity: uint64(depositCapacity) * 1024 * 1024,
-			UsedCapacity:   usedCapacity,
+			PledgeBytes:    depositCapacity * 1024 * 1024,
+			UsedBytes:      usedCapacity,
+			PosBytes:       posCapacity,
 			OfferAddress:   offerAddr.String(),
 			OfferDuration:  oItem.Duration,
 			OfferStartTime: time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),

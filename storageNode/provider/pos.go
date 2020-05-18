@@ -224,7 +224,7 @@ func (p *Info) traversePath(gc bool) {
 		break
 	}
 
-	posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+	posCidPrefix = groupID + metainfo.BlockDelimiter + p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
 }
 
 func (p *Info) doGenerateOrDelete() {
@@ -274,7 +274,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 			curGid += 1024
 		}
 
-		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = groupID + metainfo.BlockDelimiter + p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
 		data, offset, err := opt.Encode(tmpData, posCidPrefix, 0)
 		if err != nil {
 			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error: ", err)
@@ -366,7 +366,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 			curSid = -1
 		}
 
-		posCidPrefix = posID + "_" + p.localID + strconv.Itoa(curGid) + "_" + strconv.Itoa(curSid)
+		posCidPrefix = groupID + metainfo.BlockDelimiter + p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
 
 		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(posCidPrefix), nil, "local")
 		if err != nil {
