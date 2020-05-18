@@ -171,7 +171,10 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
+	key, err := crypto.HexToECDSA(hexKey)
+	if err != nil {
+		return err
+	}
 	retryCount := 0
 	for {
 		retryCount++
@@ -198,6 +201,7 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 		break
 	}
 
+	log.Println("pledge keeper success")
 	return nil
 }
 
