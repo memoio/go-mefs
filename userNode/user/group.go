@@ -223,7 +223,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	g.Lock()
 	defer g.Unlock()
 
-	utils.MLogger.Info("Connect keepers and providers for user: ", g.userID)
+	utils.MLogger.Infof("Connect keepers %s and providers %s for user: %s", g.tempKeepers, g.tempProviders, g.userID)
 	var wg sync.WaitGroup
 	for _, kid := range g.tempKeepers {
 		tempKeeper := &keeperInfo{
@@ -268,7 +268,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			}
 		}
 
-		if failNum > 0 {
+		if (failNum > 0 && i == 0) || failNum > g.keeperSLA/3 {
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -295,7 +295,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 			}
 		}
 
-		if failNum > 0 {
+		if (failNum > 0 && i == 0) || failNum > g.providerSLA/3 {
 			time.Sleep(time.Minute)
 			continue
 		}
