@@ -76,8 +76,13 @@ var keeperCmd = &cmds.Command{
 
 		var aks []keeperInfo
 
+		price, err := role.GetKeeperPrice(n.Identity.Pretty())
+		if err != nil {
+			return err
+		}
+
 		for _, ki := range kItems {
-			if ki.PledgeMoney.Sign() <= 0 {
+			if ki.PledgeMoney.Cmp(price) < 0 {
 				continue
 			}
 
