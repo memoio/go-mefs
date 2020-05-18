@@ -194,6 +194,8 @@ func (p *Info) traversePath(gc bool) {
 				if exist {
 					if gc {
 						p.ds.DeleteBlock(p.context, res.String(), "local")
+					} else {
+						p.posUsed += uint64(mullen)
 					}
 				} else {
 					break
@@ -288,7 +290,11 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 			err := p.ds.PutBlock(p.context, blockID, dataBlock, "local")
 			if err != nil {
 				utils.MLogger.Info("add block failed, error :", err)
+				continue
 			}
+
+			p.posUsed += uint64(mullen)
+
 			boff := blockID + metainfo.BlockDelimiter + strconv.Itoa(offset)
 
 			blockList = append(blockList, boff)
@@ -337,18 +343,17 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		}
 		//删除块
 		deleteBlocks := []string{}
-		j := 0
-		for i := 0; i < rep; i++ {
+		for i := rep - 1; i >= 0; i-- {
 			blockID := posCidPrefix + metainfo.BlockDelimiter + strconv.Itoa(i)
 			err := p.ds.DeleteBlock(p.context, blockID, "local")
 			if err != nil {
 				utils.MLogger.Info("delete block: ", blockID, " error :", err)
-				j++
-			} else {
-				utils.MLogger.Info("delete block : ", blockID, " success")
-				totalDecresed += uint64(mullen)
-				deleteBlocks = append(deleteBlocks, blockID)
+				continue
 			}
+			utils.MLogger.Info("delete block : ", blockID, " success")
+			p.posUsed -= uint64(mullen)
+			totalDecresed += uint64(mullen)
+			deleteBlocks = append(deleteBlocks, blockID)
 		}
 
 		//更新Gid,Sid

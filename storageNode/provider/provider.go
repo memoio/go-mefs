@@ -32,8 +32,9 @@ type Info struct {
 	sk            string
 	state         bool
 	ds            data.Service
-	storageUsed   uint64
 	storageTotal  uint64
+	storageUsed   uint64
+	posUsed       uint64
 	TotalIncome   *big.Int
 	ReadIncome    *big.Int
 	StorageIncome *big.Int
@@ -671,9 +672,11 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 	latestBlock := b.Number().Int64()
 	endBlock := b.Number().Int64()
-	storageBlock := pBlock
 	ukaddrs, posAddrs, chanAddrs := p.GetIncomeAddress()
+
+	storageBlock := pBlock
 	if len(ukaddrs) > 0 && latestBlock > storageBlock {
+		utils.MLogger.Infof("get storage income from chain")
 		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
@@ -704,6 +707,8 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 	posBlock := pBlock
 
 	if len(posAddrs) > 0 && latestBlock > posBlock {
+		utils.MLogger.Infof("get pos income from chain")
+
 		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
@@ -734,8 +739,9 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 	readBlock := pBlock
 
 	if len(chanAddrs) > 0 && latestBlock > readBlock {
-		endBlock = latestBlock
+		utils.MLogger.Infof("get read income from chain")
 
+		endBlock = latestBlock
 		for endBlock <= latestBlock {
 			if endBlock > readBlock+128 {
 				endBlock = readBlock + 128
@@ -761,6 +767,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
+	utils.MLogger.Infof("get income from chain finished at block %d", latestBlock)
 	return latestBlock, nil
 }
 
