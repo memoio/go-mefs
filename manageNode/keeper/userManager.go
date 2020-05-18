@@ -191,6 +191,28 @@ func (g *groupInfo) addBucket(bucketID string, binfo *mpb.BucketInfo) error {
 
 // bid is bucketID_stripeID_chunkID
 func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
+	// store in buckets
+	bucketID, stripeID, chunkID, err := metainfo.GetIDsFromBlock(bid)
+	if err != nil {
+		return err
+	}
+
+	thisBucket := g.getBucketInfo(bucketID, true)
+	if thisBucket == nil {
+		return nil
+	}
+
+	for _, proID := range g.providers {
+		if proID != pid {
+			thisLinfo := g.getLInfo(proID, false)
+			binfo, ok := thisLinfo.blockMap.Load(bid)
+			if ok {
+				thisLinfo.maxlength -= int64((binfo.(*blockInfo).offset) * int(thisBucket.bops.GetSegmentSize()))
+				thisLinfo.blockMap.Delete(bid)
+			}
+		}
+
+	}
 
 	thisLinfo := g.getLInfo(pid, true)
 	if thisLinfo == nil {
@@ -220,17 +242,6 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 		}
 	} else {
 		thisLinfo.blockMap.Store(bid, newcidinfo)
-	}
-
-	// store in buckets
-	bucketID, stripeID, chunkID, err := metainfo.GetIDsFromBlock(bid)
-	if err != nil {
-		return err
-	}
-
-	thisBucket := g.getBucketInfo(bucketID, true)
-	if thisBucket == nil {
-		return nil
 	}
 
 	// change length;store or calculate at startup

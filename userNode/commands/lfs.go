@@ -1743,6 +1743,7 @@ type infoOutput struct {
 type ukInfo struct {
 	UpKeepingAddr string
 	UkBalance     *big.Int
+	NeedPay       *big.Int
 	StartTime     string
 	EndTime       string
 	Duration      int64
@@ -1882,6 +1883,7 @@ var lfsInfoCmd = &cmds.Command{
 			Duration:      uk.Duration,
 			Price:         uk.Price,
 			UkBalance:     uk.Money,
+			NeedPay:       uk.NeedPay,
 			UsedBytes:     storageSize,
 		}
 

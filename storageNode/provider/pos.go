@@ -249,7 +249,7 @@ func (p *Info) doGenerateOrDelete() {
 
 // generatePosBlocks generate block accoding to the free space
 func (p *Info) generatePosBlocks(increaseSpace uint64) {
-	utils.MLogger.Info("generate pos blocks for space: %d", increaseSpace)
+	utils.MLogger.Infof("generate pos blocks for space: %d", increaseSpace)
 
 	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
 	if err != nil {
