@@ -69,6 +69,7 @@ var InfoCmd = &cmds.Command{
 		ti := new(big.Int)
 		di := new(big.Int)
 		si := new(big.Int)
+		pi := new(big.Int)
 
 		providerIns, ok := node.Inst.(*provider.Info)
 		if !ok || !providerIns.Online() { //service is not ready, 从链上获取depositCapacity
@@ -89,6 +90,7 @@ var InfoCmd = &cmds.Command{
 			ti = providerIns.TotalIncome
 			si = providerIns.StorageIncome
 			di = providerIns.ReadIncome
+			pi = providerIns.PosIncome
 		}
 
 		offerAddr, err := address.GetAddressFromID(oItem.OfferID)
@@ -109,6 +111,7 @@ var InfoCmd = &cmds.Command{
 			TotalIncome:     ti,
 			DownloadIncome:  di,
 			StorageIncome:   si,
+			PosIncome:       pi,
 		}
 		return cmds.EmitOnce(res, output)
 	},
