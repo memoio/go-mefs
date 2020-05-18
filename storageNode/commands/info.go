@@ -18,19 +18,19 @@ import (
 )
 
 type pInfoOutput struct {
-	Address         string
-	Balance         *big.Int
-	DepositCapacity uint64
-	UsedCapacity    uint64
-	OfferAddress    string
-	OfferCapacity   int64
-	OfferPrice      *big.Int
-	OfferDuration   int64
-	OfferStartTime  string
-	TotalIncome     *big.Int
-	DownloadIncome  *big.Int
-	StorageIncome   *big.Int
-	PosIncome       *big.Int
+	Address        string
+	Balance        *big.Int
+	PledgeCapacity uint64
+	UsedCapacity   uint64
+	OfferAddress   string
+	OfferCapacity  int64
+	OfferPrice     *big.Int
+	OfferDuration  int64
+	OfferStartTime string
+	TotalIncome    *big.Int
+	DownloadIncome *big.Int
+	StorageIncome  *big.Int
+	PosIncome      *big.Int
 }
 
 var InfoCmd = &cmds.Command{
@@ -99,19 +99,19 @@ var InfoCmd = &cmds.Command{
 		}
 
 		output := &pInfoOutput{
-			Address:         localAddr.String(),
-			DepositCapacity: uint64(depositCapacity) * 1024 * 1024,
-			UsedCapacity:    usedCapacity,
-			OfferAddress:    offerAddr.String(),
-			OfferDuration:   oItem.Duration,
-			OfferStartTime:  time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
-			OfferCapacity:   oItem.Capacity * 1024 * 1024,
-			OfferPrice:      oItem.Price,
-			Balance:         balance,
-			TotalIncome:     ti,
-			DownloadIncome:  di,
-			StorageIncome:   si,
-			PosIncome:       pi,
+			Address:        localAddr.String(),
+			PledgeCapacity: uint64(depositCapacity) * 1024 * 1024,
+			UsedCapacity:   usedCapacity,
+			OfferAddress:   offerAddr.String(),
+			OfferDuration:  oItem.Duration,
+			OfferStartTime: time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
+			OfferCapacity:  oItem.Capacity * 1024 * 1024,
+			OfferPrice:     oItem.Price,
+			Balance:        balance,
+			TotalIncome:    ti,
+			DownloadIncome: di,
+			StorageIncome:  si,
+			PosIncome:      pi,
 		}
 		return cmds.EmitOnce(res, output)
 	},
