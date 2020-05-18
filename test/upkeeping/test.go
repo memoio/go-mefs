@@ -116,7 +116,6 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	retryCount := 0
 	for {
 		retryCount++
-		time.Sleep(time.Minute)
 		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
 		if amountUk.Cmp(big.NewInt(100)) > 0 {
 			log.Println("contract balance", amountUk)
@@ -134,6 +133,8 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		if retryCount > 20 {
 			log.Fatal("Upkeeping has no balance")
 		}
+
+		time.Sleep(30 * time.Second)
 	}
 
 	log.Println("4.begin to query upkeeping's information")
@@ -169,11 +170,7 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 	log.Println("6.begin to query results of first stPay")
 	retryCount = 0
 	for {
-		if retryCount > 20 {
-			log.Fatal("first stPay fails")
-		}
 		retryCount++
-		time.Sleep(30 * time.Second)
 		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
 		log.Println("contract balance", amountUk)
 		if amountUk.Cmp(big.NewInt(moneyToUK)) == 0 { //合约金额不变,时间未超过startTime+3*cycle,没有真实支付
@@ -209,6 +206,11 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 				break //all is right
 			}
 		}
+
+		if retryCount > 20 {
+			log.Fatal("first stPay fails")
+		}
+		time.Sleep(30 * time.Second)
 	}
 
 	//set listProviderAddr[1] stop
