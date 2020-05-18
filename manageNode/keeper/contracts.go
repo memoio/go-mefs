@@ -99,6 +99,7 @@ func (k *Info) loadContract(mode bool) error {
 
 		if kItem.PledgeMoney.Cmp(price) < 0 {
 			price.Sub(price, kItem.PledgeMoney)
+			utils.MLogger.Infof("pledge keeper %s amount %d", k.localID, price)
 			err := role.PledgeKeeper(k.localID, k.sk, price)
 			if err != nil {
 				return err

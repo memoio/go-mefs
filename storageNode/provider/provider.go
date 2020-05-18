@@ -663,14 +663,15 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 	return ukAddr, posAddr, channelAddr
 }
 
-func (p *Info) getIncome(localAddr common.Address, storageBlock, readBlock, posBlock int64) (int64, int64, int64, error) {
+func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) {
 	b, err := contracts.GetLatestBlock()
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, err
 	}
 
 	latestBlock := b.Number().Int64()
 	endBlock := b.Number().Int64()
+	storageBlock := pBlock
 	ukaddrs, posAddrs, chanAddrs := p.GetIncomeAddress()
 	if len(ukaddrs) > 0 && latestBlock > storageBlock {
 		endBlock = latestBlock
@@ -700,6 +701,8 @@ func (p *Info) getIncome(localAddr common.Address, storageBlock, readBlock, posB
 		}
 	}
 
+	posBlock := pBlock
+
 	if len(posAddrs) > 0 && latestBlock > posBlock {
 		endBlock = latestBlock
 
@@ -727,6 +730,8 @@ func (p *Info) getIncome(localAddr common.Address, storageBlock, readBlock, posB
 			}
 		}
 	}
+
+	readBlock := pBlock
 
 	if len(chanAddrs) > 0 && latestBlock > readBlock {
 		endBlock = latestBlock
@@ -756,7 +761,7 @@ func (p *Info) getIncome(localAddr common.Address, storageBlock, readBlock, posB
 		}
 	}
 
-	return storageBlock, posBlock, readBlock, nil
+	return latestBlock, nil
 }
 
 func (p *Info) loadPeersFromChain() error {
@@ -793,14 +798,12 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 
 	p.loadPeersFromChain()
 
-	var sBlock, pBlock, rBlock int64
+	lastBlock := int64(0)
 
 	time.Sleep(7 * time.Minute)
-	sb, pb, rb, err := p.getIncome(localAddr, sBlock, pBlock, rBlock)
+	lb, err := p.getIncome(localAddr, lastBlock)
 	if err == nil {
-		sBlock = sb
-		pBlock = pb
-		rBlock = rb
+		lastBlock = lb
 	}
 
 	ticker := time.NewTicker(37 * time.Minute)
@@ -810,11 +813,9 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			sb, pb, rb, err := p.getIncome(localAddr, sBlock, pBlock, rBlock)
+			lb, err := p.getIncome(localAddr, lastBlock)
 			if err == nil {
-				sBlock = sb
-				pBlock = pb
-				rBlock = rb
+				lastBlock = lb
 			}
 			p.loadPeersFromChain()
 		}

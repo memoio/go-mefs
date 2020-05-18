@@ -206,8 +206,8 @@ var setKeeperCmd = &cmds.Command{
 
 var setKeeperPriceCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
-		Tagline:          "test setKeeper",
-		ShortDescription: "set the account'Role keeper",
+		Tagline:          "test set Keeper price",
+		ShortDescription: "set the keeper price",
 	},
 
 	Options: []cmds.Option{ //选项列表
