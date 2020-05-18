@@ -119,27 +119,13 @@ func challengeTest() error {
 	log.Println("Upload", objectName, "Size is", ToStorageSize(r), "speed is", speed, "KB/s", " addr", addr)
 	log.Println(ob.String() + "address: " + addr)
 
-	check := 0
-	var LastChallengeTime string
-	for {
-		check++
-		if check > 5 {
-			log.Println("Challenge time not change")
-			return errors.New("ChallengeTest failed, Last challenge time not change")
-		}
-		time.Sleep(2 * time.Minute)
-		getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr), shell.SetAvailTime(true))
-		if err != nil {
-			log.Println("List Objects failed :", err)
-			return err
-		}
-		log.Println("Object Name :", getOb.Objects[0].Name, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
-		if check >= 2 && strings.Compare(LastChallengeTime, getOb.Objects[0].LatestChalTime) != 0 {
-			log.Println("Challenge success")
-			break
-		}
-		LastChallengeTime = getOb.Objects[0].LatestChalTime
+	getOb, err := sh.ListObjects(bucketName, shell.SetAddress(addr), shell.SetAvailTime(true))
+	if err != nil {
+		log.Println("List Objects failed :", err)
+		return err
 	}
+	log.Println("Object Name :", getOb.Objects[0].Name, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
+	lastChallengeTime := getOb.Objects[0].LatestChalTime
 
 	keepers, err := sh.ListKeepers(shell.SetAddress(addr))
 	if err != nil {
@@ -227,6 +213,7 @@ func challengeTest() error {
 	}
 
 	time.Sleep(1 * time.Minute)
+
 	nret, err := getBlock(sh, cid[0], pro[0]) //获取块的MD5
 	if nret != "" && err == nil {
 		log.Fatal("get block from provider: ", pro[0], " expcted not")
@@ -262,6 +249,19 @@ func challengeTest() error {
 	log.Println("successfully get object :", objectName, " in bucket:", bucketName)
 
 	time.Sleep(50 * time.Minute)
+
+	getOb, err = sh.ListObjects(bucketName, shell.SetAddress(addr), shell.SetAvailTime(true))
+	if err != nil {
+		log.Println("List Objects failed :", err)
+		return err
+	}
+	log.Println("Object Name :", getOb.Objects[0].Name, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
+
+	if strings.Compare(lastChallengeTime, getOb.Objects[0].LatestChalTime) != 0 {
+		log.Println("Challenge time not change")
+		return errors.New("ChallengeTest failed, Last challenge time not change")
+	}
+
 	//获取新的provider，从新的provider上获得块的MD5
 	var newProvider string
 	kmBlock, err := metainfo.NewKey(cid[0], mpb.KeyType_BlockPos)
