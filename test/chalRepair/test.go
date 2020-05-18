@@ -257,7 +257,7 @@ func challengeTest() error {
 	}
 	log.Println("Object Name :", getOb.Objects[0].Name, "\nObject LastChallenge Time :", getOb.Objects[0].LatestChalTime)
 
-	if strings.Compare(lastChallengeTime, getOb.Objects[0].LatestChalTime) != 0 {
+	if strings.Compare(lastChallengeTime, getOb.Objects[0].LatestChalTime) == 0 {
 		log.Println("Challenge time not change")
 		return errors.New("ChallengeTest failed, Last challenge time not change")
 	}

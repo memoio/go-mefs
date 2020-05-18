@@ -29,7 +29,7 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 
 	kItems := make([]*KeeperItem, 0, len(kaddrs))
 	for _, kaddr := range kaddrs {
-		isKeeper, isBanned, money, _, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, kaddr)
+		isKeeper, isBanned, money, ptime, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, kaddr)
 		if err != nil {
 			continue
 		}
@@ -40,8 +40,9 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 			}
 
 			item := &KeeperItem{
-				KeeperID: keeperID,
-				Money:    money,
+				KeeperID:    keeperID,
+				PledgeMoney: money,
+				StartTime:   ptime.Int64(),
 			}
 			kItems = append(kItems, item)
 			totalMoney.Add(totalMoney, money)
@@ -79,7 +80,7 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 
 	pItems := make([]*ProviderItem, 0, len(paddrs))
 	for _, paddr := range paddrs {
-		isProvider, isBanned, money, _, err := proInstance.Info(&bind.CallOpts{From: localAddress}, paddr)
+		isProvider, isBanned, money, ptime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, paddr)
 		if err != nil {
 			continue
 		}
@@ -90,8 +91,9 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 			}
 
 			item := &ProviderItem{
-				ProviderID: proID,
-				Money:      money,
+				ProviderID:  proID,
+				PledgeMoney: money,
+				StartTime:   ptime.Int64(),
 			}
 			pItems = append(pItems, item)
 			totalMoney.Add(totalMoney, money)

@@ -22,17 +22,17 @@ import (
 
 // ProviderItem has provider's info
 type ProviderItem struct {
-	ProviderID string   // providerid
-	Capacity   int64    // Bytes, pledge capacity
-	Money      *big.Int // pledge money
-	StartTime  int64    // start time
+	ProviderID  string   // providerid
+	Capacity    int64    // Bytes, pledge capacity
+	PledgeMoney *big.Int // pledge money
+	StartTime   int64    // start time
 }
 
 // KeeperItem has provider's info
 type KeeperItem struct {
-	KeeperID  string   // providerid
-	Money     *big.Int // pledge money
-	StartTime int64    // start time; not in contract
+	KeeperID    string   // providerid
+	PledgeMoney *big.Int // pledge money
+	StartTime   int64    // start time; not in contract
 }
 
 // UpKeepingItem has upkeeping information
@@ -135,7 +135,7 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	retryCount := 0
 	for {
 		retryCount++
-		isKeeper, isBanned, money, _, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, keeperAddress)
+		isKeeper, isBanned, money, ptime, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, keeperAddress)
 		if err != nil {
 			if retryCount > 10 {
 				return item, nil
@@ -150,8 +150,9 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 			}
 
 			item = KeeperItem{
-				KeeperID: keeperID,
-				Money:    money,
+				KeeperID:    keeperID,
+				PledgeMoney: money,
+				StartTime:   ptime.Int64(),
 			}
 			return item, nil
 		}
@@ -228,10 +229,10 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 
 		if isProvider && !isBanned {
 			item = ProviderItem{
-				ProviderID: proID,
-				Money:      money,
-				StartTime:  stime.Int64(),
-				Capacity:   cap,
+				ProviderID:  proID,
+				PledgeMoney: money,
+				StartTime:   stime.Int64(),
+				Capacity:    cap,
 			}
 			return item, nil
 		}

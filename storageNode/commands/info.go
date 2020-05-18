@@ -30,6 +30,7 @@ type pInfoOutput struct {
 	TotalIncome     *big.Int
 	DownloadIncome  *big.Int
 	StorageIncome   *big.Int
+	PosIncome       *big.Int
 }
 
 var InfoCmd = &cmds.Command{

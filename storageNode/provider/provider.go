@@ -23,6 +23,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 // Info tracks provider's information
@@ -33,11 +34,10 @@ type Info struct {
 	ds            data.Service
 	storageUsed   uint64
 	storageTotal  uint64
-	storageBlock  int64
-	readBlock     int64
 	TotalIncome   *big.Int
 	ReadIncome    *big.Int
 	StorageIncome *big.Int
+	PosIncome     *big.Int
 	context       context.Context
 	fsGroup       sync.Map // key: queryID, value: *groupInfo
 	users         sync.Map // key: userID, value: *uInfo
@@ -599,8 +599,9 @@ func (p *Info) save(ctx context.Context) error {
 }
 
 //GetIncomeAddress get upkeepingAddress and channelAddress of this provider to filter logs in chain
-func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
+func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.Address) {
 	ukAddr := []common.Address{}
+	posAddr := []common.Address{}
 	channelAddr := []common.Address{} // missing some
 	pus := p.getGroups()
 	for _, pu := range pus {
@@ -613,7 +614,13 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
 		if err != nil {
 			continue
 		}
-		ukAddr = append(ukAddr, tmp)
+
+		if pu.uid == pos.GetPosId() {
+			posAddr = append(posAddr, tmp)
+			continue
+		} else {
+			ukAddr = append(ukAddr, tmp)
+		}
 
 		gp.channel.Range(func(key, value interface{}) bool {
 			cItem, ok := value.(*role.ChannelItem)
@@ -627,27 +634,52 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
 		})
 	}
 
-	return ukAddr, channelAddr
+	if len(posAddr) == 0 {
+		qItem, err := role.GetLatestQuery(pos.GetPosId())
+		if err != nil {
+			return ukAddr, posAddr, channelAddr
+		}
+		uItem, err := role.GetUpKeeping(pos.GetPosId(), qItem.QueryID)
+		if err != nil {
+			return ukAddr, posAddr, channelAddr
+		}
+		localAddr, err := address.GetAddressFromID(p.localID)
+		if err != nil {
+			return ukAddr, posAddr, channelAddr
+		}
+		for _, pi := range uItem.Providers {
+			if pi.Addr.String() == localAddr.String() {
+				uAddr, err := address.GetAddressFromID(uItem.UpKeepingID)
+				if err != nil {
+					return ukAddr, posAddr, channelAddr
+				}
+				posAddr = append(posAddr, uAddr)
+			}
+		}
+
+	}
+
+	return ukAddr, posAddr, channelAddr
 }
 
-func (p *Info) getIncome(localAddr common.Address) {
+func (p *Info) getIncome(localAddr common.Address, storageBlock, readBlock, posBlock int64) (int64, int64, int64, error) {
 	b, err := contracts.GetLatestBlock()
 	if err != nil {
-		return
+		return 0, 0, 0, err
 	}
 
 	latestBlock := b.Number().Int64()
-
-	ukaddrs, chanAddrs := p.GetIncomeAddress()
-	if len(ukaddrs) > 0 && latestBlock > p.storageBlock {
-		endBlock := latestBlock
+	endBlock := b.Number().Int64()
+	ukaddrs, posAddrs, chanAddrs := p.GetIncomeAddress()
+	if len(ukaddrs) > 0 && latestBlock > storageBlock {
+		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > p.storageBlock+128 {
-				endBlock = p.storageBlock + 128
+			if endBlock > storageBlock+128 {
+				endBlock = storageBlock + 128
 			}
 
-			sIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, p.storageBlock, endBlock)
+			sIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, storageBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("getukpaylog err:", err)
 				break
@@ -655,7 +687,7 @@ func (p *Info) getIncome(localAddr common.Address) {
 
 			p.StorageIncome.Add(p.StorageIncome, sIncome)
 			p.TotalIncome.Add(p.TotalIncome, sIncome)
-			p.storageBlock = endBlock
+			storageBlock = endBlock
 
 			if endBlock == latestBlock {
 				break
@@ -667,15 +699,43 @@ func (p *Info) getIncome(localAddr common.Address) {
 		}
 	}
 
-	if len(chanAddrs) > 0 && latestBlock > p.readBlock {
-		endBlock := latestBlock
+	if len(posAddrs) > 0 && latestBlock > posBlock {
+		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > p.readBlock+128 {
-				endBlock = p.readBlock + 128
+			if endBlock > posBlock+128 {
+				endBlock = posBlock + 128
 			}
 
-			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, p.readBlock, endBlock)
+			sIncome, _, err := contracts.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
+			if err != nil {
+				utils.MLogger.Info("getukpaylog err:", err)
+				break
+			}
+
+			p.PosIncome.Add(p.PosIncome, sIncome)
+			p.TotalIncome.Add(p.TotalIncome, sIncome)
+			posBlock = endBlock
+
+			if endBlock == latestBlock {
+				break
+			}
+
+			if endBlock < latestBlock {
+				endBlock = latestBlock
+			}
+		}
+	}
+
+	if len(chanAddrs) > 0 && latestBlock > readBlock {
+		endBlock = latestBlock
+
+		for endBlock <= latestBlock {
+			if endBlock > readBlock+128 {
+				endBlock = readBlock + 128
+			}
+
+			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, readBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("getukpaylog err:", err)
 				break
@@ -683,7 +743,7 @@ func (p *Info) getIncome(localAddr common.Address) {
 
 			p.ReadIncome.Add(p.ReadIncome, sIncome)
 			p.TotalIncome.Add(p.TotalIncome, sIncome)
-			p.readBlock = endBlock
+			readBlock = endBlock
 
 			if endBlock == latestBlock {
 				break
@@ -695,6 +755,7 @@ func (p *Info) getIncome(localAddr common.Address) {
 		}
 	}
 
+	return storageBlock, posBlock, readBlock, nil
 }
 
 func (p *Info) loadPeersFromChain() error {
@@ -731,8 +792,15 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 
 	p.loadPeersFromChain()
 
+	var sBlock, pBlock, rBlock int64
+
 	time.Sleep(7 * time.Minute)
-	p.getIncome(localAddr)
+	sb, pb, rb, err := p.getIncome(localAddr, sBlock, pBlock, rBlock)
+	if err == nil {
+		sBlock = sb
+		pBlock = pb
+		rBlock = rb
+	}
 
 	ticker := time.NewTicker(37 * time.Minute)
 	defer ticker.Stop()
@@ -741,7 +809,12 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			p.getIncome(localAddr)
+			sb, pb, rb, err := p.getIncome(localAddr, sBlock, pBlock, rBlock)
+			if err == nil {
+				sBlock = sb
+				pBlock = pb
+				rBlock = rb
+			}
 			p.loadPeersFromChain()
 		}
 	}

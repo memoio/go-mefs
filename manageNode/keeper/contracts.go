@@ -93,7 +93,7 @@ func (k *Info) loadContract(mode bool) error {
 			return err
 		}
 
-		if kItem.Money.Sign() <= 0 {
+		if kItem.PledgeMoney.Sign() <= 0 {
 			amount := new(big.Int).SetInt64(utils.KeeperDeposit)
 			err := role.PledgeKeeper(k.localID, k.sk, amount)
 			if err != nil {
