@@ -667,23 +667,23 @@ func (p *Info) getIncome(localAddr common.Address) {
 		}
 	}
 
-	if len(chanAddrs) > 0 && latestBlock > p.storageBlock {
+	if len(chanAddrs) > 0 && latestBlock > p.readBlock {
 		endBlock := latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > p.storageBlock+128 {
-				endBlock = p.storageBlock + 128
+			if endBlock > p.readBlock+128 {
+				endBlock = p.readBlock + 128
 			}
 
-			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, p.storageBlock, endBlock)
+			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, p.readBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("getukpaylog err:", err)
 				break
 			}
 
-			p.StorageIncome.Add(p.StorageIncome, sIncome)
+			p.ReadIncome.Add(p.ReadIncome, sIncome)
 			p.TotalIncome.Add(p.TotalIncome, sIncome)
-			p.storageBlock = endBlock
+			p.readBlock = endBlock
 
 			if endBlock == latestBlock {
 				break
@@ -718,20 +718,22 @@ func (p *Info) loadPeersFromChain() error {
 
 	role.SaveKpMap(p.localID)
 
-	localAddr, err := address.GetAddressFromID(p.localID)
-	if err != nil {
-		return err
-	}
-
-	p.getIncome(localAddr)
-
 	return nil
 }
 
 func (p *Info) getFromChainRegular(ctx context.Context) {
 	utils.MLogger.Info("Get infos from chain start!")
 
+	localAddr, err := address.GetAddressFromID(p.localID)
+	if err != nil {
+		return
+	}
+
 	p.loadPeersFromChain()
+
+	time.Sleep(7 * time.Minute)
+	p.getIncome(localAddr)
+
 	ticker := time.NewTicker(37 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -739,6 +741,7 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			p.getIncome(localAddr)
 			p.loadPeersFromChain()
 		}
 	}
