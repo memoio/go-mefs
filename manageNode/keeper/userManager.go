@@ -205,6 +205,10 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	for _, proID := range g.providers {
 		if proID != pid {
 			thisLinfo := g.getLInfo(proID, false)
+			if thisLinfo == nil {
+				continue
+			}
+
 			binfo, ok := thisLinfo.blockMap.Load(bid)
 			if ok {
 				thisLinfo.maxlength -= int64((binfo.(*blockInfo).offset) * int(thisBucket.bops.GetSegmentSize()))
