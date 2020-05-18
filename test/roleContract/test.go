@@ -129,6 +129,13 @@ func testKeeper() (err error) {
 		return errors.New("wrong parameters")
 	}
 
+	contracts.EndPoint = ethEndPoint
+	err = contracts.SetKeeper(keeperAddr, adminSk, false)
+	if err != nil {
+		log.Println("setKeeper false err:", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -201,6 +208,13 @@ func testProvider() (err error) {
 		return errors.New("wrong parameters")
 	}
 
+	contracts.EndPoint = ethEndPoint
+	err = contracts.SetProvider(proAddr, adminSk, false)
+	if err != nil {
+		log.Println("setProvider false err:", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -232,6 +246,12 @@ func testRole() (err error) {
 		}
 		log.Println("set keeper success")
 		break
+	}
+
+	err = contracts.SetKeeper(keeperAddr, adminSk, false)
+	if err != nil {
+		log.Println("setKeeper false err:", err)
+		return err
 	}
 
 	log.Println("test set provider")
@@ -267,6 +287,13 @@ func testRole() (err error) {
 		log.Println("set provider success")
 		break
 	}
+
+	err = contracts.SetProvider(providerAddr, adminSk, true)
+	if err != nil {
+		log.Println("setProvider false err:", err)
+		return err
+	}
+
 	return nil
 	log.Println("test set add kp")
 	contracts.EndPoint = ethEndPoint

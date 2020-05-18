@@ -702,6 +702,40 @@ func (n *impl) TestConnect() error {
 }
 
 //连接试三次
+func (n *impl) FastConnect(ctx context.Context, to string) bool {
+	if n.ph == nil || n.rt == nil {
+		return false
+	}
+
+	id, err := peer.IDB58Decode(to)
+	if err != nil {
+		return false
+	}
+
+	if n.ph.Network().Connectedness(id) == inet.Connected {
+		return true
+	}
+
+	pi, err := n.rt.FindPeer(ctx, id)
+	if err != nil {
+		return false
+	}
+
+	if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {
+		swrm.Backoff().Clear(pi.ID)
+	}
+
+	err = n.ph.Connect(ctx, pi)
+	if err == nil {
+		if n.ph.Network().Connectedness(id) == inet.Connected {
+			return true
+		}
+	}
+
+	return false
+}
+
+//连接试三次
 func (n *impl) Connect(ctx context.Context, to string) bool {
 	if n.ph == nil || n.rt == nil {
 		return false

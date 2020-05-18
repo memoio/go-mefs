@@ -93,9 +93,14 @@ func (k *Info) loadContract(mode bool) error {
 			return err
 		}
 
-		if kItem.PledgeMoney.Sign() <= 0 {
-			amount := new(big.Int).SetInt64(utils.KeeperDeposit)
-			err := role.PledgeKeeper(k.localID, k.sk, amount)
+		price, err := contracts.GetKeeperPrice(k.localID)
+		if err != nil {
+			return err
+		}
+
+		if kItem.PledgeMoney.Cmp(price) < 0 {
+			price.Sub(price, kItem.PledgeMoney)
+			err := role.PledgeKeeper(k.localID, k.sk, price)
 			if err != nil {
 				return err
 			}

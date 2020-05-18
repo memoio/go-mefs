@@ -162,6 +162,15 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	return item, ErrNotKeeper
 }
 
+func GetKeeperPrice(localID string) (*big.Int, error) {
+	localAddress, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return nil, err
+	}
+
+	return contracts.GetKeeperPrice(localAddress)
+}
+
 // PledgeKeeper pledgs
 func PledgeKeeper(localID, hexKey string, amount *big.Int) error {
 	localAddress, err := address.GetAddressFromID(localID)
@@ -260,6 +269,15 @@ func PledgeProvider(localID, hexKey string, size *big.Int) error {
 	price.Mul(price, size)
 
 	return contracts.PledgeProvider(localAddress, hexKey, price)
+}
+
+func GetProviderPrice(localID string) (*big.Int, error) {
+	localAddress, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return nil, err
+	}
+
+	return contracts.GetKeeperPrice(localAddress)
 }
 
 func IsProvider(userID string) (bool, error) {

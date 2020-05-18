@@ -20,6 +20,7 @@ import (
 )
 
 type allKeepers struct {
+	KeeperCount int
 	PledgeMoney *big.Int
 	KeeperInfos []keeperInfo
 }
@@ -32,8 +33,9 @@ type keeperInfo struct {
 }
 
 type allProviders struct {
-	PledgeMoney *big.Int
-	ProInfos    []proInfo
+	ProviderCount int
+	PledgeMoney   *big.Int
+	ProInfos      []proInfo
 }
 
 type proInfo struct {
@@ -80,6 +82,9 @@ var keeperCmd = &cmds.Command{
 		var aks []keeperInfo
 
 		for _, ki := range kItems {
+			if ki.PledgeMoney.Sign() <= 0 {
+				continue
+			}
 			kaddr, err := address.GetAddressFromID(ki.KeeperID)
 			if err != nil {
 				continue
@@ -89,12 +94,13 @@ var keeperCmd = &cmds.Command{
 				Address:     kaddr.String(),
 				PledgeMoney: ki.PledgeMoney,
 				PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-				Online:      n.Data.Connect(req.Context, ki.KeeperID),
+				Online:      n.Data.FastConnect(req.Context, ki.KeeperID),
 			}
 			aks = append(aks, kinfo)
 		}
 
 		output := &allKeepers{
+			KeeperCount: len(aks),
 			PledgeMoney: pledge,
 			KeeperInfos: aks,
 		}
@@ -136,10 +142,15 @@ var proCmd = &cmds.Command{
 
 		var aks []proInfo
 		for _, ki := range pItems {
+			if ki.PledgeMoney.Sign() <= 0 {
+				continue
+			}
+
 			kaddr, err := address.GetAddressFromID(ki.ProviderID)
 			if err != nil {
 				continue
 			}
+
 			kinfo := proInfo{
 				Address:     kaddr.String(),
 				PledgeMoney: ki.PledgeMoney,
@@ -150,8 +161,9 @@ var proCmd = &cmds.Command{
 		}
 
 		output := &allProviders{
-			PledgeMoney: pledge,
-			ProInfos:    aks,
+			ProviderCount: len(aks),
+			PledgeMoney:   pledge,
+			ProInfos:      aks,
 		}
 
 		return cmds.EmitOnce(res, output)

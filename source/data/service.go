@@ -36,6 +36,7 @@ type Service interface {
 
 	TestConnect() error
 	Connect(ctx context.Context, to string) bool
+	FastConnect(ctx context.Context, to string) bool
 	GetPeers() ([]peer.ID, error)
 	GetExternalAddr(p string) (ma.Multiaddr, error)
 	BlockStore() bs.Blockstore
