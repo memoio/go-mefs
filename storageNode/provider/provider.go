@@ -607,8 +607,12 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 	channelAddr := []common.Address{} // missing some
 	pus := p.getGroups()
 	for _, pu := range pus {
+		if pu.uid == pu.qid {
+			continue
+		}
+
 		gp := p.getGroupInfo(pu.uid, pu.qid, false)
-		if gp == nil {
+		if gp == nil || gp.upkeeping == nil {
 			continue
 		}
 
