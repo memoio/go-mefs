@@ -86,6 +86,11 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		}
 	}
 
+	oldBlock, err := contracts.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+
 	log.Println("1.begin to deploy upkeeping first")
 	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, listKeeperAddr[0], listKeeperAddr, listProviderAddr, 780, 1024, big.NewInt(111), defaultCycle, big.NewInt(moneyToUK), false)
 	if err != nil {
@@ -450,14 +455,20 @@ func ukTest(kCount int, pCount int, amount *big.Int, userAddr, userSk string) er
 		log.Fatal("keeper is not stopped, error")
 	}
 
+	newblk, err := contracts.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+
 	//query provider[0]'s income
 	log.Println("17. begin to test getStorageIncome")
 	upAddrs := []common.Address{uAddr}
-	total, daily, err := contracts.GetStorageIncome(upAddrs, listProviderAddr[0])
+
+	total, _, err := contracts.GetStorageIncome(upAddrs, listProviderAddr[0], oldBlock.Number().Int64(), newblk.Number().Int64())
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("totalIncome: ", total.String(), "\ndailyIncome: ", daily.String())
+	log.Println("totalIncome: ", total.String())
 	if total.Cmp(big.NewInt(120*9*3)) != 0 {
 		log.Fatal("query providers[0]'s storageIncome failed, it is not equal to 3240")
 	}

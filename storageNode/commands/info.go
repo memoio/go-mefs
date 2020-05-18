@@ -65,8 +65,12 @@ var InfoCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		providerIns, ok := node.Inst.(*provider.Info)
 
+		ti := new(big.Int)
+		di := new(big.Int)
+		si := new(big.Int)
+
+		providerIns, ok := node.Inst.(*provider.Info)
 		if !ok || !providerIns.Online() { //service is not ready, 从链上获取depositCapacity
 			providerItem, err := role.GetProviderInfo(node.Identity.Pretty(), node.Identity.Pretty())
 			if err != nil {
@@ -82,22 +86,9 @@ var InfoCmd = &cmds.Command{
 		} else {
 			depositCapacity, usedCapacity = providerIns.GetStorageInfo()
 
-			/*
-				// need test
-				ukAddress, channelAddress := providerIns.GetIncomeInfo()
-
-				totalIncome, dailyIncome, err = contracts.GetStorageIncome(ukAddress, localAddr) //income for storage
-				if err != nil {
-					return err
-				}
-				t, d, err := contracts.GetDownloadIncome(channelAddress, localAddr)
-				if err != nil {
-					return err
-				}
-
-				totalIncome.Add(totalIncome, t)
-				dailyIncome.Add(dailyIncome, d)
-			*/
+			ti = providerIns.TotalIncome
+			si = providerIns.StorageIncome
+			di = providerIns.ReadIncome
 		}
 
 		offerAddr, err := address.GetAddressFromID(oItem.OfferID)
@@ -115,6 +106,9 @@ var InfoCmd = &cmds.Command{
 			OfferCapacity:   oItem.Capacity * 1024 * 1024,
 			OfferPrice:      oItem.Price,
 			Balance:         balance,
+			TotalIncome:     ti,
+			DownloadIncome:  di,
+			StorageIncome:   si,
 		}
 		return cmds.EmitOnce(res, output)
 	},

@@ -14,6 +14,7 @@ import (
 	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
@@ -26,21 +27,26 @@ import (
 
 // Info tracks provider's information
 type Info struct {
-	localID      string
-	sk           string
-	state        bool
-	ds           data.Service
-	storageUsed  uint64
-	storageTotal uint64
-	context      context.Context
-	fsGroup      sync.Map // key: queryID, value: *groupInfo
-	users        sync.Map // key: userID, value: *uInfo
-	keepers      sync.Map // key: keeperID, value: *kInfo
-	providers    sync.Map // key: proID, value: *kInfo
-	offers       []*role.OfferItem
-	proContract  *role.ProviderItem
-	userConfigs  *lru.ARCCache
-	ms           *measure
+	localID       string
+	sk            string
+	state         bool
+	ds            data.Service
+	storageUsed   uint64
+	storageTotal  uint64
+	storageBlock  int64
+	readBlock     int64
+	TotalIncome   *big.Int
+	ReadIncome    *big.Int
+	StorageIncome *big.Int
+	context       context.Context
+	fsGroup       sync.Map // key: queryID, value: *groupInfo
+	users         sync.Map // key: userID, value: *uInfo
+	keepers       sync.Map // key: keeperID, value: *kInfo
+	providers     sync.Map // key: proID, value: *kInfo
+	offers        []*role.OfferItem
+	proContract   *role.ProviderItem
+	userConfigs   *lru.ARCCache
+	ms            *measure
 }
 
 type measure struct {
@@ -121,12 +127,15 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}
 
 	m := &Info{
-		localID: id,
-		sk:      sk,
-		ds:      ds,
-		context: ctx,
-		ms:      mea,
-		offers:  make([]*role.OfferItem, 0, 1),
+		localID:       id,
+		sk:            sk,
+		ds:            ds,
+		context:       ctx,
+		ms:            mea,
+		TotalIncome:   big.NewInt(0),
+		ReadIncome:    big.NewInt(0),
+		StorageIncome: big.NewInt(0),
+		offers:        make([]*role.OfferItem, 0, 1),
 	}
 	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
@@ -160,6 +169,12 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
 
+	err = m.load(ctx)
+	if err != nil {
+		utils.MLogger.Error("provider load failed: ", err)
+		return nil, err
+	}
+
 	go m.getFromChainRegular(ctx)
 	go m.sendStorageRegular(ctx)
 	go m.saveRegular(ctx)
@@ -192,37 +207,6 @@ func (p *Info) Close() error {
 
 func (p *Info) GetStorageInfo() (int64, uint64) {
 	return p.proContract.Capacity, p.storageUsed
-}
-
-//GetIncomeInfo get upkeepingAddress and channelAddress of this provider to filter logs in chain
-func (p *Info) GetIncomeInfo() ([]common.Address, []common.Address) {
-	ukAddr := []common.Address{}
-	channelAddr := []common.Address{}
-	p.fsGroup.Range(func(key, value interface{}) bool {
-		gInfo, ok := value.(*groupInfo)
-		if !ok {
-			return true
-		}
-		ukid := gInfo.upkeeping.UpKeepingID
-		tmp, err := address.GetAddressFromID(ukid)
-		if err != nil {
-			return false
-		}
-		ukAddr = append(ukAddr, tmp)
-
-		gInfo.channel.Range(func(key, value interface{}) bool {
-			cItem, ok := value.(*role.ChannelItem)
-			if !ok {
-				return true
-			}
-			if cItem.ProID == p.localID {
-				channelAddr = append(channelAddr) //此处需要return false终止遍历吗
-			}
-			return true
-		})
-		return true
-	})
-	return ukAddr, channelAddr
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
@@ -457,12 +441,10 @@ func (p *Info) load(ctx context.Context) error {
 	// load keepers
 	kmKID, err := metainfo.NewKey(localID, mpb.KeyType_Keepers)
 	if err != nil {
-
 		return err
 	}
 
 	kids, err := p.ds.GetKey(ctx, kmKID.ToString(), "local")
-
 	if err == nil && len(kids) > 0 {
 		utils.MLogger.Info(localID, " has keepers: ", string(kids))
 		for i := 0; i < len(kids)/utils.IDLength; i++ {
@@ -529,6 +511,10 @@ func (p *Info) load(ctx context.Context) error {
 	wg.Wait()
 
 	return nil
+}
+
+func (p *Info) loadChannel(ctx context.Context) {
+	// todo
 }
 
 func (p *Info) save(ctx context.Context) error {
@@ -612,6 +598,105 @@ func (p *Info) save(ctx context.Context) error {
 	return nil
 }
 
+//GetIncomeAddress get upkeepingAddress and channelAddress of this provider to filter logs in chain
+func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
+	ukAddr := []common.Address{}
+	channelAddr := []common.Address{} // missing some
+	pus := p.getGroups()
+	for _, pu := range pus {
+		gp := p.getGroupInfo(pu.uid, pu.qid, false)
+		if gp == nil {
+			continue
+		}
+
+		tmp, err := address.GetAddressFromID(gp.upkeeping.UpKeepingID)
+		if err != nil {
+			continue
+		}
+		ukAddr = append(ukAddr, tmp)
+
+		gp.channel.Range(func(key, value interface{}) bool {
+			cItem, ok := value.(*role.ChannelItem)
+			if !ok {
+				return true
+			}
+			if cItem.ProID == p.localID {
+				channelAddr = append(channelAddr)
+			}
+			return true
+		})
+	}
+
+	return ukAddr, channelAddr
+}
+
+func (p *Info) getIncome(localAddr common.Address) {
+	b, err := contracts.GetLatestBlock()
+	if err != nil {
+		return
+	}
+
+	latestBlock := b.Number().Int64()
+
+	ukaddrs, chanAddrs := p.GetIncomeAddress()
+	if len(ukaddrs) > 0 && latestBlock > p.storageBlock {
+		endBlock := latestBlock
+
+		for endBlock <= latestBlock {
+			if endBlock > p.storageBlock+128 {
+				endBlock = p.storageBlock + 128
+			}
+
+			sIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, p.storageBlock, endBlock)
+			if err != nil {
+				utils.MLogger.Info("getukpaylog err:", err)
+				break
+			}
+
+			p.StorageIncome.Add(p.StorageIncome, sIncome)
+			p.TotalIncome.Add(p.TotalIncome, sIncome)
+			p.storageBlock = endBlock
+
+			if endBlock == latestBlock {
+				break
+			}
+
+			if endBlock < latestBlock {
+				endBlock = latestBlock
+			}
+		}
+	}
+
+	if len(chanAddrs) > 0 && latestBlock > p.storageBlock {
+		endBlock := latestBlock
+
+		for endBlock <= latestBlock {
+			if endBlock > p.storageBlock+128 {
+				endBlock = p.storageBlock + 128
+			}
+
+			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, p.storageBlock, endBlock)
+			if err != nil {
+				utils.MLogger.Info("getukpaylog err:", err)
+				break
+			}
+
+			p.StorageIncome.Add(p.StorageIncome, sIncome)
+			p.TotalIncome.Add(p.TotalIncome, sIncome)
+			p.storageBlock = endBlock
+
+			if endBlock == latestBlock {
+				break
+			}
+
+			if endBlock < latestBlock {
+				endBlock = latestBlock
+			}
+		}
+	}
+
+}
+
 func (p *Info) loadPeersFromChain() error {
 	keepers, _, err := role.GetAllKeepers(p.localID)
 	if err != nil {
@@ -633,6 +718,13 @@ func (p *Info) loadPeersFromChain() error {
 
 	role.SaveKpMap(p.localID)
 
+	localAddr, err := address.GetAddressFromID(p.localID)
+	if err != nil {
+		return err
+	}
+
+	p.getIncome(localAddr)
+
 	return nil
 }
 
@@ -640,7 +732,7 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 	utils.MLogger.Info("Get infos from chain start!")
 
 	p.loadPeersFromChain()
-	ticker := time.NewTicker(30 * time.Minute)
+	ticker := time.NewTicker(37 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {

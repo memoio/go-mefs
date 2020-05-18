@@ -147,6 +147,11 @@ func testCloseChannel() (err error) {
 	log.Println("test close channel")
 	contracts.EndPoint = ethEndPoint
 
+	oldblk, err := contracts.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+
 	userAddr, userSk, err := test.CreateAddr()
 	if err != nil {
 		log.Println(err)
@@ -282,12 +287,17 @@ func testCloseChannel() (err error) {
 	}
 
 	log.Println("test get download income from chain")
+	newblk, err := contracts.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+
 	chAddrs := []common.Address{channelAddr}
-	total, daily, err := contracts.GetDownloadIncome(chAddrs, providerAddr)
+	total, _, err := contracts.GetReadIncome(chAddrs, providerAddr, oldblk.Number().Int64(), newblk.Number().Int64())
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("totalIncome: ", total.String(), "\ndailyIncome: ", daily.String())
+	log.Println("totalIncome: ", total.String())
 	if total.Cmp(value) != 0 {
 		log.Fatal("test get income failed")
 	}

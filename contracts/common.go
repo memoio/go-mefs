@@ -8,22 +8,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/memoio/go-mefs/contracts/channel"
-
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/memoio/go-mefs/contracts/upKeeping"
-
 	"github.com/ethereum/go-ethereum"
-
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/mapper"
 	"github.com/memoio/go-mefs/contracts/resolver"
+	"github.com/memoio/go-mefs/contracts/upKeeping"
 	"github.com/memoio/go-mefs/utils"
 )
 
@@ -119,6 +116,23 @@ func QueryBalance(account string) (balance *big.Int, err error) {
 	}
 	balance = utils.HexToBigInt(result)
 	return balance, nil
+}
+
+//GetLatestBlock query the balance of account
+func GetLatestBlock() (*types.Block, error) {
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		log.Println("rpc.Dial err", err)
+		return nil, err
+	}
+
+	b, err := client.BlockByNumber(context.Background(), nil)
+	if err != nil {
+		log.Println("client.call err:", err)
+		return nil, err
+	}
+
+	return b, nil
 }
 
 // DeployIndexer deploy role's indexer and add it to admin indexer
@@ -809,36 +823,51 @@ func GetTransactionReceipt(hash common.Hash) *types.Receipt {
 	return receipt
 }
 
-//GetStorageIncome filter upkeeping-contract Pay-logs to calculate provider's income
-func GetStorageIncome(upcontractAddress []common.Address, providerAddr common.Address) (*big.Int, *big.Int, error) {
-	log.Println("begin to filter upkeeping Pay logs in chain...")
-
-	totalIncome := big.NewInt(0)
-	dailyIncome := big.NewInt(0)
+//GetLogs filter logs according to
+func GetLogs(restrictAddress []common.Address, fromBlock, toBlock *big.Int) ([]types.Log, error) {
+	log.Println("begin to filter logs in chain...")
 
 	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
 		log.Println("rpc.Dial err", err)
-		return totalIncome, dailyIncome, err
+		return nil, err
 	}
 
 	query := ethereum.FilterQuery{
-		Addresses: upcontractAddress,
+		FromBlock: fromBlock,
+		ToBlock:   toBlock,
+		Addresses: restrictAddress,
 	}
 
 	logs, err := client.FilterLogs(context.Background(), query)
 	if err != nil {
 		log.Println("filterLogs err:", err)
-		return totalIncome, dailyIncome, err
+		return nil, err
+	}
+
+	return logs, nil
+}
+
+//GetStorageIncome filter upkeeping-contract Pay-logs to calculate provider's income
+func GetStorageIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
+	log.Println("begin to filter upkeeping Pay logs in chain...")
+
+	totalIncome := big.NewInt(0)
+
+	logs, err := GetLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
+	if err != nil {
+		return totalIncome, nil, err
 	}
 
 	contractAbi, err := abi.JSON(strings.NewReader(string(upKeeping.UpKeepingABI)))
 	if err != nil {
 		log.Println("abi json err:", err)
-		return totalIncome, dailyIncome, err
+		return totalIncome, nil, err
 	}
 
 	logPaySignHash := crypto.Keccak256Hash([]byte("Pay(address,address,uint256)"))
+
+	var resLogs []types.Log
 
 	for _, vLog := range logs {
 		if vLog.Topics[0].Hex() == logPaySignHash.Hex() && common.HexToAddress(vLog.Topics[2].Hex()).Hex() == providerAddr.Hex() {
@@ -846,54 +875,37 @@ func GetStorageIncome(upcontractAddress []common.Address, providerAddr common.Ad
 			err := contractAbi.Unpack(&payLog, "Pay", vLog.Data)
 			if err != nil {
 				log.Println("unpack log err: ", err)
-				return totalIncome, dailyIncome, err
+				return totalIncome, nil, err
 			}
 
 			totalIncome.Add(totalIncome, payLog.Value)
 
-			t, err := GetBlockTime(vLog.BlockHash)
-			if err != nil {
-				log.Println("getBlockTime err:", err)
-				return totalIncome, dailyIncome, err
-			}
-			if isToday(int64(t)) {
-				dailyIncome.Add(dailyIncome, payLog.Value)
-			}
+			resLogs = append(resLogs, vLog)
 		}
 	}
-	return totalIncome, dailyIncome, nil
+	return totalIncome, resLogs, nil
 }
 
-//GetDownloadIncome filter channel-contract CloseChannel-logs to calculate provider's income
-func GetDownloadIncome(channelContractAddress []common.Address, providerAddr common.Address) (*big.Int, *big.Int, error) {
+//GetReadIncome filter channel-contract CloseChannel-logs to calculate provider's income
+func GetReadIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
 	log.Println("begin to filter channel closeChannel logs in chain...")
 
 	totalIncome := big.NewInt(0)
-	dailyIncome := big.NewInt(0)
 
-	client, err := ethclient.Dial(EndPoint)
+	logs, err := GetLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
 	if err != nil {
-		log.Println("rpc.Dial err", err)
-		return totalIncome, dailyIncome, err
-	}
-
-	query := ethereum.FilterQuery{
-		Addresses: channelContractAddress,
-	}
-
-	logs, err := client.FilterLogs(context.Background(), query)
-	if err != nil {
-		log.Println("filterLogs err:", err)
-		return totalIncome, dailyIncome, err
+		return totalIncome, nil, err
 	}
 
 	contractAbi, err := abi.JSON(strings.NewReader(string(channel.ChannelABI)))
 	if err != nil {
 		log.Println("abi json err:", err)
-		return totalIncome, dailyIncome, err
+		return totalIncome, nil, err
 	}
 
 	logCloseChannelSignHash := crypto.Keccak256Hash([]byte("closeChannel(address,uint256)"))
+
+	var resLogs []types.Log
 
 	for _, vLog := range logs {
 		if vLog.Topics[0].Hex() == logCloseChannelSignHash.Hex() && common.HexToAddress(vLog.Topics[1].Hex()).Hex() == providerAddr.Hex() {
@@ -901,22 +913,15 @@ func GetDownloadIncome(channelContractAddress []common.Address, providerAddr com
 			err := contractAbi.Unpack(&channelLog, "closeChannel", vLog.Data)
 			if err != nil {
 				log.Println("unpack log err: ", err)
-				return totalIncome, dailyIncome, err
+				return totalIncome, nil, err
 			}
 
 			totalIncome.Add(totalIncome, channelLog.Value)
 
-			t, err := GetBlockTime(vLog.BlockHash)
-			if err != nil {
-				log.Println("getBlockTime err:", err)
-				return totalIncome, dailyIncome, err
-			}
-			if isToday(int64(t)) {
-				dailyIncome.Add(dailyIncome, channelLog.Value)
-			}
+			resLogs = append(resLogs, vLog)
 		}
 	}
-	return totalIncome, dailyIncome, nil
+	return totalIncome, resLogs, nil
 }
 
 //GetBlockTime get block's timeStamp
