@@ -178,7 +178,7 @@ func PledgeKeeper(localID, hexKey string, amount *big.Int) error {
 		return err
 	}
 
-	return contracts.PledgeProvider(localAddress, hexKey, amount)
+	return contracts.PledgeKeeper(localAddress, hexKey, amount)
 }
 
 func IsKeeper(userID string) (bool, error) {

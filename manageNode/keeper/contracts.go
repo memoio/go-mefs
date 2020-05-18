@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -93,7 +92,7 @@ func (k *Info) loadContract(mode bool) error {
 			return err
 		}
 
-		price, err := contracts.GetKeeperPrice(k.localID)
+		price, err := role.GetKeeperPrice(k.localID)
 		if err != nil {
 			return err
 		}
