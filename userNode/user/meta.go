@@ -257,15 +257,16 @@ func (l *LfsInfo) loadBucketInfo(update bool) error {
 }
 
 func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
+	idName := strconv.FormatInt(bucketID, 10)
 	localbucket := mpb.BucketInfo{
-		Name:     strconv.FormatInt(bucketID, 10),
+		Name:     idName,
 		BucketID: bucketID,
 		Deletion: true,
 	}
 
 	tsb := &superBucket{}
 	if !update {
-		ldata, _ := readFromMeta(l.fsID, strconv.FormatInt(bucketID, 10))
+		ldata, _ := readFromMeta(l.fsID, idName)
 		if len(ldata) > 0 {
 			bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
 			err := bdReader.ReadMsg(&localbucket)
@@ -275,7 +276,7 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		}
 		tsb = newsuperBucket(localbucket, false)
 		tsb.mtree.SetIndex(0)
-		tsb.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
+		tsb.mtree.Push([]byte(l.fsID + idName))
 		tsb.Root = tsb.mtree.Root()
 	} else {
 		bname, ok := l.meta.bucketIDToName[bucketID]
@@ -287,7 +288,10 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		}
 	}
 
-	remotebucket := mpb.BucketInfo{}
+	remotebucket := mpb.BucketInfo{
+		NextObjectID: -1,
+	}
+
 	rdata, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
 	if len(rdata) > 0 {
 		bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
@@ -297,7 +301,7 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		}
 	}
 
-	if tsb.GetNextOpID() < remotebucket.GetNextOpID() || tsb.GetName() != remotebucket.GetName() {
+	if tsb.GetNextOpID() < remotebucket.GetNextOpID() || (tsb.GetName() != remotebucket.GetName() && remotebucket.GetName() != idName) {
 		tsb = newsuperBucket(remotebucket, false)
 		tsb.mtree.SetIndex(0)
 		tsb.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
@@ -313,7 +317,7 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		l.meta.bucketIDToName[bucketID] = tsb.GetName()
 	}
 
-	if tsb.GetName() == strconv.FormatInt(bucketID, 10) && tsb.GetDeletion() {
+	if tsb.GetName() == idName && tsb.GetDeletion() {
 		utils.MLogger.Info("Construct delete buckets: ", bucketID)
 	}
 
