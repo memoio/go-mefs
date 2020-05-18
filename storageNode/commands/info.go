@@ -28,8 +28,8 @@ type pInfoOutput struct {
 	OfferDuration  int64
 	OfferStartTime string
 	TotalIncome    *big.Int
-	DownloadIncome *big.Int
 	StorageIncome  *big.Int
+	DownloadIncome *big.Int
 	PosIncome      *big.Int
 }
 
