@@ -43,7 +43,7 @@ func (k *Info) handlePosAdd(km *metainfo.Key, metaValue []byte, from string) {
 		utils.MLogger.Info("handlePosAdd error! from!=km.mid")
 	}
 
-	gp := k.getGroupInfo(ops[0], km.GetMid(), false)
+	gp := k.getGroupInfo(ops[0], km.GetMid(), true)
 	if gp == nil {
 		return
 	}
