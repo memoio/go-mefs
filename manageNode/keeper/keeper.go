@@ -1030,7 +1030,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 			return err
 		}
 
-		if bucketNum <= 0 {
+		if bucketNum <= 0 || gp.userID == pos.GetPosId() {
 			return gp.addBlockMeta(bid, pid, offset)
 		}
 
@@ -1038,21 +1038,33 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 		if binfo == nil {
 			bk, err := metainfo.NewKey(qid, mpb.KeyType_Bucket, gp.userID, bucketID)
 			if err != nil {
-				utils.MLogger.Infof("%s has no: %s", qid, bucketID)
 				return err
 			}
+
 			res, err := k.ds.GetKey(k.context, bk.ToString(), "local")
 			if err != nil {
+				for _, kid := range gp.keepers {
+					if kid != gp.localKeeper {
+						remoteRes, err := k.ds.GetKey(k.context, bk.ToString(), kid)
+						if err == nil && len(remoteRes) > 0 {
+							res = remoteRes
+							break
+						}
+					}
+				}
+			}
+
+			if len(res) > 0 {
+				binfo := new(mpb.BucketInfo)
+				err = proto.Unmarshal(res, binfo)
+				if err != nil {
+					utils.MLogger.Infof("%s Unmarshal bucketinfo: %s fail: ", qid, bucketID, err)
+					return err
+				}
+				gp.addBucket(bucketID, binfo)
+			} else {
 				utils.MLogger.Infof("%s has no bucketinfo: %s", qid, bucketID)
-				return err
 			}
-			binfo := new(mpb.BucketInfo)
-			err = proto.Unmarshal(res, binfo)
-			if err != nil {
-				utils.MLogger.Infof("%s Unmarshal bucketinfo: %s fail: ", qid, bucketID, err)
-				return err
-			}
-			gp.addBucket(bucketID, binfo)
 		}
 
 		return gp.addBlockMeta(bid, pid, offset)

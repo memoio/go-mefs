@@ -386,32 +386,18 @@ func (g *groupInfo) genChallengeRandom100(localID, userID, qid, proID string, ro
 
 	thisLinfo.inChallenge = true
 
-	bucketNum := int(g.bucketNum + 1)
-	bc := make([]*mpb.BucketContent, bucketNum)
-	for i := 0; i < bucketNum; i++ {
-		bi := &mpb.BucketContent{
-			ChunkNum:  0,
-			StripeNum: 0,
-			SegCount:  0,
-			SegSize:   0,
-		}
-
-		bc[i] = bi
-	}
-
 	challengetime := time.Now().Unix()
-
-	psum := 0
 
 	// at most challenge 100 blocks
 	cset := make(map[string]int)
 	ret := make([]string, 0, 100)
 	chalnum := 0
+	psum := 0
 	thisLinfo.blockMap.Range(func(key, value interface{}) bool {
 		cInfo := value.(*blockInfo)
 		cset[key.(string)] = cInfo.offset
 		ret = append(ret, key.(string)+metainfo.BlockDelimiter+strconv.Itoa(cInfo.offset))
-		psum += cInfo.offset + 1
+		psum += cInfo.offset
 		chalnum++
 		if chalnum >= 100 {
 			return false
