@@ -13,6 +13,17 @@ import (
 
 // VerifyChallenge verifies ChalInfo
 func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, []string, []string, error) {
+	switch cr.GetPolicy() {
+	case "smart", "meta":
+		return VerifyChallengeData(cr, blsKey, strict)
+	case "random100":
+		return VerifyChallengeRandom(cr, blsKey, strict)
+	default:
+		return false, nil, nil, ErrEmptyData
+	}
+}
+
+func VerifyChallengeData(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, []string, []string, error) {
 	var sucCid, faultCid []string
 	var slength, chalLength int64 //success length
 	var electedOffset int
@@ -257,6 +268,114 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 		cr.Res = true
 		cr.ChalLength = chalLength
 		cr.SuccessLength = int64((float64(slength) / float64(chalLength)) * float64(cr.TotalLength))
+		return true, sucCid, faultCid, nil
+	}
+
+	cr.Res = false
+	cr.SuccessLength = 0
+	faultCid = append(faultCid, sucCid...)
+	sucCid = nil
+	return false, sucCid, faultCid, nil
+}
+
+func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, []string, []string, error) {
+	var slength int64 //success length
+	var electedOffset int
+	var buf strings.Builder
+
+	var sucCid, faultCid []string
+
+	var chal mcl.Challenge
+	chal.Seed = mcl.GenChallenge(cr)
+
+	// key: bucketid_stripeid_blockid_offset
+	set := make(map[string]struct{}, len(cr.GetFaultBlocks()))
+	if len(cr.GetFaultBlocks()) != 0 {
+		for _, s := range cr.GetFaultBlocks() {
+			if len(s) == 0 {
+				continue
+			}
+			set[s] = struct{}{}
+			chcid, _, err := metainfo.GetBidAndOffset(s)
+			if err != nil {
+				continue
+			}
+
+			faultCid = append(faultCid, chcid)
+		}
+	}
+
+	for _, index := range cr.GetBlocks() {
+		_, ok := set[index]
+		if ok {
+			continue
+		}
+		buf.Reset()
+		chcid, off, err := metainfo.GetBidAndOffset(index)
+		if err != nil {
+			continue
+		}
+
+		sucCid = append(sucCid, chcid)
+
+		if off > 0 {
+			electedOffset = int(chal.Seed) % off
+		} else if off == 0 {
+			electedOffset = 0
+		} else {
+			continue
+		}
+
+		buf.WriteString(cr.GetQueryID())
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(chcid)
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(electedOffset))
+
+		chal.Indices = append(chal.Indices, buf.String())
+		slength += int64(off)
+	}
+
+	// recheck the status again
+	if len(chal.Indices) == 0 {
+		return false, sucCid, faultCid, ErrEmptyData
+	}
+
+	if blsKey == nil {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+
+	spliteProof := strings.Split(cr.GetBlsProof(), metainfo.DELIMITER)
+	if len(spliteProof) != 3 {
+		return false, sucCid, faultCid, ErrInvalidInput
+	}
+	muByte, err := b58.Decode(spliteProof[0])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+	nuByte, err := b58.Decode(spliteProof[1])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+	deltaByte, err := b58.Decode(spliteProof[2])
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+
+	pf := &mcl.Proof{
+		Mu:    muByte,
+		Nu:    nuByte,
+		Delta: deltaByte,
+	}
+
+	res, err := blsKey.VerifyProof(chal, pf, true)
+	if err != nil {
+		return false, sucCid, faultCid, err
+	}
+
+	if res {
+		cr.Res = true
+		cr.SuccessLength = int64((float64(slength) / float64(cr.ChalLength)) * float64(cr.TotalLength))
 		return true, sucCid, faultCid, nil
 	}
 

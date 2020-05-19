@@ -36,6 +36,13 @@ func (bm *BlockMeta) GetSid() string {
 	return bm.stripeID
 }
 
+func (bm *BlockMeta) SetSid(sid string) {
+	if bm == nil {
+		return
+	}
+	bm.stripeID = sid
+}
+
 func (bm *BlockMeta) GetCid() string {
 	if bm == nil {
 		return ""

@@ -13,6 +13,7 @@ import (
 	"github.com/memoio/go-mefs/role"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
@@ -24,13 +25,13 @@ const (
 
 // uid is defined in utils/pos
 
-var curGid = -1024
 var curSid = -1
 var posID string
 var groupID string
 var posAddr string
-var posCidPrefix string
 var inGenerate int
+var bucketNum int
+var bm *metainfo.BlockMeta
 
 var opt = &df.DataCoder{
 	Prefix: &mpb.BlockOptions{
@@ -61,6 +62,13 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	}
 
 	groupID = qItem.QueryID
+
+	localNum, err := address.GetNodeIDFromID(p.localID)
+	if err != nil {
+		return err
+	}
+
+	bucketNum = int(localNum)
 
 	gp := p.getGroupInfo(posID, groupID, true)
 	if gp == nil {
@@ -116,27 +124,31 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		utils.MLogger.Info("Get posKM from local error :", err)
 	} else {
 		utils.MLogger.Info("get posKM value: ", string(posValue))
-		posCidPrefix = string(posValue)
-		cidInfo, err := metainfo.GetBlockMeta(string(posValue) + "_0")
+		cidInfo, err := metainfo.GetBlockMeta(string(posValue))
 		if err != nil {
 			utils.MLogger.Info("get block meta in posRegular error :", err)
 		} else {
-			curGid, err = strconv.Atoi(cidInfo.GetBid()[utils.IDLength:])
-			if err != nil {
-				utils.MLogger.Info("strconv.Atoi Gid in posReguar error :", err)
-			}
-			curSid, err = strconv.Atoi(cidInfo.GetSid())
+			sid, err := strconv.Atoi(cidInfo.GetSid())
 			if err != nil {
 				utils.MLogger.Info("strconv.Atoi Sid in posReguar error :", err)
+			} else {
+				curSid = sid
 			}
 		}
 	}
 
-	utils.MLogger.Info("before traverse pos blocks reaches gid: ", curGid, ", sid: ", curSid)
+	utils.MLogger.Info("before traverse pos blocks reaches sid: ", curSid)
 
 	p.traversePath(gc)
 
-	utils.MLogger.Info("after traverse pos blocks reaches gid: ", curGid, ", sid: ", curSid)
+	utils.MLogger.Info("after traverse pos blocks reaches sid: ", curSid)
+
+	newbm, err := metainfo.NewBlockMeta(groupID, strconv.Itoa(bucketNum), strconv.Itoa(curSid), "0")
+	if err != nil {
+		return err
+	}
+
+	bm = newbm
 
 	//开始pos
 	p.posRegular(ctx)
@@ -167,62 +179,47 @@ func (p *Info) traversePath(gc bool) {
 	if gc {
 		utils.MLogger.Info("clean pos blocks first")
 	}
-	exist := false
-	gid := 0
-	var res strings.Builder
-	for {
-		sid := 0
-		for sid = 0; sid < 1024; sid++ {
-			for i := 0; i < pos.Reps; i++ {
-				res.Reset()
-				res.WriteString(groupID)
-				res.WriteString(metainfo.BlockDelimiter)
-				res.WriteString(p.localID)
-				res.WriteString(strconv.Itoa(gid))
-				res.WriteString(metainfo.BlockDelimiter)
-				res.WriteString(strconv.Itoa(sid))
-				res.WriteString(metainfo.BlockDelimiter)
-				res.WriteString(strconv.Itoa(i))
-				ncid := cid.NewCidV2([]byte(res.String()))
-				exist, err := p.ds.BlockStore().Has(ncid)
-				if err != nil {
-					continue
-				}
 
-				if exist {
-					if gc {
-						p.ds.DeleteBlock(p.context, res.String(), "local")
-					} else {
-						p.posUsed += uint64(pos.DLen)
-					}
-				} else {
-					break
-				}
+	exist := false
+	var res strings.Builder
+	for sid := 0; ; sid++ {
+		for i := 0; i < pos.Reps; i++ {
+			res.Reset()
+			res.WriteString(groupID)
+			res.WriteString(metainfo.BlockDelimiter)
+			res.WriteString(strconv.Itoa(bucketNum))
+			res.WriteString(metainfo.BlockDelimiter)
+			res.WriteString(strconv.Itoa(sid))
+			res.WriteString(metainfo.BlockDelimiter)
+			res.WriteString(strconv.Itoa(i))
+			ncid := cid.NewCidV2([]byte(res.String()))
+			exist, err := p.ds.BlockStore().Has(ncid)
+			if err != nil {
+				continue
 			}
-			if !exist {
+
+			if exist {
+				if gc {
+					p.ds.DeleteBlock(p.context, res.String(), "local")
+				} else {
+					p.posUsed += uint64(pos.DLen)
+				}
+			} else {
 				break
 			}
 		}
-		if exist && sid == 1024 {
-			gid += 1024
-			continue
+		if !exist {
+			break
 		}
-		if gc {
-			curSid = -1024
-			curGid = -1
-		} else {
-			curSid = (sid + 1023) % 1024
-			if curSid == 1023 {
-				curGid = gid - 1024
-				if curGid < 0 {
-					curSid = -1
-				}
-			}
-		}
-		break
 	}
 
-	posCidPrefix = groupID + metainfo.BlockDelimiter + p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
+	if gc {
+		curSid = -1
+	} else {
+		curSid--
+	}
+
+	bm.SetSid(strconv.Itoa(curSid))
 }
 
 func (p *Info) doGenerateOrDelete() {
@@ -265,16 +262,10 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		totalIncreased += uint64(10 * len(tmpData))
 		rand.Seed(time.Now().UnixNano())
 		fillRandom(tmpData)
-		// 配置部分
-		// 更新stripeID、bucketID
-		curSid = (curSid + 1) % 1024
-		if curSid == 0 {
-			curGid += 1024
-		}
+		curSid++
 
-		bid := p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
-		posCidPrefix = groupID + metainfo.BlockDelimiter + bid
-		data, offset, err := opt.Encode(tmpData, posCidPrefix, 0)
+		bm.SetSid(strconv.Itoa(curSid))
+		data, offset, err := opt.Encode(tmpData, bm.ToString(3), 0)
 		if err != nil {
 			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error: ", err)
 			continue
@@ -284,7 +275,8 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 
 		//做成块，放到本地
 		for i, dataBlock := range data {
-			blockID := posCidPrefix + metainfo.BlockDelimiter + strconv.Itoa(i)
+			bm.SetCid(strconv.Itoa(i))
+			blockID := bm.ToString()
 
 			err := p.ds.PutBlock(p.context, blockID, dataBlock, "local")
 			if err != nil {
@@ -294,7 +286,12 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 
 			p.posUsed += uint64(pos.DLen)
 
-			boff := bid + metainfo.BlockDelimiter + strconv.Itoa(offset)
+			res := strings.SplitAfterN(blockID, metainfo.BlockDelimiter, 2)
+			if len(res) != 2 {
+				continue
+			}
+
+			boff := res[1] + metainfo.BlockDelimiter + strconv.Itoa(offset)
 
 			blockList = append(blockList, boff)
 		}
@@ -313,12 +310,12 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		}
 
 		// 本地更新
-		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(posCidPrefix), nil, "local")
+		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(bm.ToString()), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
 		}
-		utils.MLogger.Info("posKM :", posKM.ToString(), ", posValue :", posCidPrefix)
+		utils.MLogger.Info("posKM :", posKM.ToString(), ", posValue :", bm.ToString())
 	}
 }
 
@@ -333,7 +330,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 	// delete last blocks
 	var totalDecresed uint64
 	for {
-		if curGid == -1024 && curSid == -1 {
+		if curSid == -1 {
 			return
 		}
 
@@ -343,7 +340,8 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		//删除块
 		deleteBlocks := []string{}
 		for i := pos.Reps - 1; i >= 0; i-- {
-			blockID := posCidPrefix + metainfo.BlockDelimiter + strconv.Itoa(i)
+			bm.SetCid(strconv.Itoa(i))
+			blockID := bm.ToString()
 			err := p.ds.DeleteBlock(p.context, blockID, "local")
 			if err != nil {
 				utils.MLogger.Info("delete block: ", blockID, " error :", err)
@@ -356,23 +354,16 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		}
 
 		//更新Gid,Sid
-		curSid = (curSid + 1023) % 1024
-		if curSid == 1023 {
-			curGid -= 1024
-		}
+		curSid--
 
-		if curGid == -1024 {
-			curSid = -1
-		}
+		bm.SetSid(strconv.Itoa(curSid))
 
-		posCidPrefix = groupID + metainfo.BlockDelimiter + p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
-
-		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(posCidPrefix), nil, "local")
+		err = p.ds.PutKey(p.context, posKM.ToString(), []byte(bm.ToString()), nil, "local")
 		if err != nil {
 			utils.MLogger.Info("CmdPutTo posKM error :", err)
 			continue
 		}
-		utils.MLogger.Info("after delete ,Gid is: ", curGid, ", sid is: ", curSid, ", cid prefix is: ", posCidPrefix)
+		utils.MLogger.Info("after delete, sid is: ", curSid)
 
 		// send BlockMeta deletion to keepers
 		//发送元数据到keeper

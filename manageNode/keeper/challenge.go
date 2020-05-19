@@ -61,6 +61,14 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				count = 0
 				for _, proID := range thisGroup.providers {
 					if pu.uid == pos.GetPosId() {
+						key, value, err := thisGroup.genChallengeRandom100(k.localID, pu.uid, pu.qid, proID, mtime)
+						if err != nil {
+							utils.MLogger.Infof("Challenge data for pos user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
+							continue
+						}
+						count++
+						utils.MLogger.Infof("Challenge pos data: %s", key)
+						k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 						continue
 					}
 					if cdata%2 == 0 {
@@ -365,6 +373,93 @@ func (g *groupInfo) genChallengeMeta(localID, userID, qid, proID string, rootTim
 	return km.ToString(), hByte, nil
 }
 
+func (g *groupInfo) genChallengeRandom100(localID, userID, qid, proID string, rootTime int64) (string, []byte, error) {
+	thisLinfo := g.getLInfo(proID, false)
+	if thisLinfo == nil {
+		return "", nil, role.ErrNotMyProvider
+	}
+
+	// last chanllenge has not complete
+	if thisLinfo.inChallenge {
+		thisLinfo.cleanLastChallenge()
+	}
+
+	thisLinfo.inChallenge = true
+
+	bucketNum := int(g.bucketNum + 1)
+	bc := make([]*mpb.BucketContent, bucketNum)
+	for i := 0; i < bucketNum; i++ {
+		bi := &mpb.BucketContent{
+			ChunkNum:  0,
+			StripeNum: 0,
+			SegCount:  0,
+			SegSize:   0,
+		}
+
+		bc[i] = bi
+	}
+
+	challengetime := time.Now().Unix()
+
+	psum := 0
+
+	// at most challenge 100 blocks
+	cset := make(map[string]int)
+	ret := make([]string, 0, 100)
+	chalnum := 0
+	thisLinfo.blockMap.Range(func(key, value interface{}) bool {
+		cInfo := value.(*blockInfo)
+		cset[key.(string)] = cInfo.offset
+		ret = append(ret, key.(string)+metainfo.BlockDelimiter+strconv.Itoa(cInfo.offset))
+		psum += cInfo.offset + 1
+		chalnum++
+		if chalnum >= 100 {
+			return false
+		}
+		return true
+	})
+
+	// no data
+	if psum == 0 {
+		thisLinfo.inChallenge = false
+		return "", nil, role.ErrEmptyData
+	}
+
+	if thisLinfo.maxlength < int64(psum) {
+		thisLinfo.maxlength = int64(psum)
+	}
+
+	thischalresult := &mpb.ChalInfo{
+		Policy:      "random100", // use different policy; such as "1%"
+		KeeperID:    localID,
+		ProviderID:  proID,
+		QueryID:     qid,
+		UserID:      userID,
+		ChalTime:    challengetime,
+		RootTime:    rootTime,
+		TotalLength: thisLinfo.maxlength,
+		ChalLength:  int64(psum),
+		Blocks:      ret,
+	}
+
+	hByte, err := proto.Marshal(thischalresult)
+	if err != nil {
+		thisLinfo.inChallenge = false
+		return "", nil, err
+	}
+
+	thisLinfo.chalMap.Store(challengetime, thischalresult)
+	thisLinfo.lastChalTime = challengetime
+	thisLinfo.chalCid = cset
+
+	// key: qid/"Challenge"/uid/pid/kid/chaltime
+	km, err := metainfo.NewKey(qid, mpb.KeyType_Challenge, userID, proID, localID, utils.UnixToString(challengetime))
+	if err != nil {
+		return "", nil, err
+	}
+	return km.ToString(), hByte, nil
+}
+
 func (l *lInfo) cleanLastChallenge() {
 	if !l.inChallenge {
 		return
@@ -469,11 +564,22 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	chalResult.BlsProof = strings.Join(spliteProof[:3], metainfo.DELIMITER)
 
-	if len(spliteProof) == 4 {
-		fmap, err := b58.Decode(spliteProof[3])
-		if err == nil {
-			chalResult.FailMap = fmap
+	switch chalResult.GetPolicy() {
+	case "smart", "meta":
+		if len(spliteProof) == 4 {
+			fmap, err := b58.Decode(spliteProof[3])
+			if err == nil {
+				chalResult.FailMap = fmap
+			}
 		}
+	case "random100":
+		if len(spliteProof) == 4 {
+			indices, err := b58.Decode(spliteProof[3])
+			if err == nil {
+				chalResult.FaultBlocks = strings.Split(string(indices), metainfo.DELIMITER)
+			}
+		}
+	default:
 	}
 
 	blsKey, err := k.getUserBLS12Config(userID, qid)

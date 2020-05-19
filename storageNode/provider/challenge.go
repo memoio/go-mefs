@@ -19,10 +19,6 @@ import (
 func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from string) error {
 	utils.MLogger.Info("handle challenge: ", km.ToString(), " from: ", from)
 
-	var data, tag [][]byte
-	var buf, cbuf strings.Builder
-	failchunk := false
-
 	ops := km.GetOptions()
 	if len(ops) < 4 {
 		return role.ErrWrongKey
@@ -69,18 +65,63 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return nil
 	}
 
+	var proof *mcl.Proof
+	var faultValue string
+	switch cr.GetPolicy() {
+	case "smart", "meta":
+		pr, err := p.handleChallenge(cr, blskey)
+		if err != nil {
+			return err
+		}
+		proof = pr
+		if len(cr.GetFailMap()) > 0 {
+			faultValue = metainfo.DELIMITER + b58.Encode(cr.GetFailMap())
+		}
+	case "random100":
+		pr, err := p.handleChallengeRandom(cr, blskey)
+		if err != nil {
+			return err
+		}
+		proof = pr
+		if len(cr.GetFaultBlocks()) > 0 {
+			faultValue = metainfo.DELIMITER + b58.Encode([]byte(strings.Join(cr.GetFaultBlocks(), metainfo.DELIMITER)))
+		}
+	default:
+	}
+
+	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
+
+	mustr := b58.Encode(proof.Mu)
+	nustr := b58.Encode(proof.Nu)
+	deltastr := b58.Encode(proof.Delta)
+
+	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr + faultValue
+
+	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
+	_, err = p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
+	if err != nil {
+		utils.MLogger.Info("send proof err: ", err)
+	}
+	return nil
+}
+
+func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl.Proof, error) {
+	var data, tag [][]byte
+	failchunk := false
+
 	var chal mcl.Challenge
 	chal.Seed = mcl.GenChallenge(cr)
 
 	bset := bitset.New(0)
-	err = bset.UnmarshalBinary(cr.GetChunkMap())
+	err := bset.UnmarshalBinary(cr.GetChunkMap())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	startPos := uint(chal.Seed) % bset.Len()
 	chalNum := bset.Count()
 	meta := false
+
+	startPos := uint(chal.Seed) % bset.Len()
 
 	switch cr.GetPolicy() {
 	case "100":
@@ -95,7 +136,6 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		}
 	case "meta":
 		meta = true
-		utils.MLogger.Info("handle meta challenge: ", km.ToString(), " from: ", from)
 	default:
 	}
 
@@ -110,6 +150,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	count := uint(0)
 	electedOffset := 0
 
+	var buf, cbuf strings.Builder
 	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
 		count++
 		for j := bucketID; j < bucketNum; j++ {
@@ -129,7 +170,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		stripeID = int((int64(i) - stripeNum) / int64(chunkNum))
 		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
 		buf.Reset()
-		buf.WriteString(fsID)
+		buf.WriteString(cr.GetQueryID())
 		buf.WriteString(metainfo.BlockDelimiter)
 		if meta {
 			buf.WriteString(strconv.Itoa(-bucketID))
@@ -207,7 +248,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		chunkID = int((int64(i) - stripeNum) % int64(chunkNum))
 
 		buf.Reset()
-		buf.WriteString(fsID)
+		buf.WriteString(cr.GetQueryID())
 		buf.WriteString(metainfo.BlockDelimiter)
 		if meta {
 			buf.WriteString(strconv.Itoa(-bucketID))
@@ -259,43 +300,123 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	if len(chal.Indices) == 0 {
-		utils.MLogger.Errorf("GenProof for %s fails due to no available data", fsID)
-		return nil
+		utils.MLogger.Errorf("GenProof for %s fails due to no available data", cr.GetQueryID())
+		return nil, role.ErrEmptyData
 	}
 
 	proof, err := blskey.GenProof(chal, data, tag, 32)
 	if err != nil {
 		utils.MLogger.Error("GenProof err: ", err)
-		return err
+		return nil, err
 	}
 
 	// 在发送之前检查生成的proof
 	boo, err := blskey.VerifyProof(chal, proof, true)
-	if err != nil || !boo {
+	if err != nil {
 		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
-		return err
+		return nil, err
 	}
 
-	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
-
-	mustr := b58.Encode(proof.Mu)
-	nustr := b58.Encode(proof.Nu)
-	deltastr := b58.Encode(proof.Delta)
-
-	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr
+	if !boo {
+		return nil, role.ErrWrongState
+	}
 
 	if failchunk {
 		failMap, err := bset.MarshalBinary()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		retValue = retValue + metainfo.DELIMITER + b58.Encode(failMap)
+		cr.FailMap = failMap
 	}
 
-	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
-	_, err = p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
-	if err != nil {
-		utils.MLogger.Info("send proof err: ", err)
+	return proof, nil
+}
+
+func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl.Proof, error) {
+	var chal mcl.Challenge
+	chal.Seed = mcl.GenChallenge(cr)
+
+	// 聚合
+	var data, tag [][]byte
+	var faultBlocks []string
+	var electedOffset int
+	var buf, cbuf strings.Builder
+	ctx := p.context
+	for _, index := range cr.Blocks {
+		if len(index) == 0 {
+			continue
+		}
+		buf.Reset()
+		bid, off, err := metainfo.GetBidAndOffset(index)
+		if err != nil {
+			continue
+		}
+		if off < 0 {
+			faultBlocks = append(faultBlocks, index)
+			continue
+		} else if off > 0 {
+			electedOffset = int(chal.Seed) % off
+		} else {
+			electedOffset = 0
+		}
+		buf.WriteString(cr.GetQueryID())
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(bid)
+		blockID := buf.String()
+
+		cbuf.Reset()
+		cbuf.WriteString(blockID)
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(int(mpb.KeyType_Block)))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString(strconv.Itoa(electedOffset))
+		cbuf.WriteString(metainfo.DELIMITER)
+		cbuf.WriteString("1") // length
+
+		tmpdata, err := p.ds.GetBlock(ctx, cbuf.String(), nil, "local")
+		if err != nil {
+			utils.MLogger.Warnf("get %s data and tag at %d failed: %s", blockID, electedOffset, err)
+			faultBlocks = append(faultBlocks, index)
+			continue
+		}
+
+		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
+		if !isTrue {
+			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
+			faultBlocks = append(faultBlocks, index)
+			continue
+		}
+
+		data = append(data, tmpseg[0])
+		tag = append(tag, tmptag[0])
+
+		buf.WriteString(metainfo.BlockDelimiter)
+		buf.WriteString(strconv.Itoa(segStart))
+		chal.Indices = append(chal.Indices, buf.String())
 	}
-	return nil
+
+	if len(chal.Indices) == 0 {
+		utils.MLogger.Errorf("GenProof random for %s fails due to no available data", cr.GetQueryID())
+		return nil, role.ErrEmptyData
+	}
+
+	proof, err := blskey.GenProof(chal, data, tag, 32)
+	if err != nil {
+		utils.MLogger.Error("GenProof err: ", err)
+		return nil, err
+	}
+
+	boo, err := blskey.VerifyProof(chal, proof, true)
+	if err != nil {
+		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
+		return nil, err
+	}
+
+	if !boo {
+		return nil, role.ErrWrongState
+	}
+
+	cr.FaultBlocks = faultBlocks
+
+	return proof, nil
 }
