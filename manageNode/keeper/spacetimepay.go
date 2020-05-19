@@ -37,11 +37,12 @@ func (k *Info) stPayRegular(ctx context.Context) {
 				}
 
 				thisGroup := k.getGroupInfo(uq.uid, uq.qid, false)
-				if thisGroup == nil {
+				if thisGroup == nil || thisGroup.upkeeping == nil {
 					continue
 				}
 
-				if uq.uid == pos.GetPosId() && thisGroup.upkeeping != nil {
+				if uq.uid == pos.GetPosId() {
+					utils.MLogger.Info("SpaceTime Pay for pos user")
 					thisGroup.upkeeping.Price = k.getPosPrice()
 				}
 
