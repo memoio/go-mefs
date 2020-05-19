@@ -115,7 +115,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		startTime = thisLinfo.lastPay.GetStart() + thisLinfo.lastPay.GetLength()
 	}
 
-	if startTime > g.upkeeping.EndTime && g.userID != pos.GetPosId() {
+	if startTime >= g.upkeeping.EndTime && g.userID != pos.GetPosId() {
 		utils.MLogger.Infof("SpaceTimePay expired for user %s fsID %s at %s", g.userID, g.groupID, proID)
 		return role.ErrUkExpire
 	}
@@ -123,7 +123,13 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 	utils.MLogger.Infof("SpaceTimePay start for user %s fsID %s at %s", g.userID, g.groupID, proID)
 
 	if thisLinfo.currentPay == nil {
-		amount, lastTime, mroot := thisLinfo.resultSummary(price, startTime, time.Now().Unix())
+		endTime := time.Now().Unix()
+		if endTime > g.upkeeping.EndTime {
+			endTime = g.upkeeping.EndTime
+		}
+
+		lastTime := endTime - startTime
+		amount, mroot := thisLinfo.stSummary(price, startTime, endTime)
 		if amount.Sign() > 0 {
 			knum := len(g.keepers)
 			cpay := &chalpay{
@@ -224,7 +230,7 @@ type timeValue struct {
 
 // challeng results to spacetime value
 // lastTime is the lastest challenge time which is before Now
-func (l *lInfo) resultSummary(price *big.Int, start, end int64) (*big.Int, int64, []byte) {
+func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	spacetime := big.NewInt(0)
 	var tsl []timeValue //用来对挑战时间排序
 
@@ -252,21 +258,78 @@ func (l *lInfo) resultSummary(price *big.Int, start, end int64) (*big.Int, int64
 
 	if len(tsl) <= 1 {
 		utils.MLogger.Info("no enough challenge data")
-		return spacetime, 0, nil
+		return spacetime, nil
 	}
 
 	sort.Slice(tsl, func(i, j int) bool {
 		return tsl[i].time < tsl[j].time
 	})
 
+	var newTsl []timeValue
+
+	if tsl[0].time > start && tsl[0].time < start+3600 {
+		tv := timeValue{
+			time:  start,
+			space: tsl[0].space,
+		}
+		newTsl = append(newTsl, tv)
+	} else {
+		tv := timeValue{
+			time:  start,
+			space: 0,
+		}
+		newTsl = append(newTsl, tv)
+	}
+
+	// at least once per hour
+	ftime := start + 3600
+	i := 0
+	for {
+		if ftime < tsl[i].time {
+			tv := timeValue{
+				time:  ftime,
+				space: 0,
+			}
+			newTsl = append(newTsl, tv)
+			ftime += 3600
+		} else {
+			newTsl = append(newTsl, tsl[i])
+			ftime = tsl[i].time + 3600
+			i++
+			if i >= len(tsl) {
+				i = len(tsl) - 1
+			}
+		}
+
+		if ftime > end {
+			break
+		}
+	}
+
+	tLen := len(newTsl)
+
+	if tsl[tLen-1].time < end && tsl[tLen-1].time > end-3600 {
+		tv := timeValue{
+			time:  end,
+			space: tsl[tLen-1].space,
+		}
+		newTsl = append(newTsl, tv)
+	} else {
+		tv := timeValue{
+			time:  end,
+			space: 0,
+		}
+		newTsl = append(newTsl, tv)
+	}
+
 	mtree := mt.New(sha256.New())
 	mtree.SetIndex(0)
 
-	timepre := tsl[0].time
-	lengthpre := tsl[0].space
+	timepre := newTsl[0].time
+	lengthpre := newTsl[0].space
 	var nbuf bytes.Buffer        // 替代网络连接
 	enc := gob.NewEncoder(&nbuf) // 将写入网络。
-	for _, tv := range tsl[1:] {
+	for _, tv := range newTsl[1:] {
 		spacetime.Add(spacetime, big.NewInt((tv.time-timepre)*int64(lengthpre+tv.space)/2))
 		timepre = tv.time
 		lengthpre = tv.space
@@ -287,5 +350,5 @@ func (l *lInfo) resultSummary(price *big.Int, start, end int64) (*big.Int, int64
 	if spacetime.Sign() <= 0 {
 		utils.MLogger.Info("error!amount:", spacetime, "price:", price)
 	}
-	return spacetime, timepre, mtree.Root()
+	return spacetime, mtree.Root()
 }

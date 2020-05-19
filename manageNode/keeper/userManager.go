@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"sort"
+	"encoding/hex"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"golang.org/x/crypto/sha3"
 )
 
 // user-keeper-provider map
@@ -82,7 +83,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 
 	tempInfo.clusterID = clusterID
 
-	tempInfo.masterKeeper = getMasterID(tempInfo.keepers)
+	tempInfo.masterKeeper = getMasterID(tempInfo.keepers, tempInfo.groupID)
 
 	utils.MLogger.Debugf("%s has masterID %s, and localID %s", qid, tempInfo.masterKeeper, tempInfo.localKeeper)
 	return tempInfo, nil
@@ -103,7 +104,7 @@ func (g *groupInfo) isMaster(pid string) bool {
 		}
 		if len(mymaster) > 0 {
 			utils.MLogger.Debugf(pid, " has master keepers: ", mymaster)
-			return getMasterID(mymaster) == g.localKeeper
+			return getMasterID(mymaster, g.groupID) == g.localKeeper
 		}
 	}
 
@@ -111,9 +112,26 @@ func (g *groupInfo) isMaster(pid string) bool {
 }
 
 //getMasterID choose the middle nodes
-func getMasterID(kidlist []string) string {
-	sort.Strings(kidlist)
-	return kidlist[len(kidlist)/2]
+func getMasterID(kidlist []string, groupID string) string {
+	if len(kidlist) == 0 {
+		return groupID
+	}
+
+	if len(kidlist) == 1 {
+		return kidlist[0]
+	}
+
+	largeKid := ""
+	largeIndex := 0
+	for i, kid := range kidlist {
+		d := sha3.Sum256([]byte(groupID + kid))
+		if strings.Compare(hex.EncodeToString(d[:]), largeKid) > 0 {
+			largeKid = hex.EncodeToString(d[:])
+			largeIndex = i
+		}
+	}
+
+	return kidlist[largeIndex]
 }
 
 func (g *groupInfo) getLInfo(proID string, mode bool) *lInfo {

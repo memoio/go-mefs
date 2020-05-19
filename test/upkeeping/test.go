@@ -337,14 +337,15 @@ func ukTest() error {
 	for _, pinfo := range providers {
 		if pinfo.Addr.String() == providerAddr.String() {
 			has = true
+			break
 		}
 	}
 
 	if !has {
-		log.Println("add provider failed")
-		panic("add provider failed")
+		log.Fatal("add provider failed")
 	}
 
+	log.Println("wait enddate")
 	//等待now > endDate + 60,触发第三次时空支付
 	for {
 		nowTime := time.Now().Unix()
@@ -392,7 +393,7 @@ func ukTest() error {
 				log.Println("get order fails")
 				continue
 			}
-			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == sLength*9) && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == 36) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(120*3))) == 0) { //参数结果符合要求
+			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(120*3))) == 0) { //参数结果符合要求
 				log.Println("parameters are right")
 				//检查provider[0]的余额变化
 				amount := pBalanceMap[pAddrList[0]]
@@ -402,8 +403,6 @@ func ukTest() error {
 				log.Println(pAddrList[0].String(), ":", amountCost)
 				if amountCost.Cmp(big.NewInt(perMoney*9*3)) == 0 {
 					log.Println("provider's balance increased 3240")
-				} else {
-					continue
 				}
 				//检查keeper[1]的余额变化
 				amount = kBalanceMap[kAddrList[1]]
@@ -413,8 +412,6 @@ func ukTest() error {
 				log.Println(kAddrList[1].String(), ":", amountCost)
 				if amountCost.Cmp(big.NewInt(perMoney*3*4/10)) == 0 {
 					log.Println("keeper[1] balance increased 144")
-				} else {
-					continue
 				}
 
 				break //all is right
@@ -475,7 +472,7 @@ func ukTest() error {
 	}
 
 	//query provider[0]'s income
-	log.Println("17. begin to test getStorageIncome")
+	log.Println("18. begin to test getStorageIncome")
 	upAddrs := []common.Address{uAddr}
 
 	total, _, err := contracts.GetStorageIncome(upAddrs, pAddrList[0], oldBlock.Number().Int64(), newblk.Number().Int64())
