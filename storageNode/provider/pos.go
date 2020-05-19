@@ -182,7 +182,8 @@ func (p *Info) traversePath(gc bool) {
 
 	exist := false
 	var res strings.Builder
-	for sid := 0; ; sid++ {
+	sid := 0
+	for sid = 0; ; sid++ {
 		for i := 0; i < pos.Reps; i++ {
 			res.Reset()
 			res.WriteString(groupID)
@@ -216,7 +217,7 @@ func (p *Info) traversePath(gc bool) {
 	if gc {
 		curSid = -1
 	} else {
-		curSid--
+		curSid = sid - 1
 	}
 
 	bm.SetSid(strconv.Itoa(curSid))

@@ -416,6 +416,7 @@ func ukTest() error {
 
 				break //all is right
 			}
+			log.Println(keepers, providers, needPay)
 		}
 	}
 
