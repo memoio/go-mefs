@@ -356,7 +356,7 @@ func ukTest() error {
 	}
 	fmt.Println("nowTime:", time.Now().Unix(), "endDate:", endDate.Int64())
 
-	log.Println("13.begin to third initiate spacetime pay to provider 0, stLength is 120")
+	log.Println("13.begin to third initiate spacetime pay to provider 0, stLength is: ", sLength)
 	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
@@ -393,7 +393,7 @@ func ukTest() error {
 				log.Println("get order fails")
 				continue
 			}
-			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(120*3))) == 0) { //参数结果符合要求
+			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*3))) == 0) { //参数结果符合要求
 				log.Println("parameters are right")
 				//检查provider[0]的余额变化
 				amount := pBalanceMap[pAddrList[0]]
@@ -416,7 +416,8 @@ func ukTest() error {
 
 				break //all is right
 			}
-			log.Println(keepers, providers, needPay)
+			log.Println(keepers)
+			log.Println(providers)
 		}
 	}
 
@@ -481,7 +482,7 @@ func ukTest() error {
 		log.Fatal(err)
 	}
 	log.Println("totalIncome: ", total.String())
-	if total.Cmp(big.NewInt(sLength*9*3)) != 0 {
+	if total.Cmp(big.NewInt(perMoney*9*3)) != 0 {
 		log.Fatal("query providers[0]'s storageIncome failed, it is not equal to 3240")
 	}
 
