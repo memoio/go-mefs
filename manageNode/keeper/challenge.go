@@ -12,6 +12,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 	b58 "github.com/mr-tron/base58/base58"
 )
 
@@ -59,6 +60,9 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				utils.MLogger.Infof("Challenge for user %s fsID %s at rootTime %d", pu.uid, pu.qid, mtime)
 				count = 0
 				for _, proID := range thisGroup.providers {
+					if pu.uid == pos.GetPosId() {
+						continue
+					}
 					if cdata%2 == 0 {
 						key, value, err := thisGroup.genChallengeData(k.localID, pu.uid, pu.qid, proID, mtime)
 						if err != nil {

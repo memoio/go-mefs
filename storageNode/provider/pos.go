@@ -20,8 +20,6 @@ import (
 const (
 	lowWater  = 0.70 // 数据生成为总量的70%
 	highWater = 0.85 // 使用量达到85%后，删除10%的块
-	mullen    = 100 * 1024 * 1024
-	rep       = 10 // 10备份
 )
 
 // uid is defined in utils/pos
@@ -40,7 +38,7 @@ var opt = &df.DataCoder{
 			Version:      1,
 			Policy:       df.MulPolicy,
 			DataCount:    1,
-			ParityCount:  rep - 1,
+			ParityCount:  pos.Reps - 1,
 			TagFlag:      df.BLS12,
 			SegmentSize:  df.DefaultSegmentSize,
 			Encryption:   0,
@@ -175,7 +173,7 @@ func (p *Info) traversePath(gc bool) {
 	for {
 		sid := 0
 		for sid = 0; sid < 1024; sid++ {
-			for i := 0; i < rep; i++ {
+			for i := 0; i < pos.Reps; i++ {
 				res.Reset()
 				res.WriteString(groupID)
 				res.WriteString(metainfo.BlockDelimiter)
@@ -195,7 +193,7 @@ func (p *Info) traversePath(gc bool) {
 					if gc {
 						p.ds.DeleteBlock(p.context, res.String(), "local")
 					} else {
-						p.posUsed += uint64(mullen)
+						p.posUsed += uint64(pos.DLen)
 					}
 				} else {
 					break
@@ -263,7 +261,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		if totalIncreased >= increaseSpace {
 			break
 		}
-		tmpData := make([]byte, mullen)
+		tmpData := make([]byte, pos.DLen)
 		totalIncreased += uint64(10 * len(tmpData))
 		rand.Seed(time.Now().UnixNano())
 		fillRandom(tmpData)
@@ -274,7 +272,8 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 			curGid += 1024
 		}
 
-		posCidPrefix = groupID + metainfo.BlockDelimiter + p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
+		bid := p.localID + strconv.Itoa(curGid) + metainfo.BlockDelimiter + strconv.Itoa(curSid)
+		posCidPrefix = groupID + metainfo.BlockDelimiter + bid
 		data, offset, err := opt.Encode(tmpData, posCidPrefix, 0)
 		if err != nil {
 			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error: ", err)
@@ -285,7 +284,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 
 		//做成块，放到本地
 		for i, dataBlock := range data {
-			blockID := posCidPrefix + "_" + strconv.Itoa(i)
+			blockID := posCidPrefix + metainfo.BlockDelimiter + strconv.Itoa(i)
 
 			err := p.ds.PutBlock(p.context, blockID, dataBlock, "local")
 			if err != nil {
@@ -293,9 +292,9 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 				continue
 			}
 
-			p.posUsed += uint64(mullen)
+			p.posUsed += uint64(pos.DLen)
 
-			boff := blockID + metainfo.BlockDelimiter + strconv.Itoa(offset)
+			boff := bid + metainfo.BlockDelimiter + strconv.Itoa(offset)
 
 			blockList = append(blockList, boff)
 		}
@@ -343,7 +342,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 		}
 		//删除块
 		deleteBlocks := []string{}
-		for i := rep - 1; i >= 0; i-- {
+		for i := pos.Reps - 1; i >= 0; i-- {
 			blockID := posCidPrefix + metainfo.BlockDelimiter + strconv.Itoa(i)
 			err := p.ds.DeleteBlock(p.context, blockID, "local")
 			if err != nil {
@@ -351,8 +350,8 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 				continue
 			}
 			utils.MLogger.Info("delete block : ", blockID, " success")
-			p.posUsed -= uint64(mullen)
-			totalDecresed += uint64(mullen)
+			p.posUsed -= uint64(pos.DLen)
+			totalDecresed += uint64(pos.DLen)
 			deleteBlocks = append(deleteBlocks, blockID)
 		}
 

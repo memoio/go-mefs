@@ -1,6 +1,7 @@
 package metainfo
 
 import (
+	"strconv"
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -119,4 +120,17 @@ func GetIDsFromBlock(key string) (string, string, string, error) {
 		return splitedKey[1], splitedKey[2], splitedKey[3], nil
 	}
 	return "", "", "", ErrIllegalKey
+}
+
+func GetBidAndOffset(index string) (string, int, error) {
+	splitedIndex := strings.Split(index, BlockDelimiter)
+	if len(splitedIndex) != 4 {
+		return "", 0, ErrIllegalKey
+	}
+	offset, err := strconv.Atoi(splitedIndex[3])
+	if err != nil {
+		return "", 0, err
+	}
+
+	return strings.Join(splitedIndex[:3], BlockDelimiter), offset, nil
 }

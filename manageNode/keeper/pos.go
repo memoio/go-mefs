@@ -52,19 +52,12 @@ func (k *Info) handlePosAdd(km *metainfo.Key, metaValue []byte, from string) {
 
 	blocks := strings.Split(string(metaValue), metainfo.DELIMITER)
 	for _, boff := range blocks {
-		//保存在本地
-		blockID, off, err := utils.SplitIndex(boff)
+		blockID, off, err := metainfo.GetBidAndOffset(boff)
 		if err != nil {
 			continue
 		}
 
-		//保存到内存
-		bm, err := metainfo.GetBlockMeta(blockID)
-		if err != nil {
-			continue
-		}
-
-		err = k.addBlockMeta(bm.GetQid(), blockID, from, off, true)
+		err = k.addBlockMeta(km.GetMid(), blockID, from, off, true)
 		if err != nil {
 			continue
 		}

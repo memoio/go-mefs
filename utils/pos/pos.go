@@ -9,6 +9,11 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 )
 
+const (
+	DLen = 100 * 1024 * 1024
+	Reps = 10 // 10备份
+)
+
 func GetPosAddr() string {
 	return "0x46EF41A6c60912173b50dAD714Ca2a6f82c32aE8"
 }

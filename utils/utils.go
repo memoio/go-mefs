@@ -78,19 +78,6 @@ func CheckDup(strs []string, s string) bool {
 	return true
 }
 
-func SplitIndex(index string) (string, int, error) {
-	splitedIndex := strings.Split(index, "_")
-	if len(splitedIndex) < 4 {
-		return "", 0, errors.New("String is too short")
-	}
-	offset, err := strconv.Atoi(splitedIndex[3])
-	if err != nil {
-		return "", 0, err
-	}
-
-	return strings.Join(splitedIndex[:3], "_"), offset, nil
-}
-
 // JoinStrings is
 func JoinStrings(sep string, ops ...string) string {
 	var res strings.Builder
