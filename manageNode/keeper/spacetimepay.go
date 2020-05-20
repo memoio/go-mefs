@@ -309,7 +309,7 @@ func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	if newTsl[tLen-1].time < end && newTsl[tLen-1].time > end-3600 {
 		tv := timeValue{
 			time:  end,
-			space: tsl[tLen-1].space,
+			space: newTsl[tLen-1].space,
 		}
 		newTsl = append(newTsl, tv)
 	} else {

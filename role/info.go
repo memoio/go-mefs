@@ -78,6 +78,13 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 		return nil, totalMoney, err
 	}
 
+	weiPrice := new(big.Float).SetInt(price)
+	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Int(price)
+	if price.Sign() <= 0 {
+		return nil, nil, ErrInvalidInput
+	}
+
 	pItems := make([]*ProviderItem, 0, len(paddrs))
 	for _, paddr := range paddrs {
 		isProvider, isBanned, money, ptime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, paddr)
@@ -94,6 +101,7 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 				ProviderID:  proID,
 				PledgeMoney: money,
 				StartTime:   ptime.Int64(),
+				Capacity:    new(big.Int).Quo(ptime, price).Int64(),
 			}
 			pItems = append(pItems, item)
 			totalMoney.Add(totalMoney, money)
