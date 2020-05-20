@@ -41,6 +41,8 @@ func (k *Info) stPayRegular(ctx context.Context) {
 					continue
 				}
 
+				thisGroup.loadContracts(true)
+
 				if uq.uid == pos.GetPosId() {
 					utils.MLogger.Info("SpaceTime Pay for pos user")
 					thisGroup.upkeeping.Price = k.getPosPrice()
@@ -77,8 +79,6 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 	if !g.isMaster(proID) {
 		return nil
 	}
-
-	g.loadContracts(true)
 
 	if g.upkeeping == nil {
 		return nil
@@ -194,7 +194,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		sl := big.NewInt(thisLinfo.currentPay.Length)
 		sv := new(big.Int).SetBytes(thisLinfo.currentPay.Value)
 
-		utils.MLogger.Infof("SpaceTimePay start pay for %s from %s, length %s value %s", proID, st.String(), sl.String(), sv.String())
+		utils.MLogger.Infof("SpaceTimePay start pay for provider %s userID %s fsID %s from %d, length %d value %d", proID, g.userID, g.groupID, st, sl, sv)
 
 		var root [32]byte
 		copy(root[:], thisLinfo.currentPay.Root[:32])
@@ -282,23 +282,20 @@ func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	ftime := start + 3600
 	i := 0
 	for {
-		if ftime < tsl[i].time {
+		if i >= len(tsl) || ftime < tsl[i].time {
 			tv := timeValue{
 				time:  ftime,
 				space: 0,
 			}
-			newTsl = append(newTsl, tv)
 			ftime += 3600
+			newTsl = append(newTsl, tv)
 		} else {
 			newTsl = append(newTsl, tsl[i])
 			ftime = tsl[i].time + 3600
 			i++
-			if i >= len(tsl) {
-				i = len(tsl) - 1
-			}
 		}
 
-		if ftime > end {
+		if ftime > end && i == len(tsl) {
 			break
 		}
 	}
@@ -322,10 +319,11 @@ func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	mtree := mt.New(sha256.New())
 	mtree.SetIndex(0)
 
+	var nbuf bytes.Buffer
+	enc := gob.NewEncoder(&nbuf)
+
 	timepre := newTsl[0].time
 	lengthpre := newTsl[0].space
-	var nbuf bytes.Buffer        // 替代网络连接
-	enc := gob.NewEncoder(&nbuf) // 将写入网络。
 	for _, tv := range newTsl[1:] {
 		spacetime.Add(spacetime, big.NewInt((tv.time-timepre)*int64(lengthpre+tv.space)/2))
 		timepre = tv.time

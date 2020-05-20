@@ -33,6 +33,11 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 		if err != nil {
 			continue
 		}
+
+		if money.Sign() <= 0 {
+			continue
+		}
+
 		if isKeeper && !isBanned {
 			keeperID, err := address.GetIDFromAddress(kaddr.String())
 			if err != nil {
@@ -91,6 +96,11 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 		if err != nil {
 			continue
 		}
+
+		if money.Sign() <= 0 {
+			continue
+		}
+
 		if isProvider && !isBanned {
 			proID, err := address.GetIDFromAddress(paddr.String())
 			if err != nil {

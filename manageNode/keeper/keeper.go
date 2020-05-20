@@ -681,11 +681,17 @@ func (k *Info) loadPeersFromChain() error {
 }
 
 func (k *Info) getPosPrice() *big.Int {
-	if k.pledgeStorage.Cmp(big.NewInt(0)) > 0 {
+	if k.pledgeStorage.Sign() > 0 {
 		mm := big.NewInt(MarketingMoney)
 		mm.Mul(mm, big.NewInt(utils.Token2Wei))
-		mm.Quo(mm, big.NewInt(24)) // per hour
-		return mm.Div(mm, k.pledgeStorage)
+		mm.Quo(mm, big.NewInt(24))  // per hour
+		mm.Quo(mm, k.pledgeStorage) // per MB
+
+		// to weiDollar
+		mmWei := new(big.Float).SetInt(mm)
+		mmWei.Mul(mmWei, role.GetMemoPrice())
+		mmWei.Int(mm)
+		return mm
 	}
 
 	return pos.GetPosPrice()
