@@ -351,8 +351,8 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 			keepItem: &kItem,
 		}
 
-		utils.MLogger.Infof("add new keeper %s", pid)
 		if p.ds.Connect(p.context, pid) {
+			utils.MLogger.Infof("add new keeper %s", pid)
 			ui.availTime = time.Now().Unix()
 			ui.online = true
 			p.ms.keeperNum.Inc()
@@ -361,6 +361,7 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 		}
 
 		if managed {
+			utils.MLogger.Infof("add new keeper %s", pid)
 			p.ms.keeperNum.Inc()
 			p.keepers.Store(pid, ui)
 			return ui
@@ -384,8 +385,8 @@ func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 			providerID: pid,
 		}
 
-		utils.MLogger.Infof("add new provider %s", pid)
 		if p.ds.Connect(p.context, pid) {
+			utils.MLogger.Infof("add new provider %s", pid)
 			ui.availTime = time.Now().Unix()
 			ui.online = true
 			p.ms.providerNum.Inc()
@@ -394,6 +395,7 @@ func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 		}
 
 		if managed {
+			utils.MLogger.Infof("add new provider %s", pid)
 			p.ms.providerNum.Inc()
 			p.providers.Store(pid, ui)
 			return ui
