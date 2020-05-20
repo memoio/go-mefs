@@ -29,15 +29,15 @@ type keeperInfo struct {
 }
 
 type allProviders struct {
-	ProviderCount  int
-	PledgeCapacity *big.Int
-	ProInfos       []proInfo
+	ProviderCount int
+	PledgeBytes   *big.Int
+	ProInfos      []proInfo
 }
 
 type proInfo struct {
 	Address     string
 	Online      bool
-	Storage     int64
+	PledgeBytes int64
 	PledgeMoney *big.Int
 	PledgeTime  string
 }
@@ -190,15 +190,15 @@ var proCmd = &cmds.Command{
 				PledgeMoney: ki.PledgeMoney,
 				PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
 				Online:      n.Data.FastConnect(req.Context, ki.ProviderID),
-				Storage:     ki.Capacity,
+				PledgeBytes: ki.Capacity * 1024 * 1024,
 			}
 			aks = append(aks, kinfo)
 		}
 
 		output := &allProviders{
-			ProviderCount:  len(aks),
-			PledgeCapacity: pledge,
-			ProInfos:       aks,
+			ProviderCount: len(aks),
+			PledgeBytes:   pledge.Mul(pledge, big.NewInt(1024*1024)),
+			ProInfos:      aks,
 		}
 
 		return cmds.EmitOnce(res, output)

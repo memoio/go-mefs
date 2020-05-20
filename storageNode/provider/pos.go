@@ -108,6 +108,9 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		utils.MLogger.Info("Init bls config for pos user fail: ", err)
 		return err
 	}
+
+	p.userConfigs.Add(groupID, mkey)
+
 	opt.BlsKey = mkey
 
 	opt.PreCompute()

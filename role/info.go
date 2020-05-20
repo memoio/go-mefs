@@ -101,7 +101,7 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 				ProviderID:  proID,
 				PledgeMoney: money,
 				StartTime:   ptime.Int64(),
-				Capacity:    new(big.Int).Quo(ptime, price).Int64(),
+				Capacity:    new(big.Int).Quo(money, price).Int64(),
 			}
 			pItems = append(pItems, item)
 			totalMoney.Add(totalMoney, money)
