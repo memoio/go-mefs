@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sync"
 	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -28,9 +29,9 @@ type keeperInfo struct {
 }
 
 type allProviders struct {
-	ProviderCount int
-	PledgeMoney   *big.Int
-	ProInfos      []proInfo
+	ProviderCount  int
+	PledgeCapacity *big.Int
+	ProInfos       []proInfo
 }
 
 type proInfo struct {
@@ -73,6 +74,22 @@ var keeperCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("has keepers:", len(kItems))
+		var wg sync.WaitGroup
+		for _, ki := range kItems {
+			if ki.PledgeMoney.Sign() <= 0 {
+				continue
+			}
+
+			wg.Add(1)
+			go func(kid string) {
+				defer wg.Done()
+				n.Data.Connect(req.Context, kid)
+			}(ki.KeeperID)
+		}
+
+		wg.Wait()
 
 		var aks []keeperInfo
 
@@ -141,6 +158,22 @@ var proCmd = &cmds.Command{
 			return err
 		}
 
+		fmt.Println("has providers:", len(pItems))
+
+		var wg sync.WaitGroup
+		for _, ki := range pItems {
+			if ki.PledgeMoney.Sign() <= 0 {
+				continue
+			}
+
+			wg.Add(1)
+			go func(kid string) {
+				defer wg.Done()
+				n.Data.Connect(req.Context, kid)
+			}(ki.ProviderID)
+		}
+
+		wg.Wait()
 		var aks []proInfo
 		for _, ki := range pItems {
 			if ki.PledgeMoney.Sign() <= 0 {
@@ -156,15 +189,16 @@ var proCmd = &cmds.Command{
 				Address:     kaddr.String(),
 				PledgeMoney: ki.PledgeMoney,
 				PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-				Online:      n.Data.Connect(req.Context, ki.ProviderID),
+				Online:      n.Data.FastConnect(req.Context, ki.ProviderID),
+				Storage:     ki.Capacity,
 			}
 			aks = append(aks, kinfo)
 		}
 
 		output := &allProviders{
-			ProviderCount: len(aks),
-			PledgeMoney:   pledge,
-			ProInfos:      aks,
+			ProviderCount:  len(aks),
+			PledgeCapacity: pledge,
+			ProInfos:       aks,
 		}
 
 		return cmds.EmitOnce(res, output)
