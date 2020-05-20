@@ -78,6 +78,8 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		return nil
 	}
 
+	g.loadContracts(true)
+
 	if g.upkeeping == nil {
 		return nil
 	}
@@ -109,10 +111,6 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 	thisLinfo := g.getLInfo(proID, false)
 	if thisLinfo == nil {
 		return role.ErrNotMyProvider
-	}
-
-	if thisLinfo.lastPay != nil {
-		startTime = thisLinfo.lastPay.GetStart() + thisLinfo.lastPay.GetLength()
 	}
 
 	if startTime >= g.upkeeping.EndTime && g.userID != pos.GetPosId() {
