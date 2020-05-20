@@ -126,14 +126,13 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 			endTime = g.upkeeping.EndTime
 		}
 
-		lastTime := endTime - startTime
 		amount, mroot := thisLinfo.stSummary(price, startTime, endTime)
 		if amount.Sign() > 0 {
 			knum := len(g.keepers)
 			cpay := &chalpay{
 				STValue: mpb.STValue{
 					Start:  startTime,
-					Length: lastTime - startTime,
+					Length: endTime - startTime,
 					Value:  amount.Bytes(),
 					Status: int32(knum * 2 / 3), // need at least 2/3
 					Sign:   make([][]byte, knum),
