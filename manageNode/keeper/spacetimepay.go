@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"math/big"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -290,10 +291,36 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 			g.loadContracts(true)
 			return nil
 		}
+
+		// resend to collet sign
+		mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_Sign, g.userID, proID, localID, strconv.FormatInt(cpay.GetStart(), 10), strconv.FormatInt(cpay.GetLength(), 10))
+		if err != nil {
+			cpay.Unlock()
+			return err
+		}
+
+		key := mkey.ToString()
+
+		var sign []byte
+		for i, kid := range g.keepers {
+			if kid == localID {
+				sign = cpay.GetSign()[i]
+				break
+			}
+		}
+
 		cpay.checkNum++
 		if cpay.checkNum > 3 {
 			thisLinfo.currentPay = nil
 		}
+
+		for _, kid := range g.keepers {
+			if kid == localID {
+				continue
+			}
+			go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, cpay.hash, sign, kid)
+		}
+
 		cpay.Unlock()
 	}
 
