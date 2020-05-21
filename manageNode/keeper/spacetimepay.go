@@ -23,7 +23,7 @@ import (
 
 func (k *Info) stPrePayRegular(ctx context.Context) {
 	utils.MLogger.Info("SpaceTime Pre Pay start!")
-	time.Sleep(5 * time.Minute)
+	time.Sleep(4 * time.Minute)
 	k.stPrePayAll(ctx)
 	ticker := time.NewTicker(spaceTimePayTime)
 	defer ticker.Stop()
@@ -133,9 +133,18 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 		if err != nil {
 			return err
 		}
+
+		if pInfo.Stop {
+			return nil
+		}
+
 		if pid == proID {
 			found = true
 			startTime = pInfo.StEnd.Int64()
+			if time.Now().Unix()-startTime < payInternval {
+				utils.MLogger.Infof("SpaceTimePay is not on time for user %s fsID %s at %s", g.userID, g.groupID, proID)
+				return nil
+			}
 			break
 		}
 	}
@@ -252,8 +261,14 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 		cpay := thisLinfo.currentPay
 		cpay.Lock()
 		if cpay.Status <= 0 {
-			pAddr, _ := address.GetAddressFromID(proID) //providerAddress
-			ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
+			pAddr, err := address.GetAddressFromID(proID)
+			if err != nil {
+				return err
+			}
+			ukAddr, err := address.GetAddressFromID(g.upkeeping.UpKeepingID)
+			if err != nil {
+				return err
+			}
 
 			st := big.NewInt(cpay.Start)
 			sl := big.NewInt(cpay.Length)
@@ -263,7 +278,7 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 
 			var root [32]byte
 			copy(root[:], cpay.Root[:32])
-			err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, cpay.Share, cpay.Sign)
+			err = contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, cpay.Share, cpay.Sign)
 			if err != nil {
 				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s failed %s", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String(), err)
 				cpay.Unlock()

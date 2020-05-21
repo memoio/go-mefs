@@ -19,6 +19,8 @@ const (
 	spaceTimePayTime = 61 * time.Minute
 	checkConnTime    = 5 * time.Minute
 	kpMapTime        = 11 * time.Minute
+
+	payInternval = int64(2 * 60 * 60)
 )
 
 // MarketingMoney is used to

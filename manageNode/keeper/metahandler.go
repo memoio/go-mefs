@@ -136,11 +136,13 @@ func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from strin
 			capy.GetSign()[i] = sig
 			capy.Status--
 			capy.Unlock()
+			return
 		}
 	}
 }
 
 // key is /qid/"Sign"/uid/pid/kid/stStart/length
+// value is hash
 func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleGetSign: ", km.ToString())
 	// verify sig first
