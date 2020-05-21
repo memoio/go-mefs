@@ -23,6 +23,7 @@ import (
 
 func (k *Info) stPrePayRegular(ctx context.Context) {
 	utils.MLogger.Info("SpaceTime Pre Pay start!")
+	time.Sleep(5 * time.Minute)
 	k.stPrePayAll(ctx)
 	ticker := time.NewTicker(spaceTimePayTime)
 	defer ticker.Stop()
@@ -63,6 +64,7 @@ func (k *Info) stPrePayAll(ctx context.Context) {
 
 func (k *Info) stPayRegular(ctx context.Context) {
 	utils.MLogger.Info("SpaceTime Pay start!")
+	time.Sleep(5 * time.Minute)
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
