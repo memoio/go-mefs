@@ -7,7 +7,6 @@ import (
 	"encoding/gob"
 	"math/big"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -80,7 +79,6 @@ func (k *Info) stPayRegular(ctx context.Context) {
 
 func (k *Info) stPayAll(ctx context.Context) {
 	uqs := k.getQUKeys()
-	var wg sync.WaitGroup
 	for _, uq := range uqs {
 		if uq.qid == uq.uid {
 			continue
@@ -92,17 +90,12 @@ func (k *Info) stPayAll(ctx context.Context) {
 		}
 
 		for _, proID := range thisGroup.providers {
-			wg.Add(1)
-			go func(pid string) {
-				defer wg.Done()
-				err := thisGroup.stPay(k.context, pid, k.sk, k.localID, k.ds)
-				if err != nil {
-					return
-				}
-				k.savePay(uq.uid, uq.qid, pid)
-			}(proID)
+			err := thisGroup.stPay(k.context, proID, k.sk, k.localID, k.ds)
+			if err != nil {
+				return
+			}
+			k.savePay(uq.uid, uq.qid, proID)
 		}
-		wg.Wait()
 	}
 
 	balance := role.GetBalance(k.localID)
