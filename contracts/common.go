@@ -816,6 +816,8 @@ func CheckTx(tx *types.Transaction) error {
 		return ErrTxExecu
 	}
 
+	log.Println("GasUsed:", receipt.GasUsed, "CumulativeGasUsed:", receipt.CumulativeGasUsed)
+
 	return nil
 }
 
