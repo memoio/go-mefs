@@ -292,6 +292,13 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 			return nil
 		}
 
+		cpay.checkNum++
+		if cpay.checkNum > 3 {
+			thisLinfo.currentPay = nil
+			cpay.Unlock()
+			return role.ErrEmptyData
+		}
+
 		// resend to collet sign
 		mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_Sign, g.userID, proID, localID, strconv.FormatInt(cpay.GetStart(), 10), strconv.FormatInt(cpay.GetLength(), 10))
 		if err != nil {
@@ -309,11 +316,6 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 			}
 		}
 
-		cpay.checkNum++
-		if cpay.checkNum > 3 {
-			thisLinfo.currentPay = nil
-		}
-
 		for _, kid := range g.keepers {
 			if kid == localID {
 				continue
@@ -321,10 +323,12 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 			go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, cpay.hash, sign, kid)
 		}
 
+		cpay.Status = int32(len(g.keepers))
+
 		cpay.Unlock()
 	}
 
-	return role.ErrEmptyData
+	return nil
 }
 
 type timeValue struct {

@@ -133,9 +133,7 @@ func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from strin
 	for i, kid := range gp.keepers {
 		if kid == string(metaValue) {
 			capy.Lock()
-			if len(capy.GetSign()[i]) == 0 {
-				capy.Status--
-			}
+			capy.Status--
 			capy.GetSign()[i] = sig
 			capy.Unlock()
 			return
