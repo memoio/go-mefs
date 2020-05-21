@@ -128,12 +128,14 @@ func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from strin
 		return
 	}
 
+	capy := linfo.currentPay
+
 	for i, kid := range gp.keepers {
 		if kid == string(metaValue) {
-			linfo.currentPay.Lock()
-			linfo.currentPay.GetSign()[i] = sig
-			linfo.currentPay.Status--
-			linfo.currentPay.Unlock()
+			capy.Lock()
+			capy.GetSign()[i] = sig
+			capy.Status--
+			capy.Unlock()
 		}
 	}
 }

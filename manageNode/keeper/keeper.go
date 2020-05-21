@@ -140,6 +140,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.cleanTestUsersRegular(ctx)
 	go m.checkLedgerRafi(ctx)
 	go m.repairRegular(ctx)
+	go m.stPrePayRegular(ctx)
 	go m.stPayRegular(ctx)
 	go m.checkPeers(ctx)
 	go m.getFromChainRegular(ctx)

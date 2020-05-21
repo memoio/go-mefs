@@ -385,6 +385,8 @@ type blockInfo struct {
 //chalpay: for one pay informations
 type chalpay struct {
 	sync.RWMutex
+	checkNum int
+	stop     bool
 	mpb.STValue
 	hash []byte
 }

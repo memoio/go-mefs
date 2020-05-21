@@ -21,8 +21,9 @@ import (
 	mt "gitlab.com/NebulousLabs/merkletree"
 )
 
-func (k *Info) stPayRegular(ctx context.Context) {
-	utils.MLogger.Info("SpaceTime Pay start!")
+func (k *Info) stPrePayRegular(ctx context.Context) {
+	utils.MLogger.Info("SpaceTime Pre Pay start!")
+	k.stPrePayAll(ctx)
 	ticker := time.NewTicker(spaceTimePayTime)
 	defer ticker.Stop()
 	for {
@@ -30,50 +31,86 @@ func (k *Info) stPayRegular(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			uqs := k.getQUKeys()
-			for _, uq := range uqs {
-				if uq.qid == uq.uid {
-					continue
-				}
-
-				thisGroup := k.getGroupInfo(uq.uid, uq.qid, false)
-				if thisGroup == nil || thisGroup.upkeeping == nil {
-					continue
-				}
-
-				thisGroup.loadContracts(true)
-
-				if uq.uid == pos.GetPosId() {
-					utils.MLogger.Info("SpaceTime Pay for pos user")
-					thisGroup.upkeeping.Price = k.getPosPrice()
-				}
-
-				expireCount := 0
-				for _, proID := range thisGroup.providers {
-					err := thisGroup.spaceTimePay(k.context, proID, k.sk, k.localID, k.ds)
-					if err != nil {
-						if err.Error() == role.ErrUkExpire.Error() {
-							expireCount++
-						}
-						continue
-					}
-					k.savePay(uq.uid, uq.qid, proID)
-				}
-
-				if expireCount == len(thisGroup.providers) {
-					// all pay ends;
-					k.ukpGroup.Delete(uq.qid)
-				}
-			}
-
-			balance := role.GetBalance(k.localID)
-			ba, _ := new(big.Float).SetInt(balance).Float64()
-			k.ms.balance.Set(ba)
+			k.stPrePayAll(ctx)
 		}
 	}
 }
 
-func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID string, ds data.Service) error {
+func (k *Info) stPrePayAll(ctx context.Context) {
+	uqs := k.getQUKeys()
+	for _, uq := range uqs {
+		if uq.qid == uq.uid {
+			continue
+		}
+
+		thisGroup := k.getGroupInfo(uq.uid, uq.qid, false)
+		if thisGroup == nil || thisGroup.upkeeping == nil {
+			continue
+		}
+
+		thisGroup.loadContracts(true)
+
+		if uq.uid == pos.GetPosId() {
+			utils.MLogger.Info("SpaceTime Pay for pos user")
+			thisGroup.upkeeping.Price = k.getPosPrice()
+		}
+
+		for _, proID := range thisGroup.providers {
+			thisGroup.stPrePay(k.context, proID, k.sk, k.localID, k.ds)
+		}
+	}
+}
+
+func (k *Info) stPayRegular(ctx context.Context) {
+	utils.MLogger.Info("SpaceTime Pay start!")
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			k.stPayAll(ctx)
+		}
+	}
+}
+
+func (k *Info) stPayAll(ctx context.Context) {
+	uqs := k.getQUKeys()
+	for _, uq := range uqs {
+		if uq.qid == uq.uid {
+			continue
+		}
+
+		thisGroup := k.getGroupInfo(uq.uid, uq.qid, false)
+		if thisGroup == nil || thisGroup.upkeeping == nil {
+			continue
+		}
+
+		expireCount := 0
+		for _, proID := range thisGroup.providers {
+			err := thisGroup.stPay(k.context, proID, k.sk, k.localID, k.ds)
+			if err != nil {
+				if err.Error() == role.ErrUkExpire.Error() {
+					expireCount++
+				}
+				continue
+			}
+			k.savePay(uq.uid, uq.qid, proID)
+		}
+
+		if expireCount == len(thisGroup.providers) {
+			// all pay ends;
+			k.ukpGroup.Delete(uq.qid)
+		}
+	}
+
+	balance := role.GetBalance(k.localID)
+	ba, _ := new(big.Float).SetInt(balance).Float64()
+	k.ms.balance.Set(ba)
+}
+
+func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string, ds data.Service) error {
 	// only master triggers,
 	// todo round-robin
 	if !g.isMaster(proID) {
@@ -103,9 +140,8 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		}
 	}
 
-	// PosAdd
 	if !found {
-		return nil
+		return role.ErrNotMyProvider
 	}
 
 	thisLinfo := g.getLInfo(proID, false)
@@ -128,6 +164,12 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 
 		amount, mroot := thisLinfo.stSummary(price, startTime, endTime)
 		if amount.Sign() > 0 {
+			needPay := new(big.Int).Add(g.upkeeping.NeedPay, amount)
+			if needPay.Cmp(g.upkeeping.Money) < 0 {
+				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %d fails due to no enough money in upkeeping", g.userID, g.groupID, proID, startTime)
+				return role.ErrNotEnoughBalance
+			}
+
 			knum := len(g.keepers)
 			cpay := &chalpay{
 				STValue: mpb.STValue{
@@ -139,6 +181,7 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 					Share:  make([]int64, knum+1),
 					Root:   mroot,
 				},
+				checkNum: 0,
 			}
 
 			for i := 0; i < knum; i++ {
@@ -186,36 +229,66 @@ func (g *groupInfo) spaceTimePay(ctx context.Context, proID, localSk, localID st
 		return role.ErrEmptyData
 	}
 
-	if thisLinfo.currentPay != nil && thisLinfo.currentPay.Status <= 0 {
-		pAddr, _ := address.GetAddressFromID(proID) //providerAddress
-		ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
+	return role.ErrEmptyData
+}
 
-		st := big.NewInt(thisLinfo.currentPay.Start)
-		sl := big.NewInt(thisLinfo.currentPay.Length)
-		sv := new(big.Int).SetBytes(thisLinfo.currentPay.Value)
-
-		utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s %s from %d, length %d value %d", g.userID, g.groupID, proID, st, sl, sv)
-
-		var root [32]byte
-		copy(root[:], thisLinfo.currentPay.Root[:32])
-		err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, thisLinfo.currentPay.Share, thisLinfo.currentPay.Sign)
-		if err != nil {
-			utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s failed %s", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String(), err)
-			thisLinfo.currentPay = nil
-			return err
-		}
-
-		if g.userID == pos.GetPosId() {
-			utils.MLogger.Infof("SpaceTimePay start pay for pos user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
-		} else {
-			utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
-		}
-
-		thisLinfo.currentPay.Status = 0
-		thisLinfo.lastPay = thisLinfo.currentPay
-		thisLinfo.currentPay = nil
-		g.loadContracts(true)
+func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, ds data.Service) error {
+	// only master triggers,
+	// todo round-robin
+	if !g.isMaster(proID) {
 		return nil
+	}
+
+	if g.upkeeping == nil {
+		return nil
+	}
+
+	thisLinfo := g.getLInfo(proID, false)
+	if thisLinfo == nil {
+		return role.ErrNotMyProvider
+	}
+
+	if thisLinfo.currentPay != nil {
+		cpay := thisLinfo.currentPay
+		cpay.Lock()
+		if cpay.Status <= 0 {
+			pAddr, _ := address.GetAddressFromID(proID) //providerAddress
+			ukAddr, _ := address.GetAddressFromID(g.upkeeping.UpKeepingID)
+
+			st := big.NewInt(cpay.Start)
+			sl := big.NewInt(cpay.Length)
+			sv := new(big.Int).SetBytes(cpay.Value)
+
+			utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %d, length %d value %d", g.userID, g.groupID, proID, st, sl, sv)
+
+			var root [32]byte
+			copy(root[:], cpay.Root[:32])
+			err := contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, cpay.Share, cpay.Sign)
+			if err != nil {
+				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s failed %s", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String(), err)
+				cpay.Unlock()
+				thisLinfo.currentPay = nil
+				return err
+			}
+
+			if g.userID == pos.GetPosId() {
+				utils.MLogger.Infof("SpaceTimePay start pay for pos user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
+			} else {
+				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
+			}
+
+			cpay.Status = 0
+			cpay.Unlock()
+			thisLinfo.lastPay = cpay
+			thisLinfo.currentPay = nil
+			g.loadContracts(true)
+			return nil
+		}
+		cpay.checkNum++
+		if cpay.checkNum > 3 {
+			thisLinfo.currentPay = nil
+		}
+		cpay.Unlock()
 	}
 
 	return role.ErrEmptyData
