@@ -121,8 +121,6 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 		return nil
 	}
 
-	// TODO: exit when balance is too low
-
 	price := g.upkeeping.Price
 
 	// check again
@@ -165,7 +163,7 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 		amount, mroot := thisLinfo.stSummary(price, startTime, endTime)
 		if amount.Sign() > 0 {
 			needPay := new(big.Int).Add(g.upkeeping.NeedPay, amount)
-			if needPay.Cmp(g.upkeeping.Money) < 0 {
+			if needPay.Cmp(g.upkeeping.Money) > 0 {
 				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %d fails due to no enough money in upkeeping", g.userID, g.groupID, proID, startTime)
 				return role.ErrNotEnoughBalance
 			}
