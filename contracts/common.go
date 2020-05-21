@@ -75,6 +75,7 @@ var (
 	// ErrNotDeployedKPMap is
 	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
 	ErrTxFail           = errors.New("transaction fails")
+	ErrTxExecu          = errors.New("Transaction mined but execution failed")
 )
 
 type LogPay struct {
@@ -807,7 +808,12 @@ func CheckTx(tx *types.Transaction) error {
 
 	if receipt.Status == 0 { //等于0表示交易失败，等于1表示成功
 		log.Println("Transaction mined but execution failed")
-		return ErrTxFail
+		txReceipt, err := receipt.MarshalJSON()
+		if err != nil {
+			return err
+		}
+		log.Println("TxReceipt:", string(txReceipt))
+		return ErrTxExecu
 	}
 
 	return nil
