@@ -346,5 +346,8 @@ func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	if spacetime.Sign() <= 0 {
 		utils.MLogger.Info("error!amount:", spacetime, "price:", price)
 	}
+
+	utils.MLogger.Debug("spacetime  calc is:", spacetime)
+	utils.MLogger.Debug(tsl)
 	return spacetime, mtree.Root()
 }
