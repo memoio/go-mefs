@@ -289,14 +289,14 @@ func (k *Info) savePay(userID, qid, pid string) error {
 
 	if thisLinfo != nil && thisLinfo.lastPay != nil && thisLinfo.lastPay.Status <= 0 {
 		ctx := k.context
-
+		lpay := thisLinfo.lastPay
 		//key: qid/`lastpay"/pid`
 		kmLast, err := metainfo.NewKey(qid, mpb.KeyType_LastPay, pid)
 		if err != nil {
 			return err
 		}
 
-		valueLast, err := proto.Marshal(&thisLinfo.lastPay.STValue)
+		valueLast, err := proto.Marshal(&lpay.STValue)
 		if err != nil {
 			return err
 		}
@@ -309,7 +309,7 @@ func (k *Info) savePay(userID, qid, pid string) error {
 		k.putKey(ctx, kmLast.ToString(), []byte(valueLast), nil, "local", clusterID, true)
 
 		//key: `qid/"chalpay"/userID/pid/kid/beginTime/length`
-		km, err := metainfo.NewKey(qid, mpb.KeyType_ChalPay, userID, pid, k.localID, utils.UnixToString(thisLinfo.lastPay.GetStart()), utils.UnixToString(thisLinfo.lastPay.GetLength()))
+		km, err := metainfo.NewKey(qid, mpb.KeyType_ChalPay, userID, pid, k.localID, utils.UnixToString(lpay.GetStart()), utils.UnixToString(lpay.GetLength()))
 		if err != nil {
 			return err
 		}

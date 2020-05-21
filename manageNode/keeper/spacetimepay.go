@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/memoio/go-mefs/contracts"
@@ -79,6 +80,7 @@ func (k *Info) stPayRegular(ctx context.Context) {
 
 func (k *Info) stPayAll(ctx context.Context) {
 	uqs := k.getQUKeys()
+	var wg sync.WaitGroup
 	for _, uq := range uqs {
 		if uq.qid == uq.uid {
 			continue
@@ -89,22 +91,18 @@ func (k *Info) stPayAll(ctx context.Context) {
 			continue
 		}
 
-		expireCount := 0
 		for _, proID := range thisGroup.providers {
-			err := thisGroup.stPay(k.context, proID, k.sk, k.localID, k.ds)
-			if err != nil {
-				if err.Error() == role.ErrUkExpire.Error() {
-					expireCount++
+			wg.Add(1)
+			go func(pid string) {
+				defer wg.Done()
+				err := thisGroup.stPay(k.context, pid, k.sk, k.localID, k.ds)
+				if err != nil {
+					return
 				}
-				continue
-			}
-			k.savePay(uq.uid, uq.qid, proID)
+				k.savePay(uq.uid, uq.qid, pid)
+			}(proID)
 		}
-
-		if expireCount == len(thisGroup.providers) {
-			// all pay ends;
-			k.ukpGroup.Delete(uq.qid)
-		}
+		wg.Wait()
 	}
 
 	balance := role.GetBalance(k.localID)

@@ -39,7 +39,7 @@ func TransferTo(value *big.Int, addr, eth, qeth string) error {
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 
-	gasLimit := uint64(21000)           // in units
+	gasLimit := uint64(23000)           // in units
 	gasPrice := big.NewInt(30000000000) // in wei (30 gwei)
 
 	toAddress := common.HexToAddress(addr[2:])
@@ -75,6 +75,7 @@ func TransferTo(value *big.Int, addr, eth, qeth string) error {
 
 		err = client.SendTransaction(context.Background(), signedTx)
 		if err != nil {
+			log.Println("trans transcation fail:", err)
 			continue
 		}
 

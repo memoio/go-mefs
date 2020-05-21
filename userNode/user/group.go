@@ -839,7 +839,7 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	}
 
 	for _, pid := range g.tempProviders {
-		g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pid)
+		go g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kmc.ToString(), nil, nil, pid)
 	}
 
 	return nil
