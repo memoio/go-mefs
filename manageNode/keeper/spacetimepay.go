@@ -93,7 +93,7 @@ func (k *Info) stPayAll(ctx context.Context) {
 		for _, proID := range thisGroup.providers {
 			err := thisGroup.stPay(k.context, proID, k.sk, k.localID, k.ds)
 			if err != nil {
-				return
+				continue
 			}
 			k.savePay(uq.uid, uq.qid, proID)
 		}
