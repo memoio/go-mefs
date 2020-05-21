@@ -166,7 +166,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
+		auth.GasPrice = big.NewInt(spaceTimePayGasPrice)
 		auth.GasLimit = spaceTimePayGasLimit
 		//合约余额不足会自动报错返回
 		tx, err := uk.SpaceTimePay(auth, providerAddr, stValue, stStart, stLength, merkleRoot, shareNew, sign)

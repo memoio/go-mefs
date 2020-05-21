@@ -33,7 +33,7 @@ const (
 	//InvalidAddr implements invalid contracts-address
 	InvalidAddr               = "0x0000000000000000000000000000000000000000"
 	spaceTimePayGasLimit      = uint64(8000000)
-	spaceTimePayGasPrice      = 100
+	spaceTimePayGasPrice      = 2 * defaultGasPrice
 	defaultGasPrice           = 100
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
