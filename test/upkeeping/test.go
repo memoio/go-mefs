@@ -322,7 +322,8 @@ func ukTest() error {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
-	err = contracts.AddProvider(userSk, localAddr, localAddr, ukaddr, []common.Address{providerAddr})
+	sig := [][]byte{}
+	err = contracts.AddProvider(userSk, localAddr, localAddr, ukaddr, []common.Address{providerAddr}, sig)
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
