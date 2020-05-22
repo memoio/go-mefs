@@ -109,7 +109,7 @@ func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string
 }
 
 func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from string) {
-	utils.MLogger.Info("handlePutSign: ", km.ToString())
+	utils.MLogger.Infof("handlePutSign: %s, from %s", km.ToString(), from)
 	// verify sig first
 	// putSig
 	ops := km.GetOptions()

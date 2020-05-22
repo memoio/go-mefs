@@ -15,6 +15,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/lni/dragonboat/v3"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
@@ -100,6 +101,18 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	}
 
 	m.ms.keeperNum.Inc() // add self
+
+	pubKey, err := id.GetCompressPubByte(m.sk)
+	if err != nil {
+		return nil, err
+	}
+
+	kmp, err := metainfo.NewKey(m.localID, mpb.KeyType_PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	m.ds.PutKey(ctx, kmp.ToString(), pubKey, nil, "local")
 
 	err = m.loadContract(true)
 	if err != nil {
@@ -933,12 +946,10 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 
 	utils.MLogger.Info(qid, " is a test userID, clean its data")
 	for _, proID := range thisGroup.providers {
-		thisIlinfo, ok := thisGroup.ledgerMap.Load(proID)
-		if !ok {
+		thisLinfo := thisGroup.getLInfo(proID, false)
+		if thisLinfo == nil {
 			continue
 		}
-
-		thisLinfo := thisIlinfo.(*lInfo)
 
 		thisLinfo.blockMap.Range(func(key, value interface{}) bool {
 			blockID := qid + metainfo.BlockDelimiter + key.(string)

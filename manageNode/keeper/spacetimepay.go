@@ -46,11 +46,15 @@ func (k *Info) stPrePayAll(ctx context.Context) {
 		}
 
 		thisGroup := k.getGroupInfo(uq.uid, uq.qid, false)
-		if thisGroup == nil || thisGroup.upkeeping == nil {
+		if thisGroup == nil {
 			continue
 		}
 
 		thisGroup.loadContracts(true)
+
+		if thisGroup.upkeeping == nil {
+			continue
+		}
 
 		if uq.uid == pos.GetPosId() {
 			utils.MLogger.Info("SpaceTime Pay for pos user")
@@ -164,7 +168,7 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 		}
 
 		amount, mroot := thisLinfo.stSummary(price, startTime, endTime)
-		if amount.Sign() > 0 {
+		if amount.Sign() > 0 && len(mroot) >= 32 {
 			needPay := new(big.Int).Add(g.upkeeping.NeedPay, amount)
 			if needPay.Cmp(g.upkeeping.Money) > 0 {
 				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %d fails due to no enough money in upkeeping", g.userID, g.groupID, proID, startTime)
@@ -204,20 +208,21 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 			}
 
 			mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_Sign, g.userID, proID, localID, st.String(), sl.String())
-
-			key := mkey.ToString()
-			for i, kid := range g.keepers {
-				if kid == localID {
-					cpay.Sign[i] = sign
-				}
+			if err != nil {
+				return err
 			}
 
 			thisLinfo.currentPay = cpay
 
 			// sync to other keepers？
 			// get enough signs; then
-			for _, kid := range g.keepers {
+			key := mkey.ToString()
+			for i, kid := range g.keepers {
 				if kid == localID {
+					cpay.Lock()
+					cpay.Sign[i] = sign
+					cpay.Status--
+					cpay.Unlock()
 					continue
 				}
 				go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, hash, sign, kid)
