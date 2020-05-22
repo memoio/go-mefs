@@ -12,7 +12,6 @@ import (
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	"github.com/memoio/go-mefs/utils/pos"
 )
 
 // handleUserInit collect keepers and providers for user
@@ -51,10 +50,6 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 		kc = int(item.KeeperNums)
 		pc = int(item.ProviderNums)
 		price = item.Price
-	}
-
-	if pos.GetPosId() == uid {
-		price = pos.GetPosPrice()
 	}
 
 	response, err = k.initUser(uid, qid, kc, pc, price)
