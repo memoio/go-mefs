@@ -189,10 +189,15 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 				checkNum: 0,
 			}
 
-			for i := 0; i < knum; i++ {
-				cpay.Share[i] = 1
+			for i, kid := range g.keepers {
+				if kid == localID {
+					cpay.Share[i] = int64(100 - 100*(knum-1)/knum)
+					continue
+				}
+				cpay.Share[i] = int64(100 / knum)
 			}
-			cpay.Share[knum] = int64(knum)
+
+			cpay.Share[knum] = int64(100)
 
 			st := big.NewInt(cpay.Start)
 			sl := big.NewInt(cpay.Length)
