@@ -194,7 +194,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 }
 
 //AddProvider add a provider to upKeeping
-func AddProvider(hexKey string, localAddress, userAddress, ukAddr common.Address, providerAddress []common.Address) error {
+func AddProvider(hexKey string, localAddress, userAddress, ukAddr common.Address, providerAddress []common.Address, sign [][]byte) error {
 	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("newUkErr:", err)
@@ -207,7 +207,7 @@ func AddProvider(hexKey string, localAddress, userAddress, ukAddr common.Address
 		key, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := uk.AddProvider(auth, providerAddress)
+		tx, err := uk.AddProvider(auth, providerAddress, sign)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				return err

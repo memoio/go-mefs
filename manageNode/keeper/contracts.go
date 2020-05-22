@@ -150,9 +150,11 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 		return err
 	}
 
+	//TODO
+	sig := [][]byte{}
 	if gp.isMaster(pid) {
 		utils.MLogger.Info("add provider to: ", userAddr)
-		err = contracts.AddProvider(k.sk, localAddr, userAddr, ukAddr, []common.Address{providerAddr})
+		err = contracts.AddProvider(k.sk, localAddr, userAddr, ukAddr, []common.Address{providerAddr}, sig)
 		if err != nil {
 			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err
