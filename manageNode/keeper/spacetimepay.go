@@ -207,7 +207,7 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 				return err
 			}
 
-			mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_Sign, g.userID, proID, localID, st.String(), sl.String())
+			mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_StPaySign, g.userID, proID, localID, st.String(), sl.String())
 			if err != nil {
 				return err
 			}
@@ -305,7 +305,7 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 		}
 
 		// resend to collet sign
-		mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_Sign, g.userID, proID, localID, strconv.FormatInt(cpay.GetStart(), 10), strconv.FormatInt(cpay.GetLength(), 10))
+		mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_StPaySign, g.userID, proID, localID, strconv.FormatInt(cpay.GetStart(), 10), strconv.FormatInt(cpay.GetLength(), 10))
 		if err != nil {
 			cpay.Unlock()
 			return err

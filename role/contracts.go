@@ -1253,6 +1253,50 @@ func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stS
 	return sig, nil
 }
 
+//GetHashForAddProvider keeper signature
+func GetHashForAddProvider(upKeepingAddr common.Address, providerAddr []common.Address) ([]byte, error) {
+	//(upKeepingAddr, []providerAddr)的哈希值
+
+	//keccak256内部实现
+	d := sha3.NewLegacyKeccak256()
+	d.Write(upKeepingAddr.Bytes())
+
+	for i := 0; i < len(providerAddr); i++ {
+		d.Write(providerAddr[i].Bytes())
+	}
+
+	return d.Sum(nil), nil
+}
+
+//SignForAddProvider keeper signature
+func SignForAddProvider(upKeepingAddr common.Address, providerAddr []common.Address, hexKey string) ([]byte, error) {
+	var sig []byte
+	//(upKeepingAddr, []providerAddr)的哈希值
+
+	//keccak256内部实现
+	d := sha3.NewLegacyKeccak256()
+	d.Write(upKeepingAddr.Bytes())
+
+	for i := 0; i < len(providerAddr); i++ {
+		d.Write(providerAddr[i].Bytes())
+	}
+	hash := d.Sum(nil)
+
+	//私钥格式转换
+	skECDSA, err := id.ECDSAStringToSk(hexKey)
+	if err != nil {
+		return sig, err
+	}
+
+	//私钥对上述哈希值签名
+	sig, err = crypto.Sign(hash, skECDSA)
+	if err != nil {
+		return sig, err
+	}
+
+	return sig, nil
+}
+
 //SignForSetStop keeper signature to set provider or keeper stop in upkeeping contract
 func SignForSetStop(upKeepingAddr, providerAddr common.Address, hexKey string) ([]byte, error) {
 	hash := crypto.Keccak256(upKeepingAddr.Bytes(), providerAddr.Bytes())

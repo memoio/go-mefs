@@ -6,9 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
+	id "github.com/memoio/go-mefs/crypto/identity"
+	mpb "github.com/memoio/go-mefs/proto"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 // force update if mode is set true
@@ -150,11 +153,40 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 		return err
 	}
 
-	//TODO
-	sig := [][]byte{}
 	if gp.isMaster(pid) {
 		utils.MLogger.Info("add provider to: ", userAddr)
-		err = contracts.AddProvider(k.sk, localAddr, userAddr, ukAddr, []common.Address{providerAddr}, sig)
+		mkey, err := metainfo.NewKey(gp.groupID, mpb.KeyType_ProAddSign, gp.userID, pid)
+		if err != nil {
+			return err
+		}
+
+		key := mkey.ToString()
+
+		sHash, err := role.GetHashForAddProvider(ukAddr, []common.Address{providerAddr})
+		if err != nil {
+			return err
+		}
+
+		sig, err := id.Sign(k.sk, sHash)
+		if err != nil {
+			return err
+		}
+
+		keepers := gp.keepers
+		sigs := make([][]byte, len(keepers))
+		for i, kid := range keepers {
+			if kid == k.localID {
+				sigs[i] = sig
+				continue
+			}
+			res, err := k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Get), key, sHash, sig, kid)
+			if err != nil {
+				return err
+			}
+			sigs[i] = res
+		}
+
+		err = contracts.AddProvider(k.sk, localAddr, userAddr, ukAddr, []common.Address{providerAddr}, sigs)
 		if err != nil {
 			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err

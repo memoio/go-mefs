@@ -24,7 +24,19 @@ func (k *Info) handlePosGet(km *metainfo.Key, val []byte, from string) {
 		utils.MLogger.Info("handlePosGet error! from!=km.mid")
 	}
 
-	err := k.ukAddProvider(ops[0], km.GetMid(), string(val))
+	gp := k.getGroupInfo(ops[0], km.GetMid(), true)
+	if gp == nil {
+		return
+	}
+
+	pid := string(val)
+	for _, proID := range gp.providers {
+		if proID == pid {
+			return
+		}
+	}
+
+	err := k.ukAddProvider(ops[0], km.GetMid(), pid)
 	if err != nil {
 		utils.MLogger.Info("handlePos Add provider err:", err)
 	}
@@ -41,6 +53,7 @@ func (k *Info) handlePosAdd(km *metainfo.Key, metaValue []byte, from string) {
 
 	if pos.GetPosId() != ops[0] {
 		utils.MLogger.Info("handlePosAdd error! from!=km.mid")
+		return
 	}
 
 	gp := k.getGroupInfo(ops[0], km.GetMid(), true)

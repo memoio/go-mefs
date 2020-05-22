@@ -41,11 +41,13 @@ enum KeyType {
 	  Offer = 31;
 	  UpKeeping = 32;
 	  Channel = 33;
+    StPaySign = 34;
+    ProAddSign = 35;
 
     ChalPay = 40; // each pay
     LastPay = 41;
     PosMeta = 42;
-    Sign    = 43;
+    
 }
 
 message KeyMeta{

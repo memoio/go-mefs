@@ -69,12 +69,17 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		case mpb.OpType_Get:
 			go k.handlePosGet(km, metaValue, from)
 		}
-	case mpb.KeyType_Sign:
+	case mpb.KeyType_StPaySign:
 		switch opType {
 		case mpb.OpType_Put:
-			k.handlePutSign(km, metaValue, sig, from)
+			go k.handlePutStPaySign(km, metaValue, sig, from)
 		case mpb.OpType_Get:
-			k.handleGetSign(km, metaValue, sig, from)
+			go k.handleGetStPaySign(km, metaValue, sig, from)
+		}
+	case mpb.KeyType_ProAddSign:
+		switch opType {
+		case mpb.OpType_Get:
+			return k.handleGetProAddSign(km, metaValue, sig, from)
 		}
 	default:
 		switch opType {
@@ -108,7 +113,7 @@ func (k *Info) handleGetKey(km *metainfo.Key, metaValue, sig []byte, from string
 	return k.ds.GetKey(k.context, km.ToString(), "local")
 }
 
-func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from string) {
+func (k *Info) handlePutStPaySign(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Infof("handlePutSign: %s, from %s", km.ToString(), from)
 	// verify sig first
 	// putSig
@@ -143,7 +148,7 @@ func (k *Info) handlePutSign(km *metainfo.Key, metaValue, sig []byte, from strin
 
 // key is /qid/"Sign"/uid/pid/kid/stStart/length
 // value is hash
-func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from string) {
+func (k *Info) handleGetStPaySign(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleGetSign: ", km.ToString())
 	// verify sig first
 	// verify metaValue
@@ -154,6 +159,19 @@ func (k *Info) handleGetSign(km *metainfo.Key, metaValue, sig []byte, from strin
 	}
 
 	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), []byte(k.localID), nsig, from)
+}
+
+func (k *Info) handleGetProAddSign(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handleGetSign: ", km.ToString())
+	// verify sig first
+	// verify metaValue
+	// sign it
+	nsig, err := id.Sign(k.sk, metaValue)
+	if err != nil {
+		return nil, err
+	}
+
+	return nsig, nil
 }
 
 func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from string) {

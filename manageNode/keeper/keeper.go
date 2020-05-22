@@ -55,28 +55,30 @@ type Info struct {
 }
 
 type measure struct {
-	balance     metrics.Gauge
-	groupNum    metrics.Gauge
-	userNum     metrics.Gauge
-	keeperNum   metrics.Gauge
-	providerNum metrics.Gauge
-	storageUsed metrics.Gauge
-	repairNum   metrics.Gauge
-	faultNum    metrics.Gauge
+	balance        metrics.Gauge
+	userNum        metrics.Gauge
+	groupNum       metrics.Gauge
+	masterGroupNum metrics.Gauge
+	keeperNum      metrics.Gauge
+	providerNum    metrics.Gauge
+	storageUsed    metrics.Gauge
+	repairNum      metrics.Gauge
+	faultNum       metrics.Gauge
 }
 
 // New is
 // TODO:Keeper出问题重启后，应该能自动将所有user的信息恢复到内存中
 func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	mea := &measure{
-		balance:     metrics.New("keeper.balance", "Balance of this keeper").Gauge(),
-		groupNum:    metrics.New("keeper.group_num", "Group number").Gauge(),
-		userNum:     metrics.New("keeper.user_num", "User number").Gauge(),
-		keeperNum:   metrics.New("keeper.keeper_num", "Keeper number").Gauge(),
-		providerNum: metrics.New("keeper.provider_num", "Providers number").Gauge(),
-		storageUsed: metrics.New("keeper.storage_used", "Storage used(bytes)").Gauge(),
-		repairNum:   metrics.New("keeper.repair_num", "Repair number").Gauge(),
-		faultNum:    metrics.New("keeper.fault_num", "Fault block number").Gauge(),
+		balance:        metrics.New("keeper.balance", "Balance of this keeper").Gauge(),
+		userNum:        metrics.New("keeper.user_num", "User number").Gauge(),
+		groupNum:       metrics.New("keeper.group_num", "Group number").Gauge(),
+		masterGroupNum: metrics.New("keeper.masterGroup_num", "master group number").Gauge(),
+		keeperNum:      metrics.New("keeper.keeper_num", "Keeper number").Gauge(),
+		providerNum:    metrics.New("keeper.provider_num", "Providers number").Gauge(),
+		storageUsed:    metrics.New("keeper.storage_used", "Storage used(bytes)").Gauge(),
+		repairNum:      metrics.New("keeper.repair_num", "Repair number").Gauge(),
+		faultNum:       metrics.New("keeper.fault_num", "Fault block number").Gauge(),
 	}
 
 	m := &Info{
@@ -857,19 +859,12 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		}
 
 		k.ms.groupNum.Inc()
+		if gInfo.localKeeper == gInfo.masterKeeper {
+			k.ms.masterGroupNum.Inc()
+		}
 		k.ukpGroup.Store(qid, gInfo)
 
-		retry := 0
-		for retry > 10 {
-			err := gInfo.loadContracts(true)
-			if err != nil {
-				utils.MLogger.Errorf("load contarcts for user %s failed %s", gInfo.userID, err)
-				retry++
-				time.Sleep(time.Minute)
-				continue
-			}
-			break
-		}
+		gInfo.loadContracts(false)
 
 		k.loadUserBucket(uid, qid)
 		k.loadUserBlock(qid)

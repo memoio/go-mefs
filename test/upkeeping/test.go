@@ -278,52 +278,21 @@ func ukTest() error {
 		}
 	}
 
-	log.Println("10.begin to second initiate spacetime pay to provider 0, stLength is:", sLength)
-	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-	if err != nil {
-		log.Fatal("ukGetOrder error:", err)
-	}
-	stStart = providers[0].StEnd
-	stLength = big.NewInt(sLength)
-	merkleRoot = [32]byte{0}
-	share = []int64{4, 3, 3, 10}
-	signs, err = getSigs(kAddrList, kSkList, pAddrList[0], ukaddr, stStart, stLength, amount, merkleRoot, share)
-	if err != nil {
-		log.Fatal("getSigs error:", err)
-	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], userSk, stStart, stLength, amount, merkleRoot, share, signs)
-	if err != nil {
-		log.Fatal("spacetime pay err:", err)
-		return err
-	}
-	log.Println("spacetime pay trigger")
-
-	log.Println("11.begin to query results of second stPay")
-	retryCount = 0
-	for ; retryCount < 20; retryCount++ {
-		retryCount++
-		time.Sleep(30 * time.Second)
-		_, keepers, providers, _, _, _, createDate, _, _, _, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-		if err != nil {
-			continue
-		}
-		if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*9*2) && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3*3/10) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*2))) == 0) { //参数结果符合要求
-			log.Println("parameters are right")
-			break
-		}
-	}
-	if retryCount == 20 {
-		log.Fatal("second stPay fails")
-	}
-
-	log.Println("12.begin to test addProvider")
+	log.Println("10.begin to test addProvider")
 	providerAddr, err := address.GetAddressFromID(serverPids[pCount])
 	if err != nil {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
 	}
-	sig := [][]byte{}
-	err = contracts.AddProvider(userSk, localAddr, localAddr, ukaddr, []common.Address{providerAddr}, sig)
+
+	addProviderAddrs := []common.Address{providerAddr}
+	sigs, err := getAddProviderSigs(kAddrList, kSkList, ukaddr, addProviderAddrs)
+	if err != nil {
+		log.Println("ukAddProvider getsigs error", err)
+		return err
+	}
+
+	err = contracts.AddProvider(userSk, localAddr, localAddr, ukaddr, addProviderAddrs, sigs)
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
@@ -344,6 +313,72 @@ func ukTest() error {
 
 	if !has {
 		log.Fatal("add provider failed")
+	}
+
+	log.Println("wait third cycle")
+	//等待now > endDate + 60,触发第三次时空支付
+	for {
+		nowTime := time.Now().Unix()
+		if nowTime >= createDate.Int64()+3*defaultCycle+10 {
+			break
+		}
+		time.Sleep(time.Duration(createDate.Int64()+3*defaultCycle+10-nowTime) * time.Second)
+	}
+
+	beforeEnd := false
+	if time.Now().Unix() >= endDate.Int64() {
+		beforeEnd = true
+	}
+
+	log.Println("11.begin to second initiate spacetime pay to provider 0 after 3 cycles, stLength is: ", sLength)
+	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	if err != nil {
+		log.Fatal("ukGetOrder error:", err)
+	}
+	stStart = providers[0].StEnd
+	stLength = big.NewInt(sLength)
+	merkleRoot = [32]byte{0}
+	share = []int64{4, 3, 3, 10} //keeper在本次支付中挑战的次数，share[kCount]代表挑战总次数
+	signs, err = getSigs(kAddrList, kSkList, pAddrList[0], ukaddr, stStart, stLength, amount, merkleRoot, share)
+	if err != nil {
+		log.Fatal("getSigs error:", err)
+	}
+	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], userSk, stStart, stLength, amount, merkleRoot, share, signs)
+	if err != nil {
+		log.Fatal("spacetime pay err:", err)
+		return err
+	}
+	log.Println("spacetime pay trigger")
+
+	log.Println("14.begin to query results of second stPay")
+	retryCount = 0
+	for {
+		if beforeEnd {
+			break
+		}
+
+		if retryCount > 20 {
+			log.Fatal("contract balance is not changed")
+		}
+		retryCount++
+		time.Sleep(30 * time.Second)
+		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
+		log.Println("contract balance", amountUk)
+		if amountUk.Int64() < moneyToUK {
+			_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+			if err != nil {
+				log.Println("get order fails")
+				continue
+			}
+
+			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*2))) == 0) { //参数结果符合要求
+				log.Println("parameters are right")
+			}
+			log.Println(keepers)
+			log.Println(providers)
+			log.Println(needPay)
+			break
+		}
 	}
 
 	log.Println("wait enddate")
@@ -498,6 +533,19 @@ func getSigs(keeperAddress []common.Address, keeperSk []string, providerAddr, up
 		sig, err := role.SignForStPay(upKeepingAddr, providerAddr, keeperSk[i], stStart, stLength, stValue, merkleRoot, share)
 		if err != nil {
 			log.Println("signForstPay error:", err)
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func getAddProviderSigs(keeperAddress []common.Address, keeperSk []string, upKeepingAddr common.Address, providerAddr []common.Address) ([][]byte, error) {
+	sigs := [][]byte{}
+	for i := 0; i < len(keeperAddress); i++ {
+		sig, err := role.SignForAddProvider(upKeepingAddr, providerAddr, keeperSk[i])
+		if err != nil {
+			log.Println("signForAddProvider error:", err)
 			return sigs, err
 		}
 		sigs = append(sigs, sig)

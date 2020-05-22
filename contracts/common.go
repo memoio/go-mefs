@@ -47,7 +47,7 @@ const (
 
 	offerKey   = "offerV1"
 	queryKey   = "queryV1"
-	ukey       = "upKeepingV1"
+	ukey       = "upKeepingV2"
 	rootKey    = "rootV1"
 	channelKey = "channelV1"
 )
