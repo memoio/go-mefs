@@ -1238,14 +1238,8 @@ func SignForStPay(upKeepingAddr, providerAddr common.Address, hexKey string, stS
 	}
 	hash := d.Sum(nil)
 
-	//私钥格式转换
-	skECDSA, err := id.ECDSAStringToSk(hexKey)
-	if err != nil {
-		return sig, err
-	}
-
 	//私钥对上述哈希值签名
-	sig, err = crypto.Sign(hash, skECDSA)
+	sig, err := id.Sign(hexKey, hash)
 	if err != nil {
 		return sig, err
 	}
@@ -1262,7 +1256,7 @@ func GetHashForAddProvider(upKeepingAddr common.Address, providerAddr []common.A
 	d.Write(upKeepingAddr.Bytes())
 
 	for i := 0; i < len(providerAddr); i++ {
-		d.Write(providerAddr[i].Bytes())
+		d.Write(common.LeftPadBytes(providerAddr[i].Bytes(), 32))
 	}
 
 	return d.Sum(nil), nil
@@ -1270,7 +1264,6 @@ func GetHashForAddProvider(upKeepingAddr common.Address, providerAddr []common.A
 
 //SignForAddProvider keeper signature
 func SignForAddProvider(upKeepingAddr common.Address, providerAddr []common.Address, hexKey string) ([]byte, error) {
-	var sig []byte
 	//(upKeepingAddr, []providerAddr)的哈希值
 
 	//keccak256内部实现
@@ -1278,18 +1271,12 @@ func SignForAddProvider(upKeepingAddr common.Address, providerAddr []common.Addr
 	d.Write(upKeepingAddr.Bytes())
 
 	for i := 0; i < len(providerAddr); i++ {
-		d.Write(providerAddr[i].Bytes())
+		d.Write(common.LeftPadBytes(providerAddr[i].Bytes(), 32))
 	}
 	hash := d.Sum(nil)
 
-	//私钥格式转换
-	skECDSA, err := id.ECDSAStringToSk(hexKey)
-	if err != nil {
-		return sig, err
-	}
-
 	//私钥对上述哈希值签名
-	sig, err = crypto.Sign(hash, skECDSA)
+	sig, err := id.Sign(hexKey, hash)
 	if err != nil {
 		return sig, err
 	}
@@ -1301,14 +1288,7 @@ func SignForAddProvider(upKeepingAddr common.Address, providerAddr []common.Addr
 func SignForSetStop(upKeepingAddr, providerAddr common.Address, hexKey string) ([]byte, error) {
 	hash := crypto.Keccak256(upKeepingAddr.Bytes(), providerAddr.Bytes())
 
-	//私钥格式转换
-	skECDSA, err := id.ECDSAStringToSk(hexKey)
-	if err != nil {
-		return nil, err
-	}
-
-	//私钥对上述哈希值签名
-	sig, err := crypto.Sign(hash, skECDSA)
+	sig, err := id.Sign(hexKey, hash)
 	if err != nil {
 		return nil, err
 	}

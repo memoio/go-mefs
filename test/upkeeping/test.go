@@ -32,8 +32,12 @@ var (
 	pCount = 5
 )
 
-var serverKaddrs = []string{"0x25a239c463415fF09767EDd051323385C9CE670c", "0xc67F94895F9626506857919D997e8dA7ffd95bF7", "0x9ADb6BC98FD4eE2bFF716034B9653dC5F0558B5f", "0xf904237239a79f535bdc77622CCfB31E3B3f83C9", "0x6Bd50cA3Ba83151f8Cb133B3C90737E173243adf", "0xd61E260aAA4AF3D64B899029E8c4025c96Ab31ec"}
-var keeperSk = []string{"0xa7026c19010aa9fc55393d6efdcd5df3a5b08ccf2f0432af97093e7ed5a4282c", "0xba38f489b2ad7cf6220e9fd0e3166dd45639bac684cd9c1ef47c94ec416374d5"}
+var serverKaddrs = []string{"0x8c4d5d6d57574Ef7Bb21BD369969185BF781cBCD",
+	"0x25a239c463415fF09767EDd051323385C9CE670c", "0xc67F94895F9626506857919D997e8dA7ffd95bF7", "0x9ADb6BC98FD4eE2bFF716034B9653dC5F0558B5f", "0xf904237239a79f535bdc77622CCfB31E3B3f83C9", "0x6Bd50cA3Ba83151f8Cb133B3C90737E173243adf", "0xd61E260aAA4AF3D64B899029E8c4025c96Ab31ec"}
+
+var keeperSk = []string{"25e5246b92c190dbf993ae4eeb1d3a27133d1ad3ed8109e4593bde81fa7451b0",
+	"a7026c19010aa9fc55393d6efdcd5df3a5b08ccf2f0432af97093e7ed5a4282c", "ba38f489b2ad7cf6220e9fd0e3166dd45639bac684cd9c1ef47c94ec416374d5"}
+
 var serverPids = []string{"8MHXst83NnSfYHnyqWMVjwjt2GiutV", "8MGrkL5cUpPsPbePvCfwCx6HemwDvy", "8MJ71X96BcnUNkhSFjc6CCsemL6nSQ", "8MGZ5nYsYw3Kmt8zC44W4V1NYaTGcE", "8MGhVo1ib6C6PmFhfQK4Hr3hHwQjC9", "8MJcdk2cyQvZknpxYf2AmGKDHRSRJP", "8MG9ZMYoZrZxjc7bVMeqJkaxAdb3Wx", "8MGqojupxiCesALno7sA73NhJkcSY5", "8MKAiRexSQG4SpGrpEQb4s9wjxJimX", "8MKU1DT94SB3aHTrMqWcJa2oLRtTzv", "8MJaFY7yAyYAvnjnM5hTbTfpjXhTHx", "8MGUGzCk1RUvq1aTPd9uuorrZ7FRhx", "8MHSARkgxWkjx5hKPm9vhX2v1VZ6GT"}
 
 var ethEndPoint, qethEndPoint string
@@ -57,30 +61,22 @@ func ukTest() error {
 	log.Println(">>>>>>>>>>>>>>>>>>>>>SmartContractTest>>>>>>>>>>>>>>>>>>>>>")
 	defer log.Println("===================SmartContractTestEnd============================")
 
-	userAddr, userSk, err := test.CreateAddr()
-	if err != nil {
-		log.Fatal("create user fails:", err)
-		return err
-	}
-	fmt.Println("userAddr:", userAddr, ", userSk:", userSk)
-
-	test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
-
-	localAddr := common.HexToAddress(userAddr[2:])
-	kAddrList := []common.Address{localAddr}
+	kAddrList := []common.Address{}
 	kBalanceMap := make(map[common.Address]*big.Int)
-	kBalanceMap[localAddr] = test.QueryBalance(localAddr.String(), qethEndPoint)
+	var kSkList []string
+
 	i := 0
 	for _, serverKaddr := range serverKaddrs { //得到keeper地址 并且查询初始余额
 		tempAddr := common.HexToAddress(serverKaddr)
 		kBalanceMap[tempAddr] = test.QueryBalance(tempAddr.String(), qethEndPoint)
 		kAddrList = append(kAddrList, tempAddr)
-		if i++; i == kCount-1 {
+		kSkList = append(kSkList, keeperSk[i])
+		if i++; i == kCount {
 			break
 		}
 	}
 
-	kSkList := []string{userSk, keeperSk[0], keeperSk[1]}
+	log.Println("kSkList:", kSkList[0])
 
 	pAddrList := []common.Address{}
 	pBalanceMap := make(map[common.Address]*big.Int)
@@ -100,9 +96,19 @@ func ukTest() error {
 		return err
 	}
 
+	userAddr, userSk, err := test.CreateAddr()
+	if err != nil {
+		log.Fatal("create user fails:", err)
+		return err
+	}
+	fmt.Println("userAddr:", userAddr, ", userSk:", userSk)
+	localAddr := common.HexToAddress(userAddr[2:])
+
+	test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
+
 	log.Println("1.begin to deploy upkeeping first")
 	contracts.EndPoint = ethEndPoint
-	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, kAddrList[0], kAddrList, pAddrList, sDuration, sSize, big.NewInt(sPrice), defaultCycle, big.NewInt(moneyToUK), false)
+	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, localAddr, kAddrList, pAddrList, sDuration, sSize, big.NewInt(sPrice), defaultCycle, big.NewInt(moneyToUK), false)
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err
@@ -111,7 +117,7 @@ func ukTest() error {
 
 	log.Println("2.begin to reget upkeeping's addr")
 	contracts.EndPoint = qethEndPoint
-	ukaddr, _, err := contracts.GetUpkeeping(localAddr, localAddr, kAddrList[0].String())
+	ukaddr, _, err := contracts.GetUpkeeping(localAddr, localAddr, localAddr.String())
 	if err != nil {
 		log.Fatal("cannnot get upkeeping contract: ", err)
 		return err
@@ -133,9 +139,6 @@ func ukTest() error {
 				log.Fatal("Contract balance is not equal to preset: ", moneyToUK)
 			}
 
-			amountLocal := test.QueryBalance(userAddr, qethEndPoint)
-			log.Println("user balance change due to deploy：", new(big.Int).Sub(amountLocal, kBalanceMap[localAddr]))
-			kBalanceMap[localAddr] = amountLocal
 			break
 		}
 
@@ -154,7 +157,7 @@ func ukTest() error {
 	}
 
 	createdate := big.NewInt(0)
-	if (queryAddrGet != kAddrList[0]) || (timeGet.Cmp(big.NewInt(sDuration)) != 0) || (sizeG.Cmp(big.NewInt(sSize)) != 0) || (priceG.Cmp(big.NewInt(sPrice)) != 0) || (endDate.Cmp(createdate.Add(createDate, timeGet)) != 0) || (cycle.Cmp(big.NewInt(defaultCycle)) != 0) || (needPay.Cmp(big.NewInt(0)) != 0) {
+	if (queryAddrGet != localAddr) || (timeGet.Cmp(big.NewInt(sDuration)) != 0) || (sizeG.Cmp(big.NewInt(sSize)) != 0) || (priceG.Cmp(big.NewInt(sPrice)) != 0) || (endDate.Cmp(createdate.Add(createDate, timeGet)) != 0) || (cycle.Cmp(big.NewInt(defaultCycle)) != 0) || (needPay.Cmp(big.NewInt(0)) != 0) {
 		log.Fatal("uk get wrong parameters:", queryAddrGet.String(), timeGet, sizeG, priceG, createDate, endDate, cycle, needPay)
 	}
 
@@ -174,7 +177,7 @@ func ukTest() error {
 		return err
 	}
 
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], userSk, stStart, stLength, amount, merkleRoot, share, signs)
+	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], kSkList[0], stStart, stLength, amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -223,7 +226,7 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("get setStopSigns error:", err)
 	}
-	err = contracts.SetProviderStop(userSk, localAddr, localAddr, pAddrList[1], localAddr.String(), setStopSigns)
+	err = contracts.SetProviderStop(kSkList[0], kAddrList[0], localAddr, pAddrList[1], localAddr.String(), setStopSigns)
 	if err != nil {
 		log.Fatal("set provider stop fails: ", err)
 	}
@@ -246,7 +249,7 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("getSigs error:", err)
 	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[1], userSk, stStart, big.NewInt(sLength), amount, merkleRoot, share, signs)
+	err = contracts.SpaceTimePay(ukaddr, pAddrList[1], kSkList[0], stStart, big.NewInt(sLength), amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -278,8 +281,24 @@ func ukTest() error {
 		}
 	}
 
-	log.Println("10.begin to test addProvider")
-	providerAddr, err := address.GetAddressFromID(serverPids[pCount])
+	log.Println("10.begin to test addProvider by user")
+
+	providerAddr1, err := address.GetAddressFromID(serverPids[pCount])
+	if err != nil {
+		log.Println("ukAddProvider GetAddressFromID() error", err)
+		return err
+	}
+
+	var esigs [][]byte
+	err = contracts.AddProvider(userSk, localAddr, ukaddr, []common.Address{providerAddr1}, esigs)
+	if err != nil {
+		log.Fatal("ukAddProvider user AddProvider() error", err)
+		return err
+	}
+
+	log.Println("10.begin to test addProvider by keeper")
+
+	providerAddr, err := address.GetAddressFromID(serverPids[pCount+1])
 	if err != nil {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
 		return err
@@ -292,7 +311,7 @@ func ukTest() error {
 		return err
 	}
 
-	err = contracts.AddProvider(userSk, localAddr, localAddr, ukaddr, addProviderAddrs, sigs)
+	err = contracts.AddProvider(kSkList[0], kAddrList[0], ukaddr, addProviderAddrs, sigs)
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
@@ -343,7 +362,7 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("getSigs error:", err)
 	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], userSk, stStart, stLength, amount, merkleRoot, share, signs)
+	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], kSkList[0], stStart, stLength, amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -405,7 +424,7 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("getSigs error:", err)
 	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], userSk, stStart, stLength, amount, merkleRoot, share, signs)
+	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], kSkList[0], stStart, stLength, amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -492,7 +511,7 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("get setStopSigns error:", err)
 	}
-	err = contracts.SetKeeperStop(userSk, localAddr, localAddr, kAddrList[1], localAddr.String(), setStopSigns)
+	err = contracts.SetKeeperStop(kSkList[0], kAddrList[0], localAddr, kAddrList[1], localAddr.String(), setStopSigns)
 	if err != nil {
 		log.Fatal("set keeper stop fails: ", err)
 	}

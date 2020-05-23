@@ -186,7 +186,7 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 			sigs[i] = res
 		}
 
-		err = contracts.AddProvider(k.sk, localAddr, userAddr, ukAddr, []common.Address{providerAddr}, sigs)
+		err = contracts.AddProvider(k.sk, localAddr, ukAddr, []common.Address{providerAddr}, sigs)
 		if err != nil {
 			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err
