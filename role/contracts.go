@@ -438,7 +438,7 @@ func DeployQuery(userID, sk string, storeDays, storeSize int64, storePrice *big.
 	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
 
 	if moneyAccount.Cmp(balance) > 0 { //余额不足
-		utils.MLogger.Info(uaddr.String(), " need more balance to start: ", moneyAccount.String())
+		utils.MLogger.Info("user %s has balance %d, but need more balance %d to start: ", uaddr.String(), balance, moneyAccount)
 		return queryID, ErrNotEnoughBalance
 	}
 

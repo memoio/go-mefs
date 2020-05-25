@@ -90,7 +90,7 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int
 		}
 
 		if queryID == "" || rdo {
-			qid, err := role.DeployQuery(userID, sk, capacity, duration, price, ks, ps, rdo)
+			qid, err := role.DeployQuery(userID, sk, duration, capacity, price, ks, ps, rdo)
 			if err != nil {
 				return nil, err
 			}
