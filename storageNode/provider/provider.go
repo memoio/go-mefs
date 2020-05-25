@@ -55,6 +55,7 @@ type Info struct {
 type measure struct {
 	balance     metrics.Gauge
 	storageUsed metrics.Gauge
+	storageFree metrics.Gauge
 	groupNum    metrics.Gauge
 	userNum     metrics.Gauge
 	providerNum metrics.Gauge
@@ -127,6 +128,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		keeperNum:   metrics.New("provider.keeper_num", "Keeper number").Gauge(),
 		providerNum: metrics.New("provider.provider_num", "Providers number").Gauge(),
 		storageUsed: metrics.New("provider.storage_used", "Storage used(bytes)").Gauge(),
+		storageFree: metrics.New("provider.storage_free", "Local available storage(bytes)").Gauge(),
 	}
 
 	m := &Info{
@@ -165,12 +167,6 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	m.ms.providerNum.Inc()
 
-	err = m.loadContracts(capacity, duration, depositSize, price, reDeployOffer)
-	if err != nil {
-		utils.MLogger.Error("provider load contarct failed: ", err)
-		return nil, err
-	}
-
 	lsinfo, err := role.GetDiskSpaceInfo()
 	if err != nil {
 		return nil, err
@@ -178,6 +174,13 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	m.LocalStorageTotal = lsinfo.Total
 	m.LocalStorageFree = lsinfo.Free
+	m.ms.storageFree.Set(float64(m.LocalStorageFree))
+
+	err = m.loadContracts(capacity, duration, depositSize, price, reDeployOffer)
+	if err != nil {
+		utils.MLogger.Error("provider load contarct failed: ", err)
+		return nil, err
+	}
 
 	if m.LocalStorageTotal < m.StorageTotal {
 		utils.MLogger.Error(m.localID, "pledge space %d, but local has %d", m.StorageTotal, m.LocalStorageTotal)
@@ -884,6 +887,8 @@ func (p *Info) storageSync(ctx context.Context) error {
 
 	p.LocalStorageTotal = lsinfo.Total
 	p.LocalStorageFree = lsinfo.Free
+
+	p.ms.storageFree.Set(float64(p.LocalStorageFree))
 
 	klist, ok := role.GetKeepersOfPro(p.localID)
 	if !ok {

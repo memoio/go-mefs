@@ -23,6 +23,7 @@ type pInfoOutput struct {
 	PledgeBytes    uint64
 	UsedBytes      uint64
 	PosBytes       uint64
+	LocalFreeBytes uint64
 	OfferAddress   string
 	OfferCapacity  int64
 	OfferPrice     *big.Int
@@ -100,11 +101,17 @@ var InfoCmd = &cmds.Command{
 			return err
 		}
 
+		lsinfo, err := role.GetDiskSpaceInfo()
+		if err != nil {
+			return err
+		}
+
 		output := &pInfoOutput{
 			Address:        localAddr.String(),
 			PledgeBytes:    depositCapacity,
 			UsedBytes:      usedCapacity,
 			PosBytes:       posCapacity,
+			LocalFreeBytes: lsinfo.Free,
 			OfferAddress:   offerAddr.String(),
 			OfferDuration:  oItem.Duration,
 			OfferStartTime: time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
