@@ -85,7 +85,9 @@ var InfoCmd = &cmds.Command{
 			}
 			fmt.Println("if you want to see the real income, please run 'mefs-provider daemon' first")
 		} else {
-			depositCapacity, usedCapacity, posCapacity = providerIns.GetStorageInfo()
+			depositCapacity = providerIns.StorageTotal
+			usedCapacity = providerIns.StorageUsed
+			posCapacity = providerIns.StoragePosUsed
 
 			ti = providerIns.TotalIncome
 			si = providerIns.StorageIncome
@@ -100,7 +102,7 @@ var InfoCmd = &cmds.Command{
 
 		output := &pInfoOutput{
 			Address:        localAddr.String(),
-			PledgeBytes:    depositCapacity * 1024 * 1024,
+			PledgeBytes:    depositCapacity,
 			UsedBytes:      usedCapacity,
 			PosBytes:       posCapacity,
 			OfferAddress:   offerAddr.String(),

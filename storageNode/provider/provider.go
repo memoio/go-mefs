@@ -28,26 +28,28 @@ import (
 
 // Info tracks provider's information
 type Info struct {
-	localID       string
-	sk            string
-	state         bool
-	ds            data.Service
-	storageTotal  uint64
-	storageUsed   uint64
-	posUsed       uint64
-	TotalIncome   *big.Int
-	ReadIncome    *big.Int
-	StorageIncome *big.Int
-	PosIncome     *big.Int
-	context       context.Context
-	fsGroup       sync.Map // key: queryID, value: *groupInfo
-	users         sync.Map // key: userID, value: *uInfo
-	keepers       sync.Map // key: keeperID, value: *kInfo
-	providers     sync.Map // key: proID, value: *kInfo
-	offers        []*role.OfferItem
-	proContract   *role.ProviderItem
-	userConfigs   *lru.ARCCache
-	ms            *measure
+	localID           string
+	sk                string
+	state             bool
+	ds                data.Service
+	StorageTotal      uint64
+	StorageUsed       uint64
+	StoragePosUsed    uint64
+	LocalStorageTotal uint64
+	LocalStorageFree  uint64
+	TotalIncome       *big.Int
+	ReadIncome        *big.Int
+	StorageIncome     *big.Int
+	PosIncome         *big.Int
+	context           context.Context
+	fsGroup           sync.Map // key: queryID, value: *groupInfo
+	users             sync.Map // key: userID, value: *uInfo
+	keepers           sync.Map // key: keeperID, value: *kInfo
+	providers         sync.Map // key: proID, value: *kInfo
+	offers            []*role.OfferItem
+	proContract       *role.ProviderItem
+	userConfigs       *lru.ARCCache
+	ms                *measure
 }
 
 type measure struct {
@@ -169,6 +171,18 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		return nil, err
 	}
 
+	lsinfo, err := role.GetDiskSpaceInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	m.LocalStorageTotal = lsinfo.Total
+	m.LocalStorageFree = lsinfo.Free
+
+	if m.LocalStorageTotal < m.StorageTotal {
+		utils.MLogger.Error(m.localID, "pledge space %d, but local has %d", m.StorageTotal, m.LocalStorageTotal)
+	}
+
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
 
 	err = m.load(ctx)
@@ -205,10 +219,6 @@ func (p *Info) GetRole() string {
 
 func (p *Info) Close() error {
 	return p.save(p.context)
-}
-
-func (p *Info) GetStorageInfo() (uint64, uint64, uint64) {
-	return uint64(p.proContract.Capacity), p.storageUsed, p.posUsed
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
@@ -861,12 +871,19 @@ func (p *Info) storageSync(ctx context.Context) error {
 		return err
 	}
 
+	maxSpace := p.getDiskTotal()
+	p.StorageUsed = actulDataSpace
+	p.StorageTotal = maxSpace
+
 	p.ms.storageUsed.Set(float64(actulDataSpace))
 
-	maxSpace := p.getDiskTotal()
+	lsinfo, err := role.GetDiskSpaceInfo()
+	if err != nil {
+		return err
+	}
 
-	p.storageUsed = actulDataSpace
-	p.storageTotal = maxSpace
+	p.LocalStorageTotal = lsinfo.Total
+	p.LocalStorageFree = lsinfo.Free
 
 	klist, ok := role.GetKeepersOfPro(p.localID)
 	if !ok {

@@ -7,13 +7,13 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	version "github.com/memoio/go-mefs"
-	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	config "github.com/memoio/go-mefs/config"
+	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	manet "github.com/multiformats/go-multiaddr-net"
 	sysi "github.com/whyrusleeping/go-sysinfo"
 )
 
-var sysDiagCmd = &cmds.Command{
+var SysDiagCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Print system diagnostic information.",
 		ShortDescription: `

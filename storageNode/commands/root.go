@@ -91,6 +91,7 @@ var rootSubcommands = map[string]*cmds.Command{
 	"contract":  newcmd.ContractCmd,
 	"test":      newcmd.TestCmd,
 	"list":      newcmd.ListCmd,
+	"sys":       newcmd.SysDiagCmd,
 }
 
 // RootRO is the readonly version of Root

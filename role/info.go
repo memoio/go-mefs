@@ -5,8 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
+	sysi "github.com/whyrusleeping/go-sysinfo"
 )
 
 // GetAllKeepers gets all
@@ -128,4 +130,19 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 // GetMemoPrice gets memo price
 func GetMemoPrice() *big.Float {
 	return big.NewFloat(utils.Memo2Dollar)
+}
+
+// GetDiskSpaceInfo gets local storage info
+func GetDiskSpaceInfo() (*sysi.DiskStats, error) {
+	rootpath, err := fsrepo.BestKnownPath()
+	if err != nil {
+		return nil, err
+	}
+
+	dinfo, err := sysi.DiskUsage(rootpath)
+	if err != nil {
+		return nil, err
+	}
+
+	return dinfo, nil
 }

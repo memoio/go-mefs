@@ -206,7 +206,7 @@ func (p *Info) traversePath(gc bool) {
 				if gc {
 					p.ds.DeleteBlock(p.context, res.String(), "local")
 				} else {
-					p.posUsed += uint64(pos.DLen)
+					p.StoragePosUsed += uint64(pos.DLen)
 				}
 			} else {
 				break
@@ -231,6 +231,14 @@ func (p *Info) doGenerateOrDelete() {
 	defer func() {
 		inGenerate = 0
 	}()
+
+	lsinfo, err := role.GetDiskSpaceInfo()
+	if err != nil || lsinfo.Total == 0 {
+		return
+	}
+
+	freeRatio := float64(lsinfo.Free) / float64(lsinfo.Total)
+
 	usedSpace, err := p.getDiskUsage()
 	if err != nil {
 		return
@@ -241,9 +249,12 @@ func (p *Info) doGenerateOrDelete() {
 	ratio := float64(usedSpace) / float64(totalSpace)
 	utils.MLogger.Info("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
-	if ratio < lowWater {
+	if ratio < lowWater && freeRatio > (1-lowWater) {
 		p.generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
-	} else if ratio > highWater {
+		return
+	}
+
+	if ratio > highWater || freeRatio < (1-highWater) {
 		p.deletePosBlocks(uint64(usedSpace / 10))
 	}
 }
@@ -288,7 +299,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 				continue
 			}
 
-			p.posUsed += uint64(pos.DLen)
+			p.StoragePosUsed += uint64(pos.DLen)
 
 			res := strings.SplitAfterN(blockID, metainfo.BlockDelimiter, 2)
 			if len(res) != 2 {
@@ -352,7 +363,7 @@ func (p *Info) deletePosBlocks(decreseSpace uint64) {
 				continue
 			}
 			utils.MLogger.Info("delete block : ", blockID, " success")
-			p.posUsed -= uint64(pos.DLen)
+			p.StoragePosUsed -= uint64(pos.DLen)
 			totalDecresed += uint64(pos.DLen)
 			deleteBlocks = append(deleteBlocks, blockID)
 		}
