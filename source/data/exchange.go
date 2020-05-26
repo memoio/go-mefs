@@ -138,13 +138,14 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 		delLocalBlock: metrics.New("data.delLocalBlock_total", "Total number of Data.DelLocalBlock calls").Counter(),
 		delBlockErr:   metrics.New("data.delBlockErr_total", "Total number of Data.DelBlock errors").Counter(),
 
+		getLatency: metrics.New("data.get.latency_seconds",
+			"Latency distribution of Data.Get calls").Histogram(latencyBuckets),
 		putLatency: metrics.New("data.put.latency_seconds",
 			"Latency distribution of Data.Put calls").Histogram(latencyBuckets),
-		getLatency: metrics.New("data.put.latency_seconds",
-			"Latency distribution of Data.Put calls").Histogram(latencyBuckets),
-		getSize: metrics.New("data.put.size_bytes",
-			"Latency distribution of Data.Put calls").Histogram(sizeBuckets),
-		putSize: metrics.New("data.get.size_bytes",
+
+		getSize: metrics.New("data.get.size_bytes",
+			"Latency distribution of Data.Get calls").Histogram(sizeBuckets),
+		putSize: metrics.New("data.put.size_bytes",
 			"Latency distribution of Data.Put calls").Histogram(sizeBuckets),
 	}
 
@@ -210,10 +211,27 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 		return nil, errNoConnection
 	}
 
+	switch typ {
+	case int32(mpb.OpType_Put):
+		n.ms.getSize.Observe(float64(len(data) + len(key) + len(sig)))
+		defer recordLatency(n.ms.putLatency, time.Now())
+	case int32(mpb.OpType_Get):
+		n.ms.putSize.Observe(float64(len(key) + len(sig)))
+		defer recordLatency(n.ms.getLatency, time.Now())
+	default:
+	}
+
 	res, err := n.rt.(*dht.KadDHT).SendRequest(ctx, typ, key, data, sig, p)
 	if err != nil {
 		utils.MLogger.Errorf("SendMetaRequest %s to %s fails: %s", key, to, err)
 	}
+
+	switch typ {
+	case int32(mpb.OpType_Get):
+		n.ms.putSize.Observe(float64(len(res)))
+	default:
+	}
+
 	return res, err
 }
 
@@ -307,7 +325,6 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 		}
 
 		// todo:verify sig
-		n.ms.getSize.Observe(float64(len(rec.GetValue())))
 		return rec.GetValue(), nil
 	}
 
@@ -318,13 +335,11 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 	}
 
 	n.ms.getKey.Inc()
-	defer recordLatency(n.ms.getLatency, time.Now())
 	res, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, to)
 	if err != nil {
 		n.ms.getKeyErr.Inc()
 		return nil, err
 	}
-	n.ms.getSize.Observe(float64(len(res)))
 	return res, nil
 
 }
@@ -335,8 +350,6 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 	}
 
 	utils.MLogger.Debug("PutKey: ", key, " to: ", to)
-
-	n.ms.putSize.Observe(float64(len(data)))
 
 	if to == "local" {
 		n.ms.putLocalKey.Inc()
@@ -367,7 +380,6 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 	}
 
 	n.ms.putKey.Inc()
-	defer recordLatency(n.ms.putLatency, time.Now())
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, data, sig, to)
 	if err != nil {
 		n.ms.putKeyErr.Inc()
@@ -384,7 +396,6 @@ func (n *impl) AppendKey(ctx context.Context, key string, data []byte, to string
 	}
 
 	utils.MLogger.Debug("AppendKey: ", key, " to: ", to)
-	n.ms.putSize.Observe(float64(len(data)))
 	if to == "local" {
 		n.ms.appendLocalKey.Inc()
 		skey := strings.Split(key, metainfo.DELIMITER)
@@ -485,7 +496,6 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 
 		block, err := n.bstore.Get(cid.NewCidV2([]byte(key)))
 		if err == nil {
-			n.ms.getSize.Observe(float64(len(block.RawData())))
 			return block, nil
 		}
 		if err.Error() == dataformat.ErrDataTooShort.Error() {
@@ -501,7 +511,6 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 	}
 
 	n.ms.getBlock.Inc()
-	defer recordLatency(n.ms.getLatency, time.Now())
 	retry := 0
 	for {
 		retry++
@@ -524,7 +533,6 @@ func (n *impl) GetBlock(ctx context.Context, key string, sig []byte, to string) 
 			n.ms.getBlockErr.Inc()
 			return nil, err
 		}
-		n.ms.getSize.Observe(float64(len(b.RawData())))
 		return b, nil
 	}
 }
@@ -536,8 +544,6 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	}
 
 	utils.MLogger.Debug("PutBlock: ", key, " to: ", to)
-
-	n.ms.putSize.Observe(float64(len(data)))
 
 	bids := strings.Split(key, metainfo.DELIMITER)
 	if to == "local" {
@@ -561,8 +567,6 @@ func (n *impl) PutBlock(ctx context.Context, key string, data []byte, to string)
 	}
 
 	n.ms.putBlock.Inc()
-	defer recordLatency(n.ms.putLatency, time.Now())
-
 	_, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Put), key, data, nil, to)
 	if err != nil {
 		n.ms.putBlockErr.Inc()
@@ -579,8 +583,6 @@ func (n *impl) AppendBlock(ctx context.Context, key string, data []byte, to stri
 	}
 
 	utils.MLogger.Debug("AppendBlock: ", key, " to: ", to)
-
-	n.ms.putSize.Observe(float64(len(data)))
 
 	skey := strings.Split(key, metainfo.DELIMITER)
 	if len(skey) < 4 {
