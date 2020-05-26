@@ -37,7 +37,7 @@ const (
 	defaultGasPrice           = 100
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
-	checkTxRetryCount         = 10
+	checkTxRetryCount         = 3
 )
 
 const (

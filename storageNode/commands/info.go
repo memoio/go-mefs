@@ -10,8 +10,8 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
-	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/storageNode/provider"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
@@ -82,12 +82,18 @@ var InfoCmd = &cmds.Command{
 			if err != nil {
 				return err
 			}
-			depositCapacity = uint64(providerItem.Capacity)
+			depositCapacity = uint64(providerItem.Capacity) * 1024 * 1024
 
-			usedCapacity, err = datastore.DiskUsage(node.Data.DataStore())
+			rootpath, err := fsrepo.BestKnownPath()
 			if err != nil {
 				return err
 			}
+
+			usedCapacity, err = utils.GetDirSize(rootpath)
+			if err != nil {
+				return err
+			}
+
 			fmt.Println("if you want to see the real income, please run 'mefs-provider daemon' first")
 		} else {
 			depositCapacity = providerIns.StorageTotal
