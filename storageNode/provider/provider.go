@@ -165,7 +165,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		m.ms.storageUsed.Set(float64(usedCapacity))
 	}
 
-	m.ms.providerNum.Inc()
+	m.StorageUsed = usedCapacity
 
 	lsinfo, err := role.GetDiskSpaceInfo()
 	if err != nil {
@@ -189,6 +189,8 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
+
+	m.ms.providerNum.Inc()
 
 	err = m.load(ctx)
 	if err != nil {

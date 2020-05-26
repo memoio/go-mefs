@@ -92,8 +92,3 @@ func (p *Info) getDiskTotal() uint64 {
 	}
 	return maxSpaceInByte
 }
-
-// getDiskUsage gets the disk total space which is set in config
-func getFreeSpace() {
-	return
-}
