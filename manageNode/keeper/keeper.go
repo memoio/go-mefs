@@ -17,7 +17,6 @@ import (
 	"github.com/lni/dragonboat/v3"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/proto"
-	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
@@ -124,16 +123,6 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
 		return nil, err
-	}
-
-	rootpath, _ := fsrepo.BestKnownPath()
-	m.dnh = raft.StartHost(rootpath)
-	if m.dnh != nil {
-		m.enableBft = true
-		utils.MLogger.Info("Use bft mode")
-	} else {
-		m.enableBft = false
-		utils.MLogger.Info("Use simple mode")
 	}
 
 	// cache userconfigs, key is queryID
