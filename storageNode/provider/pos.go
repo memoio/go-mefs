@@ -183,10 +183,11 @@ func (p *Info) traversePath(gc bool) {
 		utils.MLogger.Info("clean pos blocks first")
 	}
 
-	exist := false
+	notfound := 0
 	var res strings.Builder
 	sid := 0
 	for sid = 0; ; sid++ {
+		notfound = 0
 		for i := 0; i < pos.Reps; i++ {
 			res.Reset()
 			res.WriteString(groupID)
@@ -197,14 +198,12 @@ func (p *Info) traversePath(gc bool) {
 			res.WriteString(metainfo.BlockDelimiter)
 			res.WriteString(strconv.Itoa(i))
 			ncid := cid.NewCidV2([]byte(res.String()))
-			isExist, err := p.ds.BlockStore().Has(ncid)
+			exist, err := p.ds.BlockStore().Has(ncid)
 			if err != nil {
 				utils.MLogger.Infof("pos has %s failed: %s", res.String(), err)
-				exist = false
+				notfound++
 				continue
 			}
-
-			exist = isExist
 
 			if exist {
 				if gc {
@@ -213,11 +212,11 @@ func (p *Info) traversePath(gc bool) {
 					p.StoragePosUsed += uint64(pos.DLen)
 				}
 			} else {
+				notfound++
 				utils.MLogger.Infof("pos not has %s", res.String())
-				break
 			}
 		}
-		if !exist {
+		if notfound >= pos.Reps {
 			break
 		}
 	}
