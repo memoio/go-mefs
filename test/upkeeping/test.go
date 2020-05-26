@@ -76,6 +76,10 @@ func ukTest() error {
 		}
 	}
 
+	if kBalanceMap[kAddrList[0]].Cmp(big.NewInt(moneyTo)) < 0 {
+		test.TransferTo(big.NewInt(moneyTo), kAddrList[0].String(), ethEndPoint, qethEndPoint)
+	}
+
 	log.Println("kSkList:", kSkList[0])
 
 	pAddrList := []common.Address{}
