@@ -798,7 +798,7 @@ func CheckTx(tx *types.Transaction) error {
 		if receipt != nil {
 			break
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(60 * time.Second)
 	}
 
 	if receipt == nil { //30分钟获取不到交易信息，判定交易失败

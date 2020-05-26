@@ -199,7 +199,7 @@ func (p *Info) traversePath(gc bool) {
 			ncid := cid.NewCidV2([]byte(res.String()))
 			exist, err := p.ds.BlockStore().Has(ncid)
 			if err != nil {
-				utils.MLogger.Infof("has %s failed: %s", res.String(), err)
+				utils.MLogger.Infof("pos has %s failed: %s", res.String(), err)
 				continue
 			}
 
@@ -210,7 +210,7 @@ func (p *Info) traversePath(gc bool) {
 					p.StoragePosUsed += uint64(pos.DLen)
 				}
 			} else {
-				utils.MLogger.Infof("not has %s", res.String())
+				utils.MLogger.Infof("pos not has %s", res.String())
 				break
 			}
 		}

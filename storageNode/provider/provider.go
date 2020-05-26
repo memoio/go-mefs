@@ -185,7 +185,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	m.StorageTotal = m.getDiskTotal()
 
 	if m.LocalStorageTotal < m.StorageTotal {
-		utils.MLogger.Error(m.localID, "pledge space %d, but local has %d", m.StorageTotal, m.LocalStorageTotal)
+		utils.MLogger.Errorf("%s has pledge space %d, but local storage has %d", m.localID, m.StorageTotal, m.LocalStorageTotal)
 	}
 
 	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
