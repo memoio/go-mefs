@@ -197,11 +197,14 @@ func (p *Info) traversePath(gc bool) {
 			res.WriteString(metainfo.BlockDelimiter)
 			res.WriteString(strconv.Itoa(i))
 			ncid := cid.NewCidV2([]byte(res.String()))
-			exist, err := p.ds.BlockStore().Has(ncid)
+			isExist, err := p.ds.BlockStore().Has(ncid)
 			if err != nil {
 				utils.MLogger.Infof("pos has %s failed: %s", res.String(), err)
+				exist = false
 				continue
 			}
+
+			exist = isExist
 
 			if exist {
 				if gc {
