@@ -216,6 +216,7 @@ func (p *Info) traversePath(gc bool) {
 				utils.MLogger.Infof("pos not has %s", res.String())
 			}
 		}
+
 		if notfound >= pos.Reps {
 			break
 		}

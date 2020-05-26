@@ -3,8 +3,10 @@ package provider
 import (
 	mcl "github.com/memoio/go-mefs/bls12"
 	mpb "github.com/memoio/go-mefs/proto"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -59,7 +61,26 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 
 // getDiskUsage gets the disk usage
 func (p *Info) getDiskUsage() (uint64, error) {
-	return datastore.DiskUsage(p.ds.DataStore())
+	used, err := datastore.DiskUsage(p.ds.DataStore())
+	if err != nil {
+		return 0, err
+	}
+
+	rootpath, err := fsrepo.BestKnownPath()
+	if err != nil {
+		return 0, err
+	}
+
+	localUsed, err := utils.GetDirSize(rootpath)
+	if err != nil {
+		return 0, err
+	}
+
+	if used >= localUsed {
+		return localUsed, nil
+	}
+
+	return used, nil
 }
 
 // getDiskTotal gets the disk total space which is set in config
