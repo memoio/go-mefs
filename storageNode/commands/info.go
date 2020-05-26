@@ -50,6 +50,10 @@ var InfoCmd = &cmds.Command{
 			return err
 		}
 
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
 		localID := node.Identity.Pretty()
 		localAddr, err := address.GetAddressFromID(localID)
 		if err != nil {

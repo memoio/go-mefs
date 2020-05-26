@@ -182,6 +182,8 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		return nil, err
 	}
 
+	m.StorageTotal = m.getDiskTotal()
+
 	if m.LocalStorageTotal < m.StorageTotal {
 		utils.MLogger.Error(m.localID, "pledge space %d, but local has %d", m.StorageTotal, m.LocalStorageTotal)
 	}
