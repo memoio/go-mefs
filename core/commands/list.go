@@ -180,6 +180,10 @@ var proCmd = &cmds.Command{
 				continue
 			}
 
+			if ki.Capacity <= 0 {
+				continue
+			}
+
 			kaddr, err := address.GetAddressFromID(ki.ProviderID)
 			if err != nil {
 				continue

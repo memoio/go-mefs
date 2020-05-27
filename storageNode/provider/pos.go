@@ -255,7 +255,11 @@ func (p *Info) doGenerateOrDelete() {
 	utils.MLogger.Info("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
 
 	if ratio < lowWater && freeRatio > (1-lowWater) {
-		p.generatePosBlocks(uint64(float64(totalSpace) * (lowWater - ratio)))
+		generateSpace := uint64(float64(totalSpace) * (lowWater - ratio))
+		if generateSpace > uint64(pos.Reps)*uint64(pos.DLen)*30 {
+			generateSpace = uint64(pos.Reps) * uint64(pos.DLen) * 30
+		}
+		p.generatePosBlocks(generateSpace)
 		return
 	}
 
