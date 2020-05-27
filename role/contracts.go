@@ -213,7 +213,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 		isProvider, isBanned, money, stime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, proAddress)
 		if err != nil {
 			if retryCount > 10 {
-				return item, nil
+				return item, err
 			}
 			time.Sleep(30 * time.Second)
 			continue
@@ -221,14 +221,10 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 
 		price, err := proInstance.GetPrice(&bind.CallOpts{From: localAddress})
 		if err != nil {
-			if retryCount > 10 {
-				return item, nil
-			}
-			time.Sleep(30 * time.Second)
-			continue
+			return item, err
 		}
 
-		cap := utils.DepositCapacity
+		cap := int64(0)
 		weiPrice := new(big.Float).SetInt(price)
 		weiPrice.Quo(weiPrice, GetMemoPrice())
 		weiPrice.Int(price)

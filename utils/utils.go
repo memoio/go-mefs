@@ -46,8 +46,8 @@ const (
 	DefaultOfferCapacity int64 = 1000000 //MB
 	// DefaultOfferDuration is provider； 100 days
 	DefaultOfferDuration int64 = 100 // day
-	// DepositCapacity is provider deposit capacity
-	DepositCapacity int64 = 1000000 // MB
+	// DepositCapacity is provider deposit capacity, 1TB
+	DepositCapacity int64 = 1048576 // MB
 
 	// Token2Wei is 1token = 10^18 wei
 	// samely Dollar is 10^18 WeiDollar

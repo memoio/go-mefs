@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	adminSk  = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
-	codeName = "whoisyourdaddy"
+	adminSk   = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
+	codeName  = "whoisyourdaddy"
+	adminAddr = "0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6"
 )
 
 type StringList struct {
@@ -211,7 +212,7 @@ var setKeeperPriceCmd = &cmds.Command{
 	},
 
 	Options: []cmds.Option{ //选项列表
-		cmds.Int64Option("price", "price", "price").WithDefault(utils.KeeperDeposit),
+		cmds.Int64Option("depositPrice", "price", "deposit price").WithDefault(utils.KeeperDeposit),
 		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
@@ -232,13 +233,22 @@ var setKeeperPriceCmd = &cmds.Command{
 
 		hexPk := adminSk
 
-		price, ok := req.Options["price"].(int64)
+		price, ok := req.Options["depositPrice"].(int64)
 		if !ok || price <= 0 {
 			price = utils.KeeperDeposit
 		}
-		localAddr := common.HexToAddress(req.Arguments[0][2:])
 
-		err := contracts.SetKeeperPrice(localAddr, hexPk, big.NewInt(price))
+		localAddr := common.HexToAddress(adminAddr[2:])
+
+		oldPrice, err := contracts.GetProviderPrice(localAddr)
+		if err != nil {
+			fmt.Println("get Keeper price err:", err)
+			return err
+		}
+
+		fmt.Println("old deposit price is:", oldPrice)
+
+		err = contracts.SetKeeperPrice(localAddr, hexPk, big.NewInt(price))
 		if err != nil {
 			fmt.Println("setKeeper price err:", err)
 			return err
@@ -345,7 +355,7 @@ var setProviderPriceCmd = &cmds.Command{
 	},
 
 	Options: []cmds.Option{ //选项列表
-		cmds.Int64Option("price", "price", "price").WithDefault(utils.ProviderDeposit),
+		cmds.Int64Option("depositPrice", "price", "deposit price").WithDefault(utils.ProviderDeposit),
 		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
@@ -366,13 +376,21 @@ var setProviderPriceCmd = &cmds.Command{
 
 		hexPk := adminSk
 
-		price, ok := req.Options["price"].(int64)
-		if !ok || price <= 0 {
-			price = utils.ProviderDeposit
+		dprice, ok := req.Options["depositPrice"].(int64)
+		if !ok || dprice <= 0 {
+			dprice = utils.ProviderDeposit
 		}
-		localAddr := common.HexToAddress(req.Arguments[0][2:])
+		localAddr := common.HexToAddress(adminAddr[2:])
 
-		err := contracts.SetProviderPrice(localAddr, hexPk, big.NewInt(price))
+		oldPrice, err := contracts.GetProviderPrice(localAddr)
+		if err != nil {
+			fmt.Println("get Provider price err:", err)
+			return err
+		}
+
+		fmt.Println("old deposit price is:", oldPrice)
+
+		err = contracts.SetProviderPrice(localAddr, hexPk, big.NewInt(dprice))
 		if err != nil {
 			fmt.Println("set Provider price err:", err)
 			return err
