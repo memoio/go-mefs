@@ -169,13 +169,17 @@ func ByteSliceToString(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
+// GetDirSize gets dir size
 func GetDirSize(path string) (uint64, error) {
 	var size uint64
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !info.IsDir() {
 			size += uint64(info.Size())
 		}
-		return err
+		return nil
 	})
 	return size, err
 }

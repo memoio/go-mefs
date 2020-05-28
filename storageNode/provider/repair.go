@@ -137,7 +137,8 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	}
 
 	if off != segNeed {
-		utils.MLogger.Warnf("Block %s length is not right", blockID)
+		utils.MLogger.Warnf("Block %s length is not right, need %d, but got %d", blockID, segNeed, off)
+		return role.ErrEmptyData
 	}
 
 	ok, err := df.VerifyBlockLength(newstripe[nbid], 0, segNeed)
