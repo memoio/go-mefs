@@ -4,7 +4,10 @@ import (
 	"errors"
 )
 
-const Debug = false
+const (
+	Debug          = false
+	SessionExpTime = int64(30 * 60)
+)
 
 var (
 	ErrNotEnoughBalance = errors.New("balance is insufficient")

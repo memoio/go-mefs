@@ -10,10 +10,6 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-const (
-	expireTime = int64(30 * 60)
-)
-
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	value, ok := p.userConfigs.Get(groupID)
 	if ok {
