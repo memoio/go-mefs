@@ -108,11 +108,21 @@ func main() {
 	log.Println("share link is ", slink)
 
 	log.Println("======9. begin to kill user======")
-	res, err := sh.Kill(addr)
-	if err != nil {
-		log.Fatal("kill user ", addr, " fails ", err)
+
+	retry := 0
+	for {
+		retry++
+		res, err := sh.Kill(addr)
+		if err != nil {
+			if retry > 5 {
+				log.Fatal("kill user ", addr, " fails ", err)
+			}
+			time.Sleep(27 * time.Second)
+			continue
+		}
+		log.Println(res.ChildLists[0])
+		break
 	}
-	log.Println(res.ChildLists[0])
 
 	log.Println("======10. begin to create another account======")
 	testuser2, err := sh.CreateUser()
