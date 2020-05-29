@@ -296,7 +296,7 @@ func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance
 				log.Println("get addr from indexer err: ", err)
 				return indexerAddr, ownAddr, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 			continue
 		}
 
@@ -410,7 +410,7 @@ func GetAddrFromResolver(localAddress common.Address, ownerAddress common.Addres
 				log.Println("getMapperAddrErr:", err)
 				return mapperAddr, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 			continue
 		}
 		if len(mapperAddr) == 0 || mapperAddr.String() == InvalidAddr {
@@ -444,7 +444,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 				log.Println("deploy Mapper to indexer Err:", err)
 				return mapperAddr, mapperInstance, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 			continue
 		}
 
@@ -495,7 +495,7 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 
 		addrGetted, err := GetAddrsFromMapper(localAddress, mapperInstance)
 		if err != nil {
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 			continue
 		}
 
@@ -519,13 +519,16 @@ func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapp
 				log.Println("get addr from mapper:", err)
 				return nil, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 			continue
 		}
 		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
 			return channels, nil
 		}
 
+		if retryCount < 3 {
+			continue
+		}
 		log.Println("get empty addr from mapper")
 		return nil, ErrEmpty
 	}

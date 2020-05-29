@@ -112,7 +112,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 			}
 			p.ds.PutKey(ctx, km.ToString(), cItem.Sig, nil, "local")
 
-			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) {
+			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) && cItem.Money.Sign() > 0 {
 				cSign := new(mpb.ChannelSign)
 				err = proto.Unmarshal(cItem.Sig, cSign)
 				if err != nil {
@@ -122,6 +122,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 				// need verify value again;
 				err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
 				if err != nil {
+					utils.MLogger.Errorf("close channel %s err: %s", cItem.ChannelID, err)
 					continue
 				}
 
@@ -140,6 +141,50 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 	gp := p.getGroupInfo(userID, groupID, false)
 	if gp != nil && gp.userID != gp.groupID {
 		ctx := p.context
+
+		for _, proID := range gp.providers {
+			chanIDs, err := role.GetAllChannels(userID, groupID, proID)
+			if err != nil {
+				continue
+			}
+
+			clen := len(chanIDs)
+
+			for i := 0; i < clen-1; i++ {
+				ba, err := role.QueryBalance(chanIDs[i])
+				if err != nil {
+					continue
+				}
+
+				if ba.Sign() <= 0 {
+					continue
+				}
+
+				km, err := metainfo.NewKey(p.localID, mpb.KeyType_Channel, chanIDs[i])
+				if err != nil {
+					continue
+				}
+
+				valueByte, err := p.ds.GetKey(ctx, km.ToString(), "local")
+				if err != nil {
+					utils.MLogger.Error("get channel value from local fails: ", err)
+					continue
+				}
+
+				cSign := &mpb.ChannelSign{}
+				err = proto.Unmarshal(valueByte, cSign)
+				if err != nil {
+					utils.MLogger.Error("proto.Unmarshal channelSign err:", err)
+					continue
+				}
+
+				err = role.CloseChannel(chanIDs[i], p.sk, cSign.GetSig(), new(big.Int).SetBytes(cSign.GetValue()))
+				if err != nil {
+					utils.MLogger.Errorf("close channel %s err: %s", chanIDs[i], err)
+					continue
+				}
+			}
+		}
 
 		chs := gp.getChannels()
 		for _, ch := range chs {
@@ -177,8 +222,10 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				cItem.Sig = valueByte
 			}
 
+			cItem.Money = role.GetBalance(cItem.ChannelID)
+
 			// close before timeout
-			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) {
+			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) && cItem.Money.Sign() > 0 {
 				cSign := new(mpb.ChannelSign)
 				err = proto.Unmarshal(cItem.Sig, cSign)
 				if err != nil {
@@ -188,6 +235,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				// need verify value again;
 				err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
 				if err != nil {
+					utils.MLogger.Errorf("close channel %s err: %s", cItem.ChannelID, err)
 					continue
 				}
 

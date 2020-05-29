@@ -500,22 +500,20 @@ func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte
 		if newValue.Cmp(cItem.Money) > 0 {
 			utils.MLogger.Infof("need to redeploy channel contract for %s, has balance %d, need %d ", cItem.ProID, cItem.Money, newValue)
 
-			err := role.KillChannel(cItem.ChannelID, hexSK)
+			chanID, err := role.DeployChannel(do.group.shareToID, do.group.groupID, pInfo.providerID, do.group.privKey, do.group.storeDays, do.group.storeSize/int64(do.group.providerSLA), true)
 			if err != nil {
-				utils.MLogger.Errorf("close channel %s fails: %s", cItem.ChannelID, err)
+				return nil, nil, err
 			}
 
-			oldChannelID := cItem.ChannelID
+			gotItem, err := role.GetChannelInfo(do.group.shareToID, chanID)
+			if err != nil {
+				return nil, nil, err
+			}
 
-			do.group.loadContracts(context.Background(), pInfo.providerID)
+			pInfo.chanItem = &gotItem
 
 			cItem = pInfo.chanItem
 			newValue = readPrice
-
-			if oldChannelID == cItem.ChannelID {
-				utils.MLogger.Infof("fails to change channel from: %s", oldChannelID)
-				return nil, nil, role.ErrNoContract
-			}
 
 			if newValue.Cmp(cItem.Money) > 0 {
 				return nil, nil, role.ErrNotEnoughBalance

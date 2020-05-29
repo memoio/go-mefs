@@ -1044,6 +1044,40 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 	return item, nil
 }
 
+func GetAllChannels(userID, queryID, proID string) ([]string, error) {
+	utils.MLogger.Debugf("get channel for user %s, provider %s, and query %s", userID, proID, queryID)
+	userAddr, err := address.GetAddressFromID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	queryAddr, err := address.GetAddressFromID(queryID)
+	if err != nil {
+		return nil, err
+	}
+
+	proAddr, err := address.GetAddressFromID(proID)
+	if err != nil {
+		return nil, err
+	}
+
+	channelAddrs, err := contracts.GetChannelAddrs(userAddr, userAddr, proAddr, queryAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []string
+	for _, cAddr := range channelAddrs {
+		channelID, err := address.GetIDFromAddress(cAddr.String())
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, channelID)
+	}
+
+	return res, nil
+}
+
 //SignForChannel user sends a private key signature to the provider
 func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err error) {
 	channelAddr, err := address.GetAddressFromID(channelID)
