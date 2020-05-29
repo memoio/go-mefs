@@ -496,13 +496,20 @@ func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte
 		readPrice.Mul(readPrice, big.NewInt(int64(readLen)))
 		readPrice.Quo(readPrice, big.NewInt(1024*1024))
 
-		newValue := new(big.Int).Add(readPrice, cItem.Value) //100 + valueBase
+		newValue := new(big.Int).Add(readPrice, cItem.Value)
 		if newValue.Cmp(cItem.Money) > 0 {
 			utils.MLogger.Infof("need to redeploy channel contract for %s, contract has balance %d, need %d ", cItem.ProID, cItem.Money, newValue)
+
+			oldChanID := cItem.ChannelID
 
 			chanID, err := role.DeployChannel(do.group.shareToID, do.group.groupID, pInfo.providerID, do.group.privKey, do.group.storeDays, do.group.storeSize/int64(do.group.providerSLA), true)
 			if err != nil {
 				return nil, nil, err
+			}
+
+			if chanID == oldChanID {
+				utils.MLogger.Infof("channel %s has not changed", cItem.ChannelID)
+				return nil, nil, role.ErrEmptyData
 			}
 
 			gotItem, err := role.GetChannelInfo(do.group.shareToID, chanID)
@@ -516,6 +523,7 @@ func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte
 			newValue = readPrice
 
 			if newValue.Cmp(cItem.Money) > 0 {
+				utils.MLogger.Infof("channel %s has money %d, but need %d", cItem.ChannelID, cItem.Money, newValue)
 				return nil, nil, role.ErrNotEnoughBalance
 			}
 		}

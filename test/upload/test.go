@@ -65,7 +65,13 @@ func uploadTest(count int) error {
 		return err
 	}
 
-	err = sh.StartUser(addr)
+	var startOpts []func(*shell.RequestBuilder) error
+	//set option of bucket
+	startOpts = append(startOpts, shell.SetOp("ks", "3"))
+	startOpts = append(startOpts, shell.SetOp("ps", "6"))
+	startOpts = append(startOpts, shell.SetOp("cap", "600MB"))
+
+	err = sh.StartUser(addr, startOpts...)
 	if err != nil {
 		log.Println("Start user failed :", err)
 		return err
@@ -123,7 +129,7 @@ func uploadTest(count int) error {
 	}
 
 	log.Println("Upload test complete")
-	log.Println("uUpload ", fileNum, " files, ", fileUploadSuccessNum, " files success; rate is: ", fileUploadSuccessNum/count)
+	log.Println("Upload ", fileNum, " files, ", fileUploadSuccessNum, " files success; rate is: ", fileUploadSuccessNum/count)
 
 	//download file
 	fileDownloadSuccessNum := 0

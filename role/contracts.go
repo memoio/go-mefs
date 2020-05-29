@@ -899,7 +899,7 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 
 	utils.MLogger.Info("Finish deploy channel contract: ", chanID)
 
-	return chanID, err
+	return chanID, nil
 }
 
 //GetChannelInfo used to getchannel-contract item
@@ -957,22 +957,6 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 			Value:     big.NewInt(0),
 			Money:     ba,
 		}
-		break
-	}
-
-	retryCount = 0
-	for {
-		retryCount++
-		balance, err := contracts.QueryBalance(chanAddress.String())
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		item.Money = balance
 		return item, nil
 	}
 }
@@ -1122,7 +1106,7 @@ func SignForChannel(channelID, hexKey string, value *big.Int) (sig []byte, err e
 	return mes, nil
 }
 
-//VerifyChannelSig provider used to verify user's signature for channel-contract
+//VerifyChannelSign provider used to verify user's signature for channel-contract
 func VerifyChannelSign(cSign *mpb.ChannelSign) (verify bool) {
 	channelAddr, err := address.GetAddressFromID(cSign.GetChannelID())
 	if err != nil {
