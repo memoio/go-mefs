@@ -20,8 +20,7 @@ const (
 	checkConnTime    = 5 * time.Minute
 	kpMapTime        = 11 * time.Minute
 
-	payInternval   = int64(2 * 60 * 60)
-	sessionExpTime = int64(30 * 60)
+	payInternval = int64(2 * 60 * 60)
 )
 
 // MarketingMoney is used to
