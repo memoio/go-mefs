@@ -315,6 +315,20 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 		if ui != nil {
 			ui.setQuery(gp.groupID)
 		}
+
+		kmsess, err := metainfo.NewKey(groupID, mpb.KeyType_Session, userID)
+		if err != nil {
+			return nil
+		}
+
+		sessByte, err := p.ds.GetKey(p.context, kmsess.ToString(), "local")
+		if err == nil && len(sessByte) > 0 {
+			sID, err := uuid.ParseBytes(sessByte)
+			if err == nil {
+				gp.sessionID = sID
+				gp.sessionTime = time.Now().Unix() - 1500 //
+			}
+		}
 	}
 
 	return gp

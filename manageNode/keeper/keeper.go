@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru"
 	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -853,12 +854,27 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		}
 		k.ukpGroup.Store(qid, gInfo)
 
+		kmsess, err := metainfo.NewKey(uid, mpb.KeyType_Session, qid)
+		if err != nil {
+			return gInfo, err
+		}
+
+		sessByte, err := k.ds.GetKey(k.context, kmsess.ToString(), "local")
+		if err == nil && len(sessByte) > 0 {
+			sID, err := uuid.ParseBytes(sessByte)
+			if err == nil {
+				gInfo.sessionID = sID
+				gInfo.sessionTime = time.Now().Unix() - 1500 //
+			}
+		}
+
 		gInfo.loadContracts(false)
 
 		k.loadUserBucket(uid, qid)
 		k.loadUserBlock(qid)
 		k.loadUserPay(uid, qid)
 		k.loadUserChallenge(uid, qid)
+
 		return gInfo, nil
 	}
 	// init userConfig

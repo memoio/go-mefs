@@ -141,6 +141,14 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 		}
 		gp.sessionID = sessID
 		gp.sessionTime = time.Now().Unix()
+
+		kmsess, err := metainfo.NewKey(gp.groupID, mpb.KeyType_Session, gp.userID)
+		if err != nil {
+			return nil, err
+		}
+
+		p.ds.PutKey(p.context, kmsess.ToString(), []byte(sessID.String()), nil, "local")
+
 		return []byte(sessID.String()), nil
 	}
 

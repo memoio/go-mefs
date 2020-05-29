@@ -438,7 +438,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 				pinfo.chanItem.Value = money
 				pinfo.chanItem.Sig = mes
 				pinfo.chanItem.Dirty = true
-				utils.MLogger.Info("Download success，change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
+				utils.MLogger.Info("Download success, change channel.value: ", pinfo.chanItem.ChannelID, " to: ", money.String())
 				pinfo.Unlock()
 				key, err := metainfo.NewKey(pinfo.providerID, mpb.KeyType_Channel, pinfo.chanItem.ChannelID)
 				if err == nil {
@@ -498,7 +498,7 @@ func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte
 
 		newValue := new(big.Int).Add(readPrice, cItem.Value) //100 + valueBase
 		if newValue.Cmp(cItem.Money) > 0 {
-			utils.MLogger.Infof("need to redeploy channel contract for %s, has balance %d, need %d ", cItem.ProID, cItem.Money, newValue)
+			utils.MLogger.Infof("need to redeploy channel contract for %s, contract has balance %d, need %d ", cItem.ProID, cItem.Money, newValue)
 
 			chanID, err := role.DeployChannel(do.group.shareToID, do.group.groupID, pInfo.providerID, do.group.privKey, do.group.storeDays, do.group.storeSize/int64(do.group.providerSLA), true)
 			if err != nil {
