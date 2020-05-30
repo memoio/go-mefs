@@ -682,7 +682,6 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 				}
 				channelAddr = append(channelAddr, chanAddr)
 			}
-
 		}
 	}
 
@@ -736,7 +735,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 			sIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, storageBlock, endBlock)
 			if err != nil {
-				utils.MLogger.Info("getukpaylog err:", err)
+				utils.MLogger.Info("get ukpay log err:", err)
 				break
 			}
 
@@ -768,7 +767,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 			sIncome, _, err := contracts.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
 			if err != nil {
-				utils.MLogger.Info("getukpaylog err:", err)
+				utils.MLogger.Info("get pos ukpay log err:", err)
 				break
 			}
 
@@ -797,9 +796,9 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 				endBlock = readBlock + 1024
 			}
 
-			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, readBlock, endBlock)
+			sIncome, _, err := contracts.GetReadIncome(chanAddrs, localAddr, readBlock, endBlock)
 			if err != nil {
-				utils.MLogger.Info("getukpaylog err:", err)
+				utils.MLogger.Info("get readpay log err:", err)
 				break
 			}
 
