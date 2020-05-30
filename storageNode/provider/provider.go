@@ -730,8 +730,8 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > storageBlock+128 {
-				endBlock = storageBlock + 128
+			if endBlock > storageBlock+1024 {
+				endBlock = storageBlock + 1024
 			}
 
 			sIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, storageBlock, endBlock)
@@ -762,8 +762,8 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > posBlock+128 {
-				endBlock = posBlock + 128
+			if endBlock > posBlock+1024 {
+				endBlock = posBlock + 1024
 			}
 
 			sIncome, _, err := contracts.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
@@ -793,8 +793,8 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 		endBlock = latestBlock
 		for endBlock <= latestBlock {
-			if endBlock > readBlock+128 {
-				endBlock = readBlock + 128
+			if endBlock > readBlock+1024 {
+				endBlock = readBlock + 1024
 			}
 
 			sIncome, _, err := contracts.GetReadIncome(ukaddrs, localAddr, readBlock, endBlock)

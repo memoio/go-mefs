@@ -119,6 +119,10 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 					continue
 				}
 
+				if cItem.Value.Sign() == 0 {
+					continue
+				}
+
 				// need verify value again;
 				err = role.CloseChannel(cItem.ChannelID, p.sk, cSign.GetSig(), cItem.Value)
 				if err != nil {
@@ -178,7 +182,12 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 					continue
 				}
 
-				err = role.CloseChannel(chanIDs[i], p.sk, cSign.GetSig(), new(big.Int).SetBytes(cSign.GetValue()))
+				cValue := new(big.Int).SetBytes(cSign.GetValue())
+				if cValue.Sign() == 0 {
+					continue
+				}
+
+				err = role.CloseChannel(chanIDs[i], p.sk, cSign.GetSig(), cValue)
 				if err != nil {
 					utils.MLogger.Errorf("close channel %s err: %s", chanIDs[i], err)
 					continue
@@ -229,6 +238,10 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				cSign := new(mpb.ChannelSign)
 				err = proto.Unmarshal(cItem.Sig, cSign)
 				if err != nil {
+					continue
+				}
+
+				if cItem.Value.Sign() == 0 {
 					continue
 				}
 
