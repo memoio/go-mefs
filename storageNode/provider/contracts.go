@@ -193,7 +193,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				continue
 			}
 			cItem := ci.(*role.ChannelItem)
-			if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+			if cItem.Money.Sign() == 0 {
 				continue
 			}
 
@@ -294,7 +294,7 @@ func (g *groupInfo) loadContracts(proID string, mode bool) error {
 		return err
 	}
 
-	if cItem.Money.Cmp(big.NewInt(0)) > 0 {
+	if cItem.Money.Sign() > 0 {
 		g.channel.Store(cItem.ChannelID, &cItem)
 	}
 
@@ -320,7 +320,7 @@ func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {
 			return nil
 		}
 
-		if cItem.Money.Cmp(big.NewInt(0)) > 0 {
+		if cItem.Money.Sign() > 0 {
 			g.channel.Store(chanID, &cItem)
 			return &cItem
 		}
@@ -330,7 +330,7 @@ func (g *groupInfo) getChanItem(localID, chanID string) *role.ChannelItem {
 
 	cItem := cv.(*role.ChannelItem)
 
-	if cItem.Money.Cmp(big.NewInt(0)) == 0 {
+	if cItem.Money.Sign() == 0 {
 		g.channel.Delete(chanID)
 	}
 

@@ -119,7 +119,6 @@ func (p *Info) handleGetBlock(km *metainfo.Key, metaValue, sig []byte, from stri
 		if value != nil {
 			if cItem.Money.Cmp(big.NewInt(0)) == 0 || value.Cmp(cItem.Money) > 0 {
 				utils.MLogger.Errorf("verify sig for block %s failed, money is not enough, has %s, expected %s", splitedNcid[0], cItem.Money.String(), value.String())
-				go p.loadChannelValue(gp.userID, gp.groupID)
 				return nil, role.ErrNotEnoughBalance
 			}
 		}

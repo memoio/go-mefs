@@ -661,16 +661,29 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 			ukAddr = append(ukAddr, tmp)
 		}
 
-		gp.channel.Range(func(key, value interface{}) bool {
-			cItem, ok := value.(*role.ChannelItem)
-			if !ok {
-				return true
+		for _, proID := range gp.providers {
+			chanIDs, err := role.GetAllChannels(pu.uid, pu.qid, proID)
+			if err != nil {
+				continue
 			}
-			if cItem.ProID == p.localID {
-				channelAddr = append(channelAddr)
+			for _, chanID := range chanIDs {
+				ba, err := role.QueryBalance(chanID)
+				if err != nil {
+					continue
+				}
+
+				if ba.Sign() > 0 {
+					continue
+				}
+
+				chanAddr, err := address.GetAddressFromID(chanID)
+				if err != nil {
+					continue
+				}
+				channelAddr = append(channelAddr, chanAddr)
 			}
-			return true
-		})
+
+		}
 	}
 
 	if len(posAddr) == 0 {
