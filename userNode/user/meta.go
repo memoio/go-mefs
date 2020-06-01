@@ -201,20 +201,26 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 	}
 
 	remoteSb := mpb.SuperBlockInfo{}
-	rdata, _ := l.getDataFromBlock(int(defaultMetaBackupCount), "0", "0")
-	if len(rdata) > 0 {
-		sdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
-		err := sdReader.ReadMsg(&remoteSb)
-		if err != nil {
-			utils.MLogger.Info("Protobuf ReadMsg remote fail: ", err)
+	rdatas, err := l.getDataFromBlock(int(defaultMetaBackupCount), "0", "0")
+	if err == nil {
+		for _, rdata := range rdatas {
+			if len(rdata) == 0 {
+				continue
+			}
+			sdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
+			err := sdReader.ReadMsg(&remoteSb)
+			if err != nil {
+				utils.MLogger.Info("Protobuf ReadMsg remote fail: ", err)
+				continue
+			}
+			if l.meta.sb.GetNextBucketID() < remoteSb.GetNextBucketID() || (l.meta.sb.GetNextBucketID() == remoteSb.GetNextBucketID() && len(l.meta.sb.GetLRoot()) < len(remoteSb.GetLRoot())) {
+				// remote has newer
+				utils.MLogger.Info("remote superblock has newer buckets: ", remoteSb.GetNextBucketID()-1)
+				l.meta.sb.SuperBlockInfo = remoteSb
+				l.meta.sb.dirty = true
+			}
 		}
-	}
 
-	if l.meta.sb.GetNextBucketID() < remoteSb.GetNextBucketID() || (l.meta.sb.GetNextBucketID() == remoteSb.GetNextBucketID() && len(l.meta.sb.GetLRoot()) < len(remoteSb.GetLRoot())) {
-		// remote has newer
-		utils.MLogger.Info("remote superblock has newer buckets: ", remoteSb.GetNextBucketID()-1)
-		l.meta.sb.SuperBlockInfo = remoteSb
-		l.meta.sb.dirty = true
 	}
 
 	// verify at start
@@ -238,7 +244,7 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 		}
 	}
 
-	if !localHas && len(rdata) == 0 {
+	if !localHas && len(rdatas) == 0 {
 		utils.MLogger.Warn("Cannot load Lfs superblock.")
 		return ErrCannotLoadSuperBlock
 	}
@@ -292,22 +298,30 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 		NextObjectID: -1,
 	}
 
-	rdata, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
-	if len(rdata) > 0 {
-		bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
-		err := bdReader.ReadMsg(&remotebucket)
-		if err != nil {
-			utils.MLogger.Info("Protobuf ReadMsg remote fail: ", err)
-		}
-	}
+	rdatas, err := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucketID)), "0")
+	if err == nil && len(rdatas) > 0 {
+		for _, rdata := range rdatas {
+			if len(rdata) == 0 {
+				continue
+			}
 
-	if tsb.GetNextOpID() < remotebucket.GetNextOpID() || (tsb.GetName() != remotebucket.GetName() && remotebucket.GetName() != idName) {
-		tsb = newsuperBucket(remotebucket, false)
-		tsb.mtree.SetIndex(0)
-		tsb.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
-		tsb.Root = tsb.mtree.Root()
-		tsb.dirty = true
-		utils.MLogger.Infof("remote has newer ops %d for bucket %d", remotebucket.GetNextOpID()-1, tsb.GetBucketID())
+			bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
+			err := bdReader.ReadMsg(&remotebucket)
+			if err != nil {
+				utils.MLogger.Info("Protobuf ReadMsg remote fail: ", err)
+				continue
+			}
+
+			if tsb.GetNextOpID() < remotebucket.GetNextOpID() || (tsb.GetName() != remotebucket.GetName() && remotebucket.GetName() != idName) {
+				tsb = newsuperBucket(remotebucket, false)
+				tsb.mtree.SetIndex(0)
+				tsb.mtree.Push([]byte(l.fsID + strconv.FormatInt(bucketID, 10)))
+				tsb.Root = tsb.mtree.Root()
+				tsb.dirty = true
+				utils.MLogger.Infof("remote has newer ops %d for bucket %d", remotebucket.GetNextOpID()-1, tsb.GetBucketID())
+			}
+		}
+
 	}
 
 	if tsb.GetDeletion() {
@@ -341,7 +355,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 
 	utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " has objects: ", bucket.NextObjectID)
 
-	var localOps, remoteOps int64
+	var localOps, remoteOps, remoteMax int64
 	var data []byte
 	op := mpb.OpRecord{}
 	if !update {
@@ -366,34 +380,45 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 		localOps = bucket.applyOpID + 1
 	}
 
-	rdata, _ := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
-	if len(rdata) > 0 {
-		odReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
-		for {
-			err := odReader.ReadMsg(&op)
-			if err != nil {
-				break
-			}
+	remoteMax = localOps
 
-			if op.GetOpType() == mpb.LfsOp_OpErr {
+	rdatas, err := l.getDataFromBlock(int(l.meta.sb.MetaBackupCount), strconv.Itoa(int(-bucket.BucketID)), "1")
+	if err == nil && len(rdatas) > 0 {
+		for _, rdata := range rdatas {
+			if len(rdata) == 0 {
 				continue
 			}
 
-			remoteOps++
-		}
-	}
+			remoteOps = 0
 
-	if localOps < remoteOps {
-		data = rdata
-		utils.MLogger.Infof("remote has newer objects at ops %d in bucket: %d", remoteOps-1, bucket.GetBucketID())
-		bucket.dirty = true
+			odReader := ggio.NewDelimitedReader(bytes.NewBuffer(rdata), len(rdata))
+			for {
+				err := odReader.ReadMsg(&op)
+				if err != nil {
+					break
+				}
+
+				if op.GetOpType() == mpb.LfsOp_OpErr {
+					continue
+				}
+
+				remoteOps++
+			}
+
+			if localOps < remoteOps && remoteMax < remoteOps {
+				remoteMax = remoteOps
+				data = rdata
+				utils.MLogger.Infof("remote has newer objects at ops %d in bucket: %d", remoteOps-1, bucket.GetBucketID())
+				bucket.dirty = true
+			}
+		}
 	}
 
 	if len(data) == 0 && bucket.GetNextOpID() > 0 {
 		return ErrCannotLoadMetaBlock
 	}
 
-	if len(data) > 0 && (!update || localOps < remoteOps) {
+	if len(data) > 0 && (!update || localOps < remoteMax) {
 		if int64(len(data)) < obSize {
 			utils.MLogger.Info("Objects in bucket: ", bucket.BucketID, " miss some objects")
 		}
@@ -621,29 +646,39 @@ func (l *LfsInfo) putDataToBlocks(data []byte, metaBackupCount int, buc, stripe 
 		utils.MLogger.Errorf("user %s lfs %s bucket %s info persist to local failed. ", l.userID, l.fsID, buc)
 		return err
 	}
-	providers, _, err := l.gInfo.GetProviders(ctx, metaBackupCount)
+
+	providers, _, err := l.gInfo.GetProviders(ctx, -1)
 	if err != nil && len(providers) == 0 {
 		return err
 	}
 
-	for j := 0; j < metaBackupCount && j < len(providers); j++ { //
-		bm.SetCid(strconv.Itoa(j))
+	pros := utils.DisorderArray(providers)
+
+	i := 0
+	for j := 0; i < metaBackupCount && j < len(pros); j++ {
+		bm.SetCid(strconv.Itoa(i))
 		ncid := bm.ToString()
 		km, _ := metainfo.NewKey(ncid, mpb.KeyType_Block)
-		err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[j], providers[j])
+		err = l.ds.PutBlock(ctx, km.ToString(), dataEncoded[i], pros[j])
 		if err != nil {
 			continue
 		}
 
-		err = l.gInfo.putDataMetaToKeepers(ctx, ncid, providers[j], int(offset))
+		err = l.gInfo.putDataMetaToKeepers(ctx, ncid, pros[j], int(offset))
 		if err != nil {
 			continue
 		}
+		i++
 	}
+
+	if i < metaBackupCount-1 {
+		utils.MLogger.Infof("No enough online providers for metablock:%s", bm.ToString())
+	}
+
 	return nil
 }
 
-func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]byte, error) {
+func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([][]byte, error) {
 	if l.keySet == nil {
 		return nil, role.ErrEmptyBlsKey
 	}
@@ -653,7 +688,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 		return nil, err
 	}
 
-	var data []byte
+	var data [][]byte
 	ctx := l.context
 
 	bm, err := metainfo.NewBlockMeta(l.fsID, buc, stripe, "0")
@@ -680,39 +715,41 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([]b
 		if err == nil && b != nil { //获取到有效数据块，跳出
 			_, _, _, ok := enc.VerifyBlock(b.RawData(), ncid)
 			if ok {
-				data = b.RawData()
-				if len(data) > 0 {
-					utils.MLogger.Info("Load meta in block: ", ncid, " from provider: ", provider)
-					break
+				if len(b.RawData()) > 0 {
+					res := make([][]byte, 1)
+					res[0] = b.RawData()
+					rdata, err := enc.Decode(res, 0, -1)
+					if err != nil {
+						continue
+					}
+					data = append(data, rdata)
 				}
 			}
 		}
 	}
 
-	if len(data) == 0 {
-		bm.SetCid(strconv.Itoa(0))
-		ncidlocal := bm.ToString()
-		km, _ := metainfo.NewKey(ncidlocal, mpb.KeyType_Block)
-		b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
-		if err == nil && b != nil {
-			_, _, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
-			if ok {
-				data = b.RawData()
+	bm.SetCid(strconv.Itoa(0))
+	ncidlocal := bm.ToString()
+	km, _ := metainfo.NewKey(ncidlocal, mpb.KeyType_Block)
+	b, err := l.ds.GetBlock(ctx, km.ToString(), nil, "local")
+	if err == nil && b != nil {
+		_, _, _, ok := enc.VerifyBlock(b.RawData(), ncidlocal)
+		if ok {
+			if len(b.RawData()) > 0 {
+				res := make([][]byte, 1)
+				res[0] = b.RawData()
+				rdata, err := enc.Decode(res, 0, -1)
+				if err == nil && len(rdata) > 0 {
+					data = append(data, rdata)
+				}
 			}
 		}
 	}
 
 	if len(data) > 0 {
-		res := make([][]byte, 1)
-		res[0] = data
-		data, err = enc.Decode(res, 0, -1)
-		if err != nil {
-			utils.MLogger.Info("Decode data fail: ", err)
-			return nil, err
-		}
-
 		return data, nil
 	}
+
 	return nil, role.ErrEmptyData
 }
 
