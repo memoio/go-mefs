@@ -57,9 +57,13 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		return nil, ErrPolicy
 	}
 
+	if options.DataCount < 1 || options.ParityCount < 1 {
+		return nil, ErrWrongParameters
+	}
+
 	// datacount + parityCount should <= providerSLA
 	if options.DataCount+options.ParityCount > int32(l.gInfo.providerSLA) {
-		utils.MLogger.Errorf("data count and parity count is too large, should not large than provider number %d", l.gInfo.providerSLA)
+		utils.MLogger.Errorf("data and parity count are %d, should not large than provider number %d", options.DataCount+options.ParityCount, l.gInfo.providerSLA)
 		return nil, ErrPolicy
 	}
 

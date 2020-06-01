@@ -173,6 +173,22 @@ func (l *lfsGateway) MakeBucketWithLocation(ctx context.Context, bucket, options
 	err := json.Unmarshal([]byte(options), bucketOptions)
 	if err != nil {
 		bucketOptions = df.DefaultBucketOptions()
+		lfsIns, ok := l.lfs.(*user.LfsInfo)
+		if !ok {
+			return convertToMinioError(errLfsServiceNotReady, "", "")
+		}
+
+		conpro, unconpro, err := lfsIns.GetGroup().GetProviders(ctx, -1)
+		if err != nil {
+			return err
+		}
+
+		proCount := int32(len(conpro) + len(unconpro))
+
+		if proCount < (bucketOptions.GetDataCount() + bucketOptions.GetParityCount()) {
+			bucketOptions.DataCount = proCount - 3
+			bucketOptions.ParityCount = 2
+		}
 	}
 	_, err = l.lfs.CreateBucket(ctx, bucket, bucketOptions)
 
