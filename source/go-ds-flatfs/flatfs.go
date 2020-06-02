@@ -292,7 +292,7 @@ func (fs *Datastore) ShardStr() string {
 
 func (fs *Datastore) encode(key datastore.Key) (dir, file string) {
 	noslash := key.String()[1:]
-	blkInfo, err := metainfo.GetBlockMeta(noslash)
+	blkInfo, err := metainfo.NewBlockFromString(noslash)
 	if err != nil {
 		return "", ""
 	}

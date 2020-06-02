@@ -6,7 +6,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
@@ -23,7 +23,7 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	if err != nil {
 		return nil, err
 	}
-	dtype := km.GetKType()
+	dtype := km.GetKeyType()
 	switch dtype {
 	case mpb.KeyType_UserInit:
 		go k.handleUserInit(km, from)
@@ -122,7 +122,7 @@ func (k *Info) handlePutStPaySign(km *metainfo.Key, metaValue, sig []byte, from 
 		return
 	}
 
-	gp := k.getGroupInfo(ops[0], km.GetMid(), false)
+	gp := k.getGroupInfo(ops[0], km.GetMainID(), false)
 	if gp == nil {
 		return
 	}
@@ -194,7 +194,7 @@ func (k *Info) handleAddBucket(km *metainfo.Key, metaValue, sig []byte, from str
 	}
 
 	k.ds.PutKey(ctx, km.ToString(), metaValue, sig, "local")
-	k.addBucket(km.GetMid(), ops[1], binfo)
+	k.addBucket(km.GetMainID(), ops[1], binfo)
 }
 
 func (k *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from string) {
@@ -213,7 +213,7 @@ func (k *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from str
 func (k *Info) handleAddBlockPos(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleAddBlockPos: ", km.ToString())
 
-	blockID := km.GetMid()
+	blockID := km.GetMainID()
 
 	sValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(sValue) != 2 {
@@ -236,7 +236,7 @@ func (k *Info) handleAddBlockPos(km *metainfo.Key, metaValue, sig []byte, from s
 
 func (k *Info) handleDeleteBlockPos(km *metainfo.Key, metaValue, sig []byte, from string) {
 	utils.MLogger.Info("handleDeleteBlockPos: ", km.ToString())
-	blockID := km.GetMid()
+	blockID := km.GetMainID()
 
 	// delete from local
 	k.ds.DeleteKey(k.context, km.ToString(), "local")
@@ -277,7 +277,7 @@ func (k *Info) handleStorage(km *metainfo.Key, value []byte, pid string) {
 
 func (k *Info) handleExternalAddr(km *metainfo.Key) ([]byte, error) {
 	utils.MLogger.Info("handleExternnalAddr: ", km.ToString())
-	peerID := km.GetMid()
+	peerID := km.GetMainID()
 	addr, err := k.ds.GetExternalAddr(peerID)
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func (k *Info) handleExternalAddr(km *metainfo.Key) ([]byte, error) {
 func (k *Info) handleChalTime(km *metainfo.Key) ([]byte, error) {
 	utils.MLogger.Info("handleChalTime: ", km.ToString())
 
-	blockID := km.GetMid()
+	blockID := km.GetMainID()
 	if len(blockID) <= utils.IDLength {
 		return nil, role.ErrWrongKey
 	}

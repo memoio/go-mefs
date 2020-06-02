@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	df "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -14,7 +14,7 @@ import (
 func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error {
 	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
-	blockID := km.GetMid()
+	blockID := km.GetMainID()
 	ops := km.GetOptions()
 	if len(ops) < 2 {
 		return role.ErrWrongKey

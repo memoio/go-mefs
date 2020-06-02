@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -37,7 +37,7 @@ func (k *Info) handleUserInit(km *metainfo.Key, from string) {
 	}
 
 	uid := options[0]
-	qid := km.GetMid()
+	qid := km.GetMainID()
 	price := big.NewInt(utils.STOREPRICE)
 	var response string
 	if qid != uid {
@@ -171,7 +171,7 @@ func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 	}
 
 	uid := ops[0]
-	qid := km.GetMid()
+	qid := km.GetMainID()
 
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp != nil {
@@ -206,7 +206,7 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue, sig []byte, from stri
 	}
 
 	uid := ops[0]
-	qid := km.GetMid()
+	qid := km.GetMainID()
 
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp != nil {
@@ -257,7 +257,7 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 	}
 
 	uid := ops[0]
-	qid := km.GetMid()
+	qid := km.GetMainID()
 
 	k.fillPinfo(uid, qid, pc, kc, metaValue, from)
 

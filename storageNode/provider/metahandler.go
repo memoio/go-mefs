@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
@@ -22,7 +22,7 @@ func (p *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	if err != nil {
 		return nil, err
 	}
-	dtype := km.GetKType()
+	dtype := km.GetKeyType()
 	switch dtype {
 	case mpb.KeyType_UserStart:
 		return p.handleUserStart(km, metaValue, sig, from)
@@ -102,7 +102,7 @@ func (p *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from str
 func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handleUserStart: ", km.ToString(), " from: ", from)
 
-	gid := km.GetMid()
+	gid := km.GetMainID()
 	ops := km.GetOptions()
 	if len(ops) != 5 {
 		return nil, role.ErrWrongKey
@@ -162,7 +162,7 @@ func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 	if len(ops) != 4 {
 		return nil, role.ErrWrongKey
 	}
-	gid := km.GetMid()
+	gid := km.GetMainID()
 
 	uid := ops[0]
 	gp := p.getGroupInfo(uid, gid, false)
@@ -192,7 +192,7 @@ func (p *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 	}
 
 	uid := ops[0]
-	qid := km.GetMid()
+	qid := km.GetMainID()
 
 	gp := p.getGroupInfo(uid, qid, false)
 	if gp != nil {

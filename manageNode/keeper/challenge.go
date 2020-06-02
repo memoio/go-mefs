@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/bitset"
@@ -495,7 +495,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 
-	qid := km.GetMid()
+	qid := km.GetMainID()
 	userID := ops[0]
 	proID := ops[1]
 	kid := ops[2]

@@ -15,7 +15,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/memoio/go-mefs/contracts"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"

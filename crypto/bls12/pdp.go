@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/gogo/protobuf/proto"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"golang.org/x/crypto/blake2b"
 )
 

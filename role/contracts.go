@@ -14,7 +14,7 @@ import (
 	"github.com/memoio/go-mefs/contracts/market"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"golang.org/x/crypto/sha3"

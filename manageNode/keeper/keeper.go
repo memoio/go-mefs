@@ -17,12 +17,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/lni/dragonboat/v3"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/source/raft"
 	"github.com/memoio/go-mefs/utils"
@@ -400,7 +399,7 @@ func (k *Info) loadUserBucket(uid, qid string) error {
 
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
-		rec := new(recpb.Record)
+		rec := new(mpb.Record)
 		err := proto.Unmarshal(e.Value, rec)
 		if err != nil {
 			continue
@@ -426,7 +425,7 @@ func (k *Info) loadUserBucket(uid, qid string) error {
 		if err != nil {
 			continue
 		}
-		k.addBucket(km.GetMid(), ops[1], binfo)
+		k.addBucket(km.GetMainID(), ops[1], binfo)
 	}
 	return nil
 }
@@ -436,7 +435,7 @@ func (k *Info) loadUserBlock(qid string) error {
 	prefix := qid + metainfo.BlockDelimiter
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
-		rec := new(recpb.Record)
+		rec := new(mpb.Record)
 		err := proto.Unmarshal(e.Value, rec)
 		if err != nil {
 			continue
@@ -464,7 +463,7 @@ func (k *Info) loadUserBlock(qid string) error {
 			continue
 		}
 
-		getID := strings.SplitN(km.GetMid(), metainfo.BlockDelimiter, 2)
+		getID := strings.SplitN(km.GetMainID(), metainfo.BlockDelimiter, 2)
 		if len(getID) != 2 || (len(getID) > 0 && getID[0] != qid) {
 			continue
 		}
@@ -572,7 +571,7 @@ func (k *Info) loadUserChallenge(userID, qid string) error {
 		}
 		chalRes := new(mpb.ChalInfo)
 		for _, e := range es {
-			rec := new(recpb.Record)
+			rec := new(mpb.Record)
 			err := proto.Unmarshal(e.Value, rec)
 			if err != nil {
 				continue
@@ -711,7 +710,7 @@ func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to stri
 	k.ds.PutKey(ctx, key, data, sig, "local")
 
 	if k.enableBft && flag {
-		rec := &recpb.Record{
+		rec := &mpb.Record{
 			Key:       []byte(key),
 			Value:     data,
 			Signature: sig,
@@ -738,7 +737,7 @@ func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64, fla
 			return nil, err
 		}
 
-		rec := new(recpb.Record)
+		rec := new(mpb.Record)
 		err = proto.Unmarshal(res, rec)
 		if err != nil {
 			return nil, err

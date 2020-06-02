@@ -26,12 +26,11 @@ import (
 	goprocess "github.com/jbenet/goprocess"
 	goprocessctx "github.com/jbenet/goprocess/context"
 	kb "github.com/libp2p/go-libp2p-kbucket"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/source/go-libp2p-kad-dht/metrics"
 	opts "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/opts"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
-	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	providers "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/providers"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -159,7 +158,7 @@ func makeDHT(ctx context.Context, h host.Host, dstore ds.Batching, protocols []p
 }
 
 // putValueToPeer stores the given key/value pair at the peer 'p'
-func (dht *KadDHT) putValueToPeer(ctx context.Context, p peer.ID, rec *recpb.Record) error {
+func (dht *KadDHT) putValueToPeer(ctx context.Context, p peer.ID, rec *mpb.Record) error {
 	pmes := pb.NewMessage(pb.Message_PUT_VALUE, rec.Key, 0)
 	pmes.Record = rec
 	rpmes, err := dht.sendRequest(ctx, p, pmes)
@@ -182,7 +181,7 @@ var errInvalidRecord = errors.New("received invalid record")
 // key. It returns either the value or a list of closer peers.
 // NOTE: It will update the dht's peerstore with any new addresses
 // it finds for the given peer.
-func (dht *KadDHT) getValueOrPeers(ctx context.Context, p peer.ID, key string) (*recpb.Record, []*peer.AddrInfo, error) {
+func (dht *KadDHT) getValueOrPeers(ctx context.Context, p peer.ID, key string) (*mpb.Record, []*peer.AddrInfo, error) {
 	pmes, err := dht.getValueSingle(ctx, p, key)
 	if err != nil {
 		return nil, nil, err
@@ -240,7 +239,7 @@ func (dht *KadDHT) getValueSingle(ctx context.Context, p peer.ID, key string) (*
 }
 
 // getLocal attempts to retrieve the value from the datastore
-func (dht *KadDHT) getLocal(key string) (*recpb.Record, error) {
+func (dht *KadDHT) getLocal(key string) (*mpb.Record, error) {
 	logger.Debugf("getLocal %s", key)
 	rec, err := dht.getRecordFromDatastore(mkDsKey(key))
 	if err != nil {
@@ -258,7 +257,7 @@ func (dht *KadDHT) getLocal(key string) (*recpb.Record, error) {
 }
 
 // putLocal stores the key value pair in the datastore
-func (dht *KadDHT) putLocal(key string, rec *recpb.Record) error {
+func (dht *KadDHT) putLocal(key string, rec *mpb.Record) error {
 	logger.Debugf("putLocal: %v %v", key, rec)
 	data, err := proto.Marshal(rec)
 	if err != nil {

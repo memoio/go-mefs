@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
@@ -1112,7 +1112,7 @@ func (g *groupInfo) deleteBlocksFromProvider(ctx context.Context, blockID string
 	}
 
 	// or sent by provider?
-	km.KType = mpb.KeyType_BlockPos
+	km.KeyType = mpb.KeyType_BlockPos
 	for _, kp := range g.tempKeepers {
 		go g.ds.DeleteKey(ctx, km.ToString(), kp)
 	}

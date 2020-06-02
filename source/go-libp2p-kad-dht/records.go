@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 
-	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
+	mpb "github.com/memoio/go-mefs/pb"
 )
 
 // MaxRecordAge specifies the maximum time that any node will hold onto a record
@@ -21,8 +21,8 @@ import (
 const MaxRecordAge = time.Hour * 36
 
 // MakePutRecord creates a dht record for the given key/value pair
-func MakePutRecord(key string, value []byte) *pb.Record {
-	record := new(pb.Record)
+func MakePutRecord(key string, value []byte) *mpb.Record {
+	record := new(mpb.Record)
 	record.Key = []byte(key)
 	record.Value = value
 	return record

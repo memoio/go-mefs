@@ -14,7 +14,7 @@ import (
 
 	"github.com/memoio/go-mefs/core"
 	df "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/userNode/user"
 	rbtree "github.com/memoio/go-mefs/utils/RbTree"

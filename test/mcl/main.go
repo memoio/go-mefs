@@ -1,7 +1,7 @@
 package main
 
 import (
-	mcl "github.com/memoio/go-mefs/bls12"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 )
 
 func main() {

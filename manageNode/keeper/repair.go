@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
@@ -679,7 +679,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 // value: "ok"/pid/offset or "fail"
 func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider string) {
 	utils.MLogger.Info("handleRepairResult: ", km.ToString(), " From:", provider)
-	blockID := km.GetMid()
+	blockID := km.GetMainID()
 	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedValue) != 3 {
 		return

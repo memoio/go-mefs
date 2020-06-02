@@ -14,7 +14,7 @@ import (
 
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"

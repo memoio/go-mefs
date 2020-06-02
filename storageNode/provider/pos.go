@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/bls12"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	df "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"
@@ -127,7 +127,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		utils.MLogger.Info("Get posKM from local error :", err)
 	} else {
 		utils.MLogger.Info("get posKM value: ", string(posValue))
-		cidInfo, err := metainfo.GetBlockMeta(string(posValue))
+		cidInfo, err := metainfo.NewBlockFromString(string(posValue))
 		if err != nil {
 			utils.MLogger.Info("get block meta in posRegular error :", err)
 		} else {

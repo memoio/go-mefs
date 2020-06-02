@@ -10,16 +10,8 @@
 syntax = "proto3";
 package dht.pb;
 
-message Record {
-	// The key that references this record
-	bytes key = 1;
+import "github.com/memoio/go-mefs/pb/mefs.proto";
 
-	// The actual value this record is storing
-	bytes value = 2;
-
-	// A signature for the key+value depends on type
-	bytes signature = 3;
-}
 
 message Message {
 	enum MessageType {
@@ -69,7 +61,7 @@ message Message {
 
 	// Used to return a value
 	// PUT_VALUE, GET_VALUE
-	Record record = 4;
+	mefs.pb.Record record = 4;
 
 	bool errMsg = 5;
 

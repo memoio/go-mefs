@@ -84,8 +84,8 @@ func NewBlockMeta(qid, bid, sid, cid string) (*BlockMeta, error) {
 	}, nil
 }
 
-//GetBlockMeta 对于传入的key进行整理，返回结构体KeyMeta
-func GetBlockMeta(key string) (*BlockMeta, error) {
+//NewBlockFromString convert string to blockmeta
+func NewBlockFromString(key string) (*BlockMeta, error) {
 	splitedKey := strings.Split(key, BlockDelimiter)
 	if len(splitedKey) < 3 {
 		return nil, ErrIllegalKey
@@ -96,23 +96,6 @@ func GetBlockMeta(key string) (*BlockMeta, error) {
 	}
 
 	return NewBlockMeta(splitedKey[0], splitedKey[1], splitedKey[2], splitedKey[3])
-}
-
-//GetCidFromBlock retur cid:
-// if key == uid_bucketid_sid_blockid, returns bucketid_sid_blockid
-// if key == bucketid_sid_blockid, returns bucketid_sid_blockid
-func GetCidFromBlock(key string) (string, error) {
-	splitedKey := strings.Split(key, BlockDelimiter)
-
-	if len(splitedKey) == 3 {
-		return key, nil
-	}
-
-	if len(splitedKey) == 4 {
-		return strings.Join(splitedKey[1:], BlockDelimiter), nil
-	}
-
-	return "", ErrIllegalKey
 }
 
 // GetIDsFromBlock returns bucketid;

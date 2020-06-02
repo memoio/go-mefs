@@ -1,7 +1,7 @@
 package user
 
 import (
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -15,14 +15,14 @@ func (u *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		return nil, err
 	}
 
-	keytype := km.GetKType()
+	keytype := km.GetKeyType()
 	switch keytype {
 	case mpb.KeyType_UserInit: //handle init response from keeper
 		switch opType {
 		case mpb.OpType_Put:
-			fs, ok := u.fsMap.Load(km.GetMid())
+			fs, ok := u.fsMap.Load(km.GetMainID())
 			if !ok {
-				utils.MLogger.Warn("no lfs for: ", km.GetMid())
+				utils.MLogger.Warn("no lfs for: ", km.GetMainID())
 			}
 			go fs.(*LfsInfo).gInfo.handleUserInit(u.context, km, metaValue, from)
 		default:

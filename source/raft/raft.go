@@ -24,7 +24,7 @@ import (
 	"github.com/lni/dragonboat/v3/logger"
 	sm "github.com/lni/dragonboat/v3/statemachine"
 	"github.com/lni/goutils/fileutil"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/source/gorocksdb"
 )

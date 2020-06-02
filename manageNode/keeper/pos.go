@@ -3,7 +3,7 @@ package keeper
 import (
 	"strings"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -24,7 +24,7 @@ func (k *Info) handlePosGet(km *metainfo.Key, val []byte, from string) {
 		utils.MLogger.Info("handlePosGet error! from!=km.mid")
 	}
 
-	gp := k.getGroupInfo(ops[0], km.GetMid(), true)
+	gp := k.getGroupInfo(ops[0], km.GetMainID(), true)
 	if gp == nil {
 		return
 	}
@@ -36,7 +36,7 @@ func (k *Info) handlePosGet(km *metainfo.Key, val []byte, from string) {
 		}
 	}
 
-	err := k.ukAddProvider(ops[0], km.GetMid(), pid)
+	err := k.ukAddProvider(ops[0], km.GetMainID(), pid)
 	if err != nil {
 		utils.MLogger.Info("handlePos Add provider err:", err)
 	}
@@ -56,7 +56,7 @@ func (k *Info) handlePosAdd(km *metainfo.Key, metaValue []byte, from string) {
 		return
 	}
 
-	gp := k.getGroupInfo(ops[0], km.GetMid(), true)
+	gp := k.getGroupInfo(ops[0], km.GetMainID(), true)
 	if gp == nil {
 		return
 	}
@@ -70,7 +70,7 @@ func (k *Info) handlePosAdd(km *metainfo.Key, metaValue []byte, from string) {
 			continue
 		}
 
-		err = k.addBlockMeta(km.GetMid(), blockID, from, off, true)
+		err = k.addBlockMeta(km.GetMainID(), blockID, from, off, true)
 		if err != nil {
 			continue
 		}
@@ -101,7 +101,7 @@ func (k *Info) handlePosDelete(km *metainfo.Key, metaValue []byte, from string) 
 			continue
 		}
 		//再删除内存中信息
-		bm, err := metainfo.GetBlockMeta(blockID)
+		bm, err := metainfo.NewBlockFromString(blockID)
 		if err != nil {
 			continue
 		}

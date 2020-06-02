@@ -10,7 +10,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils"
 	rbtree "github.com/memoio/go-mefs/utils/RbTree"
 	"github.com/memoio/go-mefs/utils/metainfo"

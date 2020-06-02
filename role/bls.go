@@ -3,8 +3,8 @@ package role
 import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/gogo/protobuf/proto"
-	mcl "github.com/memoio/go-mefs/bls12"
-	mpb "github.com/memoio/go-mefs/proto"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils"
 )
 
