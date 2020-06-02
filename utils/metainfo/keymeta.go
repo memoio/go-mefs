@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 )
 
 var (

@@ -15,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -95,7 +95,7 @@ func (dht *KadDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 	return resp, nil
 }
 
-func (dht *KadDHT) checkLocalDatastore(k []byte) (*pb.Record, error) {
+func (dht *KadDHT) checkLocalDatastore(k []byte) (*mpb.Record, error) {
 	logger.Debugf("%s handleGetValue looking into ds", dht.self)
 	dskey := convertToDsKey(k)
 	buf, err := dht.datastore.Get(dskey)
@@ -113,7 +113,7 @@ func (dht *KadDHT) checkLocalDatastore(k []byte) (*pb.Record, error) {
 	// if we have the value, send it back
 	logger.Debugf("%s handleGetValue success!", dht.self)
 
-	rec := new(pb.Record)
+	rec := new(mpb.Record)
 	err = proto.Unmarshal(buf, rec)
 	if err != nil {
 		logger.Debug("failed to unmarshal DHT record from datastore")
@@ -159,7 +159,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 			return nil, err
 		}
 
-		pubrec := new(pb.Record)
+		pubrec := new(mpb.Record)
 		err = proto.Unmarshal(pubRecByte, pubrec)
 		if err != nil {
 			return nil, err
@@ -194,7 +194,7 @@ func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 // returns nil, nil when either nothing is found or the value found doesn't properly validate.
 // returns nil, some_error when there's a *datastore* error (i.e., something goes very wrong)
-func (dht *KadDHT) getRecordFromDatastore(dskey ds.Key) (*pb.Record, error) {
+func (dht *KadDHT) getRecordFromDatastore(dskey ds.Key) (*mpb.Record, error) {
 	buf, err := dht.datastore.Get(dskey)
 	if err == ds.ErrNotFound {
 		return nil, nil
@@ -203,7 +203,7 @@ func (dht *KadDHT) getRecordFromDatastore(dskey ds.Key) (*pb.Record, error) {
 		logger.Errorf("Got error retrieving record with key %s from datastore: %s", dskey, err)
 		return nil, err
 	}
-	rec := new(pb.Record)
+	rec := new(mpb.Record)
 	err = proto.Unmarshal(buf, rec)
 	if err != nil {
 		// Bad data in datastore, log it but don't return an error, we'll just overwrite it

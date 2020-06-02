@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 )
 
 type DownloadObjectOptions struct {

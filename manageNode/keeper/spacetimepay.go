@@ -12,7 +12,7 @@ import (
 
 	"github.com/memoio/go-mefs/contracts"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"

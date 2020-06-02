@@ -19,7 +19,7 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	routing "github.com/libp2p/go-libp2p-routing"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
@@ -40,7 +40,7 @@ func (dht *KadDHT) AssignmetahandlerV2(metahandler instance.Service) error {
 }
 
 //将KV保存在本地，若key已经存在，则将value添加在后面而不是覆盖
-func (dht *KadDHT) appendLocal(key string, rec *pb.Record) error {
+func (dht *KadDHT) appendLocal(key string, rec *mpb.Record) error {
 	logger.Debugf("appendLocal: %v %v", key, rec)
 	reclocal, _ := dht.getLocal(key) //检查本地数据
 
@@ -203,7 +203,7 @@ func (dht *KadDHT) IterFrom(ctx context.Context, prefix, id string) ([]byte, err
 
 	var out string
 	var err error
-	recout := new(pb.Record)
+	recout := new(mpb.Record)
 	//本地查找
 	if strings.Compare(id, "local") == 0 {
 		recout, err = dht.iterLocal(prefix)
@@ -225,17 +225,17 @@ func (dht *KadDHT) IterFrom(ctx context.Context, prefix, id string) ([]byte, err
 }
 
 //从本地对给定前缀进行迭代查询,查询的结果用‘ ’连接保存在record结构中返回
-func (dht *KadDHT) iterLocal(prefix string) (*pb.Record, error) {
+func (dht *KadDHT) iterLocal(prefix string) (*mpb.Record, error) {
 	var keylist [][]byte
 	var valuelist [][]byte
-	recout := new(pb.Record)
+	recout := new(mpb.Record)
 	key := ds.NewKey(prefix).String() //去掉base32编码
 	q := dsq.Query{Prefix: key}
 	qr, _ := dht.datastore.Query(q) //进行查询操作
 	es, _ := qr.Rest()
 
 	for _, e := range es {
-		rec := new(pb.Record)
+		rec := new(mpb.Record)
 		proto.Unmarshal(e.Value, rec) //解出rec 一条记录的kv
 		keylist = append(keylist, rec.Key)
 		valuelist = append(valuelist, rec.Value) //将这条记录的kv添加进kv表中
@@ -292,7 +292,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 }
 
 //广播的Meta操作的回调，在操作最后，会在返回信息中添加与本节点相连的最近节点
-func (dht *KadDHT) handleMetaBroadcast(ctx context.Context, key string, p peer.ID) (_ *pb.Record, err error) {
+func (dht *KadDHT) handleMetaBroadcast(ctx context.Context, key string, p peer.ID) (_ *mpb.Record, err error) {
 	ctx = logger.Start(ctx, "handleMetaRequest")
 	logger.SetTag(ctx, "peer", p)
 	defer func() { logger.FinishWithErr(ctx, err) }() //各项记录操作

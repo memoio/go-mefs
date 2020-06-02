@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strconv"
 
-	mcl "github.com/memoio/go-mefs/bls12"
-	mpb "github.com/memoio/go-mefs/proto"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	mpb "github.com/memoio/go-mefs/pb"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"

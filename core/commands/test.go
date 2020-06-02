@@ -10,7 +10,7 @@ import (
 	"io"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
-	mcl "github.com/memoio/go-mefs/bls12"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/utils/address"

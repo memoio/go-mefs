@@ -3,7 +3,7 @@ package keeper
 import (
 	"strings"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"

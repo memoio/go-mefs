@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	mcl "github.com/memoio/go-mefs/bls12"
-	mpb "github.com/memoio/go-mefs/proto"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	b58 "github.com/mr-tron/base58/base58"

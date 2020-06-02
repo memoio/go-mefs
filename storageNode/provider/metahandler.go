@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"

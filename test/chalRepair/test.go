@@ -16,7 +16,7 @@ import (
 
 	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"

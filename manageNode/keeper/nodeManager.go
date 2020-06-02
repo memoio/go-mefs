@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"

@@ -19,14 +19,13 @@ import (
 	"github.com/memoio/go-mefs/config"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	bs "github.com/memoio/go-mefs/source/go-ipfs-blockstore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
-	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
@@ -250,7 +249,7 @@ func (n *impl) GetUserPublicKey(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	pubrec := new(recpb.Record)
+	pubrec := new(mpb.Record)
 	err = proto.Unmarshal(pubRecByte, pubrec)
 	if err != nil {
 		return nil, err
@@ -318,7 +317,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 			n.ms.getKeyErr.Inc()
 			return nil, err
 		}
-		rec := new(recpb.Record)
+		rec := new(mpb.Record)
 		err = proto.Unmarshal(recByte, rec)
 		if err != nil {
 			return nil, err
@@ -353,7 +352,7 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 
 	if to == "local" {
 		n.ms.putLocalKey.Inc()
-		rec := &recpb.Record{
+		rec := &mpb.Record{
 			Key:       []byte(key),
 			Value:     data,
 			Signature: sig,

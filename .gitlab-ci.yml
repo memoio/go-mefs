@@ -35,7 +35,7 @@ bls12-golint:
   stage: golangci-lint
   when: always
   script:
-    - cd $GOPATH/src/github.com/memoio/go-mefs/bls12
+    - cd $GOPATH/src/github.com/memoio/go-mefs/crypto/bls12
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
     - "47.92.5.51"

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	proto "github.com/gogo/protobuf/proto"
-	mcl "github.com/memoio/go-mefs/bls12"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"

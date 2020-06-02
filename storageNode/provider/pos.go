@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/bls12"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	df "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	"github.com/memoio/go-mefs/utils"

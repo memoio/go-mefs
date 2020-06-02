@@ -3,7 +3,7 @@ package instance
 import (
 	"errors"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 )
 
 var (

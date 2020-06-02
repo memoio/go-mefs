@@ -19,7 +19,7 @@ import (
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/memoio/go-mefs/crypto/aes"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"

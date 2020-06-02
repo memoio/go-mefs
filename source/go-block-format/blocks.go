@@ -10,7 +10,7 @@ import (
 
 	proto "github.com/gogo/protobuf/proto"
 	u "github.com/ipfs/go-ipfs-util"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	cid "github.com/memoio/go-mefs/source/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )

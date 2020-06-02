@@ -3,8 +3,8 @@ package keeper
 import (
 	"time"
 
-	mcl "github.com/memoio/go-mefs/bls12"
-	mpb "github.com/memoio/go-mefs/proto"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"

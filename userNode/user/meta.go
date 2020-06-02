@@ -15,7 +15,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	config "github.com/memoio/go-mefs/config"
 	dataformat "github.com/memoio/go-mefs/data-format"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"

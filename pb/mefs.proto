@@ -1,5 +1,6 @@
 syntax = "proto3";
-package proto;
+package mefs.pb;
+
 
 enum OpType {
     BroadCast = 0;
@@ -244,4 +245,15 @@ message STValue {
 message KVData {
   bytes Key = 1;
   bytes Value = 2;
+}
+
+message Record {
+	// The key that references this record
+	bytes key = 1;
+
+	// The actual value this record is storing
+	bytes value = 2;
+
+	// A signature for the key+value depends on type
+	bytes signature = 3;
 }

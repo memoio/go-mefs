@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 )
 
 // TQuene is a basic priority queue.

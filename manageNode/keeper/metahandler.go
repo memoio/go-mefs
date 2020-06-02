@@ -6,7 +6,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	id "github.com/memoio/go-mefs/crypto/identity"
-	mpb "github.com/memoio/go-mefs/proto"
+	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
