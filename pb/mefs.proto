@@ -27,6 +27,8 @@ enum KeyType {
     ChalTime = 12; // handle query Challenge time of block
     Pos = 13;      // handle generated data
     Bucket = 14;   // handle and store user's lfs bucket information
+    StPaySign = 15;  // handle spacetime pay sign 
+    ProAddSign = 16; // hanle add provider sign
     
     HeartBeat = 20;  // handle user's heartBeat
     UserInit = 21;   // handle user's lfs init request
@@ -36,20 +38,20 @@ enum KeyType {
     Challenge = 25;  // handle chanllenge request
 	  Repair = 26;     // handle repair request
     ExternalAddress = 27; // handle node's ip request
-    StPaySign = 28;  // handle spacetime pay sign 
-    ProAddSign = 29; // hanle add provider sign
+    Storage = 28;  // handle node's storage information
 
 	  Query = 30;  // record query contract
 	  Offer = 31;
 	  UpKeeping = 32;
 	  Channel = 33;
 
+    Income = 39; // record income information
     ChalPay = 40; // record pay information
     LastPay = 41; // record last pay information; no need
     PosMeta = 42; // record pos metainfomation
     Session = 43;  // record user's session information
     LastStripe = 44; // record latest stripe in buckets
-    Storage = 45;  // record node's storage information
+    
 }
 
 // record key meta 

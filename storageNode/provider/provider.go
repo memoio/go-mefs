@@ -816,6 +816,22 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
+	km, err := metainfo.NewKey(p.localID, mpb.KeyType_Income)
+	if err == nil {
+		var res strings.Builder
+		res.WriteString(strconv.FormatInt(latestBlock, 10))
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(p.TotalIncome.String())
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(p.StorageIncome.String())
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(p.ReadIncome.String())
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(p.PosIncome.String())
+
+		p.ds.PutKey(p.context, km.ToString(), []byte(res.String()), nil, "local")
+	}
+
 	utils.MLogger.Infof("get income from chain finished at block %d", latestBlock)
 	return latestBlock, nil
 }
@@ -855,6 +871,40 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 	p.loadPeersFromChain()
 
 	lastBlock := int64(0)
+
+	km, err := metainfo.NewKey(p.localID, mpb.KeyType_Income)
+	if err == nil {
+		res, err := p.ds.GetKey(p.context, km.ToString(), "local")
+		if err == nil && len(res) > 0 {
+			ins := strings.Split(string(res), metainfo.DELIMITER)
+			if len(ins) == 5 {
+				lb, err := strconv.ParseInt(ins[0], 10, 0)
+				if err == nil {
+					lastBlock = lb
+				}
+
+				ti, ok := new(big.Int).SetString(ins[1], 10)
+				if ok {
+					p.TotalIncome = ti
+				}
+
+				si, ok := new(big.Int).SetString(ins[2], 10)
+				if ok {
+					p.StorageIncome = si
+				}
+
+				ri, ok := new(big.Int).SetString(ins[3], 10)
+				if ok {
+					p.ReadIncome = ri
+				}
+
+				pi, ok := new(big.Int).SetString(ins[4], 10)
+				if ok {
+					p.PosIncome = pi
+				}
+			}
+		}
+	}
 
 	time.Sleep(7 * time.Minute)
 	lb, err := p.getIncome(localAddr, lastBlock)
