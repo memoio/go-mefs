@@ -706,32 +706,12 @@ func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to stri
 	utils.MLogger.Debugf("put %s to %s", key, to)
 
 	k.ds.PutKey(ctx, key, data, sig, "local")
-
-<<<<<<< HEAD
-=======
-	if k.enableBft && flag {
-		rec := &mpb.Record{
-			Key:       []byte(key),
-			Value:     data,
-			Signature: sig,
-		}
-		recByte, err := proto.Marshal(rec)
-		if err != nil {
-			utils.MLogger.Error("proto Marshal fails: ", err)
-			return err
-		}
-
-		// need retry?
-		raft.Write(ctx, k.dnh, clusterID, key, recByte)
-	}
-
->>>>>>> 3ea0e927f3c3ce0719eeff005165f54edf2a17d1
 	return nil
 }
 
 func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64, flag bool) ([]byte, error) {
 	utils.MLogger.Debugf("get %s from %s", key, to)
-	
+
 	return k.ds.GetKey(ctx, key, "local")
 }
 
