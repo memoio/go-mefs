@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"bytes"
 	"context"
 	"math/big"
 	"strconv"
@@ -23,7 +22,6 @@ import (
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	dht "github.com/memoio/go-mefs/source/go-libp2p-kad-dht"
 	"github.com/memoio/go-mefs/source/instance"
-	"github.com/memoio/go-mefs/source/raft"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -709,53 +707,11 @@ func (k *Info) putKey(ctx context.Context, key string, data, sig []byte, to stri
 
 	k.ds.PutKey(ctx, key, data, sig, "local")
 
-	if k.enableBft && flag {
-		rec := &mpb.Record{
-			Key:       []byte(key),
-			Value:     data,
-			Signature: sig,
-		}
-		recByte, err := proto.Marshal(rec)
-		if err != nil {
-			utils.MLogger.Error("proto Marshal fails: ", err)
-			return err
-		}
-
-		// need retry?
-		raft.Write(ctx, k.dnh, clusterID, key, recByte)
-	}
-
 	return nil
 }
 
 func (k *Info) getKey(ctx context.Context, key, to string, clusterID uint64, flag bool) ([]byte, error) {
 	utils.MLogger.Debugf("get %s from %s", key, to)
-
-	if k.enableBft && flag {
-		res, err := raft.Read(ctx, k.dnh, clusterID, key)
-		if err != nil {
-			return nil, err
-		}
-
-		rec := new(mpb.Record)
-		err = proto.Unmarshal(res, rec)
-		if err != nil {
-			return nil, err
-		}
-
-		val, err := k.ds.GetKey(ctx, key, "local")
-		if err != nil {
-			utils.MLogger.Debugf("get %s fails %s", key, err)
-		} else {
-			if bytes.Compare(val, rec.GetValue()) == 0 {
-				utils.MLogger.Debugf("get %s success", key)
-			} else {
-				utils.MLogger.Debugf("get %s success, value is not equal", key)
-			}
-		}
-
-		return rec.GetValue(), nil
-	}
 
 	return k.ds.GetKey(ctx, key, "local")
 }
@@ -794,57 +750,6 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		gInfo, err := newGroup(k.localID, uid, qid, keepers, providers)
 		if err != nil {
 			return nil, err
-		}
-
-		if k.enableBft {
-			initialMembers := make(map[uint64]string)
-			err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, false, initialMembers)
-			if err == nil {
-				gInfo.bft = true
-				utils.MLogger.Infof("try start cluster %d for %s, success", gInfo.clusterID, gInfo.groupID)
-			} else {
-				utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
-				if err == dragonboat.ErrClusterAlreadyExist {
-					gInfo.bft = true
-				} else {
-					for _, kid := range gInfo.keepers {
-						if kid == k.localID {
-							initialMembers[gInfo.nodeID] = raft.Addr
-							continue
-						}
-
-						t, err := address.GetNodeIDFromID(kid)
-						if err != nil {
-							continue
-						}
-
-						ipAddr, err := k.ds.GetExternalAddr(kid)
-						if err != nil {
-							continue
-						}
-
-						ips := strings.Split(ipAddr.String(), "/")
-						if len(ips) != 5 {
-							utils.MLogger.Errorf("ip %s is wrong", ipAddr.String())
-							continue
-						}
-
-						initialMembers[t] = ips[2] + ":3001"
-					}
-
-					if len(initialMembers) == len(gInfo.keepers) {
-						err = raft.StartCluster(k.dnh, gInfo.clusterID, gInfo.nodeID, false, initialMembers)
-						if err != nil {
-							utils.MLogger.Errorf("start cluster %d for %s, fails %s", gInfo.clusterID, gInfo.groupID, err)
-							if err != dragonboat.ErrClusterAlreadyExist {
-								gInfo.bft = false
-							}
-						}
-						gInfo.bft = true
-						utils.MLogger.Infof("start cluster %d for %s, success, has members: %s", gInfo.clusterID, gInfo.groupID, initialMembers)
-					}
-				}
-			}
 		}
 
 		k.ms.groupNum.Inc()
