@@ -14,7 +14,6 @@ import (
 	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/lni/dragonboat/v3"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -36,7 +35,6 @@ type Info struct {
 	state         bool
 	enableBft     bool
 	context       context.Context
-	dnh           *dragonboat.NodeHost
 	raftNodeID    uint64
 	repch         chan string
 	ds            data.Service
@@ -164,9 +162,6 @@ func (k *Info) GetRole() string {
 // Close is
 func (k *Info) Close() error {
 	err := k.save(k.context)
-	if k.dnh != nil {
-		k.dnh.Stop()
-	}
 	return err
 }
 

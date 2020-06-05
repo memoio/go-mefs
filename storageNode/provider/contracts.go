@@ -24,7 +24,7 @@ func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.I
 
 		// pledge again
 		if proItem.Capacity < depositSize {
-			utils.MLogger.Infof("your old pledge capacity is %d, now will change to %d", proItem.Capacity, depositSize)
+			utils.MLogger.Infof("your old pledge capacity is %d MB, now will change to %d MB", proItem.Capacity, depositSize)
 			dsize := new(big.Int).SetInt64(depositSize - proItem.Capacity)
 			err := role.PledgeProvider(proID, p.sk, dsize)
 			if err != nil {
