@@ -106,12 +106,11 @@ environment variable:
 				password, _ = utils.GetPassWord()
 			}
 			hexsk, err := id.GetPrivateKey("", password, kf)
-			if err == nil {
-				return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
+			if err != nil {
+				fmt.Println("load keyfile fails:", err)
+				return err
 			}
-
-			fmt.Println("load keyfile fails:", err)
-			fmt.Println("====== manually input privatekey and password =====")
+			return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
 		}
 
 		hexsk, ok := req.Options[secretKeyKwd].(string)

@@ -302,7 +302,7 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 	if gp != nil {
 		p.ms.groupNum.Inc()
 		p.fsGroup.Store(groupID, gp)
-		p.loadChannelValue(userID, groupID)
+		go p.loadChannelValue(userID, groupID)
 		for _, kid := range gp.keepers {
 			p.getKInfo(kid, true)
 		}

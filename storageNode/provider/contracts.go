@@ -225,7 +225,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 			}
 
 			value := new(big.Int).SetBytes(cSign.GetValue())
-			utils.MLogger.Info("channel value are:", value.String())
+			utils.MLogger.Infof("channel %s has value: %s", cItem.ChannelID, value.String())
 			if value.Cmp(cItem.Value) > 0 {
 				cItem.Value = value
 				cItem.Sig = valueByte
