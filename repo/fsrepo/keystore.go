@@ -70,7 +70,7 @@ func GetKeyStore() string {
 	dir, _ := config.Path(fsrepoPath, Keystore)
 	_, err := os.Stat(dir)
 	// dir exist
-	if !os.IsExist(err) {
+	if os.IsExist(err) {
 		err = os.Mkdir(dir, 0755)
 		if err != nil {
 			return ""
