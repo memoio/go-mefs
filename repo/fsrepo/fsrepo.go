@@ -249,14 +249,12 @@ func initKeyStore(path, privateKey, peerID, password string) error {
 	}
 
 	_, err = os.Stat(dir)
-	// dir exist
-	if os.IsExist(err) {
-		return ErrKSExist
-	}
-
-	err = os.Mkdir(dir, 0755)
-	if err != nil {
-		return err
+	// dir not exist
+	if os.IsNotExist(err) {
+		err = os.Mkdir(dir, 0755)
+		if err != nil {
+			return err
+		}
 	}
 
 	return PutPrivateKeyToKeystore(privateKey, peerID, password)
