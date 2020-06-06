@@ -21,7 +21,7 @@ func BestKnownPath() (string, error) {
 	}
 
 	_, err = os.Stat(mefsPath)
-	if os.IsExist(err) {
+	if os.IsNotExist(err) {
 		err = os.Mkdir(mefsPath, 0755)
 		if err != nil {
 			return "", err
