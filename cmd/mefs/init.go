@@ -28,8 +28,7 @@ const (
 )
 
 var (
-	errRepoExists    = errors.New("mefs configuration file already exists, reinitializing would overwrite your keys")
-	errShortPassword = errors.New("password is too short; length should be at least 8")
+	errRepoExists = errors.New("mefs configuration file already exists, reinitializing would overwrite your keys")
 )
 
 // InitCmd inits
@@ -103,7 +102,7 @@ environment variable:
 		if ok && kf != "" {
 			password, ok := req.Options[passwordKwd].(string)
 			if !ok || password == "" {
-				password = GetPassWord()
+				password, _ = utils.GetPassWord()
 			}
 			hexsk, err := id.GetPrivateKey("", password, kf)
 			if err == nil {
@@ -135,39 +134,24 @@ environment variable:
 
 		password, ok := req.Options[passwordKwd].(string)
 		if !ok || len(password) < 8 {
-			fmt.Println(errShortPassword)
-			password = GetPassWord()
-			if len(password) < 8 {
-				return errShortPassword
+			fmt.Println("Password is too short, length should be at least 8")
+			retry := 0
+			for {
+				gotpwd, err := utils.GetPassWord()
+				if err != nil {
+					if retry > 2 {
+						return err
+					}
+					retry++
+					continue
+				}
+				password = gotpwd
+				break
 			}
 		}
 
 		return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
 	},
-}
-
-func GetPassWord() string {
-	var password string
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	go func() {
-		defer cancel()
-		fmt.Printf("Please input your password: ")
-		input := bufio.NewScanner(os.Stdin)
-		ok := input.Scan()
-		if ok {
-			password = input.Text()
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-	}
-
-	if password == "" {
-		fmt.Println("\nuse default password: ", utils.DefaultPassword)
-		password = utils.DefaultPassword
-	}
-	return password
 }
 
 func CheckRepo(repoRoot string) error {

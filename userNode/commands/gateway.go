@@ -1,12 +1,8 @@
 package commands
 
 import (
-	"bufio"
-	"context"
 	"fmt"
 	"io"
-	"os"
-	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
@@ -15,30 +11,6 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
-
-func GetPassWord() string {
-	var password string
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	go func() {
-		defer cancel()
-		fmt.Printf("Please input your password: ")
-		input := bufio.NewScanner(os.Stdin)
-		ok := input.Scan()
-		if ok {
-			password = input.Text()
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-	}
-
-	if password == "" {
-		fmt.Println("\nuse default password: ", utils.DefaultPassword)
-		password = utils.DefaultPassword
-	}
-	return password
-}
 
 var GatewayCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
@@ -103,7 +75,19 @@ var gwStartCmd = &cmds.Command{
 
 		pwd, ok := req.Options[PassWord].(string)
 		if !ok || pwd == "" {
-			pwd = GetPassWord()
+			retry := 0
+			for {
+				gotpwd, err := utils.GetPassWord()
+				if err != nil {
+					if retry > 2 {
+						return err
+					}
+					retry++
+					continue
+				}
+				pwd = gotpwd
+				break
+			}
 		}
 
 		if len(pwd) < 8 {

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -325,4 +327,33 @@ func FormatSecond(n int64) (result string) {
 	s := d / time.Second
 	result = fmt.Sprintf("%s%02dm%02ds", result, m, s)
 	return
+}
+
+func GetPassWord() (string, error) {
+	var password string
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	go func() {
+		defer cancel()
+		fmt.Printf("Please input your password (at least 8): ")
+		input := bufio.NewScanner(os.Stdin)
+		ok := input.Scan()
+		if ok {
+			password = input.Text()
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+	}
+
+	if password == "" {
+		fmt.Println("\nuse default password: ", DefaultPassword)
+		password = DefaultPassword
+	}
+
+	if len(password) < 8 {
+		fmt.Println("\n your password is too short, at least 8")
+		return password, errors.New("Password is too short, length should be at least 8")
+	}
+	return password, nil
 }

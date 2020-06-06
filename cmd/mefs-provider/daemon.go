@@ -219,7 +219,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	hexsk, _ := req.Options[secretKeyKwd].(string)
 	password, ok := req.Options[passwordKwd].(string)
 	if !ok || password == "" {
-		password = minit.GetPassWord()
+		password, _ = utils.GetPassWord()
 	}
 
 	nKey, _ := req.Options[netKeyKwd].(string)
@@ -288,6 +288,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	node, err := core.NewNode(req.Context, ncfg, uid, password, nKey)
 	if err != nil {
 		log.Error("error from node construction: ", err)
+		fmt.Println("error from node construction: ", err)
 		return err
 	}
 

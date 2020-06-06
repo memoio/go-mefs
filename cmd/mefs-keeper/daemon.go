@@ -210,7 +210,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	hexsk, _ := req.Options[secretKeyKwd].(string)
 	password, ok := req.Options[passwordKwd].(string)
 	if !ok || password == "" {
-		password = minit.GetPassWord()
+		password, _ = utils.GetPassWord()
 	}
 
 	nKey, _ := req.Options[netKeyKwd].(string)

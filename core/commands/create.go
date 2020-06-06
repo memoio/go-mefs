@@ -1,12 +1,8 @@
 package commands
 
 import (
-	"bufio"
-	"context"
 	"fmt"
 	"io"
-	"os"
-	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	id "github.com/memoio/go-mefs/crypto/identity"
@@ -22,30 +18,6 @@ const (
 type UserPrivMessage struct {
 	Address string
 	Sk      string
-}
-
-func GetPassWord() string {
-	var password string
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	go func() {
-		defer cancel()
-		fmt.Printf("Please input your password: ")
-		input := bufio.NewScanner(os.Stdin)
-		ok := input.Scan()
-		if ok {
-			password = input.Text()
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-	}
-
-	if password == "" {
-		fmt.Println("\nuse default password: ", utils.DefaultPassword)
-		password = utils.DefaultPassword
-	}
-	return password
 }
 
 var CreateCmd = &cmds.Command{
@@ -67,7 +39,7 @@ var CreateCmd = &cmds.Command{
 		if ok && kf != "" {
 			password, ok := req.Options[PassWord].(string)
 			if !ok || password == "" {
-				password = GetPassWord()
+				password, _ = utils.GetPassWord()
 			}
 			hexsk, err := id.GetPrivateKey("", password, kf)
 			if err != nil {
@@ -93,8 +65,21 @@ var CreateCmd = &cmds.Command{
 
 		pwd, found := req.Options[PassWord].(string)
 		if !found || pwd == "" {
-			pwd = GetPassWord()
+			retry := 0
+			for {
+				gotpwd, err := utils.GetPassWord()
+				if err != nil {
+					if retry > 2 {
+						return err
+					}
+					retry++
+					continue
+				}
+				pwd = gotpwd
+				break
+			}
 		}
+
 		sk, found := req.Options[SecreteKey].(string)
 		if !found || sk == "" {
 			tsk, err := id.Create()
