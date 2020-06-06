@@ -19,20 +19,20 @@ import (
 
 type pInfoOutput struct {
 	Address        string
-	Balance        *big.Int
-	PledgeBytes    uint64
-	UsedBytes      uint64
-	PosBytes       uint64
-	LocalFreeBytes uint64
+	Balance        string
+	PledgeBytes    string
+	UsedBytes      string
+	PosBytes       string
+	LocalFreeBytes string
 	OfferAddress   string
-	OfferCapacity  int64
-	OfferPrice     *big.Int
-	OfferDuration  int64
+	OfferCapacity  string
+	OfferPrice     string
+	OfferDuration  string
 	OfferStartTime string
-	TotalIncome    *big.Int
-	StorageIncome  *big.Int
-	DownloadIncome *big.Int
-	PosIncome      *big.Int
+	TotalIncome    string
+	StorageIncome  string
+	DownloadIncome string
+	PosIncome      string
 }
 
 var InfoCmd = &cmds.Command{
@@ -118,20 +118,20 @@ var InfoCmd = &cmds.Command{
 
 		output := &pInfoOutput{
 			Address:        localAddr.String(),
-			PledgeBytes:    depositCapacity,
-			UsedBytes:      usedCapacity,
-			PosBytes:       posCapacity,
-			LocalFreeBytes: lsinfo.Free,
+			PledgeBytes:    utils.FormatBytes(int64(depositCapacity)),
+			UsedBytes:      utils.FormatBytes(int64(usedCapacity)),
+			PosBytes:       utils.FormatBytes(int64(posCapacity)),
+			LocalFreeBytes: utils.FormatBytes(int64(lsinfo.Free)),
 			OfferAddress:   offerAddr.String(),
-			OfferDuration:  oItem.Duration,
+			OfferDuration:  utils.FormatSecond(oItem.Duration),
 			OfferStartTime: time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
-			OfferCapacity:  oItem.Capacity * 1024 * 1024,
-			OfferPrice:     oItem.Price,
-			Balance:        balance,
-			TotalIncome:    ti,
-			DownloadIncome: di,
-			StorageIncome:  si,
-			PosIncome:      pi,
+			OfferCapacity:  utils.FormatBytes(int64(oItem.Capacity * 1024 * 1024)),
+			OfferPrice:     utils.FormatStorePrice(oItem.Price),
+			Balance:        utils.FormatWei(balance),
+			TotalIncome:    utils.FormatWei(ti),
+			DownloadIncome: utils.FormatWei(di),
+			StorageIncome:  utils.FormatWei(si),
+			PosIncome:      utils.FormatWei(pi),
 		}
 		return cmds.EmitOnce(res, output)
 	},

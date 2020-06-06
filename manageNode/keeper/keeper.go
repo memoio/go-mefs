@@ -681,7 +681,7 @@ func (k *Info) loadPeersFromChain() error {
 func (k *Info) getPosPrice() *big.Int {
 	if k.pledgeStorage.Sign() > 0 {
 		mm := big.NewInt(MarketingMoney)
-		mm.Mul(mm, big.NewInt(utils.Token2Wei))
+		mm.Mul(mm, big.NewInt(utils.Token))
 		mm.Quo(mm, big.NewInt(24))  // per hour
 		mm.Quo(mm, k.pledgeStorage) // per MB
 

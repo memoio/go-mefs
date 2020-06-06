@@ -16,6 +16,22 @@ import (
 )
 
 const (
+	KiB = 1024
+	MiB = 1048576
+	GiB = 1073741824
+	TiB = 1099511627776
+
+	KB = 1e3
+	MB = 1e6
+	GB = 1e9
+	TB = 1e12
+
+	Wei   = 1
+	GWei  = 1e9
+	Token = 1e18
+)
+
+const (
 	//BASETIME 用于记录的时间
 	BASETIME = time.RFC3339
 
@@ -49,9 +65,8 @@ const (
 	// DepositCapacity is provider deposit capacity, 1TB
 	DepositCapacity int64 = 1048576 // MB
 
-	// Token2Wei is 1token = 10^18 wei
+	// 1token = 10^18 wei
 	// samely Dollar is 10^18 WeiDollar
-	Token2Wei = 1000000000000000000
 
 	// Memo2Dollar is default Memo token Price, 1 token = 0.01 dollar
 	Memo2Dollar float64 = 0.01
@@ -182,4 +197,132 @@ func GetDirSize(path string) (uint64, error) {
 		return nil
 	})
 	return size, err
+}
+
+// FormatBytes convert bytes to human readable string. Like 2 MiB, 64.2 KiB, 52 B
+func FormatBytes(i int64) (result string) {
+	switch {
+	case i >= TiB:
+		result = fmt.Sprintf("%.02f TiB", float64(i)/TiB)
+	case i >= GiB:
+		result = fmt.Sprintf("%.02f GiB", float64(i)/GiB)
+	case i >= MiB:
+		result = fmt.Sprintf("%.02f MiB", float64(i)/MiB)
+	case i >= KiB:
+		result = fmt.Sprintf("%.02f KiB", float64(i)/KiB)
+	default:
+		result = fmt.Sprintf("%d B", i)
+	}
+	return
+}
+
+// FormatBytesDec Convert bytes to base-10 human readable string. Like 2 MB, 64.2 KB, 52 B
+func FormatBytesDec(i int64) (result string) {
+	switch {
+	case i >= TB:
+		result = fmt.Sprintf("%.02f TB", float64(i)/TB)
+	case i >= GB:
+		result = fmt.Sprintf("%.02f GB", float64(i)/GB)
+	case i >= MB:
+		result = fmt.Sprintf("%.02f MB", float64(i)/MB)
+	case i >= KB:
+		result = fmt.Sprintf("%.02f KB", float64(i)/KB)
+	default:
+		result = fmt.Sprintf("%d B", i)
+	}
+	return
+}
+
+func FormatWei(i *big.Int) (result string) {
+	f := new(big.Float).SetInt(i)
+	res, _ := f.Float64()
+	switch {
+	case res >= Token:
+		result = fmt.Sprintf("%.02f Token", res/Token)
+	case res >= GWei:
+		result = fmt.Sprintf("%.02f Gwei", res/GWei)
+	default:
+		result = fmt.Sprintf("%d Wei", i.Int64())
+	}
+	return
+}
+
+func FormatWeiDollar(i *big.Int) (result string) {
+	f := new(big.Float).SetInt(i)
+	res, _ := f.Float64()
+	switch {
+	case res >= Token:
+		result = fmt.Sprintf("%.02f Dollar (For now, 1 Dollar = 100 Token)", res/Token)
+	case res >= GWei:
+		result = fmt.Sprintf("%.02f GweiDollar (For now, 1 GweiDollar = 100 Gwei)", res/GWei)
+	default:
+		result = fmt.Sprintf("%f WeiDollar (For now, 1 WeiDollar = 100 Wei)", res)
+	}
+	return
+}
+
+func FormatStorePrice(i *big.Int) (result string) {
+	f := new(big.Float).SetInt(i)
+	f.Mul(f, big.NewFloat(float64(1024*1024*24*30)))
+	res, _ := f.Float64()
+	switch {
+	case res >= Token:
+		result = fmt.Sprintf("%.02f Dollar/(TiB*Month) (For now, 1 Dollar = 100 Token)", res/Token)
+	case res >= GWei:
+		result = fmt.Sprintf("%.02f GweiDollar/(TiB*Month) (For now, 1 GweiDollar = 100 Gwei)", res/GWei)
+	default:
+		result = fmt.Sprintf("%f WeiDollar/(TiB*Month) (For now, 1 WeiDollar = 100 Wei)", res)
+	}
+	return
+}
+
+func FormatReadPrice(i *big.Int) (result string) {
+	f := new(big.Float).SetInt(i)
+	f.Mul(f, big.NewFloat(float64(1024)))
+	res, _ := f.Float64()
+	switch {
+	case res >= Token:
+		result = fmt.Sprintf("%.02f Dollar/GiB (For now, 1 Dollar = 100 Token)", res/Token)
+	case res >= GWei:
+		result = fmt.Sprintf("%.02f GweiDollar/GiB (For now, 1 GweiDollar = 100 Gwei)", res/GWei)
+	default:
+		result = fmt.Sprintf("%f WeiDollar/GiB (For now, 1 WeiDollar = 100 Wei)", res)
+	}
+	return
+}
+
+// FormatDuration convert time duration to human readable string
+func FormatDuration(n int64) (result string) {
+	d := time.Duration(n)
+	if d > time.Hour*24 {
+		result = fmt.Sprintf("%dd", d/24/time.Hour)
+		d -= (d / time.Hour / 24) * (time.Hour * 24)
+	}
+	if d > time.Hour {
+		result = fmt.Sprintf("%s%dh", result, d/time.Hour)
+		d -= d / time.Hour * time.Hour
+	}
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	result = fmt.Sprintf("%s%02dm%02ds", result, m, s)
+	return
+}
+
+// FormatSecond convert seconds to human readable string
+func FormatSecond(n int64) (result string) {
+	d := time.Duration(n) * time.Second
+	if d > time.Hour*24 {
+		result = fmt.Sprintf("%dd", d/24/time.Hour)
+		d -= (d / time.Hour / 24) * (time.Hour * 24)
+	}
+	if d > time.Hour {
+		result = fmt.Sprintf("%s%dh", result, d/time.Hour)
+		d -= d / time.Hour * time.Hour
+	}
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	result = fmt.Sprintf("%s%02dm%02ds", result, m, s)
+	return
 }

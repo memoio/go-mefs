@@ -56,21 +56,10 @@ var (
 )
 
 func (ob ObjectStat) String() string {
-	FloatStorage := float64(ob.Size)
-	var OutStorage string
-	if FloatStorage < 1024 && FloatStorage > 0 {
-		OutStorage = fmt.Sprintf("%.2f", FloatStorage) + "B"
-	} else if FloatStorage < 1048576 && FloatStorage >= 1024 {
-		OutStorage = fmt.Sprintf("%.2f", FloatStorage/1024) + "KB"
-	} else if FloatStorage < 1073741824 && FloatStorage >= 1048576 {
-		OutStorage = fmt.Sprintf("%.2f", FloatStorage/1048576) + "MB"
-	} else {
-		OutStorage = fmt.Sprintf("%.2f", FloatStorage/1073741824) + "GB"
-	}
 	return fmt.Sprintf(
 		"ObjectName: %s\n--ObjectSize: %s\n--MD5: %s\n--Ctime: %s\n--Dir: %t\n--LatestChalTime: %s\n",
 		ansi.Color(ob.Name, "green"),
-		OutStorage,
+		utils.FormatBytes(ob.Size),
 		ob.MD5,
 		ob.Ctime,
 		ob.Dir,
@@ -1716,24 +1705,13 @@ mefs lfs show_storage show the storage space used(kb)
 			}
 		}
 
-		FloatStorage := float64(storageSize)
-		var OutStorage string
-		if FloatStorage < 1024 && FloatStorage >= 0 {
-			OutStorage = fmt.Sprintf("%.2f", FloatStorage) + "B"
-		} else if FloatStorage < 1048576 && FloatStorage >= 1024 {
-			OutStorage = fmt.Sprintf("%.2f", FloatStorage/1024) + "KB"
-		} else if FloatStorage < 1073741824 && FloatStorage >= 1048576 {
-			OutStorage = fmt.Sprintf("%.2f", FloatStorage/1048576) + "MB"
-		} else {
-			OutStorage = fmt.Sprintf("%.2f", FloatStorage/1073741824) + "GB"
-		}
-		return cmds.EmitOnce(res, OutStorage)
+		return cmds.EmitOnce(res, utils.FormatBytes(int64(storageSize)))
 	},
 }
 
 type infoOutput struct {
 	UserAddr      string
-	Balance       *big.Int
+	Balance       string
 	QueryAddr     string
 	UpkeepingInfo ukInfo
 	KeeperInfos   []keeperInfo
@@ -1742,14 +1720,14 @@ type infoOutput struct {
 
 type ukInfo struct {
 	UpKeepingAddr string
-	UkBalance     *big.Int
-	NeedPay       *big.Int
+	UkBalance     string
+	NeedPay       string
 	StartTime     string
 	EndTime       string
-	Duration      int64
-	Price         *big.Int
-	TotalBytes    uint64
-	UsedBytes     uint64
+	Duration      string
+	Price         string
+	TotalBytes    string
+	UsedBytes     string
 }
 
 type keeperInfo struct {
@@ -1760,9 +1738,9 @@ type proInfo struct {
 	ProviderAddr string
 	ChannelAddr  string
 	StartTime    string
-	Duration     int64
-	Money        *big.Int
-	CostValue    *big.Int
+	Duration     string
+	Money        string
+	CostValue    string
 }
 
 var lfsInfoCmd = &cmds.Command{
@@ -1867,9 +1845,9 @@ var lfsInfoCmd = &cmds.Command{
 				ProviderAddr: pi.Addr.String(),
 				ChannelAddr:  channerAddr.String(),
 				StartTime:    time.Unix(cItem.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-				Duration:     cItem.Duration,
-				Money:        cItem.Money,
-				CostValue:    cItem.Value,
+				Duration:     utils.FormatSecond(cItem.Duration),
+				Money:        utils.FormatWei(cItem.Money),
+				CostValue:    utils.FormatWei(cItem.Value),
 			}
 
 			providers = append(providers, ci)
@@ -1879,17 +1857,17 @@ var lfsInfoCmd = &cmds.Command{
 			UpKeepingAddr: ukaddr.String(),
 			StartTime:     time.Unix(uk.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
 			EndTime:       time.Unix(uk.EndTime, 0).In(time.Local).Format(utils.SHOWTIME),
-			TotalBytes:    uint64(uk.Capacity * 1024 * 1024),
-			Duration:      uk.Duration,
-			Price:         uk.Price,
-			UkBalance:     uk.Money,
-			NeedPay:       uk.NeedPay,
-			UsedBytes:     storageSize,
+			TotalBytes:    utils.FormatBytes(uk.Capacity * 1024 * 1024),
+			Duration:      utils.FormatSecond(uk.Duration),
+			Price:         utils.FormatStorePrice(uk.Price),
+			UkBalance:     utils.FormatWei(uk.Money),
+			NeedPay:       utils.FormatWei(uk.NeedPay),
+			UsedBytes:     utils.FormatBytes(int64(storageSize)),
 		}
 
 		output := &infoOutput{
 			UserAddr:      useraddr.String(),
-			Balance:       balance,
+			Balance:       utils.FormatWei(balance),
 			QueryAddr:     queryaddr.String(),
 			UpkeepingInfo: ui,
 			KeeperInfos:   keepers,
