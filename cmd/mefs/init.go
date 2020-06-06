@@ -19,6 +19,7 @@ import (
 	id "github.com/memoio/go-mefs/crypto/identity"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 const (
@@ -46,7 +47,7 @@ environment variable:
 `,
 	},
 	Arguments: []cmds.Argument{
-		cmds.FileArg("config", false, false, "Initialize with the given configuration.").EnableStdin(),
+		cmds.StringArg("addr", false, false, "The practice user's address that you want to init as network node"),
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to load/store the PrivateKey from keyfile").WithDefault(""),
@@ -115,7 +116,7 @@ environment variable:
 
 		hexsk, ok := req.Options[secretKeyKwd].(string)
 		if !ok || hexsk == "" {
-			fmt.Printf("input your private key: ")
+			fmt.Printf("input your private key manully: ")
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			go func() {
 				defer cancel()
@@ -148,6 +149,20 @@ environment variable:
 				password = gotpwd
 				break
 			}
+		}
+
+		if len(req.Arguments) > 0 {
+			addr := req.Arguments[0]
+			uid, err := address.GetIDFromAddress(addr)
+			if err != nil {
+				return err
+			}
+			sk, err := fsrepo.GetPrivateKeyFromKeystore(uid, password)
+			if err != nil {
+				return err
+			}
+
+			hexsk = sk
 		}
 
 		return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
