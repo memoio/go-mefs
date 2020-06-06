@@ -190,7 +190,7 @@ func testProvider() (err error) {
 	log.Println("pledge provide need price is: ", price)
 	contracts.EndPoint = ethEndPoint
 	log.Println("2. test pledge provider")
-	size := new(big.Int).SetInt64(utils.DepositCapacity / 1000)
+	size := new(big.Int).SetInt64(utils.DepositCapacity / 1024)
 	size.Mul(size, price)
 	err = contracts.PledgeProvider(proAddr, userSk, size)
 	if err != nil {

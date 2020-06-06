@@ -56,7 +56,7 @@ const (
 	ProviderSLA = 6
 
 	// DefaultCapacity is default store capacity： 1GB
-	DefaultCapacity int64 = 1000 //MB
+	DefaultCapacity int64 = 1024 //MB
 	// DefaultDuration is default store days： 100 days
 	DefaultDuration int64 = 100 // day
 	// DefaultCycle is default cycle: 1 day
@@ -64,8 +64,8 @@ const (
 
 	// offer options
 
-	// DefaultOfferCapacity is provider offer capacity
-	DefaultOfferCapacity int64 = 1000000 //MB
+	// DefaultOfferCapacity is provider default offer capacity: 1TB
+	DefaultOfferCapacity int64 = 1048576 //MB
 	// DefaultOfferDuration is provider； 100 days
 	DefaultOfferDuration int64 = 100 // day
 	// DepositCapacity is provider deposit capacity, 1TB
