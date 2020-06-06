@@ -17,20 +17,20 @@ import (
 
 type allKeepers struct {
 	KeeperCount int
-	PledgeMoney *big.Int
+	PledgeMoney string
 	KeeperInfos []keeperInfo
 }
 
 type keeperInfo struct {
 	Address     string
 	Online      bool
-	PledgeMoney *big.Int
+	PledgeMoney string
 	PledgeTime  string
 }
 
 type allProviders struct {
 	ProviderCount int
-	PledgeBytes   *big.Int
+	PledgeBytes   string
 	ProInfos      []proInfo
 }
 
@@ -110,7 +110,7 @@ var keeperCmd = &cmds.Command{
 
 			kinfo := keeperInfo{
 				Address:     kaddr.String(),
-				PledgeMoney: ki.PledgeMoney,
+				PledgeMoney: utils.FormatWei(ki.PledgeMoney),
 				PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
 				Online:      n.Data.FastConnect(req.Context, ki.KeeperID),
 			}
@@ -119,7 +119,7 @@ var keeperCmd = &cmds.Command{
 
 		output := &allKeepers{
 			KeeperCount: len(aks),
-			PledgeMoney: pledge,
+			PledgeMoney: utils.FormatWei(pledge),
 			KeeperInfos: aks,
 		}
 
@@ -199,9 +199,10 @@ var proCmd = &cmds.Command{
 			aks = append(aks, kinfo)
 		}
 
+		pledge.Mul(pledge, big.NewInt(1024*1024))
 		output := &allProviders{
 			ProviderCount: len(aks),
-			PledgeBytes:   pledge.Mul(pledge, big.NewInt(1024*1024)),
+			PledgeBytes:   utils.FormatBytes(pledge.Int64()),
 			ProInfos:      aks,
 		}
 
