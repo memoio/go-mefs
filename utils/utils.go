@@ -28,6 +28,10 @@ const (
 	GB = 1e9
 	TB = 1e12
 
+	Day    = 86400
+	Hour   = 3600
+	Minute = 60
+
 	Wei   = 1
 	GWei  = 1e9
 	Token = 1e18
@@ -312,23 +316,31 @@ func FormatDuration(n int64) (result string) {
 }
 
 // FormatSecond convert seconds to human readable string
-func FormatSecond(n int64) (result string) {
-	d := time.Duration(n) * time.Second
-	if d > time.Hour*24 {
-		result = fmt.Sprintf("%dd", d/24/time.Hour)
-		d -= (d / time.Hour / 24) * (time.Hour * 24)
+func FormatSecond(d int64) (result string) {
+	if d > Day {
+		result = fmt.Sprintf("%d day", d/Day)
+		d -= (d / Day) * (Day)
 	}
-	if d > time.Hour {
-		result = fmt.Sprintf("%s%dh", result, d/time.Hour)
-		d -= d / time.Hour * time.Hour
+
+	if d == 0 {
+		return
 	}
-	m := d / time.Minute
-	d -= m * time.Minute
-	s := d / time.Second
-	result = fmt.Sprintf("%s%02dm%02ds", result, m, s)
+
+	if d > Hour {
+		result = fmt.Sprintf("%s %d hour", result, d/Hour)
+		d -= (d / Hour) * Hour
+	}
+
+	if d == 0 {
+		return
+	}
+	m := d / Minute
+	d -= m * Minute
+	result = fmt.Sprintf("%s %02d minute %02d second", result, m, d)
 	return
 }
 
+// GetPassWord gets password from input
 func GetPassWord() (string, error) {
 	var password string
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
