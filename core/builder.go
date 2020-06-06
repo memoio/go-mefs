@@ -109,7 +109,7 @@ func NewNode(ctx context.Context, cfg *BuildCfg, uid, password, nKey string) (*M
 		}
 	}
 
-	if n.Identity.Validate() == nil {
+	if n.Identity.Validate() != nil {
 		err := n.loadID()
 		if err != nil {
 			return nil, err
