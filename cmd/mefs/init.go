@@ -213,6 +213,19 @@ func DoInit(out io.Writer, repoRoot string, password string, conf *config.Config
 	}
 
 	if fsrepo.IsInitialized(repoRoot) {
+		pub, err := id.GetPubByte(prikey)
+		if err != nil {
+			return err
+		}
+		pid, err := id.GetIDFromPubKey(pub)
+		if err != nil {
+			return err
+		}
+
+		err = fsrepo.PutPrivateKeyToKeystore(prikey, pid, password)
+		if err != nil {
+			return err
+		}
 		return errRepoExists
 	}
 

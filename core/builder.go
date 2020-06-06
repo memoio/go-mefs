@@ -73,7 +73,7 @@ func (cfg *BuildCfg) fillDefaults() error {
 }
 
 // NewNode constructs and returns an MefsNode using the given cfg.
-func NewNode(ctx context.Context, cfg *BuildCfg, password, nKey string) (*MefsNode, error) {
+func NewNode(ctx context.Context, cfg *BuildCfg, uid, password, nKey string) (*MefsNode, error) {
 	if cfg == nil {
 		cfg = new(BuildCfg)
 	}
@@ -101,6 +101,21 @@ func NewNode(ctx context.Context, cfg *BuildCfg, password, nKey string) (*MefsNo
 	// TODO: this is a weird circular-ish dependency, rework it
 	n.proc = goprocessctx.WithContextAndTeardown(ctx, n.teardown)
 
+	// setup local peer ID (private key is loaded in online setup)
+	if len(uid) > 0 {
+		id, err := peer.IDB58Decode(uid)
+		if err == nil {
+			n.Identity = id
+		}
+	}
+
+	if n.Identity.Validate() == nil {
+		err := n.loadID()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if err := setupNode(ctx, n, cfg); err != nil {
 		n.Close()
 		return nil, err
@@ -119,11 +134,6 @@ func isTooManyFDError(err error) bool {
 }
 
 func setupNode(ctx context.Context, n *MefsNode, cfg *BuildCfg) error {
-	// setup local peer ID (private key is loaded in online setup)
-	if err := n.loadID(); err != nil {
-		return err
-	}
-
 	rds := &retry.Datastore{
 		Batching:    n.Repo.Datastore(),
 		Delay:       time.Millisecond * 200,

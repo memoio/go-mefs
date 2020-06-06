@@ -138,7 +138,7 @@ func mainRet() int {
 				// and return it.
 				n, err = core.NewNode(ctx, &core.BuildCfg{
 					Repo: r,
-				}, utils.DefaultPassword, "")
+				}, "", utils.DefaultPassword, "")
 				if err != nil {
 					return nil, err
 				}

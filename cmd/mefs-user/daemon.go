@@ -15,12 +15,12 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	mprome "github.com/ipfs/go-metrics-prometheus"
 	version "github.com/memoio/go-mefs"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	minit "github.com/memoio/go-mefs/cmd/mefs"
 	utilmain "github.com/memoio/go-mefs/cmd/util"
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
@@ -263,7 +263,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return fmt.Errorf("unrecognized routing option: %s", routingOption)
 	}
 
-	node, err := core.NewNode(req.Context, ncfg, password, nKey) //根据配置信息获得本地mefs节点实例
+	node, err := core.NewNode(req.Context, ncfg, "", password, nKey)
 	if err != nil {
 		log.Error("error from node construction: ", err)
 		return err

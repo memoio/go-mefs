@@ -15,12 +15,12 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	mprome "github.com/ipfs/go-metrics-prometheus"
 	version "github.com/memoio/go-mefs"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	minit "github.com/memoio/go-mefs/cmd/mefs"
 	utilmain "github.com/memoio/go-mefs/cmd/util"
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	"github.com/memoio/go-mefs/manageNode/commands"
 	"github.com/memoio/go-mefs/manageNode/corehttp"
 	"github.com/memoio/go-mefs/manageNode/keeper"
@@ -28,6 +28,7 @@ import (
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
@@ -131,7 +132,9 @@ environment variable:
   export MEFS_PATH=/path/to/mefsrepo
 `,
 	},
-
+	Arguments: []cmds.Argument{
+		cmds.StringArg("addr", false, false, "The practice user's address that you want to start as network node"),
+	},
 	Options: []cmds.Option{
 		cmds.BoolOption(initOptionKwd, "Initialize mefs-keeper with default settings if not already initialized"),
 		cmds.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
@@ -193,6 +196,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if unencrypted {
 		log.Warningf(`Running with --%s: All connections are UNENCRYPTED.
 		You will not be able to connect to regular encrypted networks.`, unencryptTransportKwd)
+	}
+
+	var uid string
+	if len(req.Arguments) > 0 {
+		addr := req.Arguments[0]
+		uid, err = address.GetIDFromAddress(addr)
+		if err != nil {
+			return err
+		}
 	}
 
 	hexsk, _ := req.Options[secretKeyKwd].(string)
@@ -265,7 +277,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return fmt.Errorf("unrecognized routing option: %s", routingOption)
 	}
 
-	node, err := core.NewNode(req.Context, ncfg, password, nKey) //根据配置信息获得本地mefs节点实例
+	node, err := core.NewNode(req.Context, ncfg, uid, password, nKey)
 	if err != nil {
 		log.Error("error from node construction: ", err)
 		return err
