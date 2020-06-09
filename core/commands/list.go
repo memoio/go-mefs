@@ -16,9 +16,12 @@ import (
 )
 
 type allKeepers struct {
-	KeeperCount int
-	PledgeMoney string
-	KeeperInfos []keeperInfo
+	KeeperCount    int
+	PledgeMoney    string
+	OnlineCount    int
+	OnlineKepepers []keeperInfo
+	OfflineCount   int
+	OfflineKeepers []keeperInfo
 }
 
 type keeperInfo struct {
@@ -29,16 +32,19 @@ type keeperInfo struct {
 }
 
 type allProviders struct {
-	ProviderCount int
-	PledgeBytes   string
-	ProInfos      []proInfo
+	ProviderCount    int
+	PledgeBytes      string
+	OnlineCount      int
+	OnlineProviders  []proInfo
+	OfflineCount     int
+	OfflineProviders []proInfo
 }
 
 type proInfo struct {
 	Address     string
 	Online      bool
-	PledgeBytes int64
-	PledgeMoney *big.Int
+	PledgeBytes string
+	PledgeMoney string
 	PledgeTime  string
 }
 
@@ -91,7 +97,7 @@ var keeperCmd = &cmds.Command{
 
 		wg.Wait()
 
-		var aks []keeperInfo
+		var ons, offs []keeperInfo
 
 		price, err := role.GetKeeperPrice(n.Identity.Pretty())
 		if err != nil {
@@ -108,19 +114,33 @@ var keeperCmd = &cmds.Command{
 				continue
 			}
 
-			kinfo := keeperInfo{
-				Address:     kaddr.String(),
-				PledgeMoney: utils.FormatWei(ki.PledgeMoney),
-				PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-				Online:      n.Data.FastConnect(req.Context, ki.KeeperID),
+			if n.Data.FastConnect(req.Context, ki.KeeperID) {
+				kinfo := keeperInfo{
+					Address:     kaddr.String(),
+					PledgeMoney: utils.FormatWei(ki.PledgeMoney),
+					PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+					Online:      true,
+				}
+				ons = append(ons, kinfo)
+			} else {
+				kinfo := keeperInfo{
+					Address:     kaddr.String(),
+					PledgeMoney: utils.FormatWei(ki.PledgeMoney),
+					PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+					Online:      false,
+				}
+				offs = append(offs, kinfo)
 			}
-			aks = append(aks, kinfo)
+
 		}
 
 		output := &allKeepers{
-			KeeperCount: len(aks),
-			PledgeMoney: utils.FormatWei(pledge),
-			KeeperInfos: aks,
+			KeeperCount:    len(ons) + len(offs),
+			PledgeMoney:    utils.FormatWei(pledge),
+			OnlineCount:    len(ons),
+			OnlineKepepers: ons,
+			OfflineCount:   len(offs),
+			OfflineKeepers: offs,
 		}
 
 		return cmds.EmitOnce(res, output)
@@ -174,7 +194,7 @@ var proCmd = &cmds.Command{
 		}
 
 		wg.Wait()
-		var aks []proInfo
+		var ons, offs []proInfo
 		for _, ki := range pItems {
 			if ki.PledgeMoney.Sign() <= 0 {
 				continue
@@ -189,21 +209,36 @@ var proCmd = &cmds.Command{
 				continue
 			}
 
-			kinfo := proInfo{
-				Address:     kaddr.String(),
-				PledgeMoney: ki.PledgeMoney,
-				PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-				Online:      n.Data.FastConnect(req.Context, ki.ProviderID),
-				PledgeBytes: ki.Capacity * 1024 * 1024,
+			if n.Data.FastConnect(req.Context, ki.ProviderID) {
+				kinfo := proInfo{
+					Address:     kaddr.String(),
+					PledgeMoney: utils.FormatWei(ki.PledgeMoney),
+					PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+					Online:      true,
+					PledgeBytes: utils.FormatBytes(ki.Capacity * 1024 * 1024),
+				}
+				ons = append(ons, kinfo)
+			} else {
+				kinfo := proInfo{
+					Address:     kaddr.String(),
+					PledgeMoney: utils.FormatWei(ki.PledgeMoney),
+					PledgeTime:  time.Unix(ki.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+					Online:      false,
+					PledgeBytes: utils.FormatBytes(ki.Capacity * 1024 * 1024),
+				}
+				offs = append(offs, kinfo)
 			}
-			aks = append(aks, kinfo)
+
 		}
 
 		pledge.Mul(pledge, big.NewInt(1024*1024))
 		output := &allProviders{
-			ProviderCount: len(aks),
-			PledgeBytes:   utils.FormatBytes(pledge.Int64()),
-			ProInfos:      aks,
+			ProviderCount:    len(ons) + len(offs),
+			PledgeBytes:      utils.FormatBytes(pledge.Int64()),
+			OnlineCount:      len(ons),
+			OnlineProviders:  ons,
+			OfflineCount:     len(offs),
+			OfflineProviders: offs,
 		}
 
 		return cmds.EmitOnce(res, output)
