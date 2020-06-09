@@ -17,6 +17,7 @@ import (
 // NOTE: This is here -- and not inside cmd/ipfs/init.go -- because of an
 // import dependency issue. TODO: move this into a config/default/ package.
 var DefaultBootstrapAddresses = []string{
+	"/ip4/119.3.159.159/tcp/4001/p2p/8MG8mghNNtP7LCJdoqWkrnUmfvNgKZ",
 	"/ip4/39.100.145.251/tcp/4001/p2p/8MGRZbvn8caS431icB2P1uT74B3EHh",
 	"/ip4/47.90.212.117/tcp/4001/p2p/8MKX58Ko5vBeJUkfgpkig53jZzwqoW",
 	"/ip4/39.98.240.7/tcp/4001/p2p/8MHYzNkm6dF9SWU5u7Py8MJ31vJrzS",
