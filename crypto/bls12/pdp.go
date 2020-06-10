@@ -55,15 +55,15 @@ type PublicKey struct {
 	TagCount int
 	BlsPk    G2
 	SignG2   G2
-	ElemG1s  []G1
-	ElemG2s  []G2
+	ElemG1s  [][]byte
+	ElemG2s  [][]byte
 }
 
 // SecretKey is bls secret key
 type SecretKey struct {
 	BlsSk       Fr
 	ElemSk      Fr
-	ElemPowerSk []Fr
+	ElemPowerSk [][]byte
 }
 
 // KeySet is wrap
@@ -95,11 +95,11 @@ func GenKeySetWithSeed(seed []byte, tagCount, count int) (*KeySet, error) {
 	pk := &PublicKey{
 		Count:    count,
 		TagCount: tagCount,
-		ElemG1s:  make([]G1, tagCount),
-		ElemG2s:  make([]G2, count),
+		ElemG1s:  make([][]byte, tagCount),
+		ElemG2s:  make([][]byte, count),
 	}
 	sk := &SecretKey{
-		ElemPowerSk: make([]Fr, count),
+		ElemPowerSk: make([][]byte, count),
 	}
 	ks := &KeySet{pk, sk}
 
@@ -109,22 +109,28 @@ func GenKeySetWithSeed(seed []byte, tagCount, count int) (*KeySet, error) {
 	sk.BlsSk.SetHashOf(seed1[:])
 
 	seed2 := sha256.Sum256(seed1[:])
-	sk.ElemSk.SetHashOf(seed)
+	sk.ElemSk.SetHashOf(seed2[:])
 
 	var frSeed Fr
 	seed3 := sha256.Sum256(seed2[:])
 	frSeed.SetHashOf(seed3[:])
-	err := pk.ElemG1s[0].HashAndMapTo(frSeed.Serialize())
+	var g1 G1
+	err := g1.HashAndMapTo(frSeed.Serialize())
 	if err != nil {
 		return nil, err
 	}
 
+	pk.ElemG1s[0] = g1.Serialize()
+
+	var g2 G2
 	seed4 := sha256.Sum256(seed3[:])
 	frSeed.SetHashOf(seed4[:])
-	err = pk.ElemG2s[0].HashAndMapTo(frSeed.Serialize())
+	err = g2.HashAndMapTo(frSeed.Serialize())
 	if err != nil {
 		return nil, err
 	}
+
+	pk.ElemG2s[0] = g2.Serialize()
 
 	seed5 := sha256.Sum256(seed4[:])
 	frSeed.SetHashOf(seed5[:])
@@ -144,11 +150,11 @@ func GenKeySet() (*KeySet, error) {
 	pk := &PublicKey{
 		Count:    PDPCountV1,
 		TagCount: TagAtomNumV1,
-		ElemG1s:  make([]G1, TagAtomNumV1),
-		ElemG2s:  make([]G2, PDPCountV1),
+		ElemG1s:  make([][]byte, TagAtomNumV1),
+		ElemG2s:  make([][]byte, PDPCountV1),
 	}
 	sk := &SecretKey{
-		ElemPowerSk: make([]Fr, PDPCountV1),
+		ElemPowerSk: make([][]byte, PDPCountV1),
 	}
 	ks := &KeySet{pk, sk}
 
@@ -159,16 +165,24 @@ func GenKeySet() (*KeySet, error) {
 
 	var seed Fr
 	seed.SetByCSPRNG()
-	err := pk.ElemG1s[0].HashAndMapTo(seed.Serialize())
+
+	var g1 G1
+	err := g1.HashAndMapTo(seed.Serialize())
 	if err != nil {
 		return nil, err
 	}
 
+	pk.ElemG1s[0] = g1.Serialize()
+
 	seed.SetByCSPRNG()
-	err = pk.ElemG2s[0].HashAndMapTo(seed.Serialize())
+
+	var g2 G2
+	err = g2.HashAndMapTo(seed.Serialize())
 	if err != nil {
 		return nil, err
 	}
+
+	pk.ElemG2s[0] = g2.Serialize()
 
 	seed.SetByCSPRNG()
 	err = pk.SignG2.HashAndMapTo(seed.Serialize())
@@ -186,21 +200,32 @@ func GenKeySet() (*KeySet, error) {
 func (k *KeySet) Calculate() {
 	var oneFr Fr
 	oneFr.SetInt64(1)
-	k.Sk.ElemPowerSk[0] = oneFr
+	k.Sk.ElemPowerSk[0] = oneFr.Serialize()
 
+	var oldFr, newFr Fr
 	for i := 1; i < k.Pk.Count; i++ {
-		FrMul(&k.Sk.ElemPowerSk[i], &k.Sk.ElemPowerSk[i-1], &k.Sk.ElemSk)
+		oldFr.Deserialize(k.Sk.ElemPowerSk[i-1])
+		FrMul(&newFr, &oldFr, &k.Sk.ElemSk)
+		k.Sk.ElemPowerSk[i] = newFr.Serialize()
 	}
 
 	G2Mul(&k.Pk.BlsPk, &k.Pk.SignG2, &k.Sk.BlsSk)
 	// U = u^(x^i), i = 0, 1, ..., tagCount-1
+	var oldG1, newG1 G1
+	oldG1.Deserialize(k.Pk.ElemG1s[0])
 	for i := 1; i < k.Pk.TagCount; i++ {
-		G1Mul(&k.Pk.ElemG1s[i], &k.Pk.ElemG1s[0], &k.Sk.ElemPowerSk[i])
+		oldFr.Deserialize(k.Sk.ElemPowerSk[i])
+		G1Mul(&newG1, &oldG1, &oldFr)
+		k.Pk.ElemG1s[i] = newG1.Serialize()
 	}
 
 	// W = w^(x^i), i = 0, 1, ..., count-1
+	var oldG2, newG2 G2
+	oldG2.Deserialize(k.Pk.ElemG2s[0])
 	for i := 1; i < k.Pk.Count; i++ {
-		G2Mul(&k.Pk.ElemG2s[i], &k.Pk.ElemG2s[0], &k.Sk.ElemPowerSk[i])
+		oldFr.Deserialize(k.Sk.ElemPowerSk[i])
+		G2Mul(&newG2, &oldG2, &oldFr)
+		k.Pk.ElemG2s[i] = newG2.Serialize()
 	}
 	return
 }
@@ -237,7 +262,7 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 		return nil, ErrKeyIsNil
 	}
 
-	var uMiDel G1
+	var uMiDel, eg1 G1
 
 	atoms, err := splitSegmentToAtoms(segments, typ)
 	if err != nil {
@@ -250,24 +275,26 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 
 	// Prod(u_j^M_ij)，即Prod(u^Sigma(x^j*M_ij))
 	if k.Sk != nil {
-		var power Fr
+		var power, mid, Mi, psk Fr
 		power.Clear() // Set0
 		for j, atom := range atoms {
-			var mid, Mi Fr
 			i := j + start
 			judge := Mi.SetHashOf(atom)
 			if !judge {
 				return nil, ErrSetHashOf
 			}
+			psk.Deserialize(k.Sk.ElemPowerSk[i])
 
-			FrMul(&mid, &(k.Sk.ElemPowerSk[i]), &Mi) // Xi * Mi
-			FrAdd(&power, &power, &mid)              // power = Sigma(Xi*Mi)
+			FrMul(&mid, &psk, &Mi)      // Xi * Mi
+			FrAdd(&power, &power, &mid) // power = Sigma(Xi*Mi)
 		}
-		G1Mul(&uMiDel, &(k.Pk.ElemG1s[0]), &power) // uMiDel = u ^ Sigma(Xi*Mi)
+
+		eg1.Deserialize(k.Pk.ElemG1s[0])
+		G1Mul(&uMiDel, &eg1, &power) // uMiDel = u ^ Sigma(Xi*Mi)
 	} else {
+		var Mi Fr
+		var mid G1
 		for j, atom := range atoms {
-			var Mi Fr
-			var mid G1
 			i := j + start
 			// Mi为atom而非block或segment
 			judge := Mi.SetHashOf(atom)
@@ -275,7 +302,9 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 				return nil, ErrSetHashOf
 			}
 
-			G1Mul(&mid, &(k.Pk.ElemG1s[i]), &Mi) // uMiDel = ui ^ Mi)
+			eg1.Deserialize(k.Pk.ElemG1s[i])
+
+			G1Mul(&mid, &eg1, &Mi) // uMiDel = ui ^ Mi)
 			G1Add(&uMiDel, &uMiDel, &mid)
 		}
 	}
@@ -357,19 +386,25 @@ func (k *KeySet) VerifyTag(index, segment, tag []byte) bool {
 		return false
 	}
 
+	if t.IsZero() {
+		return false
+	}
+
 	atoms, err := splitSegmentToAtoms(segment, 32)
 	if err != nil {
 		return false
 	}
 
+	var Mi Fr
+	var eg1 G1
 	for j, atom := range atoms {
-		var Mi Fr
 		judge := Mi.SetHashOf(atom)
 		if !judge {
 			return false
 		}
-		G1Mul(&mido, &(k.Pk.ElemG1s[j]), &Mi) // mido = uj ^ mij
-		G1Add(&midt, &midt, &mido)            // midt = Prod(uj^mij)
+		eg1.Deserialize(k.Pk.ElemG1s[j])
+		G1Mul(&mido, &eg1, &Mi)    // mido = uj ^ mij
+		G1Add(&midt, &midt, &mido) // midt = Prod(uj^mij)
 	}
 
 	G1Add(&formula, &HWi, &midt) // formula = H(Wi) * Prod(uj^mij)
@@ -386,6 +421,7 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 		return nil, ErrKeyIsNil
 	}
 	var m Fr
+	var eg1 G1
 	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
 	if len(segments) == 0 || len(segments[0]) == 0 {
 		return nil, ErrSegmentSize
@@ -422,8 +458,9 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	var muProd G1
 	muProd.Clear()
 	for j, sum := range sums {
-		G1Mul(&mu[j], &(k.Pk.ElemG1s[j]), &sum) // mu_j = U_j ^ sum_j
-		G1Add(&muProd, &muProd, &mu[j])         // mu = Prod(U_j^sum_j)
+		eg1.Deserialize(k.Pk.ElemG1s[j])
+		G1Mul(&mu[j], &eg1, &sum)       // mu_j = U_j ^ sum_j
+		G1Add(&muProd, &muProd, &mu[j]) // mu = Prod(U_j^sum_j)
 	}
 
 	// delta = Prod(tag_i)
@@ -455,11 +492,12 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	// 对于BLS12_381,h_j = w_(c+j)
 	// nuProd = Prod(h_j^sums_j)
 	nu := make([]G2, tagNum)
-	var nuProd G2
+	var nuProd, eg2 G2
 	nuProd.Clear()
 	for j, sum := range sums {
-		G2Mul(&nu[j], &k.Pk.ElemG2s[c+j], &sum) // nu_j = h_j ^ sum_j
-		G2Add(&nuProd, &nuProd, &nu[j])         // nu = Prod(h_j^sum_j)
+		eg2.Deserialize(k.Pk.ElemG2s[c+j])
+		G2Mul(&nu[j], &eg2, &sum)       // nu_j = h_j ^ sum_j
+		G2Add(&nuProd, &nuProd, &nu[j]) // nu = Prod(h_j^sum_j)
 	}
 
 	return &Proof{
@@ -538,9 +576,14 @@ func (k *KeySet) VerifyProof(chal Challenge, pf *Proof, mode bool) (bool, error)
 		rand.Seed(chal.Seed + int64(cmix))
 		c := rand.Intn(k.Pk.Count - k.Pk.TagCount)
 
-		Pairing(&lhs2, &mu, &k.Pk.ElemG2s[c])
+		var eg2 G2
+		eg2.Deserialize(k.Pk.ElemG2s[c])
+		var eg1 G1
+		eg1.Deserialize(k.Pk.ElemG1s[0])
+
+		Pairing(&lhs2, &mu, &eg2)
 		// rhs = e(u, nu)
-		Pairing(&rhs2, &k.Pk.ElemG1s[0], &nu)
+		Pairing(&rhs2, &eg1, &nu)
 		// check
 		if !lhs2.IsEqual(&rhs2) {
 			return false, ErrVerifyStepTwo
@@ -592,11 +635,12 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 	// muProd = Prod(u_j^sums_j)
 	// nuProd = Prod(h_j^sums_j)
 	mu := make([]G1, tagNum)
-	var muProd G1
+	var muProd, eg1 G1
 	muProd.Clear()
 	for j, sum := range sums {
-		G1Mul(&mu[j], &(k.Pk.ElemG1s[j]), &sum) // mu_j = U_j ^ sum_j
-		G1Add(&muProd, &muProd, &mu[j])         // mu = Prod(U_j^sum_j)
+		eg1.Deserialize(k.Pk.ElemG1s[j])
+		G1Mul(&mu[j], &eg1, &sum)       // mu_j = U_j ^ sum_j
+		G1Add(&muProd, &muProd, &mu[j]) // mu = Prod(U_j^sum_j)
 	}
 	// delta = Prod(tag_i)
 	var delta G1

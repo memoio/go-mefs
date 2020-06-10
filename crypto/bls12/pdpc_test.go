@@ -83,6 +83,11 @@ func BenchmarkGenChallenge(b *testing.B) {
 		if err != nil {
 			panic("Error")
 		}
+
+		boo := keySet.VerifyTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, tags[j])
+		if boo == false {
+			panic("VerifyTag false")
+		}
 	}
 
 	// -------------- TPA --------------- //
@@ -113,7 +118,7 @@ func BenchmarkGenProof(b *testing.B) {
 	blocks := make([]string, SegNum)
 	for i := 0; i < SegNum; i++ {
 		segments[i] = data[SegSize*i : SegSize*(i+1)]
-		blocks[i] = strconv.Itoa(i)
+		blocks[i] = strconv.Itoa(i) + "_" + "0"
 	}
 
 	// ------------- the data owner --------------- //
@@ -133,15 +138,6 @@ func BenchmarkGenProof(b *testing.B) {
 		Indices: blocks,
 	}
 
-	// ------------- the storage provider ---------------- //
-	// fetch the tag & challenge
-	for j, segment := range segments {
-		index := strconv.Itoa(j) + "_" + "0"
-		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
-		if boo == false {
-			println("VerifyTag: ", boo)
-		}
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// generate the proof
