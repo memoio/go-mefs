@@ -98,7 +98,9 @@ func GenKeySetWithSeed(seed []byte, tagCount, count int) (*KeySet, error) {
 		ElemG1s:  make([]G1, tagCount),
 		ElemG2s:  make([]G2, count),
 	}
-	sk := new(SecretKey)
+	sk := &SecretKey{
+		ElemPowerSk: make([]Fr, count),
+	}
 	ks := &KeySet{pk, sk}
 
 	// bls
@@ -145,7 +147,9 @@ func GenKeySet() (*KeySet, error) {
 		ElemG1s:  make([]G1, TagAtomNumV1),
 		ElemG2s:  make([]G2, PDPCountV1),
 	}
-	sk := new(SecretKey)
+	sk := &SecretKey{
+		ElemPowerSk: make([]Fr, PDPCountV1),
+	}
 	ks := &KeySet{pk, sk}
 
 	// bls
@@ -180,25 +184,21 @@ func GenKeySet() (*KeySet, error) {
 
 // Calculate cals Xi = x^i, Ui and Wi i = 0, 1, ..., N
 func (k *KeySet) Calculate() {
-	if len(k.Sk.ElemPowerSk) != k.Pk.Count {
-		k.Sk.ElemPowerSk = make([]Fr, k.Pk.Count)
-	}
+	var oneFr Fr
+	oneFr.SetInt64(1)
+	k.Sk.ElemPowerSk[0] = oneFr
 
-	k.Sk.ElemPowerSk[1] = k.Sk.ElemSk
-
-	for i := 2; i < k.Pk.Count; i++ {
+	for i := 1; i < k.Pk.Count; i++ {
 		FrMul(&k.Sk.ElemPowerSk[i], &k.Sk.ElemPowerSk[i-1], &k.Sk.ElemSk)
 	}
 
 	G2Mul(&k.Pk.BlsPk, &k.Pk.SignG2, &k.Sk.BlsSk)
 	// U = u^(x^i), i = 0, 1, ..., tagCount-1
-	k.Pk.ElemG1s = make([]G1, k.Pk.TagCount)
 	for i := 1; i < k.Pk.TagCount; i++ {
 		G1Mul(&k.Pk.ElemG1s[i], &k.Pk.ElemG1s[0], &k.Sk.ElemPowerSk[i])
 	}
 
 	// W = w^(x^i), i = 0, 1, ..., count-1
-	k.Pk.ElemG2s = make([]G2, k.Pk.Count)
 	for i := 1; i < k.Pk.Count; i++ {
 		G2Mul(&k.Pk.ElemG2s[i], &k.Pk.ElemG2s[0], &k.Sk.ElemPowerSk[i])
 	}
@@ -263,7 +263,6 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 			FrMul(&mid, &(k.Sk.ElemPowerSk[i]), &Mi) // Xi * Mi
 			FrAdd(&power, &power, &mid)              // power = Sigma(Xi*Mi)
 		}
-
 		G1Mul(&uMiDel, &(k.Pk.ElemG1s[0]), &power) // uMiDel = u ^ Sigma(Xi*Mi)
 	} else {
 		for j, atom := range atoms {
@@ -372,6 +371,7 @@ func (k *KeySet) VerifyTag(index, segment, tag []byte) bool {
 		G1Mul(&mido, &(k.Pk.ElemG1s[j]), &Mi) // mido = uj ^ mij
 		G1Add(&midt, &midt, &mido)            // midt = Prod(uj^mij)
 	}
+
 	G1Add(&formula, &HWi, &midt) // formula = H(Wi) * Prod(uj^mij)
 
 	Pairing(&left, &t, &(k.Pk.SignG2))       // left = e(tag, g)
@@ -387,7 +387,7 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	}
 	var m Fr
 	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
-	if len(segments) == 0 {
+	if len(segments) == 0 || len(segments[0]) == 0 {
 		return nil, ErrSegmentSize
 	}
 
@@ -481,14 +481,26 @@ func (k *KeySet) VerifyProof(chal Challenge, pf *Proof, mode bool) (bool, error)
 		return false, err
 	}
 
+	if mu.IsZero() {
+		return false, nil
+	}
+
 	err = nu.Deserialize(pf.Nu)
 	if err != nil {
 		return false, err
 	}
 
+	if nu.IsZero() {
+		return false, nil
+	}
+
 	err = delta.Deserialize(pf.Delta)
 	if err != nil {
 		return false, err
+	}
+
+	if delta.IsZero() {
+		return false, nil
 	}
 
 	var ProdHWi, ProdHWimu, HWi G1
@@ -548,7 +560,7 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 	}
 	var m Fr
 
-	if len(segments) == 0 {
+	if len(segments) == 0 || len(segments[0]) == 0 {
 		return false, ErrSegmentSize
 	}
 
@@ -595,7 +607,12 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 		if err != nil {
 			return false, err
 		}
+
 		G1Add(&delta, &delta, &t)
+	}
+
+	if delta.IsZero() {
+		return false, nil
 	}
 
 	var ProdHWi, ProdHWimu, HWi G1

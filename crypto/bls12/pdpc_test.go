@@ -178,11 +178,16 @@ func BenchmarkVerifyProof(b *testing.B) {
 
 	// ------------- the data owner --------------- //
 	tags := make([][]byte, SegNum)
-	for j, segment := range segments {
+	for i, segment := range segments {
 		// generate the data tag
-		tags[j], err = keySet.GenTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, 0, 32, true)
+		tags[i], err = keySet.GenTag([]byte(blocks[i]), segment, 0, 32, true)
 		if err != nil {
 			panic(err)
+		}
+
+		boo := keySet.VerifyTag([]byte(blocks[i]), segment, tags[i])
+		if boo == false {
+			panic("VerifyTag false")
 		}
 	}
 
@@ -193,15 +198,6 @@ func BenchmarkVerifyProof(b *testing.B) {
 		Indices: blocks,
 	}
 
-	// ------------- the storage provider ---------------- //
-	// fetch the tag & challenge
-	for j, segment := range segments {
-		index := strconv.Itoa(j) + "_" + "0"
-		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
-		if boo == false {
-			println("VerifyTag: ", boo)
-		}
-	}
 	// generate the proof
 	proof, err := keySet.GenProof(chal, segments, tags, 32)
 	if err != nil {
@@ -210,16 +206,9 @@ func BenchmarkVerifyProof(b *testing.B) {
 
 	// -------------- TPA --------------- //
 	// Verify the proof
-	h := Challenge{}
-	h.Seed = chal.Seed
-	h.Indices = make([]string, SegNum)
-	for i := range chal.Indices {
-		bid := strconv.Itoa(i)
-		h.Indices[i] = bid + "_" + "0"
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, err := keySet.VerifyProof(h, proof, true)
+		result, err := keySet.VerifyProof(chal, proof, true)
 		if err != nil {
 			panic("Error")
 		}
@@ -259,12 +248,18 @@ func TestVerifyProof(t *testing.T) {
 
 	// ------------- the data owner --------------- //
 	tags := make([][]byte, SegNum/2)
-	for j, segment := range segments {
+	for i, segment := range segments {
 		// generate the data tag
-		tags[j], err = keySet.GenTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, 0, 32, true)
+		tag, err := keySet.GenTag([]byte(blocks[i]), segment, 0, 32, true)
 		if err != nil {
-			panic("Error")
+			panic("gentag Error")
 		}
+
+		boo := keySet.VerifyTag([]byte(blocks[i]), segment, tag)
+		if boo == false {
+			panic("VerifyTag1")
+		}
+		tags[i] = tag
 	}
 
 	// -------------- TPA --------------- //
@@ -274,34 +269,20 @@ func TestVerifyProof(t *testing.T) {
 		Indices: blocks,
 	}
 
-	// ------------- the storage provider ---------------- //
-	// fetch the tag & challenge
-	for j, segment := range segments {
-		index := strconv.Itoa(j) + "_" + "0"
-		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
-		if boo == false {
-			println("VerifyTag: ", boo)
-		}
-	}
 	// generate the proof
 	proof, err := keySet.GenProof(chal, segments, tags, 32)
 	if err != nil {
 		panic(err)
 	}
 
+	t.Log(proof)
+
 	// -------------- TPA --------------- //
 	// Verify the proof
-	h := Challenge{}
-	h.Seed = chal.Seed
-	h.Indices = make([]string, SegNum/2)
-	for i := range chal.Indices {
-		bid := strconv.Itoa(i)
-		h.Indices[i] = bid + "_" + "0"
-	}
 
-	result, err := keySet.VerifyProof(h, proof, true)
+	result, err := keySet.VerifyProof(chal, proof, true)
 	if err != nil {
-		panic("Error")
+		t.Fatal(err)
 	}
 	if !result {
 		t.Errorf("Verificaition failed!")

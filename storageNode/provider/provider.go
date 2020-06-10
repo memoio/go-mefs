@@ -143,10 +143,6 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		PosIncome:     big.NewInt(0),
 		offers:        make([]*role.OfferItem, 0, 1),
 	}
-	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
-	if err != nil {
-		return nil, err
-	}
 
 	// cache userconfigs, key is queryID
 	ucache, err := lru.NewARC(1024)
@@ -201,6 +197,11 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	go m.getFromChainRegular(ctx)
 	go m.sendStorageRegular(ctx)
 	go m.saveRegular(ctx)
+
+	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	if err != nil {
+		return nil, err
+	}
 
 	m.state = true
 	if enablePos {

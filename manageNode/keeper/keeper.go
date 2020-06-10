@@ -116,11 +116,6 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		return nil, err
 	}
 
-	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
-	if err != nil {
-		return nil, err
-	}
-
 	// cache userconfigs, key is queryID
 	ucache, err := lru.NewARC(1024)
 	if err != nil {
@@ -144,6 +139,12 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.stPayRegular(ctx)
 	go m.checkPeers(ctx)
 	go m.getFromChainRegular(ctx)
+
+	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	if err != nil {
+		return nil, err
+	}
+
 	m.state = true
 	utils.MLogger.Info("Keeper Service is ready")
 	return m, nil
