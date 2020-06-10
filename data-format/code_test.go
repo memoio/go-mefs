@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	"github.com/memoio/go-mefs/crypto/aes"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
 )
 
 // 全局配置
@@ -23,6 +23,8 @@ var Mullen = 1 * 1024 * 1024
 
 var userID = "8MGxCuiT75bje883b7uFb6eMrJt5cP"
 
+var FileSize = 8 * 1024 * 1024
+
 func BenchmarkEncode(b *testing.B) {
 	err := mcl.Init(mcl.BLS12_381)
 	if err != nil {
@@ -33,14 +35,14 @@ func BenchmarkEncode(b *testing.B) {
 		log.Fatal(err)
 	}
 
-	opt, err := NewDataCoderWithDefault(keyset, RsPolicy, 3, 2, userID, userID)
+	opt, err := NewDataCoderWithDefault(keyset, RsPolicy, 16, 16, userID, userID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	data := make([]byte, 4096*3)
+	data := make([]byte, FileSize)
 	fillRandom(data)
-
+	b.SetBytes(int64(FileSize))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// 构建加密秘钥icy
@@ -48,10 +50,13 @@ func BenchmarkEncode(b *testing.B) {
 		skey := sha256.Sum256(tmpkey)
 
 		// 加密、Encode
-		data, _ = aes.AesEncrypt(data, skey[:])
+		Encdata, _ := aes.AesEncrypt(data, skey[:])
 
 		// 多副本含前缀
-		opt.Encode(data, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
+		_, _, err := opt.Encode(Encdata, "8MGxCuiT75bje883b7uFb6eMrJt5cP_1_0", 0)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -88,7 +93,6 @@ func CodeAndRepair(policy, dc, pc, size int) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Println("encode offset is: ", offset)
 
 	gotdata, err := opt.Decode(datas, 0, dlen)
@@ -111,7 +115,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 
 	datas, len, err := Repair(datas)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Repair ", err)
 	}
 
 	log.Println("repair offset is: ", len)
@@ -126,7 +130,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 
 	gotdata, err = opt.Decode(datas, 0, dlen)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Decode ", err)
 	}
 
 	gotdata, _ = aes.AesDecrypt(gotdata, skey[:])
@@ -144,7 +148,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 
 	datas, len, err = Repair(datas)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Repair2 ", err)
 	}
 
 	log.Println("repair offset is: ", len)
@@ -159,7 +163,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 
 	gotdata, err = opt.Decode(datas, 0, dlen)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Decode2 ", err)
 	}
 
 	gotdata, _ = aes.AesDecrypt(gotdata, skey[:])
@@ -181,7 +185,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 
 		gotdata, err = opt.Decode(datas, 0, dlen)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Decode3 ", err)
 		}
 
 		gotdata, _ = aes.AesDecrypt(gotdata, skey[:])

@@ -17,7 +17,6 @@ import (
 var (
 	ErrSplitSegmentToAtoms = errors.New("invalid segment")
 	ErrKeyIsNil            = errors.New("the key is nil")
-	ErrSetHashOf           = errors.New("SetHashOf is not true")
 	ErrSetString           = errors.New("SetString is not true")
 	ErrSetBigInt           = errors.New("SetBigInt is not true")
 	ErrSetToBigInt         = errors.New("SetString (for big.Int) is not true")
@@ -106,28 +105,29 @@ func GenKeySetWithSeed(seed []byte, tagCount, count int) (*KeySet, error) {
 	// bls
 	// private key
 	seed1 := sha256.Sum256(seed)
-	sk.BlsSk.SetHashOf(seed1[:])
+	sk.BlsSk.SetLittleEndian(seed1[:])
 
 	seed2 := sha256.Sum256(seed1[:])
-	sk.ElemSk.SetHashOf(seed)
+	sk.ElemSk.SetLittleEndian(seed2[:])
 
 	var frSeed Fr
 	seed3 := sha256.Sum256(seed2[:])
-	frSeed.SetHashOf(seed3[:])
+	frSeed.SetLittleEndian(seed3[:])
+
 	err := pk.ElemG1s[0].HashAndMapTo(frSeed.Serialize())
 	if err != nil {
 		return nil, err
 	}
 
 	seed4 := sha256.Sum256(seed3[:])
-	frSeed.SetHashOf(seed4[:])
+	frSeed.SetLittleEndian(seed4[:])
 	err = pk.ElemG2s[0].HashAndMapTo(frSeed.Serialize())
 	if err != nil {
 		return nil, err
 	}
 
 	seed5 := sha256.Sum256(seed4[:])
-	frSeed.SetHashOf(seed5[:])
+	frSeed.SetLittleEndian(seed5[:])
 	err = pk.SignG2.HashAndMapTo(frSeed.Serialize())
 	if err != nil {
 		return nil, err
@@ -206,7 +206,7 @@ func (k *KeySet) Calculate() {
 }
 
 // -------------------- proof related routines ------------------- //
-func splitSegmentToAtoms(data []byte, typ int) ([][]byte, error) {
+func splitSegmentToAtoms(data []byte, typ int) ([]Fr, error) {
 	if len(data) == 0 {
 		return nil, ErrSplitSegmentToAtoms
 	}
@@ -217,14 +217,14 @@ func splitSegmentToAtoms(data []byte, typ int) ([][]byte, error) {
 
 	num := (len(data)-1)/typ + 1
 
-	atom := make([][]byte, num)
+	atom := make([]Fr, num)
 
 	for i := 0; i < num-1; i++ {
-		atom[i] = data[typ*i : typ*(i+1)]
+		atom[i].SetLittleEndian(data[typ*i : typ*(i+1)])
 	}
 
 	// last one
-	atom[num-1] = data[typ*(num-1):]
+	atom[num-1].SetLittleEndian(data[typ*(num-1):])
 
 	return atom, nil
 }
@@ -232,14 +232,14 @@ func splitSegmentToAtoms(data []byte, typ int) ([][]byte, error) {
 // GenTag create tag for *SINGLE* segment
 // typ: 32B atom or 24B atom
 // mode: sign or not
-func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool) ([]byte, error) {
+func (k *KeySet) GenTag(index []byte, segment []byte, start, typ int, mode bool) ([]byte, error) {
 	if k == nil || k.Pk == nil {
 		return nil, ErrKeyIsNil
 	}
 
 	var uMiDel G1
 
-	atoms, err := splitSegmentToAtoms(segments, typ)
+	atoms, err := splitSegmentToAtoms(segment, typ)
 	if err != nil {
 		return nil, err
 	}
@@ -251,35 +251,18 @@ func (k *KeySet) GenTag(index []byte, segments []byte, start, typ int, mode bool
 	// Prod(u_j^M_ij)，即Prod(u^Sigma(x^j*M_ij))
 	if k.Sk != nil {
 		var power Fr
-		power.Clear() // Set0
-		for j, atom := range atoms {
-			var mid, Mi Fr
-			i := j + start
-			judge := Mi.SetHashOf(atom)
-			if !judge {
-				return nil, ErrSetHashOf
-			}
-
-			FrMul(&mid, &(k.Sk.ElemPowerSk[i]), &Mi) // Xi * Mi
-			FrAdd(&power, &power, &mid)              // power = Sigma(Xi*Mi)
-		}
+		FrEvaluatePolynomial(&power, atoms, &(k.Sk.ElemPowerSk[1]))
 		G1Mul(&uMiDel, &(k.Pk.ElemG1s[0]), &power) // uMiDel = u ^ Sigma(Xi*Mi)
 	} else {
+		//FrEvaluatePolynomial
 		for j, atom := range atoms {
-			var Mi Fr
+			// var Mi Fr
 			var mid G1
 			i := j + start
-			// Mi为atom而非block或segment
-			judge := Mi.SetHashOf(atom)
-			if !judge {
-				return nil, ErrSetHashOf
-			}
-
-			G1Mul(&mid, &(k.Pk.ElemG1s[i]), &Mi) // uMiDel = ui ^ Mi)
+			G1Mul(&mid, &k.Pk.ElemG1s[i], &atom) // uMiDel = ui ^ Mi)
 			G1Add(&uMiDel, &uMiDel, &mid)
 		}
 	}
-
 	if start == 0 {
 		// H(Wi)
 		var HWi G1
@@ -357,18 +340,17 @@ func (k *KeySet) VerifyTag(index, segment, tag []byte) bool {
 		return false
 	}
 
+	if t.IsZero() {
+		return false
+	}
+
 	atoms, err := splitSegmentToAtoms(segment, 32)
 	if err != nil {
 		return false
 	}
 
 	for j, atom := range atoms {
-		var Mi Fr
-		judge := Mi.SetHashOf(atom)
-		if !judge {
-			return false
-		}
-		G1Mul(&mido, &(k.Pk.ElemG1s[j]), &Mi) // mido = uj ^ mij
+		G1Mul(&mido, &k.Pk.ElemG1s[j], &atom) // mido = uj ^ mij
 		G1Add(&midt, &midt, &mido)            // midt = Prod(uj^mij)
 	}
 
@@ -385,7 +367,6 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	if k == nil || k.Pk == nil || typ <= 0 {
 		return nil, ErrKeyIsNil
 	}
-	var m Fr
 	// sums_j为待挑战的各segments位于同一位置(即j)上的atom的和
 	if len(segments) == 0 || len(segments[0]) == 0 {
 		return nil, ErrSegmentSize
@@ -407,11 +388,7 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 		}
 
 		for j, atom := range atoms { // 扫描各segment
-			judge := m.SetHashOf(atom)
-			if !judge {
-				return nil, ErrSetHashOf
-			}
-			FrAdd(&sums[j], &sums[j], &m)
+			FrAdd(&sums[j], &sums[j], &atom)
 		}
 	}
 	if len(k.Pk.ElemG1s) < tagNum {
@@ -422,8 +399,8 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	var muProd G1
 	muProd.Clear()
 	for j, sum := range sums {
-		G1Mul(&mu[j], &(k.Pk.ElemG1s[j]), &sum) // mu_j = U_j ^ sum_j
-		G1Add(&muProd, &muProd, &mu[j])         // mu = Prod(U_j^sum_j)
+		G1Mul(&mu[j], &k.Pk.ElemG1s[j], &sum) // mu_j = U_j ^ sum_j
+		G1Add(&muProd, &muProd, &mu[j])       // mu = Prod(U_j^sum_j)
 	}
 
 	// delta = Prod(tag_i)
@@ -558,7 +535,6 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 	if k.Pk == nil {
 		return false, ErrKeyIsNil
 	}
-	var m Fr
 
 	if len(segments) == 0 || len(segments[0]) == 0 {
 		return false, ErrSegmentSize
@@ -577,11 +553,7 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 			if len(atoms) < tagNum {
 				return false, ErrNumOutOfRange
 			}
-			judge := m.SetHashOf(atom)
-			if !judge {
-				return false, ErrSetHashOf
-			}
-			FrAdd(&sums[j], &sums[j], &m)
+			FrAdd(&sums[j], &sums[j], &atom)
 		}
 	}
 

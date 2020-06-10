@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-const SegSize = 4 * 1024
-const FileSize = 10 * 1024 * 1024
-const SegNum = FileSize / SegSize
+var SegSize = 4 * 1024
+var FileSize = 8 * 1024 * 1024
+var SegNum = FileSize / SegSize
 
 // 测试tag的形成
 func BenchmarkGenTag(b *testing.B) {
@@ -36,14 +36,15 @@ func BenchmarkGenTag(b *testing.B) {
 	}
 
 	// ------------- the data owner --------------- //
-	tagTable := make(map[string][]byte)
+	//tagTable := make(map[string][]byte)
 	// add index/data pair
 	// index := fmt.Sprintf("%s", sampleIdPrefix)
+	b.SetBytes(int64(FileSize))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j, segment := range segments {
 			// generate the data tag
-			tagTable[strconv.Itoa(j)], err = keySet.GenTag([]byte(strconv.Itoa(j)), segment, 0, 32, true)
+			_, err = keySet.GenTag([]byte("123456"+strconv.Itoa(j)), segment, 0, 32, true)
 			if err != nil {
 				println(err.Error())
 			}
@@ -51,6 +52,73 @@ func BenchmarkGenTag(b *testing.B) {
 	}
 }
 
+func BenchmarkGenOneTag(b *testing.B) {
+	err := Init(BLS12_381)
+	if err != nil {
+		panic(err)
+	}
+	keySet, err := GenKeySet()
+	if err != nil {
+		panic(err)
+	}
+	// sample data
+	data := make([]byte, SegSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
+
+	// ------------- the data owner --------------- //
+	//tagTable := make(map[string][]byte)
+	// add index/data pair
+	// index := fmt.Sprintf("%s", sampleIdPrefix)
+	b.SetBytes(int64(SegSize))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// generate the data tag
+		_, err := keySet.GenTag([]byte("123456"+strconv.Itoa(i)), data, 0, 32, true)
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func benchmarkGenOneTag(keySet *KeySet) func(b *testing.B) {
+	return func(b *testing.B) {
+		// sample data
+		data := make([]byte, SegSize)
+		rand.Seed(time.Now().UnixNano())
+		fillRandom(data)
+
+		// ------------- the data owner --------------- //
+		//tagTable := make(map[string][]byte)
+		// add index/data pair
+		// index := fmt.Sprintf("%s", sampleIdPrefix)
+		b.SetBytes(int64(SegSize))
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// generate the data tag
+			_, err := keySet.GenTag([]byte("123456"+strconv.Itoa(i)), data, 0, 32, true)
+			if err != nil {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func BenchmarkMultiGenTag(b *testing.B) {
+	err := Init(BLS12_381)
+	if err != nil {
+		panic(err)
+	}
+	keySet, err := GenKeySet()
+	if err != nil {
+		panic(err)
+	}
+	SegSize = 4 * 1024
+	for i := 0; i < 8; i++ {
+		b.Run("SegSize:"+strconv.Itoa(SegSize/1024)+"Kb", benchmarkGenOneTag(keySet))
+		SegSize = SegSize * 2
+	}
+}
 func BenchmarkGenChallenge(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
@@ -83,6 +151,11 @@ func BenchmarkGenChallenge(b *testing.B) {
 		if err != nil {
 			panic("Error")
 		}
+
+		boo := keySet.VerifyTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, tags[j])
+		if boo == false {
+			panic("VerifyTag false")
+		}
 	}
 
 	// -------------- TPA --------------- //
@@ -113,7 +186,7 @@ func BenchmarkGenProof(b *testing.B) {
 	blocks := make([]string, SegNum)
 	for i := 0; i < SegNum; i++ {
 		segments[i] = data[SegSize*i : SegSize*(i+1)]
-		blocks[i] = strconv.Itoa(i)
+		blocks[i] = strconv.Itoa(i) + "_" + "0"
 	}
 
 	// ------------- the data owner --------------- //
@@ -133,15 +206,6 @@ func BenchmarkGenProof(b *testing.B) {
 		Indices: blocks,
 	}
 
-	// ------------- the storage provider ---------------- //
-	// fetch the tag & challenge
-	for j, segment := range segments {
-		index := strconv.Itoa(j) + "_" + "0"
-		boo := keySet.VerifyTag([]byte(index), segment, tags[j])
-		if boo == false {
-			println("VerifyTag: ", boo)
-		}
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// generate the proof
@@ -286,6 +350,40 @@ func TestVerifyProof(t *testing.T) {
 	}
 	if !result {
 		t.Errorf("Verificaition failed!")
+	}
+}
+
+func TestEvaluatePolynomial(t *testing.T) {
+	err := Init(BLS12_381)
+	if err != nil {
+		panic(err)
+	}
+	k, err := GenKeySet()
+	if err != nil {
+		panic(err)
+	}
+	SegSize = 32 * 1024
+	// sample data
+	segment := make([]byte, SegSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(segment)
+	atoms, err := splitSegmentToAtoms(segment, 32)
+	if err != nil {
+		t.Error(err)
+	}
+	var power1 Fr
+	power1.Clear() // Set0
+	FrEvaluatePolynomial(&power1, atoms, &(k.Sk.ElemPowerSk[1]))
+	var power2 Fr
+	power2.Clear() // Set0
+	for j, atom := range atoms {
+		var mid Fr
+		FrMul(&mid, &(k.Sk.ElemPowerSk[j]), &atom)    // Xi * Mi
+		FrAdd(&power2, &power2, &mid) // power = Sigma(Xi*Mi)
+	}
+	ok := power1.IsEqual(&power2)
+	if !ok {
+		t.Error("Not Equal")
 	}
 }
 

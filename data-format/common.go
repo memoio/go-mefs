@@ -14,8 +14,8 @@ import (
 const (
 	RsPolicy            = 1
 	MulPolicy           = 2
-	DefaultSegmentSize  = 4096
-	DefaultSegmentCount = 256
+	DefaultSegmentSize  = 32 * 1024
+	DefaultSegmentCount = 64
 	DefaultTagFlag      = BLS12
 	CurrentVersion      = 1
 	DefaultCrypt        = 1
