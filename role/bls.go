@@ -16,6 +16,16 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 	pubkey := mkey.Pk
 	pubkeyBls := pubkey.BlsPk.Serialize()
 	pubkeyG := pubkey.SignG2.Serialize()
+	pubkeyU := make([][]byte, mkey.Pk.TagCount)
+	pubkeyW := make([][]byte, mkey.Pk.Count)
+
+	for i, u := range pubkey.ElemG1s {
+		pubkeyU[i] = u.Serialize()
+	}
+
+	for i, w := range pubkey.ElemG2s {
+		pubkeyW[i] = w.Serialize()
+	}
 
 	// 对BLS12的私钥进行加密
 	c := btcec.S256()
@@ -35,8 +45,8 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 	userBLS12ConfigProto := &mpb.UserBLS12Config{
 		PubkeyBls: pubkeyBls,
 		PubkeyG:   pubkeyG,
-		PubkeyU:   pubkey.ElemG1s,
-		PubkeyW:   pubkey.ElemG2s,
+		PubkeyU:   pubkeyU,
+		PubkeyW:   pubkeyW,
 		PrikeyBls: blsSKByte,
 		X:         XByte,
 		Count:     int32(mkey.Pk.Count),
@@ -83,7 +93,15 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 
 	pk.TagCount = len(userBLS12ConfigProto.PubkeyU)
 
-	pk.ElemG1s = userBLS12ConfigProto.PubkeyU
+	pk.ElemG1s = make([]mcl.G1, pk.TagCount)
+	for i, u := range userBLS12ConfigProto.PubkeyU {
+		var temp mcl.G1
+		err = temp.Deserialize(u)
+		if err != nil {
+			utils.MLogger.Info("Deserialize failed: ", err)
+		}
+		pk.ElemG1s[i] = temp
+	}
 
 	// version is user for different default
 	if userBLS12ConfigProto.GetCount() == 0 {
@@ -94,7 +112,15 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 
 	pk.Count = len(userBLS12ConfigProto.PubkeyW)
 
-	pk.ElemG2s = userBLS12ConfigProto.PubkeyW
+	pk.ElemG2s = make([]mcl.G2, pk.Count)
+	for i, w := range userBLS12ConfigProto.PubkeyW {
+		var temp mcl.G2
+		err = temp.Deserialize(w)
+		if err != nil {
+			utils.MLogger.Info("Deserialize failed: ", err)
+		}
+		pk.ElemG2s[i] = temp
+	}
 
 	mkey.Pk = pk
 
