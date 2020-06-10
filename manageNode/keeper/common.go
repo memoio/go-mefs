@@ -33,17 +33,18 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 		return value.(*mcl.KeySet), nil
 	}
 
+	if userID == pos.GetPosId() {
+		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNum, mcl.PDPCount)
+		if err != nil {
+			return nil, err
+		}
+
+		k.userConfigs.Add(groupID, mkey)
+		return mkey, nil
+	}
+
 	userconfigbyte, err := k.getUserBLS12ConfigByte(userID, groupID)
 	if err != nil {
-		if userID == pos.GetPosId() {
-			mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNum, mcl.PDPCount)
-			if err != nil {
-				return nil, err
-			}
-
-			k.userConfigs.Add(groupID, mkey)
-			return mkey, nil
-		}
 		return nil, err
 	}
 

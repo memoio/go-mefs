@@ -8,12 +8,23 @@ import (
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	value, ok := p.userConfigs.Get(groupID)
 	if ok {
 		return value.(*mcl.KeySet), nil
+	}
+
+	if userID == pos.GetPosId() {
+		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNum, mcl.PDPCount)
+		if err != nil {
+			utils.MLogger.Info("Init bls config for pos user fail: ", err)
+			return nil, err
+		}
+
+		p.userConfigs.Add(groupID, mkey)
 	}
 
 	kmBls12, err := metainfo.NewKey(groupID, mpb.KeyType_Config, userID)
