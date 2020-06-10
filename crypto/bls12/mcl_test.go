@@ -1,8 +1,10 @@
 package mcl
 
-import "testing"
-import "fmt"
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+	"testing"
+)
 
 func testBadPointOfG2(t *testing.T) {
 	var Q G2
@@ -161,6 +163,28 @@ func TestMclMain(t *testing.T) {
 		t.Log("BLS12_381")
 		testMcl(t, BLS12_381)
 	}
+}
+
+func BenchmarkFrSetHash(b *testing.B) {
+	err := Init(BLS12_381)
+	if err != nil {
+		b.Errorf("ErrInit")
+	}
+
+	var f Fr
+	atom := make([]byte, 32)
+	for i := 0; i < 32; i++ {
+		atom[i] |= 0xff
+	}
+	b.ResetTimer()
+	b.SetBytes(32)
+	for i := 0; i < b.N; i++ {
+		ok := f.SetHashOf(atom)
+		if !ok {
+			b.Errorf("ErrSetLittleEndian")
+		}
+	}
+	b.Log(atom, len(atom))
 }
 
 func BenchmarkSetHashOf(b *testing.B) {

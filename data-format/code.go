@@ -131,14 +131,14 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 	stripe := make([][]byte, d.blockCount)
 	for i := 0; i < d.blockCount; i++ {
-		stripe[i] = make([]byte, 0, blockSize+preLen)
-		stripe[i] = append(stripe[i], preData...)
+		stripe[i] = make([]byte, blockSize+preLen)
+		copy(stripe[i], preData)
 	}
 
 	// 生成临时块组保存data切分后的segment
-	dataGroup := createGroup(d.blockCount, d.segSize)
+	dataGroup := make([][]byte, d.blockCount)
 	// 生成taggroup装一组的tag+tagP
-	tagGroup := createGroup(d.blockCount*d.tagCount, d.tagSize)
+	tagGroup := make([][]byte, d.blockCount*d.tagCount)
 
 	enc, err := reedsolomon.New(int(dc), int(pc))
 	if err != nil {
@@ -151,9 +151,9 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 	}
 
 	for i := start; i < start+endSegment && len(data) != 0; i++ {
-		clearGroup(dataGroup)
-		clearGroup(tagGroup)
+		beginOffset := preLen + (i-start)*d.fieldSize
 		for j := 0; j < dc; j++ {
+			dataGroup[j] = stripe[j][beginOffset : beginOffset+d.segSize]
 			// 填充数据
 			if len(data) < d.segSize {
 				copy(dataGroup[j], data)
@@ -167,12 +167,16 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 		switch d.Prefix.Bopts.Policy {
 		case MulPolicy:
 			for j := dc; j < d.blockCount; j++ {
+				dataGroup[j] = stripe[j][beginOffset : beginOffset+d.segSize]
 				res := copy(dataGroup[j], dataGroup[0])
 				if res != d.segSize {
 					utils.MLogger.Error("copied: ", res, " is less than: ", d.segSize)
 				}
 			}
 		case RsPolicy:
+			for j := dc; j < d.blockCount; j++ {
+				dataGroup[j] = stripe[j][beginOffset : beginOffset+d.segSize]
+			}
 			err = enc.Encode(dataGroup)
 			if err != nil {
 				return nil, 0, err
@@ -183,6 +187,7 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 		var res strings.Builder
 		for j := 0; j < d.blockCount; j++ {
+			tagGroup[j] = stripe[j][beginOffset+d.segSize : beginOffset+d.segSize+d.tagSize]
 			// 生成tag并装进taggroup，index为peerid_bucketid_stripeid_blockid_offsetid
 			res.Reset()
 			res.WriteString(ncidPrefix)
@@ -198,23 +203,18 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 			}
 			copy(tagGroup[j], tag)
 		}
+
+		for j := 1; j < d.tagCount; j++ {
+			for k := 0; k < d.blockCount; k++ {
+				tagGroup[j*d.blockCount+k] = stripe[k][beginOffset+d.segSize+j*d.tagSize : beginOffset+d.segSize+(j+1)*d.tagSize]
+			}
+		}
 		// 生成tag+tagP的taggroup格式
 		err = encP.Encode(tagGroup)
 		if err != nil {
 			return nil, 0, err
 		}
 		// 生成Field结构，此时beginOffset为下一个Field的起始偏移
-
-		for j := 0; j < d.blockCount; j++ {
-			stripe[j] = append(stripe[j], dataGroup[j]...)
-		}
-
-		for j := 0; j < d.blockCount*d.tagCount; {
-			for k := 0; k < d.blockCount; k++ {
-				stripe[k] = append(stripe[k], tagGroup[j]...)
-				j++
-			}
-		}
 	}
 	// endoffset
 	return stripe, start + endSegment, nil

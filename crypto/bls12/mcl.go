@@ -5,10 +5,10 @@ package mcl
 #include <mcl/bn.h>
 */
 import "C"
-import "fmt"
-import "unsafe"
-import big "github.com/ncw/gmp"
-
+import (
+	"fmt"
+	"unsafe"
+)
 // CurveFp254BNb -- 254 bit curve
 const CurveFp254BNb = C.mclBn_CurveFp254BNb
 
@@ -102,43 +102,6 @@ func (x *Fr) SetString(s string, base int) error {
 		return fmt.Errorf("err mclBnFr_setStr %x", err)
 	}
 	return nil
-}
-
-// SetBytes --
-func (x *Fr) SetBytes(b []byte) error {
-	bint := new(big.Int).SetBytes(b)
-	return x.SetString(bint.String(), 10)
-}
-
-// SetBigInt --
-func (x *Fr) SetBigInt(i *big.Int) error {
-	return x.SetString(i.String(), 10)
-}
-
-// ToBytes --
-func (x *Fr) ToBytes() []byte {
-	str := x.GetString(10)
-	i, ok := new(big.Int).SetString(str, 10)
-	if !ok {
-		return nil
-	}
-	return i.Bytes()
-}
-
-// ToBigInt --
-func (x *Fr) ToBigInt() *big.Int {
-	str := x.GetString(10)
-	i, ok := new(big.Int).SetString(str, 10)
-	if !ok {
-		return nil
-	}
-	return i
-}
-
-// ToInt64 --
-func (x *Fr) ToInt64() int64 {
-	bi := x.ToBigInt()
-	return bi.Int64()
 }
 
 // Deserialize --
@@ -242,23 +205,7 @@ func FrDiv(out *Fr, x *Fr, y *Fr) {
 	C.mclBnFr_div(out.getPointer(), x.getPointer(), y.getPointer())
 }
 
-// FrPowBigInt --
-func FrPowBigInt(out *Fr, x *Fr, y *big.Int) error {
-	str := GetFieldOrder()
-	forder, judge := new(big.Int).SetString(str, 10)
-	if !judge {
-		return ErrSetToBigInt
-	}
 
-	base := new(big.Int).SetBytes(x.Serialize())
-	res := new(big.Int).Exp(base, y, forder)
-
-	err := out.SetString(res.String(), 10)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 // G1 --
 type G1 struct {
