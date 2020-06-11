@@ -135,7 +135,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 	cset := make(map[string]int)
 	bset := bitset.New(0)
 	psum := 0
-	stripeNum := int64(0)
+	cNum := int64(0)
 
 	// challenge buckets
 	for i := 1; i < bucketNum; i++ {
@@ -145,11 +145,14 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 			continue
 		}
 
-		// not challenge last one
 		count := binfo.curStripes
-		if count <= 0 {
+		if count < 0 {
 			continue
 		}
+
+		bc[i].ChunkNum = int32(binfo.chunkNum)
+		bc[i].SegSize = binfo.bops.GetSegmentSize()
+		bc[i].SegCount = binfo.bops.GetSegmentCount()
 
 		for k := 0; k < binfo.chunkNum; k++ {
 			res.Reset()
@@ -161,25 +164,21 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 			cInfo, ok := thisLinfo.blockMap.Load(res.String())
 			if ok {
 				if cInfo.(*blockInfo).offset != int(binfo.bops.GetSegmentCount()) {
-					cInfo.(*blockInfo).availtime = challengetime
-				} else {
-					// segment is full
-					if k == 0 {
+					if count == 0 {
+						bc[i].SegCount = int32(cInfo.(*blockInfo).offset)
 						count++
 					}
+				} else {
+					// seg is full
+					count++
 				}
+				break
 			}
 		}
 
-		bi := &mpb.BucketContent{
-			ChunkNum:  int32(binfo.chunkNum),
-			StripeNum: int64(count),
-			SegCount:  binfo.bops.GetSegmentCount(),
-			SegSize:   binfo.bops.GetSegmentSize(),
-		}
-		bc[i] = bi
+		bc[i].StripeNum = int64(count)
 
-		bset.Set(uint(stripeNum) + uint(count*binfo.chunkNum))
+		bset.SetTo(uint(count*binfo.chunkNum), false)
 		for j := 0; j < count; j++ {
 			for k := 0; k < binfo.chunkNum; k++ {
 				res.Reset()
@@ -190,7 +189,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 				res.WriteString(strconv.Itoa(k))
 				cInfo, ok := thisLinfo.blockMap.Load(res.String())
 				if ok {
-					bset.Set(uint(stripeNum) + uint(j*binfo.chunkNum) + uint(k))
+					bset.Set(uint(cNum) + uint(j*binfo.chunkNum) + uint(k))
 					psum += (cInfo.(*blockInfo).offset * int(binfo.bops.GetSegmentSize()))
 					cset[res.String()] = cInfo.(*blockInfo).offset
 					break
@@ -198,8 +197,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 			}
 		}
 
-		bset.SetTo(uint(stripeNum)+uint(count*binfo.chunkNum), false)
-		stripeNum += int64(count * binfo.chunkNum)
+		cNum += int64(count * binfo.chunkNum)
 	}
 
 	// no data
