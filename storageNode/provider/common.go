@@ -18,7 +18,7 @@ func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	}
 
 	if userID == pos.GetPosId() {
-		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNum, mcl.PDPCount)
+		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNumV1, mcl.PDPCountV1)
 		if err != nil {
 			utils.MLogger.Info("Init bls config for pos user fail: ", err)
 			return nil, err

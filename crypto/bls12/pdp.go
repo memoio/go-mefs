@@ -244,8 +244,8 @@ func (k *KeySet) GenTag(index []byte, segment []byte, start, typ int, mode bool)
 		return nil, err
 	}
 
-	if len(atoms)+start > k.Pk.Count {
-		return nil, ErrGenTag
+	if len(atoms)+start > k.Pk.TagCount {
+		return nil, ErrNumOutOfRange
 	}
 
 	// Prod(u_j^M_ij)，即Prod(u^Sigma(x^j*M_ij))

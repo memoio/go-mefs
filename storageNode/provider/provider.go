@@ -190,7 +190,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	err = m.load(ctx)
 	if err != nil {
-		utils.MLogger.Error("provider load failed: ", err)
+		utils.MLogger.Error("provider load local info failed: ", err)
 		return nil, err
 	}
 
@@ -869,14 +869,13 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 		return
 	}
 
-	p.loadPeersFromChain()
-
 	lastBlock := int64(0)
 
 	km, err := metainfo.NewKey(p.localID, mpb.KeyType_Income)
 	if err == nil {
 		res, err := p.ds.GetKey(p.context, km.ToString(), "local")
 		if err == nil && len(res) > 0 {
+			utils.MLogger.Infof("Load %s income info: %s", km.ToString(), string(res))
 			ins := strings.Split(string(res), metainfo.DELIMITER)
 			if len(ins) == 5 {
 				lb, err := strconv.ParseInt(ins[0], 10, 0)
@@ -906,6 +905,8 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 			}
 		}
 	}
+
+	p.loadPeersFromChain()
 
 	time.Sleep(7 * time.Minute)
 	lb, err := p.getIncome(localAddr, lastBlock)

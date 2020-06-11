@@ -34,7 +34,7 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
 	}
 
 	if userID == pos.GetPosId() {
-		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNum, mcl.PDPCount)
+		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNumV1, mcl.PDPCountV1)
 		if err != nil {
 			return nil, err
 		}

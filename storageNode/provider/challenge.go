@@ -382,7 +382,7 @@ func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl
 
 		tmpseg, tmptag, segStart, isTrue := df.GetSegAndTag(tmpdata.RawData(), blockID, blskey)
 		if !isTrue {
-			utils.MLogger.Warnf("verify %s data and tag failed", blockID)
+			utils.MLogger.Warnf("verify %s data and tag at %d failed", blockID, electedOffset)
 			faultBlocks = append(faultBlocks, index)
 			continue
 		}
