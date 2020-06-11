@@ -56,7 +56,7 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 				for i := 0; i <= int(bucketNum); i++ {
 					binfo := gp.getBucketInfo(strconv.Itoa(-i), true)
 					if binfo == nil {
-						utils.MLogger.Infof("missing bucket %d info for user %s fsID %s", -i, pu.uid, pu.qid)
+						utils.MLogger.Infof("missing bucket %d info", -i)
 						continue
 					}
 

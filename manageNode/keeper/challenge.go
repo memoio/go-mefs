@@ -118,7 +118,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 
 	bucketNum := int(g.bucketNum + 1)
 	bc := make([]*mpb.BucketContent, bucketNum)
-	for i := 0; i <= bucketNum; i++ {
+	for i := 0; i < bucketNum; i++ {
 		bi := &mpb.BucketContent{
 			ChunkNum:  0,
 			StripeNum: 0,
@@ -138,7 +138,7 @@ func (g *groupInfo) genChallengeData(localID, userID, qid, proID string, rootTim
 	stripeNum := int64(0)
 
 	// challenge buckets
-	for i := 1; i <= bucketNum; i++ {
+	for i := 1; i < bucketNum; i++ {
 		binfo := g.getBucketInfo(strconv.Itoa(i), false)
 		if binfo == nil {
 			utils.MLogger.Infof("missing bucket %d info", i)
