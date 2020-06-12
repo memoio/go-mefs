@@ -390,7 +390,8 @@ func (ih *IntrHandler) Handle(handler func(count int, ih *IntrHandler), sigs ...
 	go func() {
 		defer ih.wg.Done()
 		count := 0
-		for range ih.sig {
+		for s := range ih.sig {
+			fmt.Println("exit signal:", s)
 			count++
 			handler(count, ih)
 		}
@@ -419,7 +420,7 @@ func setupInterruptHandler(ctx context.Context) (io.Closer, context.Context) {
 		}
 	}
 
-	intrh.Handle(handlerFunc, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	intrh.Handle(handlerFunc, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	return intrh, ctx
 }
