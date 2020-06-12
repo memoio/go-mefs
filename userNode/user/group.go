@@ -481,7 +481,7 @@ func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaVa
 		return
 	}
 
-	utils.MLogger.Info("Receive InitResponse，from：", from, ", value is：", string(metaValue))
+	utils.MLogger.Infof("Receive InitResponse, from：%s, value is：%s", from, string(metaValue))
 	splitedMeta := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(splitedMeta) != 2 {
 		return

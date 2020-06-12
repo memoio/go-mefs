@@ -668,8 +668,15 @@ func (n *impl) BroadcastMessage(ctx context.Context, key string) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	_, err := n.rt.(*dht.KadDHT).GetValue(ctx, key)
-	return err
+
+	n.rt.(*dht.KadDHT).GetValue(ctx, key)
+
+	for _, pid := range n.ph.Network().Peers() {
+		// send to all connectness
+		n.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, pid.Pretty())
+	}
+
+	return nil
 }
 
 func (n *impl) TestConnect() error {

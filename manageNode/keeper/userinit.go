@@ -73,14 +73,15 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 		localID := k.localID
 		// fill self
 		newResponse.WriteString(localID)
-		kc--
+		kcount := kc * 2
+		kcount--
 		//fill other keepers
 		keepers, err := k.GetKeepers()
 		if err != nil {
 			return "", err
 		}
 		for _, kid := range keepers {
-			if kc == 0 {
+			if kcount == 0 {
 				break
 			}
 			if kid == localID {
@@ -90,7 +91,7 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 			thisinfo, ok := k.keepers.Load(kid)
 			if ok && thisinfo.(*kInfo).online == true {
 				newResponse.WriteString(kid)
-				kc--
+				kcount--
 			}
 		}
 
@@ -100,9 +101,10 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 		if err != nil {
 			return "", err
 		}
+		pcount := pc * 2
 		// fill providers
 		for _, proID := range pros {
-			if pc == 0 {
+			if pcount == 0 {
 				break
 			}
 			if proID == localID {
@@ -115,7 +117,7 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 				if thisP.online && thisP.offerItem != nil {
 					if thisP.offerItem.Price.Cmp(price) <= 0 && thisP.credit > 0 {
 						newResponse.WriteString(proID)
-						kc--
+						pcount--
 					} else {
 						utils.MLogger.Debugf("provider %s need price %d, but %d; has credit: %d", proID, thisP.offerItem.Price, price, thisP.credit)
 					}
