@@ -8,7 +8,6 @@ import (
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
-	sysi "github.com/whyrusleeping/go-sysinfo"
 )
 
 // GetAllKeepers gets all
@@ -133,13 +132,13 @@ func GetMemoPrice() *big.Float {
 }
 
 // GetDiskSpaceInfo gets local storage info
-func GetDiskSpaceInfo() (*sysi.DiskStats, error) {
+func GetDiskSpaceInfo() (*utils.DiskStats, error) {
 	rootpath, err := fsrepo.BestKnownPath()
 	if err != nil {
 		return nil, err
 	}
 
-	dinfo, err := sysi.DiskUsage(rootpath)
+	dinfo, err := utils.DiskStatus(rootpath)
 	if err != nil {
 		return nil, err
 	}

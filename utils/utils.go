@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -368,4 +369,26 @@ func GetPassWord() (string, error) {
 		return password, errors.New("Password is too short, length should be at least 8")
 	}
 	return password, nil
+}
+
+type DiskStats struct {
+	Total uint64 `json:"all"`
+	Used  uint64 `json:"used"`
+	Free  uint64 `json:"free"`
+}
+
+// DiskStatus returns disk usage of path/disk
+func DiskStatus(path string) (*DiskStats, error) {
+	fs := syscall.Statfs_t{}
+	err := syscall.Statfs(path, &fs)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &DiskStats{
+		Total: fs.Blocks * uint64(fs.Bsize),
+		Free:  fs.Bfree * uint64(fs.Bsize),
+	}
+	m.Used = m.Total - m.Free
+	return m, nil
 }
