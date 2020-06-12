@@ -513,6 +513,11 @@ func (p *Info) load(ctx context.Context) error {
 				continue
 			}
 
+			// pos user is init in pos service
+			if userID == pos.GetPosId() {
+				continue
+			}
+
 			utils.MLogger.Info("Load user: ", userID, " 's infomations")
 			wg.Add(1)
 			go func(userID string) {
