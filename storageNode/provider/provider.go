@@ -195,6 +195,15 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	utils.MLogger.Info("Take charge of network handler")
 
+	if enablePos {
+		go func() {
+			err := m.PosService(ctx, gc)
+			if err != nil {
+				utils.MLogger.Errorf("start pos err: %s ", err)
+			}
+		}()
+	}
+
 	err = m.load(ctx)
 	if err != nil {
 		utils.MLogger.Error("provider load local info failed: ", err)
@@ -206,14 +215,6 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	go m.saveRegular(ctx)
 
 	m.state = true
-	if enablePos {
-		go func() {
-			err := m.PosService(ctx, gc)
-			if err != nil {
-				utils.MLogger.Errorf("start pos err: %s ", err)
-			}
-		}()
-	}
 
 	utils.MLogger.Info("Provider Service is ready")
 	return m, nil
