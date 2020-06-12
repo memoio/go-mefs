@@ -342,10 +342,10 @@ func ukTest() error {
 	//等待now > endDate + 60,触发第三次时空支付
 	for {
 		nowTime := time.Now().Unix()
-		if nowTime >= createDate.Int64()+3*defaultCycle+10 {
+		if nowTime >= createDate.Int64()+3*defaultCycle+60 {
 			break
 		}
-		time.Sleep(time.Duration(createDate.Int64()+3*defaultCycle+10-nowTime) * time.Second)
+		time.Sleep(time.Duration(createDate.Int64()+3*defaultCycle+60-nowTime) * time.Second)
 	}
 
 	beforeEnd := false

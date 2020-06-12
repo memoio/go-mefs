@@ -252,7 +252,7 @@ func (p *Info) doGenerateOrDelete() {
 	totalSpace := p.getDiskTotal()
 
 	ratio := float64(usedSpace) / float64(totalSpace)
-	utils.MLogger.Info("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ",ratio is: ", ratio)
+	utils.MLogger.Info("usedSpace is: ", usedSpace, ", totalSpace is: ", totalSpace, ", ratio is: ", ratio, ", free ratio is:", freeRatio)
 
 	if ratio < lowWater && freeRatio > (1-lowWater) {
 		generateSpace := uint64(float64(totalSpace) * (lowWater - ratio))
