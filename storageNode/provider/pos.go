@@ -259,6 +259,12 @@ func (p *Info) doGenerateOrDelete() {
 		if generateSpace > uint64(pos.Reps)*uint64(pos.DLen)*30 {
 			generateSpace = uint64(pos.Reps) * uint64(pos.DLen) * 30
 		}
+
+		if lsinfo.Free < generateSpace {
+			utils.MLogger.Infof("Local only has space: %d", lsinfo.Free)
+			return
+		}
+
 		p.generatePosBlocks(generateSpace)
 		return
 	}

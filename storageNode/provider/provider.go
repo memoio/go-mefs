@@ -188,6 +188,13 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	m.ms.providerNum.Inc()
 
+	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.MLogger.Info("Take charge of network handler")
+
 	err = m.load(ctx)
 	if err != nil {
 		utils.MLogger.Error("provider load local info failed: ", err)
@@ -197,11 +204,6 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	go m.getFromChainRegular(ctx)
 	go m.sendStorageRegular(ctx)
 	go m.saveRegular(ctx)
-
-	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
-	if err != nil {
-		return nil, err
-	}
 
 	m.state = true
 	if enablePos {
@@ -309,7 +311,7 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 		}
 
 		for _, pid := range gp.providers {
-			p.getPInfo(pid, true)
+			go p.getPInfo(pid, true)
 		}
 
 		ui := p.getUserInfo(userID)
