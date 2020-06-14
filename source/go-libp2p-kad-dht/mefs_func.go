@@ -273,7 +273,7 @@ func (dht *KadDHT) handleMetaInfo(ctx context.Context, p peer.ID, pmes *pb.Messa
 
 	res, err := dht.metahandler.HandleMetaMessage(mpb.OpType(rpmes.GetOpType()), metaKey, metaValue, sig, p.Pretty())
 	if err != nil {
-		log.Printf("handleMetaInfo()err:%s\nmetakey:%s\nfrom:%s\n", err, metaKey, p.Pretty())
+		log.Printf("handleMetaInfo() metakey:%s, from:%s, fails:%s", metaKey, p.Pretty(), err)
 		rpmes.ErrMsg = true
 	}
 
