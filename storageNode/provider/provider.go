@@ -233,6 +233,7 @@ func (p *Info) Close() error {
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
+	utils.MLogger.Infof("Create user %s fsID %s groupInfo", uid, gid)
 	g := &groupInfo{
 		userID:    uid,
 		groupID:   gid,
@@ -483,6 +484,7 @@ func (p *Info) load(ctx context.Context) error {
 		return err
 	}
 
+	var wg sync.WaitGroup
 	kids, err := p.ds.GetKey(ctx, kmKID.ToString(), "local")
 	if err == nil && len(kids) > 0 {
 		utils.MLogger.Info(localID, " has keepers: ", string(kids))
@@ -493,18 +495,23 @@ func (p *Info) load(ctx context.Context) error {
 				continue
 			}
 
-			p.getKInfo(tmpKid, false)
+			wg.Add(1)
+			go func(keepID string) {
+				defer wg.Done()
+				p.getKInfo(keepID, false)
+			}(tmpKid)
 		}
 	}
 
+	wg.Wait()
+
+	utils.MLogger.Info("Load all users' infomations begin")
 	kmUID, err := metainfo.NewKey(localID, mpb.KeyType_Users)
 	if err != nil {
 		return err
 	}
 
-	var wg sync.WaitGroup
 	users, err := p.ds.GetKey(ctx, kmUID.ToString(), "local")
-
 	if err == nil && len(users) > 0 {
 		for i := 0; i < len(users)/utils.IDLength; i++ {
 			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
@@ -537,8 +544,8 @@ func (p *Info) load(ctx context.Context) error {
 					return
 				}
 
-				for i := 0; i < len(qs)/utils.IDLength; i++ {
-					qid := string(qs[i*utils.IDLength : (i+1)*utils.IDLength])
+				for j := 0; j < len(qs)/utils.IDLength; j++ {
+					qid := string(qs[j*utils.IDLength : (j+1)*utils.IDLength])
 					_, err := peer.IDB58Decode(qid)
 					if err != nil {
 						continue
@@ -548,11 +555,15 @@ func (p *Info) load(ctx context.Context) error {
 
 					p.getGroupInfo(userID, qid, true)
 				}
+
+				utils.MLogger.Info("Load user: ", userID, " 's infomations finished")
 			}(userID)
 		}
 	}
 
 	wg.Wait()
+
+	utils.MLogger.Info("Load all users' infomations finished")
 
 	return nil
 }
