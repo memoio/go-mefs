@@ -29,6 +29,8 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
+	mdns "github.com/multiformats/go-multiaddr-dns"
+	mnet "github.com/multiformats/go-multiaddr-net"
 )
 
 var (
@@ -888,7 +890,29 @@ func (n *impl) GetExternalAddr(p string) (ma.Multiaddr, error) {
 		if rid.Pretty() == p {
 			addr := c.RemoteMultiaddr()
 			utils.MLogger.Debug(p, " has extern ip: ", addr.String())
-			return addr, nil
+			ok := mnet.IsThinWaist(addr)
+			if ok {
+				// is ip4/tcp or ip4/udp
+				ok = mnet.IsPrivateAddr(addr)
+				if !ok {
+					// is public addr
+					return addr, nil
+				}
+			} else {
+				// is /dns/...
+				addrs, err := mdns.Resolve(context.Background(), addr)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, maddr := range addrs {
+					ok = mnet.IsPrivateAddr(maddr)
+					if !ok {
+						return maddr, nil
+					}
+				}
+			}
+
 		}
 	}
 
