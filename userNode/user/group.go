@@ -916,7 +916,7 @@ func (g *groupInfo) GetProChannel(proID string) *role.ChannelItem {
 }
 
 func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []string, error) {
-	if g == nil {
+	if g == nil || g.state < groupStarted {
 		return nil, nil, ErrLfsServiceNotReady
 	}
 	num := count
@@ -949,6 +949,9 @@ func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []stri
 }
 
 func (g *groupInfo) GetProviders(ctx context.Context, count int) ([]string, []string, error) {
+	if g.state < groupStarted {
+		return nil, nil, ErrLfsServiceNotReady
+	}
 	num := count
 	if count < 0 {
 		num = len(g.tempProviders)

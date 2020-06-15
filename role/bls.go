@@ -125,7 +125,9 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 	mkey.Pk = pk
 
 	if len(privKey) > 0 {
-		sk := new(mcl.SecretKey)
+		sk := &mcl.SecretKey{
+			ElemPowerSk: make([]mcl.Fr, pk.Count),
+		}
 		c := btcec.S256()
 		seck, _ := btcec.PrivKeyFromBytes(c, privKey)
 		if seck == nil {

@@ -244,14 +244,24 @@ func (k *KeySet) GenTag(index []byte, segment []byte, start, typ int, mode bool)
 		return nil, err
 	}
 
-	if len(atoms)+start > k.Pk.TagCount {
+	if len(atoms)+start > k.Pk.TagCount || start < 0 {
 		return nil, ErrNumOutOfRange
 	}
 
 	// Prod(u_j^M_ij)，即Prod(u^Sigma(x^j*M_ij))
 	if k.Sk != nil {
 		var power Fr
-		FrEvaluatePolynomial(&power, atoms, &(k.Sk.ElemPowerSk[1]))
+		if start == 0 {
+			FrEvaluatePolynomial(&power, atoms, &(k.Sk.ElemPowerSk[1]))
+		} else {
+			power.Clear() // Set0
+			for j, atom := range atoms {
+				var mid Fr
+				i := j + start
+				FrMul(&mid, &(k.Sk.ElemPowerSk[i]), &atom) // Xi * Mi
+				FrAdd(&power, &power, &mid)                // power = Sigma(Xi*Mi)
+			}
+		}
 		G1Mul(&uMiDel, &(k.Pk.ElemG1s[0]), &power) // uMiDel = u ^ Sigma(Xi*Mi)
 	} else {
 		//FrEvaluatePolynomial
