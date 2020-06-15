@@ -177,6 +177,10 @@ func (k *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp != nil {
+		if !gp.status {
+			return nil, role.ErrServiceNotReady
+		}
+
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
 			return nil, err
@@ -212,6 +216,9 @@ func (k *Info) handleUserStop(km *metainfo.Key, metaValue, sig []byte, from stri
 
 	gp := k.getGroupInfo(uid, qid, false)
 	if gp != nil {
+		if !gp.status {
+			return nil, role.ErrServiceNotReady
+		}
 		ok := k.ds.VerifyKey(k.context, km.ToString(), metaValue, sig)
 		if !ok {
 			utils.MLogger.Infof("key signature is wrong for %s", km.ToString())
@@ -265,6 +272,9 @@ func (k *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gp := k.getGroupInfo(uid, qid, true)
 	if gp != nil {
+		if !gp.status {
+			return nil, role.ErrServiceNotReady
+		}
 		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < role.SessionExpTime {
 			return []byte(gp.sessionID.String()), nil
 		}

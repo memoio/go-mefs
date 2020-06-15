@@ -19,6 +19,7 @@ import (
 
 // user-keeper-provider map
 type groupInfo struct {
+	status       bool
 	sessionID    uuid.UUID // for user
 	sessionTime  int64
 	clusterID    uint64 // raft clusterID
@@ -449,6 +450,7 @@ func (k *Info) getGroupInfo(userID, groupID string, mode bool) *groupInfo {
 		if err != nil {
 			return nil
 		}
+
 		return ginfo
 	}
 	return nil

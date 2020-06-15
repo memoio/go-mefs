@@ -31,7 +31,7 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 				}
 
 				gp := k.getGroupInfo(pu.uid, pu.qid, false)
-				if gp == nil || gp.upkeeping == nil {
+				if gp == nil || gp.upkeeping == nil || !gp.status {
 					continue
 				}
 
@@ -291,7 +291,7 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 				}
 
 				gp := k.getGroupInfo(pu.uid, pu.qid, false)
-				if gp == nil || gp.upkeeping == nil {
+				if gp == nil || gp.upkeeping == nil || !gp.status {
 					continue
 				}
 
@@ -704,7 +704,6 @@ func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider s
 	}
 
 	return
-
 }
 
 //searchNewProvider find a NEW provider for user

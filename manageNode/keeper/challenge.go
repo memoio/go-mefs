@@ -31,7 +31,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 			pus := k.getQUKeys()
 			for _, pu := range pus {
 				thisGroup := k.getGroupInfo(pu.uid, pu.qid, false)
-				if thisGroup == nil || thisGroup.upkeeping == nil {
+				if thisGroup == nil || thisGroup.upkeeping == nil || !thisGroup.status {
 					continue
 				}
 
@@ -513,6 +513,11 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	thisGroup := k.getGroupInfo(userID, qid, false)
 	if thisGroup == nil {
 		utils.MLogger.Warnf("handleProof: %s fails: no groupinfo", km.ToString())
+		return
+	}
+
+	if !thisGroup.status {
+		utils.MLogger.Warnf("handleProof: %s fails: groupinfo is not ready", km.ToString())
 		return
 	}
 

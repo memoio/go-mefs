@@ -333,7 +333,6 @@ func (k *Info) loadUser(ctx context.Context) error {
 		return err
 	}
 
-	var wg sync.WaitGroup
 	if users, err := k.ds.GetKey(ctx, kmUID.ToString(), "local"); users != nil && err == nil {
 		for i := 0; i < len(users)/utils.IDLength; i++ { //对user进行循环，逐个恢复user信息
 			userID := string(users[i*utils.IDLength : (i+1)*utils.IDLength])
@@ -342,10 +341,8 @@ func (k *Info) loadUser(ctx context.Context) error {
 				continue
 			}
 
-			utils.MLogger.Info("Load user: ", userID, " 's infomations")
-			wg.Add(1)
+			utils.MLogger.Info("Load user: ", userID, " 's infomations begin")
 			go func(userID string) {
-				defer wg.Done()
 				kmfs, err := metainfo.NewKey(userID, mpb.KeyType_Query)
 				if err != nil {
 					return
@@ -378,11 +375,10 @@ func (k *Info) loadUser(ctx context.Context) error {
 						continue
 					}
 				}
+				utils.MLogger.Info("Load user: ", userID, " 's infomations finished")
 			}(userID)
 		}
 	}
-
-	wg.Wait()
 
 	return nil
 }
@@ -774,6 +770,7 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		k.loadUserPay(uid, qid)
 		k.loadUserChallenge(uid, qid)
 
+		gInfo.status = true
 		return gInfo, nil
 	}
 	// init userConfig
