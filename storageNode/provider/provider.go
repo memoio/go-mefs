@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"math/big"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,6 +51,7 @@ type Info struct {
 	proContract       *role.ProviderItem
 	userConfigs       *lru.ARCCache
 	ms                *measure
+	eAddr             string
 }
 
 type measure struct {
@@ -120,7 +122,7 @@ type pInfo struct {
 }
 
 //New start provider service
-func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, depositSize int64, price *big.Int, reDeployOffer, enablePos, gc bool) (instance.Service, error) {
+func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, depositSize int64, price *big.Int, reDeployOffer, enablePos, gc bool, extAddr string) (instance.Service, error) {
 	mea := &measure{
 		balance:     metrics.New("provider.balance", "Balance of this provider").Gauge(),
 		groupNum:    metrics.New("provider.group_num", "Group number").Gauge(),
@@ -208,6 +210,25 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	if err != nil {
 		utils.MLogger.Error("provider load local info failed: ", err)
 		return nil, err
+	}
+
+	if extAddr != "" {
+		eaddr := strings.Split(extAddr, ":")
+		if len(eaddr) == 2 {
+			if net.ParseIP(eaddr[0]) != nil {
+				ips := strings.Split(eaddr[0], ".")
+				if len(ips) == 4 {
+					// example:= /ip4/123.123.234.123/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
+					m.eAddr = "/ip4/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
+				} else {
+					// example:= /ip4/123.123.234.123/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
+					m.eAddr = "/ip6/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
+				}
+			} else {
+				// example:= /dns/239v39e500.zicp.vip/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
+				m.eAddr = "/dns/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
+			}
+		}
 	}
 
 	go m.getFromChainRegular(ctx)
@@ -963,6 +984,25 @@ func (p *Info) sendStorageRegular(ctx context.Context) {
 			p.storageSync(ctx)
 		}
 	}
+}
+
+func (p *Info) extAddrSync(ctx context.Context) error {
+	if p.eAddr == "" {
+		return nil
+	}
+
+	km, err := metainfo.NewKey(p.localID, mpb.KeyType_ExternalAddress)
+	if err != nil {
+		utils.MLogger.Info("construct StorageSync KV error :", err)
+		return err
+	}
+
+	p.keepers.Range(func(key, value interface{}) bool {
+		go p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(p.eAddr), nil, key.(string))
+		return true
+	})
+
+	return nil
 }
 
 func (p *Info) storageSync(ctx context.Context) error {

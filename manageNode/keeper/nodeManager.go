@@ -50,6 +50,7 @@ type kInfo struct {
 	online    bool
 	availTime int64
 	keepItem  *role.KeeperItem
+	eAddr     string
 }
 
 // todo node queue: accodring to credit, storage used
@@ -66,6 +67,7 @@ type pInfo struct {
 	availTime    int64
 	offerItem    *role.OfferItem // "latest"
 	proItem      *role.ProviderItem
+	eAddr        string
 }
 
 func (p *pInfo) setOffer(flag bool) error {

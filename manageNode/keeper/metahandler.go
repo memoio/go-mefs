@@ -11,6 +11,9 @@ import (
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	ma "github.com/multiformats/go-multiaddr"
+	mdns "github.com/multiformats/go-multiaddr-dns"
+	mnet "github.com/multiformats/go-multiaddr-net"
 )
 
 // HandleMetaMessage callback
@@ -57,7 +60,12 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	case mpb.KeyType_Storage:
 		go k.handleStorage(km, metaValue, from)
 	case mpb.KeyType_ExternalAddress:
-		return k.handleExternalAddr(km)
+		switch opType {
+		case mpb.OpType_Put:
+			go k.handlePutExAddr(km, metaValue, from)
+		case mpb.OpType_Get:
+			return k.handleExternalAddr(km)
+		}
 	case mpb.KeyType_ChalTime:
 		return k.handleChalTime(km)
 	case mpb.KeyType_Pos:
@@ -275,14 +283,69 @@ func (k *Info) handleStorage(km *metainfo.Key, value []byte, pid string) {
 	thisInfo.usedSpace = used
 }
 
+func (k *Info) handlePutExAddr(km *metainfo.Key, value []byte, from string) {
+	utils.MLogger.Info("handlePutExternnalAddr: ", km.ToString(), string(value))
+	pid := km.GetMainID()
+	pi, err := k.getPInfo(pid, false)
+	if err != nil {
+		ki, err := k.getKInfo(pid, false)
+		if err == nil {
+			ki.eAddr = string(value)
+		}
+	} else {
+		pi.eAddr = string(value)
+	}
+}
+
 func (k *Info) handleExternalAddr(km *metainfo.Key) ([]byte, error) {
 	utils.MLogger.Info("handleExternnalAddr: ", km.ToString())
-	peerID := km.GetMainID()
-	addr, err := k.ds.GetExternalAddr(peerID)
+	pid := km.GetMainID()
+	var addr string
+	thisInfoI, ok := k.providers.Load(pid)
+	if ok {
+		addr = thisInfoI.(*pInfo).eAddr
+	}
+
+	if addr == "" {
+		thisInfoI, ok := k.keepers.Load(pid)
+		if ok {
+			addr = thisInfoI.(*kInfo).eAddr
+		}
+	}
+
+	if addr != "" {
+		maddr, err := ma.NewMultiaddr(addr)
+		if err == nil {
+			ok := mnet.IsThinWaist(maddr)
+			if ok {
+				// is ip4/tcp or ip4/udp
+				ok = mnet.IsPrivateAddr(maddr)
+				if !ok {
+					// is public addr
+					return maddr.Bytes(), nil
+				}
+			} else {
+				// is /dns/...
+				addrs, err := mdns.Resolve(k.context, maddr)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, maddr := range addrs {
+					ok = mnet.IsPrivateAddr(maddr)
+					if !ok {
+						return maddr.Bytes(), nil
+					}
+				}
+			}
+		}
+	}
+
+	maddr, err := k.ds.GetExternalAddr(pid)
 	if err != nil {
 		return nil, err
 	}
-	return addr.Bytes(), nil
+	return maddr.Bytes(), nil
 }
 
 func (k *Info) handleChalTime(km *metainfo.Key) ([]byte, error) {

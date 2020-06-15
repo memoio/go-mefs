@@ -152,6 +152,7 @@ environment variable:
 		cmds.StringOption("depositCapacity", "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
 		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
+		cmds.StringOption("extAddress", "extAddr", "provider external address when using ddns or port mapping, tcp protocol only, such as: 239v39e500.zicp.vip:50272 or 123.123.123.123:50272").WithDefault(""),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
@@ -461,6 +462,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return errWrongInput
 	}
 
+	exAddr := req.Options["extAddress"].(string)
+
 	switch cfg.Role {
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("Starting as a provider")
@@ -468,7 +471,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc)
+		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc, exAddr)
 		if err != nil {
 			fmt.Println("Start provider Service failed:", err)
 			return err
