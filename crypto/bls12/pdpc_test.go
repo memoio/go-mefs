@@ -378,12 +378,48 @@ func TestEvaluatePolynomial(t *testing.T) {
 	power2.Clear() // Set0
 	for j, atom := range atoms {
 		var mid Fr
-		FrMul(&mid, &(k.Sk.ElemPowerSk[j]), &atom)    // Xi * Mi
-		FrAdd(&power2, &power2, &mid) // power = Sigma(Xi*Mi)
+		FrMul(&mid, &(k.Sk.ElemPowerSk[j]), &atom) // Xi * Mi
+		FrAdd(&power2, &power2, &mid)              // power = Sigma(Xi*Mi)
 	}
 	ok := power1.IsEqual(&power2)
 	if !ok {
 		t.Error("Not Equal")
+	}
+}
+
+func benchmarkEvaluatePolynomial(k *KeySet) func(b *testing.B) {
+	return func(b *testing.B) {
+		// sample data
+		segment := make([]byte, SegSize)
+		rand.Seed(time.Now().UnixNano())
+		fillRandom(segment)
+		b.SetBytes(int64(SegSize))
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			atoms, err := splitSegmentToAtoms(segment, 32)
+			if err != nil {
+				b.Error(err)
+			}
+			var power1 Fr
+			power1.Clear() // Set0
+			FrEvaluatePolynomial(&power1, atoms, &(k.Sk.ElemPowerSk[1]))
+		}
+	}
+}
+
+func BenchmarkMultiEP(b *testing.B) {
+	err := Init(BLS12_381)
+	if err != nil {
+		panic(err)
+	}
+	keySet, err := GenKeySet()
+	if err != nil {
+		panic(err)
+	}
+	SegSize = 4 * 1024
+	for i := 0; i < 8; i++ {
+		b.Run("SegSize:"+strconv.Itoa(SegSize/1024)+"KB", benchmarkEvaluatePolynomial(keySet))
+		SegSize = SegSize * 2
 	}
 }
 
