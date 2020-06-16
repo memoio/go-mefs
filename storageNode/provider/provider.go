@@ -65,6 +65,7 @@ type measure struct {
 }
 
 type groupInfo struct {
+	status       bool
 	sessionID    uuid.UUID
 	sessionTime  int64
 	userID       string
@@ -355,6 +356,8 @@ func (p *Info) newGroupWithFS(userID, groupID string, kpids string) *groupInfo {
 				gp.sessionTime = time.Now().Unix() - 1500 //
 			}
 		}
+
+		gp.status = true
 	}
 
 	return gp
@@ -546,10 +549,8 @@ func (p *Info) load(ctx context.Context) error {
 				continue
 			}
 
-			utils.MLogger.Info("Load user: ", userID, " 's infomations")
-			wg.Add(1)
+			utils.MLogger.Info("Load user: ", userID, " 's infomations begin")
 			go func(userID string) {
-				defer wg.Done()
 				kmfs, err := metainfo.NewKey(userID, mpb.KeyType_Query)
 				if err != nil {
 					return
@@ -582,9 +583,7 @@ func (p *Info) load(ctx context.Context) error {
 		}
 	}
 
-	wg.Wait()
-
-	utils.MLogger.Info("Load all users' infomations finished")
+	utils.MLogger.Info("Load all users' infomations...")
 
 	return nil
 }
@@ -982,6 +981,7 @@ func (p *Info) sendStorageRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			p.storageSync(ctx)
+			p.extAddrSync(ctx)
 		}
 	}
 }

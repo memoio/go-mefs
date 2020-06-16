@@ -47,12 +47,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	// incase get block has no group info
-	go func() {
-		_, ok := p.fsGroup.Load(fsID)
-		if !ok {
-			p.getGroupInfo(userID, fsID, true)
-		}
-	}()
+	gp := p.getGroupInfo(userID, fsID, true)
+	if gp == nil || !gp.status {
+		return role.ErrServiceNotReady
+	}
 
 	blskey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {

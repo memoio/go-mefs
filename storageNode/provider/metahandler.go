@@ -127,6 +127,10 @@ func (p *Info) handleUserStart(km *metainfo.Key, metaValue, sig []byte, from str
 
 	gp := p.getGroupInfo(uid, gid, false)
 	if gp != nil {
+		if !gp.status {
+			return nil, role.ErrServiceNotReady
+		}
+
 		if ops[4] == "0" && gp.sessionID != uuid.Nil && time.Now().Unix()-gp.sessionTime < role.SessionExpTime {
 			return []byte(gp.sessionID.String()), nil
 		}
@@ -167,6 +171,10 @@ func (p *Info) handleUserStop(km *metainfo.Key, metaValue []byte, from string) (
 	uid := ops[0]
 	gp := p.getGroupInfo(uid, gid, false)
 	if gp != nil {
+		if !gp.status {
+			return nil, role.ErrServiceNotReady
+		}
+
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
 			return nil, err
@@ -196,6 +204,10 @@ func (p *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 
 	gp := p.getGroupInfo(uid, qid, false)
 	if gp != nil {
+		if !gp.status {
+			return
+		}
+
 		sessID, err := uuid.Parse(ops[3])
 		if err != nil {
 			return

@@ -2,11 +2,15 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -391,4 +395,38 @@ func DiskStatus(path string) (*DiskStats, error) {
 	}
 	m.Used = m.Total - m.Free
 	return m, nil
+}
+
+// GetIntranetIP gets inter ip
+func GetIntranetIP() ([]string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	var iAddrs []string
+	for _, address := range addrs {
+		// ip is loopback?
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				iAddrs = append(iAddrs, ipnet.IP.String())
+			}
+		}
+	}
+
+	return iAddrs, nil
+}
+
+// GetPulicIP gets public ip
+func GetPulicIP() (string, error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes.TrimSpace(content)), nil
 }
