@@ -248,7 +248,7 @@ func challengeTest() error {
 
 	log.Println("successfully get object :", objectName, " in bucket:", bucketName)
 
-	time.Sleep(50 * time.Minute)
+	time.Sleep(60 * time.Minute)
 
 	getOb, err = sh.ListObjects(bucketName, shell.SetAddress(addr), shell.SetAvailTime(true))
 	if err != nil {
