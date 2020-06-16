@@ -201,3 +201,65 @@ func BenchmarkSetHashOf(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkPairing(tb *testing.B) {
+	err := Init(BLS12_381)
+	if err != nil {
+		tb.Errorf("ErrInit")
+	}
+	var a, b, ab Fr
+	err = a.SetString("123", 10)
+	if err != nil {
+		tb.Error(err)
+		return
+	}
+	err = b.SetString("456", 10)
+	if err != nil {
+		tb.Error(err)
+		return
+	}
+	FrMul(&ab, &a, &b)
+	var P, aP G1
+	var Q, bQ G2
+	err = P.HashAndMapTo([]byte("this"))
+	if err != nil {
+		tb.Error(err)
+		return
+	}
+	fmt.Printf("P=%s\n", P.GetString(16))
+	G1Mul(&aP, &P, &a)
+	fmt.Printf("aP=%s\n", aP.GetString(16))
+	err = Q.HashAndMapTo([]byte("that"))
+	if err != nil {
+		tb.Error(err)
+		return
+	}
+	fmt.Printf("Q=%s\n", Q.GetString(16))
+	G2Mul(&bQ, &Q, &b)
+	fmt.Printf("bQ=%s\n", bQ.GetString(16))
+	var e1 GT
+	tb.ResetTimer()
+	for i := 0; i < tb.N; i++ {
+		Pairing(&e1, &aP, &bQ)
+	}
+}
+
+func BenchmarkG1Mul(b *testing.B) {
+	err := Init(BLS12_381)
+	if err != nil {
+		b.Errorf("ErrInit")
+	}
+	var a Fr
+	a.SetByCSPRNG()
+	var P, aP G1
+	err = P.HashAndMapTo([]byte("thisdjdk"))
+	if err != nil {
+		b.Error(err)
+		return
+	}
+	fmt.Printf("P=%s\n", P.GetString(16))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		G1Mul(&aP, &P, &a)
+	}
+}

@@ -6,6 +6,7 @@ import (
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
+	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/userNode/miniogw"
 	"github.com/memoio/go-mefs/userNode/user"
 	"github.com/memoio/go-mefs/utils"
@@ -37,6 +38,30 @@ var gwStartCmd = &cmds.Command{
 	Options: []cmds.Option{
 		cmds.StringOption(PassWord, "pwd", "The password for user").WithDefault(""),
 		cmds.StringOption("EndPoint", "url", "The gateway endpoint: ip:port, default is: 127.0.0.1:5080").WithDefault("127.0.0.1:5080"),
+	},
+	PreRun: func(req *cmds.Request, env cmds.Environment) error {
+		pwd, ok := req.Options[PassWord].(string)
+		if !ok || pwd == "" {
+			retry := 0
+			for {
+				gotpwd, err := utils.GetPassWord()
+				if err != nil {
+					if retry > 2 {
+						return err
+					}
+					retry++
+					continue
+				}
+				pwd = gotpwd
+				break
+			}
+		}
+
+		if len(pwd) < 8 {
+			return errWrongInput
+		}
+		req.Options[PassWord] = pwd
+		return nil
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -74,26 +99,13 @@ var gwStartCmd = &cmds.Command{
 		}
 
 		pwd, ok := req.Options[PassWord].(string)
-		if !ok || pwd == "" {
-			retry := 0
-			for {
-				gotpwd, err := utils.GetPassWord()
-				if err != nil {
-					if retry > 2 {
-						return err
-					}
-					retry++
-					continue
-				}
-				pwd = gotpwd
-				break
-			}
-		}
-
-		if len(pwd) < 8 {
+		if !ok || len(pwd) < 8 {
 			return errWrongInput
 		}
-
+		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
+		if err != nil {
+			return err
+		}
 		ep, ok := req.Options["EndPoint"].(string)
 		if !ok {
 			return errWrongInput
