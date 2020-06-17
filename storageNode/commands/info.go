@@ -18,22 +18,24 @@ import (
 )
 
 type pInfoOutput struct {
-	Address        string
-	PublicNetwork  string
-	Balance        string
-	PledgeBytes    string
-	UsedBytes      string
-	PosBytes       string
-	LocalFreeBytes string
-	OfferAddress   string
-	OfferCapacity  string
-	OfferPrice     string
-	OfferDuration  string
-	OfferStartTime string
-	TotalIncome    string
-	StorageIncome  string
-	DownloadIncome string
-	PosIncome      string
+	Address         string
+	StartTime       string
+	ReadyForService bool
+	PublicNetwork   string
+	Balance         string
+	PledgeBytes     string
+	UsedBytes       string
+	PosBytes        string
+	LocalFreeBytes  string
+	OfferAddress    string
+	OfferCapacity   string
+	OfferPrice      string
+	OfferDuration   string
+	OfferStartTime  string
+	TotalIncome     string
+	StorageIncome   string
+	DownloadIncome  string
+	PosIncome       string
 }
 
 var InfoCmd = &cmds.Command{
@@ -78,9 +80,10 @@ var InfoCmd = &cmds.Command{
 		pi := new(big.Int)
 
 		var eAddr string
-
+		ready := false
+		stime := time.Unix(0, 0)
 		providerIns, ok := node.Inst.(*provider.Info)
-		if !ok || !providerIns.Online() { //service is not ready, 从链上获取depositCapacity
+		if !ok { //service is not ready, 从链上获取depositCapacity
 			providerItem, err := role.GetProviderInfo(node.Identity.Pretty(), node.Identity.Pretty())
 			if err != nil {
 				return err
@@ -108,6 +111,8 @@ var InfoCmd = &cmds.Command{
 			di = providerIns.ReadIncome
 			pi = providerIns.PosIncome
 			eAddr, _ = providerIns.GetPublicAddress()
+			ready = providerIns.Online()
+			stime = providerIns.StartTime
 		}
 
 		offerAddr, err := address.GetAddressFromID(oItem.OfferID)
@@ -121,22 +126,24 @@ var InfoCmd = &cmds.Command{
 		}
 
 		output := &pInfoOutput{
-			Address:        localAddr.String(),
-			PublicNetwork:  eAddr,
-			PledgeBytes:    utils.FormatBytes(int64(depositCapacity)),
-			UsedBytes:      utils.FormatBytes(int64(usedCapacity)),
-			PosBytes:       utils.FormatBytes(int64(posCapacity)),
-			LocalFreeBytes: utils.FormatBytes(int64(lsinfo.Free)),
-			OfferAddress:   offerAddr.String(),
-			OfferDuration:  utils.FormatSecond(oItem.Duration),
-			OfferStartTime: time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
-			OfferCapacity:  utils.FormatBytes(int64(oItem.Capacity * 1024 * 1024)),
-			OfferPrice:     utils.FormatStorePrice(oItem.Price),
-			Balance:        utils.FormatWei(balance),
-			TotalIncome:    utils.FormatWei(ti),
-			DownloadIncome: utils.FormatWei(di),
-			StorageIncome:  utils.FormatWei(si),
-			PosIncome:      utils.FormatWei(pi),
+			Address:         localAddr.String(),
+			StartTime:       stime.In(time.Local).Format(utils.SHOWTIME),
+			ReadyForService: ready,
+			PublicNetwork:   eAddr,
+			PledgeBytes:     utils.FormatBytes(int64(depositCapacity)),
+			UsedBytes:       utils.FormatBytes(int64(usedCapacity)),
+			PosBytes:        utils.FormatBytes(int64(posCapacity)),
+			LocalFreeBytes:  utils.FormatBytes(int64(lsinfo.Free)),
+			OfferAddress:    offerAddr.String(),
+			OfferDuration:   utils.FormatSecond(oItem.Duration),
+			OfferStartTime:  time.Unix(oItem.CreateDate, 0).In(time.Local).Format(utils.SHOWTIME),
+			OfferCapacity:   utils.FormatBytes(int64(oItem.Capacity * 1024 * 1024)),
+			OfferPrice:      utils.FormatStorePrice(oItem.Price),
+			Balance:         utils.FormatWei(balance),
+			TotalIncome:     utils.FormatWei(ti),
+			DownloadIncome:  utils.FormatWei(di),
+			StorageIncome:   utils.FormatWei(si),
+			PosIncome:       utils.FormatWei(pi),
 		}
 		return cmds.EmitOnce(res, output)
 	},

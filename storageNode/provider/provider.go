@@ -52,6 +52,9 @@ type Info struct {
 	userConfigs       *lru.ARCCache
 	ms                *measure
 	ExtAddr           string
+	serverAddr        string
+	serverTime        time.Time
+	StartTime         time.Time
 }
 
 type measure struct {
@@ -145,6 +148,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		StorageIncome: big.NewInt(0),
 		PosIncome:     big.NewInt(0),
 		offers:        make([]*role.OfferItem, 0, 1),
+		StartTime:     time.Now(),
 	}
 
 	// cache userconfigs, key is queryID
@@ -259,16 +263,24 @@ func (p *Info) GetPublicAddress() (string, error) {
 		return p.ExtAddr, nil
 	}
 
+	if p.serverAddr != "" && p.serverTime.Add(time.Hour).After(time.Now()) {
+		return p.serverAddr, nil
+	}
+
 	e, err := p.ds.GetPublicAddr(p.context, p.localID)
 	if err != nil {
 		return "", err
 	}
 
 	if strings.Contains(e.String(), p.localID) {
-		return e.String(), nil
+		p.serverAddr = e.String()
+		p.serverTime = time.Now()
 	}
 
-	return e.String() + "/p2p/" + p.localID, nil
+	p.serverAddr = e.String() + "/p2p/" + p.localID
+	p.serverTime = time.Now()
+
+	return p.serverAddr, nil
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
