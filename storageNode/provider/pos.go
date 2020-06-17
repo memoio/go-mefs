@@ -53,6 +53,36 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
 	utils.MLogger.Info("Start Pos Service")
+
+	//从磁盘读取存储的Cidprefix
+	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
+	if err != nil {
+		utils.MLogger.Info("NewKeyMeta posKM error :", err)
+		return err
+	}
+
+	posValue, err := p.ds.GetKey(ctx, posKM.ToString(), "local")
+	if err != nil {
+		utils.MLogger.Info("Get posKM from local error :", err)
+	} else {
+		utils.MLogger.Info("get posKM value: ", string(posValue))
+		cidInfo, err := metainfo.NewBlockFromString(string(posValue))
+		if err != nil {
+			utils.MLogger.Info("get block meta in posRegular error :", err)
+		} else {
+			sid, err := strconv.Atoi(cidInfo.GetSid())
+			if err != nil {
+				utils.MLogger.Info("strconv.Atoi Sid in posReguar error :", err)
+			} else {
+				curSid = sid
+			}
+		}
+	}
+
+	utils.MLogger.Info("before traverse pos blocks reaches sid: ", curSid)
+
+	p.StoragePosUsed = uint64(pos.DLen * pos.Reps * (curSid + 1))
+
 	posID = pos.GetPosId()
 	posAddr = pos.GetPosAddr()
 
@@ -114,35 +144,6 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	opt.BlsKey = mkey
 
 	opt.PreCompute()
-
-	//从磁盘读取存储的Cidprefix
-	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
-	if err != nil {
-		utils.MLogger.Info("NewKeyMeta posKM error :", err)
-		return err
-	}
-
-	posValue, err := p.ds.GetKey(ctx, posKM.ToString(), "local")
-	if err != nil {
-		utils.MLogger.Info("Get posKM from local error :", err)
-	} else {
-		utils.MLogger.Info("get posKM value: ", string(posValue))
-		cidInfo, err := metainfo.NewBlockFromString(string(posValue))
-		if err != nil {
-			utils.MLogger.Info("get block meta in posRegular error :", err)
-		} else {
-			sid, err := strconv.Atoi(cidInfo.GetSid())
-			if err != nil {
-				utils.MLogger.Info("strconv.Atoi Sid in posReguar error :", err)
-			} else {
-				curSid = sid
-			}
-		}
-	}
-
-	p.StoragePosUsed = uint64(pos.DLen * pos.Reps * (curSid + 1))
-
-	utils.MLogger.Info("before traverse pos blocks reaches sid: ", curSid)
 
 	p.traversePath(gc)
 
