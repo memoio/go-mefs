@@ -21,6 +21,7 @@ import (
 type pInfoOutput struct {
 	Address         string
 	StartTime       string
+	UpTime          string
 	ReadyForService bool
 	PublicNetwork   string
 	PublicReachable bool
@@ -85,6 +86,7 @@ var InfoCmd = &cmds.Command{
 		ready := false
 		reachable := false
 		stime := time.Unix(0, 0)
+		uTime := int64(0)
 		providerIns, ok := node.Inst.(*provider.Info)
 		if !ok { //service is not ready, 从链上获取depositCapacity
 			providerItem, err := role.GetProviderInfo(node.Identity.Pretty(), node.Identity.Pretty())
@@ -121,6 +123,7 @@ var InfoCmd = &cmds.Command{
 			}
 			ready = providerIns.Online()
 			stime = providerIns.StartTime
+			uTime = time.Now().Unix() - stime.Unix()
 		}
 
 		offerAddr, err := address.GetAddressFromID(oItem.OfferID)
@@ -136,6 +139,7 @@ var InfoCmd = &cmds.Command{
 		output := &pInfoOutput{
 			Address:         localAddr.String(),
 			StartTime:       stime.In(time.Local).Format(utils.SHOWTIME),
+			UpTime:          utils.FormatSecond(uTime),
 			ReadyForService: ready,
 			PublicNetwork:   eAddr,
 			PublicReachable: reachable,
