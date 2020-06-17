@@ -107,7 +107,7 @@ var InfoCmd = &cmds.Command{
 			si = providerIns.StorageIncome
 			di = providerIns.ReadIncome
 			pi = providerIns.PosIncome
-			eAddr, _ = providerIns.GetIPAddress()
+			eAddr, _ = providerIns.GetPublicAddress()
 		}
 
 		offerAddr, err := address.GetAddressFromID(oItem.OfferID)

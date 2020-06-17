@@ -782,7 +782,7 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 	}
 
 	for i := 0; i < connectTryCount; i++ {
-		res := n.getAddrAndConnect(ctx, id)
+		res := n.GetAddrAndConnect(ctx, id.Pretty())
 		if res {
 			return true
 		}
@@ -790,12 +790,17 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 	return false
 }
 
-func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
+func (n *impl) GetAddrAndConnect(ctx context.Context, to string) bool {
 	if n.ph == nil || n.rt == nil {
 		return false
 	}
 
-	km, err := metainfo.NewKey(to.Pretty(), mpb.KeyType_ExternalAddress)
+	km, err := metainfo.NewKey(to, mpb.KeyType_ExternalAddress)
+	if err != nil {
+		return false
+	}
+
+	toID, err := peer.IDB58Decode(to)
 	if err != nil {
 		return false
 	}
@@ -833,7 +838,7 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 		}
 
 		npi = peer.AddrInfo{
-			ID:    to,
+			ID:    toID,
 			Addrs: []ma.Multiaddr{pai},
 		}
 
@@ -851,6 +856,61 @@ func (n *impl) getAddrAndConnect(ctx context.Context, to peer.ID) bool {
 		}
 	}
 	return false
+}
+
+func (n *impl) GetPublicAddr(ctx context.Context, need string) (ma.Multiaddr, error) {
+	if n.ph == nil || n.rt == nil {
+		return nil, errNoRouting
+	}
+
+	km, err := metainfo.NewKey(need, mpb.KeyType_ExternalAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, defaultBootstrapAddress := range config.DefaultBootstrapAddresses {
+		bi, err := ma.NewMultiaddr(defaultBootstrapAddress)
+		if err != nil {
+			continue
+		}
+
+		pi, err := peer.AddrInfoFromP2pAddr(bi)
+		if err != nil {
+			continue
+		}
+
+		npi := peer.AddrInfo{
+			ID:    pi.ID,
+			Addrs: pi.Addrs,
+		}
+
+		err = n.ph.Connect(ctx, npi)
+		if err != nil {
+			continue
+		}
+
+		res, err := n.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), nil, nil, npi.ID.Pretty())
+		if err != nil {
+			continue
+		}
+
+		pai, err := ma.NewMultiaddrBytes(res)
+		if err != nil {
+			utils.MLogger.Errorf("multiaddr %s failed to parse: %s", string(res), err)
+			continue
+		}
+
+		ok := mnet.IsThinWaist(pai)
+		if ok {
+			// is ip4/tcp or ip4/udp
+			ok = mnet.IsPrivateAddr(pai)
+			if !ok {
+				// is public addr
+				return pai, nil
+			}
+		}
+	}
+	return nil, errNoConnection
 }
 
 func (n *impl) Itererate(prefix string) ([]dsq.Entry, error) {
@@ -912,7 +972,6 @@ func (n *impl) GetExternalAddr(p string) (ma.Multiaddr, error) {
 					}
 				}
 			}
-
 		}
 	}
 

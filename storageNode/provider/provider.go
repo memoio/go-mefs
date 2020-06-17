@@ -254,12 +254,12 @@ func (p *Info) GetRole() string {
 func (p *Info) Close() error {
 	return p.save(p.context)
 }
-func (p *Info) GetIPAddress() (string, error) {
+func (p *Info) GetPublicAddress() (string, error) {
 	if p.ExtAddr != "" {
 		return p.ExtAddr, nil
 	}
 
-	e, err := p.ds.GetExternalAddr(p.localID)
+	e, err := p.ds.GetPublicAddr(p.context, p.localID)
 	if err != nil {
 		return "", err
 	}
