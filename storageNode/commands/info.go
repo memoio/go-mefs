@@ -19,6 +19,7 @@ import (
 
 type pInfoOutput struct {
 	Address        string
+	PublicNetwork  string
 	Balance        string
 	PledgeBytes    string
 	UsedBytes      string
@@ -76,6 +77,8 @@ var InfoCmd = &cmds.Command{
 		si := new(big.Int)
 		pi := new(big.Int)
 
+		var eAddr string
+
 		providerIns, ok := node.Inst.(*provider.Info)
 		if !ok || !providerIns.Online() { //service is not ready, 从链上获取depositCapacity
 			providerItem, err := role.GetProviderInfo(node.Identity.Pretty(), node.Identity.Pretty())
@@ -104,6 +107,7 @@ var InfoCmd = &cmds.Command{
 			si = providerIns.StorageIncome
 			di = providerIns.ReadIncome
 			pi = providerIns.PosIncome
+			eAddr, _ = providerIns.GetIPAddress()
 		}
 
 		offerAddr, err := address.GetAddressFromID(oItem.OfferID)
@@ -118,6 +122,7 @@ var InfoCmd = &cmds.Command{
 
 		output := &pInfoOutput{
 			Address:        localAddr.String(),
+			PublicNetwork:  eAddr,
 			PledgeBytes:    utils.FormatBytes(int64(depositCapacity)),
 			UsedBytes:      utils.FormatBytes(int64(usedCapacity)),
 			PosBytes:       utils.FormatBytes(int64(posCapacity)),

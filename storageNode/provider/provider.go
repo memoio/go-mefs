@@ -51,7 +51,7 @@ type Info struct {
 	proContract       *role.ProviderItem
 	userConfigs       *lru.ARCCache
 	ms                *measure
-	eAddr             string
+	ExtAddr           string
 }
 
 type measure struct {
@@ -214,20 +214,21 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	}
 
 	if extAddr != "" {
+		utils.MLogger.Info("extAddress is set to: ", extAddr)
 		eaddr := strings.Split(extAddr, ":")
 		if len(eaddr) == 2 {
 			if net.ParseIP(eaddr[0]) != nil {
 				ips := strings.Split(eaddr[0], ".")
 				if len(ips) == 4 {
 					// example:= /ip4/123.123.234.123/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
-					m.eAddr = "/ip4/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
+					m.ExtAddr = "/ip4/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
 				} else {
 					// example:= /ip4/123.123.234.123/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
-					m.eAddr = "/ip6/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
+					m.ExtAddr = "/ip6/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
 				}
 			} else {
 				// example:= /dns/239v39e500.zicp.vip/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
-				m.eAddr = "/dns/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
+				m.ExtAddr = "/dns/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
 			}
 		}
 	}
@@ -252,6 +253,18 @@ func (p *Info) GetRole() string {
 
 func (p *Info) Close() error {
 	return p.save(p.context)
+}
+func (p *Info) GetIPAddress() (string, error) {
+	if p.ExtAddr != "" {
+		return p.ExtAddr, nil
+	}
+
+	e, err := p.ds.GetExternalAddr(p.localID)
+	if err != nil {
+		return "", err
+	}
+
+	return e.String(), nil
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {
@@ -987,7 +1000,7 @@ func (p *Info) sendStorageRegular(ctx context.Context) {
 }
 
 func (p *Info) extAddrSync(ctx context.Context) error {
-	if p.eAddr == "" {
+	if p.ExtAddr == "" {
 		return nil
 	}
 
@@ -998,7 +1011,7 @@ func (p *Info) extAddrSync(ctx context.Context) error {
 	}
 
 	p.keepers.Range(func(key, value interface{}) bool {
-		go p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(p.eAddr), nil, key.(string))
+		go p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(p.ExtAddr), nil, key.(string))
 		return true
 	})
 
