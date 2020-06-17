@@ -260,10 +260,6 @@ func (p *Info) Close() error {
 	return p.save(p.context)
 }
 func (p *Info) GetPublicAddress() (string, error) {
-	if p.ExtAddr != "" {
-		return p.ExtAddr, nil
-	}
-
 	if p.serverAddr != "" && p.serverTime.Add(time.Hour).After(time.Now()) {
 		return p.serverAddr, nil
 	}

@@ -65,6 +65,8 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 			go k.handlePutExAddr(km, metaValue, from)
 		case mpb.OpType_Get:
 			return k.handleExternalAddr(km)
+		case mpb.OpType_Delete:
+			go k.handleDelExAddr(km)
 		}
 	case mpb.KeyType_ChalTime:
 		return k.handleChalTime(km)
@@ -283,8 +285,32 @@ func (k *Info) handleStorage(km *metainfo.Key, value []byte, pid string) {
 	thisInfo.usedSpace = used
 }
 
-func (k *Info) handlePutExAddr(km *metainfo.Key, value []byte, from string) {
+func (k *Info) handleDelExAddr(km *metainfo.Key) {
+	utils.MLogger.Info("handleDelExternnalAddr: ", km.ToString())
+
+	pid := km.GetMainID()
+	pi, err := k.getPInfo(pid, false)
+	if err != nil {
+		ki, err := k.getKInfo(pid, false)
+		if err == nil {
+			ki.eAddr = ""
+		}
+	} else {
+		pi.eAddr = ""
+	}
+}
+
+func (k *Info) handlePutExAddr(km *metainfo.Key, value []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handlePutExternnalAddr: ", km.ToString(), string(value))
+
+	ea := strings.Split(string(value), "/")
+	if len(ea) >= 5 {
+		ipa := ea[2] + ":" + ea[4]
+		if !utils.IsReachable(ipa) {
+			return nil, role.ErrNotConnectd
+		}
+	}
+
 	pid := km.GetMainID()
 	pi, err := k.getPInfo(pid, false)
 	if err != nil {
@@ -295,6 +321,8 @@ func (k *Info) handlePutExAddr(km *metainfo.Key, value []byte, from string) {
 	} else {
 		pi.eAddr = string(value)
 	}
+
+	return []byte(instance.MetaHandlerComplete), nil
 }
 
 func (k *Info) handleExternalAddr(km *metainfo.Key) ([]byte, error) {
