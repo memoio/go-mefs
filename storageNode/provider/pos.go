@@ -140,6 +140,8 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		}
 	}
 
+	p.StoragePosUsed = uint64(pos.DLen * pos.Reps * (curSid + 1))
+
 	utils.MLogger.Info("before traverse pos blocks reaches sid: ", curSid)
 
 	p.traversePath(gc)
@@ -208,8 +210,6 @@ func (p *Info) traversePath(gc bool) {
 			if exist {
 				if gc {
 					p.ds.DeleteBlock(p.context, res.String(), "local")
-				} else {
-					p.StoragePosUsed += uint64(pos.DLen)
 				}
 			} else {
 				notfound++
@@ -227,6 +227,8 @@ func (p *Info) traversePath(gc bool) {
 	} else {
 		curSid = sid - 1
 	}
+
+	p.StoragePosUsed = uint64(pos.DLen * pos.Reps * (curSid + 1))
 
 	bm.SetSid(strconv.Itoa(curSid))
 }

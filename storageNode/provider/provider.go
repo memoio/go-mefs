@@ -243,6 +243,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 
 	m.state = true
 
+	m.GetPublicAddress()
 	utils.MLogger.Info("Provider Service is ready")
 	return m, nil
 }

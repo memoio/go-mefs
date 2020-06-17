@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"strings"
 	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -22,6 +23,7 @@ type pInfoOutput struct {
 	StartTime       string
 	ReadyForService bool
 	PublicNetwork   string
+	PublicReachable bool
 	Balance         string
 	PledgeBytes     string
 	UsedBytes       string
@@ -81,6 +83,7 @@ var InfoCmd = &cmds.Command{
 
 		var eAddr string
 		ready := false
+		reachable := false
 		stime := time.Unix(0, 0)
 		providerIns, ok := node.Inst.(*provider.Info)
 		if !ok { //service is not ready, 从链上获取depositCapacity
@@ -111,6 +114,11 @@ var InfoCmd = &cmds.Command{
 			di = providerIns.ReadIncome
 			pi = providerIns.PosIncome
 			eAddr, _ = providerIns.GetPublicAddress()
+			ea := strings.Split(eAddr, "/")
+			if len(ea) >= 4 {
+				ipa := ea[1] + ":" + ea[3]
+				reachable = utils.IsReachable(ipa)
+			}
 			ready = providerIns.Online()
 			stime = providerIns.StartTime
 		}
@@ -130,6 +138,7 @@ var InfoCmd = &cmds.Command{
 			StartTime:       stime.In(time.Local).Format(utils.SHOWTIME),
 			ReadyForService: ready,
 			PublicNetwork:   eAddr,
+			PublicReachable: reachable,
 			PledgeBytes:     utils.FormatBytes(int64(depositCapacity)),
 			UsedBytes:       utils.FormatBytes(int64(usedCapacity)),
 			PosBytes:        utils.FormatBytes(int64(posCapacity)),
