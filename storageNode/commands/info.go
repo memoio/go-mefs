@@ -115,8 +115,8 @@ var InfoCmd = &cmds.Command{
 			pi = providerIns.PosIncome
 			eAddr, _ = providerIns.GetPublicAddress()
 			ea := strings.Split(eAddr, "/")
-			if len(ea) >= 4 {
-				ipa := ea[1] + ":" + ea[3]
+			if len(ea) >= 5 {
+				ipa := ea[2] + ":" + ea[4]
 				reachable = utils.IsReachable(ipa)
 			}
 			ready = providerIns.Online()
