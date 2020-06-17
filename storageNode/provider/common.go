@@ -83,11 +83,11 @@ func (p *Info) getDiskUsage() (uint64, error) {
 		return 0, err
 	}
 
-	if used >= localUsed {
-		return localUsed, nil
+	if used != localUsed {
+		utils.MLogger.Infof("localUsed is %d, while calculate is: %d", localUsed, used)
 	}
 
-	return used, nil
+	return localUsed, nil
 }
 
 // getDiskTotal gets the disk total space which is set in config

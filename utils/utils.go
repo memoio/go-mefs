@@ -433,9 +433,11 @@ func GetPulicIP() (string, error) {
 
 //IsReachable checks addr(ip:port) is reachable
 func IsReachable(addr string) bool {
-	_, err := net.DialTimeout("tcp", addr, 30*time.Second)
+	_, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
-		return false
+		if strings.Contains(err.Error(), "connection refused") {
+			return false
+		}
 	}
 
 	return true
