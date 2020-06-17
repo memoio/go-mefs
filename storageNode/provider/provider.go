@@ -25,6 +25,8 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
+	mdns "github.com/multiformats/go-multiaddr-dns"
+	mnet "github.com/multiformats/go-multiaddr-net"
 )
 
 // Info tracks provider's information
@@ -269,13 +271,27 @@ func (p *Info) GetPublicAddress() (string, error) {
 		return "", err
 	}
 
-	if strings.Contains(e.String(), p.localID) {
-		p.serverAddr = e.String()
-		p.serverTime = time.Now()
+	eAddr := e.String()
+	if strings.Contains(eAddr, "dns") {
+		ctx, cancle := context.WithTimeout(p.context, 30*time.Second)
+		defer cancle()
+		addrs, _ := mdns.Resolve(ctx, e)
+		for _, maddr := range addrs {
+			ok := mnet.IsPrivateAddr(maddr)
+			if !ok {
+				eAddr = maddr.String()
+				break
+			}
+		}
 	}
 
-	p.serverAddr = e.String() + "/p2p/" + p.localID
-	p.serverTime = time.Now()
+	if strings.Contains(eAddr, p.localID) {
+		p.serverAddr = eAddr
+		p.serverTime = time.Now()
+	} else {
+		p.serverAddr = eAddr + "/p2p/" + p.localID
+		p.serverTime = time.Now()
+	}
 
 	return p.serverAddr, nil
 }
