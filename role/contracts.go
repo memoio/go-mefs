@@ -186,7 +186,17 @@ func IsKeeper(userID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return contracts.IsKeeper(localAddress)
+
+	for i := 0; i < 3; i++ {
+		ok, err := contracts.IsKeeper(localAddress)
+		if err != nil {
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		return ok, nil
+	}
+	return false, ErrNotConnectd
 }
 
 // GetProviderInfo returns provider info
@@ -281,7 +291,17 @@ func IsProvider(userID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return contracts.IsProvider(localAddress)
+
+	for i := 0; i < 3; i++ {
+		ok, err := contracts.IsProvider(localAddress)
+		if err != nil {
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		return ok, nil
+	}
+	return false, ErrNotConnectd
 }
 
 // DeployOffer is

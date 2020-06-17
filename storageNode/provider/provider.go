@@ -264,7 +264,11 @@ func (p *Info) GetPublicAddress() (string, error) {
 		return "", err
 	}
 
-	return e.String(), nil
+	if strings.Contains(e.String(), p.localID) {
+		return e.String(), nil
+	}
+
+	return e.String() + "/p2p/" + p.localID, nil
 }
 
 func newGroup(localID, uid, gid string, kps []string, pros []string) *groupInfo {

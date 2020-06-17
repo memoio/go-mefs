@@ -301,7 +301,7 @@ func IsProvider(localaddress common.Address) (bool, error) {
 		From: localaddress,
 	}, localaddress)
 	if err != nil {
-		log.Println("isKeepererr:", err)
+		log.Println("isProviderErr:", err)
 		return false, err
 	}
 	return isProvider, nil
