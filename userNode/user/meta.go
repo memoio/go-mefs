@@ -525,7 +525,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		}
 		ob.Parts = append(ob.Parts, &part)
 		ob.PartCount++
-		ob.ETag = calulateETag(ob)
+		ob.ETag = calculateETagForNewPart(ob.ETag, part.ETag)
 		ob.Length += part.Length
 		ob.MTime = part.GetCTime()
 		ob.Unlock()

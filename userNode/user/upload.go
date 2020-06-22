@@ -246,7 +246,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	object.Parts = append(object.Parts, opart)
 	object.PartCount++
 	object.Length += int64(ul.length)
-	object.ETag = calulateETag(object)
+	object.ETag = calculateETagForNewPart(object.ETag, opart.ETag)
 	object.MTime = opart.CTime
 
 	// bucket
@@ -613,20 +613,64 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	return errrt
 }
 
-func calulateETag(ob *ObjectInfo) string {
+func calculateETag(ob *ObjectInfo) string {
+	if len(ob.GetParts()) == 0 {
+		return ""
+	}
 	if len(ob.GetParts()) == 1 {
 		return ob.GetParts()[0].ETag
 	}
 
-	var hashes []byte
+	result, err := hex.DecodeString(ob.GetParts()[0].ETag)
+	if err != nil {
+		return ""
+	}
 	for i := 0; i < len(ob.GetParts()); i++ {
-		md5, err := hex.DecodeString(ob.GetParts()[i].ETag)
+		temp, err := hex.DecodeString(ob.GetParts()[i].ETag)
 		if err != nil {
 			continue
 		}
-		hashes = append(hashes, md5...)
+		err = xor(result, temp)
+		if err != nil {
+			return ""
+		}
 	}
 
-	sum := md5.Sum(hashes)
-	return hex.EncodeToString(sum[:])
+	return hex.EncodeToString(result)
+}
+
+func calculateETagForNewPart(old, new string) string {
+	var oldBytes, newBytes []byte
+	var err error
+	if len(old) == 0 {
+		return new
+	} else {
+		oldBytes, err = hex.DecodeString(old)
+		if err != nil {
+			return ""
+		}
+	}
+	if len(new) == 0 {
+		return old
+	} else {
+		newBytes, err = hex.DecodeString(new)
+		if err != nil {
+			return ""
+		}
+	}
+	err = xor(oldBytes, newBytes)
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(oldBytes)
+}
+
+func xor(a []byte, b []byte) error {
+	if len(a) != len(b) {
+		return ErrWrongParameters
+	}
+	for i := 0; i < len(a); i++ {
+		a[i] ^= b[i]
+	}
+	return nil
 }
