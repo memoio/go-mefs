@@ -15,6 +15,7 @@ import (
 	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/memoio/go-mefs/config"
 	"github.com/memoio/go-mefs/contracts"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -25,6 +26,7 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
+	ma "github.com/multiformats/go-multiaddr"
 	mdns "github.com/multiformats/go-multiaddr-dns"
 	mnet "github.com/multiformats/go-multiaddr-net"
 )
@@ -243,9 +245,11 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 	go m.sendStorageRegular(ctx)
 	go m.saveRegular(ctx)
 
+	m.extAddrSync(ctx)
+	m.GetPublicAddress()
+
 	m.state = true
 
-	m.GetPublicAddress()
 	utils.MLogger.Info("Provider Service is ready")
 	return m, nil
 }
@@ -1037,6 +1041,25 @@ func (p *Info) extAddrSync(ctx context.Context) error {
 	if err != nil {
 		utils.MLogger.Info("construct StorageSync KV error :", err)
 		return err
+	}
+
+	for _, defaultBootstrapAddress := range config.DefaultBootstrapAddresses {
+		bi, err := ma.NewMultiaddr(defaultBootstrapAddress)
+		if err != nil {
+			continue
+		}
+
+		pi, err := peer.AddrInfoFromP2pAddr(bi)
+		if err != nil {
+			continue
+		}
+
+		ok := p.ds.FastConnect(p.context, pi.ID.Pretty())
+		if !ok {
+			continue
+		}
+
+		p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(p.ExtAddr), nil, pi.ID.Pretty())
 	}
 
 	p.keepers.Range(func(key, value interface{}) bool {
