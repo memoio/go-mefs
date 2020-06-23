@@ -509,6 +509,9 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		return
 	}
 	proInfo.(*pInfo).credit--
+	if proInfo.(*pInfo).credit < -100 {
+		proInfo.(*pInfo).credit = -100
+	}
 
 	thisGroup := k.getGroupInfo(userID, qid, false)
 	if thisGroup == nil {

@@ -43,7 +43,7 @@ var opt = &df.DataCoder{
 			TagFlag:      df.BLS12,
 			SegmentSize:  df.DefaultSegmentSize,
 			Encryption:   0,
-			SegmentCount: 25600,
+			SegmentCount: 3200,
 		},
 	},
 }
@@ -155,6 +155,12 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	}
 
 	bm = newbm
+
+	// send last one
+	metaValue := bm.ToString()
+	for _, keeper := range gp.keepers {
+		p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(metaValue), nil, keeper)
+	}
 
 	//开始pos
 	p.posRegular(ctx)

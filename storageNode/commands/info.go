@@ -19,7 +19,7 @@ import (
 )
 
 type pInfoOutput struct {
-	Address         string
+	Wallet          string
 	StartTime       string
 	UpTime          string
 	ReadyForService bool
@@ -137,7 +137,7 @@ var InfoCmd = &cmds.Command{
 		}
 
 		output := &pInfoOutput{
-			Address:         localAddr.String(),
+			Wallet:          localAddr.String(),
 			StartTime:       stime.In(time.Local).Format(utils.SHOWTIME),
 			UpTime:          utils.FormatSecond(uTime),
 			ReadyForService: ready,
