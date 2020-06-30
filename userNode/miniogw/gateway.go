@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -310,6 +311,10 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 
 	hasPrefixKey := false
 
+	// for s3 fuse
+	ud := make(map[string]string)
+	ud["x-amz-meta-mode"] = "33204"
+
 	//用于过滤prefix
 	first := true
 	for ; limit > 0 && objectIter != nil; objectIter = objectIter.Next() {
@@ -337,14 +342,16 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 			index := strings.Index(name[prefixLen:], delimiter)
 			//无"/"，简单对象
 			if index < 0 {
+				ud["x-amz-meta-mtime"] = strconv.FormatInt(object.GetMTime(), 10)
 				loi.Objects = append(loi.Objects, minio.ObjectInfo{
 					Bucket:      bucket,
 					Name:        name,
-					ModTime:     time.Unix(object.GetMTime(), 0),
+					ModTime:     time.Unix(object.GetMTime(), 0).UTC(),
 					Size:        object.GetLength(),
 					IsDir:       object.GetInfo().GetDir(),
 					ETag:        object.GetETag(),
 					ContentType: object.GetInfo().GetContentType(),
+					UserDefined: ud,
 				})
 			} else {
 				//有"/"，获取文件夹抽象
@@ -364,14 +371,16 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 				}
 			}
 		} else { //递归获取，全部返回
+			ud["x-amz-meta-mtime"] = strconv.FormatInt(object.GetMTime(), 10)
 			loi.Objects = append(loi.Objects, minio.ObjectInfo{
 				Bucket:      bucket,
 				Name:        object.GetInfo().GetName(),
-				ModTime:     time.Unix(object.GetMTime(), 0),
+				ModTime:     time.Unix(object.GetMTime(), 0).UTC(),
 				Size:        object.GetLength(),
 				IsDir:       object.GetInfo().GetDir(),
 				ETag:        object.GetETag(),
 				ContentType: object.GetInfo().GetContentType(),
+				UserDefined: ud,
 			})
 		}
 		limit--
@@ -379,12 +388,14 @@ func (l *lfsGateway) ListObjects(ctx context.Context, bucket, prefix, marker, de
 
 	//!recursive时返回的结果依然包括Prefix，抽象成文件夹
 	if len(prefix) > 0 && !recursive && !hasPrefixKey {
+		ud["x-amz-meta-mtime"] = strconv.FormatInt(time.Now().Unix(), 10)
 		loi.Objects = append(loi.Objects, minio.ObjectInfo{
-			Bucket:  bucket,
-			Name:    entryPrefixMatch,
-			Size:    0,
-			IsDir:   true,
-			ModTime: time.Now().UTC(),
+			Bucket:      bucket,
+			Name:        entryPrefixMatch,
+			Size:        0,
+			IsDir:       true,
+			ModTime:     time.Now().UTC(),
+			UserDefined: ud,
 		})
 	}
 	//没读完
@@ -502,14 +513,21 @@ func (l *lfsGateway) GetObjectInfo(ctx context.Context, bucket, object string, o
 	if err != nil {
 		return minio.ObjectInfo{}, convertToMinioError(err, bucket, object)
 	}
+
+	// for s3 fuse
+	ud := make(map[string]string)
+	ud["x-amz-meta-mode"] = "33204"
+	ud["x-amz-meta-mtime"] = strconv.FormatInt(obj.GetMTime(), 10)
 	// need handle ETag
 	objInfo = minio.ObjectInfo{
 		Bucket:      bucket,
 		Name:        object,
+		ModTime:     time.Unix(obj.GetMTime(), 0).UTC(),
 		IsDir:       obj.GetInfo().GetDir(),
 		ETag:        obj.GetETag(),
 		ContentType: obj.GetInfo().GetContentType(),
 		Size:        obj.GetLength(),
+		UserDefined: ud,
 	}
 
 	return objInfo, nil

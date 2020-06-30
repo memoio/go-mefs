@@ -162,6 +162,7 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 		bucket.mtree.Push(tag)
 		bucket.Root = bucket.mtree.Root()
 		bucket.dirty = true
+		bucket.MTime = time.Now().Unix()
 
 		l.meta.dirty = true
 		utils.MLogger.Infof("Upload create object: %s in bucket: %s", objectName, bucketName)
@@ -251,6 +252,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 
 	// bucket
 	bucket.Length += int64(ul.rawLen)
+	bucket.MTime = opart.CTime
 	payload, err := proto.Marshal(opart)
 	if err != nil {
 		return nil, err

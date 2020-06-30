@@ -504,7 +504,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 			},
 		})
 		bucket.applyOpID = op.GetOpID()
-		utils.MLogger.Info("Add Object-", info.GetName(), " in bucket: ", bucket.Name)
+		utils.MLogger.Info("Add Object: ", info.GetName(), " in bucket: ", bucket.Name)
 	case mpb.LfsOp_OpAppend:
 		part := mpb.ObjectPart{}
 		err = proto.Unmarshal(payload, &part)

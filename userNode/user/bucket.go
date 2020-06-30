@@ -95,6 +95,7 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 		BOpts:        options,
 		Length:       0,
 		CTime:        time.Now().Unix(),
+		MTime:        time.Now().Unix(),
 		Deletion:     false,
 		NextObjectID: 0,
 		NextOpID:     0,
@@ -154,6 +155,7 @@ func (l *LfsInfo) DeleteBucket(ctx context.Context, bucketName string) (*mpb.Buc
 	defer l.meta.sb.Unlock()
 	bucket.Lock()
 	bucket.Deletion = true
+	bucket.MTime = time.Now().Unix()
 	delete(l.meta.buckets, bucket.Name)
 	delete(l.meta.bucketIDToName, bucket.GetBucketID())
 	l.meta.deletedBuckets = append(l.meta.deletedBuckets, bucket)
