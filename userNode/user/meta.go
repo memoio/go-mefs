@@ -514,7 +514,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		}
 		ob, ok := bucket.Objects.Find(MetaName(part.GetName())).(*ObjectInfo)
 		if !ok || ob == nil {
-			utils.MLogger.Error("Add Part-", part.GetPartID(), "to an inexistent object-", part.GetName())
+			utils.MLogger.Error("Add Object Part: ", part.GetPartID(), "to an inexistent object: ", part.GetName())
 			return ErrObjectNotExist
 		}
 
@@ -539,7 +539,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		}
 		ob, ok := bucket.Objects.Find(MetaName(mes.GetName())).(*ObjectInfo)
 		if !ok || ob == nil {
-			utils.MLogger.Error("Delete an inexistent object-", mes.GetName())
+			utils.MLogger.Error("Delete an inexistent object: ", mes.GetName())
 			return err
 		}
 		ob.Lock()
