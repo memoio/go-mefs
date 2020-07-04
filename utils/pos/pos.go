@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	DLen = 100 * 1024 * 1024
-	Reps = 10 // 10备份
+	DLen     = 100 * 1024 * 1024
+	SegCount = 3200
+	SegSize  = 32768
+	Reps     = 10 // 10备份
 )
 
 func GetPosAddr() string {

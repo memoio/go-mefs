@@ -14,6 +14,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -171,9 +172,17 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 				return nil
 			}
 
-			if bid > 0 {
-				bop = df.DefaultBucketOptions()
+			if g.userID == pos.GetPosId() {
+				bop.DataCount = 1
+				bop.ParityCount = pos.Reps - 1
+				bop.SegmentCount = pos.SegCount
+				bop.SegmentSize = pos.SegSize
+			} else {
+				if bid > 0 {
+					bop = df.DefaultBucketOptions()
+				}
 			}
+
 			tempInfo := &bucketInfo{
 				bops:       bop,
 				curStripes: -1,
@@ -319,12 +328,22 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 	segSize := df.DefaultSegmentSize
 	// delete from buckets
-	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
+	bids := strings.Split(bid, metainfo.BlockDelimiter)
+	if len(bids) != 3 {
+		return
+	}
 
 	bui, ok := g.buckets.Load(bids[0])
 	if ok {
-		bui.(*bucketInfo).stripes.Delete(bids[1])
+		binfo := bui.(*bucketInfo)
+		binfo.stripes.Delete(bids[1] + metainfo.BlockDelimiter + bids[2])
 		segSize = int(bui.(*bucketInfo).bops.GetSegmentSize())
+		if g.userID == pos.GetPosId() {
+			strpeNum, err := strconv.Atoi(bids[1])
+			if err == nil {
+				binfo.curStripes = strpeNum - 1
+			}
+		}
 	}
 
 	thisLinfo := g.getLInfo(pid, false)

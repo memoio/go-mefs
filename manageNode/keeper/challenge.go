@@ -409,6 +409,8 @@ func (g *groupInfo) genChallengeRandom100(localID, userID, qid, proID string, ro
 		return "", nil, role.ErrEmptyData
 	}
 
+	psum *= (pos.DLen)
+
 	if thisLinfo.maxlength < int64(psum) {
 		thisLinfo.maxlength = int64(psum)
 	}

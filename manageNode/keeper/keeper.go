@@ -279,6 +279,10 @@ func (k *Info) save(ctx context.Context) error {
 			k.savePay(qu.uid, qu.qid, proID)
 		}
 
+		if qu.uid == pos.GetPosId() {
+			continue
+		}
+
 		kmBS, err := metainfo.NewKey(qu.qid, mpb.KeyType_BucketStripes, qu.uid)
 		if err != nil {
 			return err
@@ -405,6 +409,9 @@ func (k *Info) loadUser(ctx context.Context) error {
 
 func (k *Info) loadUserBucketStripes(uid, qid string) error {
 	// load bucketinfo
+	if uid == pos.GetPosId() {
+		return nil
+	}
 
 	kmBS, err := metainfo.NewKey(qid, mpb.KeyType_BucketStripes, uid)
 	if err != nil {

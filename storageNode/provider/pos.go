@@ -41,9 +41,9 @@ var opt = &df.DataCoder{
 			DataCount:    1,
 			ParityCount:  pos.Reps - 1,
 			TagFlag:      df.BLS12,
-			SegmentSize:  df.DefaultSegmentSize,
+			SegmentSize:  pos.SegSize,
 			Encryption:   0,
-			SegmentCount: 3200,
+			SegmentCount: pos.SegCount,
 		},
 	},
 }
@@ -276,11 +276,19 @@ func (p *Info) doGenerateOrDelete() {
 		}
 
 		p.generatePosBlocks(generateSpace)
-		return
+	} else {
+		if ratio > highWater || freeRatio < (1-highWater) {
+			p.deletePosBlocks(uint64(usedSpace / 10))
+		}
 	}
 
-	if ratio > highWater || freeRatio < (1-highWater) {
-		p.deletePosBlocks(uint64(usedSpace / 10))
+	km, err := metainfo.NewKey(groupID, mpb.KeyType_Pos, posID)
+	gp := p.getGroupInfo(posID, groupID, false)
+	if gp == nil {
+		return
+	}
+	for _, keeper := range gp.keepers {
+		p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(bm.ToString()+metainfo.BlockDelimiter+strconv.Itoa(pos.SegCount)), nil, keeper)
 	}
 }
 
