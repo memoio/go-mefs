@@ -34,7 +34,7 @@ type groupInfo struct {
 	rootID       string
 	upkeeping    *role.UpKeepingItem
 	query        *role.QueryItem
-	bucketNum    int64
+	bucketNum    int64    // largest bucketID
 	buckets      sync.Map // key:bucketID(string); value: *bucketInfo
 	ledgerMap    sync.Map // key:proID，value:*chalInfo
 }
@@ -48,6 +48,7 @@ func newGroup(localID, uid, qid string, keepers, providers []string) (*groupInfo
 		keepers:      keepers,
 		providers:    providers,
 		sessionID:    uuid.Nil,
+		bucketNum:    -1,
 	}
 
 	if qid != uid {
@@ -221,6 +222,15 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 		return nil
 	}
 
+	snum, err := strconv.Atoi(stripeID)
+	if err != nil {
+		return err
+	}
+
+	if snum < thisBucket.curStripes && offset < int(thisBucket.bops.GetSegmentCount()) {
+		utils.MLogger.Infof("group %s add chunk: %s and its offset %d, is short", g.groupID, bid, offset)
+	}
+
 	for _, proID := range g.providers {
 		if proID != pid {
 			thisLinfo := g.getLInfo(proID, false)
@@ -254,21 +264,33 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	v, ok := thisLinfo.blockMap.Load(bid)
 	if ok {
 		newcidinfo = v.(*blockInfo)
-		oldOffset = newcidinfo.offset
-		if offset > oldOffset {
-			newcidinfo.offset = oldOffset
-		}
-
-		if newcidinfo.storedOn != pid {
+		oldPid := newcidinfo.storedOn
+		// verify again
+		// delete from old provider
+		if oldPid != pid {
+			oldLinfo := g.getLInfo(oldPid, true)
+			if oldLinfo != nil {
+				binfo, ok := thisLinfo.blockMap.Load(bid)
+				if ok {
+					oldLinfo.maxlength -= int64((binfo.(*blockInfo).offset) * int(thisBucket.bops.GetSegmentSize()))
+					oldLinfo.blockMap.Delete(bid)
+				}
+			}
 			newcidinfo.storedOn = pid
 			newcidinfo.repair = 0
 		}
+
+		// update offset
+		oldOffset = newcidinfo.offset
+		if offset > oldOffset {
+			newcidinfo.offset = offset
+			thisLinfo.maxlength += int64((offset - oldOffset) * int(thisBucket.bops.GetSegmentSize()))
+		}
 	} else {
 		thisLinfo.blockMap.Store(bid, newcidinfo)
+		// change length;store or calculate at startup
+		thisLinfo.maxlength += int64((offset) * int(thisBucket.bops.GetSegmentSize()))
 	}
-
-	// change length;store or calculate at startup
-	thisLinfo.maxlength += int64((offset - oldOffset) * int(thisBucket.bops.GetSegmentSize()))
 
 	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 	if len(bids) < 2 {
@@ -276,11 +298,6 @@ func (g *groupInfo) addBlockMeta(bid, pid string, offset int) error {
 	}
 	// key: stripeID_chunkID
 	thisBucket.stripes.Store(bids[1], newcidinfo)
-
-	snum, err := strconv.Atoi(stripeID)
-	if err != nil {
-		return err
-	}
 
 	if snum > thisBucket.curStripes {
 		thisBucket.curStripes = snum
@@ -379,7 +396,7 @@ type lInfo struct {
 type blockInfo struct {
 	repair    int // need repair
 	availtime int64
-	offset    int    // length - 1
+	offset    int    // length
 	storedOn  string // stored on which provider
 }
 

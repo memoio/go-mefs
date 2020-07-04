@@ -31,7 +31,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 
 	pubKey, err := p.getNewUserConfig(userID, fsID)
 	if err != nil {
-		utils.MLogger.Warn("get new user`s config failed,error :", err)
+		utils.MLogger.Warn("get new user`s config failed, error :", err)
 		return err
 	}
 

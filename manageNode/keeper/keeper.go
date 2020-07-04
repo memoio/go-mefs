@@ -268,6 +268,7 @@ func (k *Info) save(ctx context.Context) error {
 
 	// save last pay
 	qus := k.getQUKeys()
+	stripeNum := -1
 	for _, qu := range qus {
 		gp := k.getGroupInfo(qu.uid, qu.qid, false)
 		if gp == nil {
@@ -277,6 +278,25 @@ func (k *Info) save(ctx context.Context) error {
 		for _, proID := range gp.providers {
 			k.savePay(qu.uid, qu.qid, proID)
 		}
+
+		kmBS, err := metainfo.NewKey(qu.qid, mpb.KeyType_BucketStripes, qu.uid)
+		if err != nil {
+			return err
+		}
+
+		res.Reset()
+
+		for i := 0; i <= int(gp.bucketNum); i++ {
+			stripeNum = -1
+			bi, ok := gp.buckets.Load(strconv.Itoa(i))
+			if ok {
+				stripeNum = bi.(*bucketInfo).curStripes
+			}
+			res.WriteString(strconv.Itoa(stripeNum))
+			res.WriteString(metainfo.DELIMITER)
+		}
+
+		k.ds.PutKey(ctx, kmBS.ToString(), []byte(res.String()), nil, "local")
 	}
 
 	return nil
@@ -383,9 +403,40 @@ func (k *Info) loadUser(ctx context.Context) error {
 	return nil
 }
 
+func (k *Info) loadUserBucketStripes(uid, qid string) error {
+	// load bucketinfo
+
+	kmBS, err := metainfo.NewKey(qid, mpb.KeyType_BucketStripes, uid)
+	if err != nil {
+		return err
+	}
+
+	res, err := k.ds.GetKey(k.context, kmBS.ToString(), "local")
+	if err != nil {
+		return err
+	}
+
+	gp := k.getGroupInfo(uid, qid, false)
+	if gp == nil {
+		return role.ErrNotMyUser
+	}
+
+	vals := strings.Split(string(res), metainfo.DELIMITER)
+	for i, val := range vals {
+		buc := gp.getBucketInfo(strconv.Itoa(i), true)
+		snum, err := strconv.Atoi(val)
+		if err != nil {
+			continue
+		}
+		buc.curStripes = snum
+	}
+
+	return nil
+}
+
 func (k *Info) loadUserBucket(uid, qid string) error {
 	// load bucketinfo
-	prefix := qid + metainfo.DELIMITER + strconv.Itoa(int(mpb.KeyType_Bucket)) + metainfo.DELIMITER + uid
+	prefix := qid + metainfo.DELIMITER + strconv.Itoa(int(mpb.KeyType_Bucket)) + metainfo.DELIMITER + uid + metainfo.DELIMITER
 
 	es, _ := k.ds.Itererate(prefix)
 	for _, e := range es {
@@ -766,6 +817,8 @@ func (k *Info) createGroup(uid, qid string, keepers, providers []string) (*group
 		gInfo.loadContracts(false)
 
 		k.loadUserBucket(uid, qid)
+		k.loadUserBucketStripes(uid, qid)
+		// need check chunks and query missing from providers
 		k.loadUserBlock(qid)
 		k.loadUserPay(uid, qid)
 		k.loadUserChallenge(uid, qid)

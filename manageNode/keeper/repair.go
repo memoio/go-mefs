@@ -168,7 +168,6 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 
 					count := binfo.curStripes
 					for j := 0; j <= count; j++ {
-						nowtime := time.Now().Unix()
 						multipleLost = 0
 						for l := 0; l < binfo.chunkNum; l++ {
 							res.Reset()
@@ -179,6 +178,7 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 							cInfo, ok := binfo.stripes.Load(scid)
 							if ok {
 								thisinfo := cInfo.(*blockInfo)
+								nowtime := time.Now().Unix()
 								eclasped := nowtime - thisinfo.availtime
 								switch thisinfo.repair {
 								case 0:
@@ -629,6 +629,10 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 			response = pid
 			oldpid = pid
 			offset = thisinfo.(*blockInfo).offset
+			stripNum, err := strconv.Atoi(blkinfo[3])
+			if err == nil && thisbucket.curStripes > stripNum {
+				offset = int(thisbucket.bops.GetSegmentCount())
+			}
 		}
 
 		res.WriteString(pid)
@@ -654,7 +658,8 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 		}
 	}
 
-	if credit < 0 || len(response) == 0 || response == "" {
+	if len(response) == 0 || response == "" || credit < -50 {
+		utils.MLogger.Info("Repair: need choose a new provider to replace old due to low credit: ", response)
 		response = k.searchNewProvider(ctx, qid, ugid)
 		if response == "" {
 			utils.MLogger.Info("Repair failed, no available provider")
