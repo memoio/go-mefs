@@ -67,9 +67,15 @@ func main() {
 
 	contracts.EndPoint = qethEndPoint
 
-	queryGot, _, err := contracts.GetLatestQuery(localAddr, localAddr)
-	if queryGot.String() != queryAddr.String() {
-		log.Fatal(queryAddr.String(), " set different from got:", queryGot.String())
+	queryGot, err := contracts.GetQueryAddrs(localAddr, localAddr)
+	if err != nil{
+		log.Fatal("get query addrs fails", err)
+	}
+	if len(queryGot) < 1{
+		log.Fatal("get empty queryAddrs")
+	}
+	if queryGot[len(queryGot)-1].String() != queryAddr.String() {
+		log.Fatal(queryAddr.String(), " set different from got:", queryGot[len(queryGot)-1].String())
 	}
 
 	log.Println("start get 'completed' params")

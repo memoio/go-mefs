@@ -229,7 +229,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 			continue
 		}
 
-		price, err := proInstance.GetPrice(&bind.CallOpts{From: localAddress})
+		price, err := GetProviderPrice(localID)
 		if err != nil {
 			return item, err
 		}
@@ -264,7 +264,7 @@ func PledgeProvider(localID, hexKey string, size *big.Int) error {
 		return err
 	}
 
-	price, err := contracts.GetProviderPrice(localAddress)
+	price, err := GetProviderPrice(localID)
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func GetProviderPrice(localID string) (*big.Int, error) {
 		return nil, err
 	}
 
-	return contracts.GetKeeperPrice(localAddress)
+	return contracts.GetProviderPrice(localAddress)
 }
 
 func IsProvider(userID string) (bool, error) {
@@ -400,6 +400,11 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 		return item, err
 	}
 
+	if len(oAddrs) < 1 {
+		utils.MLogger.Info("get ", proID, " 's offer address is empty")
+		return item, ErrNoContract
+	}
+
 	offerAddr := oAddrs[len(oAddrs)-1]
 	offerID, err := address.GetIDFromAddress(offerAddr.String())
 	if err != nil {
@@ -488,7 +493,13 @@ func GetLatestQuery(userID string) (QueryItem, error) {
 
 	qAddrs, err := contracts.GetQueryAddrs(userAddr, userAddr)
 	if err != nil {
+		utils.MLogger.Info("get ", userID, " 's query address err: ", err)
 		return item, err
+	}
+
+	if len(qAddrs) < 1 {
+		utils.MLogger.Info("get ", userID, " 's query address is empty")
+		return item, ErrNoContract
 	}
 
 	queryID, err := address.GetIDFromAddress(qAddrs[len(qAddrs)-1].String())

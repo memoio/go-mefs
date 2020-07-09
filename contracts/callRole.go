@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
@@ -99,17 +100,6 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 	return isKeeper, nil
 }
 
-func GetKeeperInfo(localAddress common.Address) (bool, bool, *big.Int, *big.Int, error) {
-	_, keeperContract, err := GetKeeperContractFromIndexer(localAddress)
-	if err != nil {
-		log.Println("keeperContracterr:", err)
-		return false, false, nil, nil, err
-	}
-	return keeperContract.Info(&bind.CallOpts{
-		From: localAddress,
-	}, localAddress)
-}
-
 func SetKeeperBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
 	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
@@ -176,6 +166,8 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 		return err
 	}
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 
@@ -183,16 +175,21 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.GasLimit = defaultGasLimit
 		auth.Value = amount
-		tx, err := kInstance.Pledge(auth)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = kInstance.Pledge(auth)
 		if err != nil {
 			return err
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("keeper pledge transaction Err:", err)
-				return err
+				log.Println("keeper pledge transaction Err:", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -206,7 +203,7 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 }
 
 // GetAllKeepers gets all keepers from chain
-func GetAllKeepers(localAddr common.Address) ([]common.Address, error) {
+func GetAllKeepersAddr(localAddr common.Address) ([]common.Address, error) {
 	_, keeperContract, err := GetKeeperContractFromIndexer(localAddr)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
@@ -307,17 +304,6 @@ func IsProvider(localaddress common.Address) (bool, error) {
 	return isProvider, nil
 }
 
-func GetProviderInfo(localaddress common.Address) (bool, bool, *big.Int, *big.Int, error) {
-	_, providerContract, err := GetProviderContractFromIndexer(localaddress)
-	if err != nil {
-		log.Println("providerContracterr:", err)
-		return false, false, nil, nil, err
-	}
-	return providerContract.Info(&bind.CallOpts{
-		From: localaddress,
-	}, localaddress)
-}
-
 func SetProviderBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
 	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
 	if err != nil {
@@ -382,6 +368,8 @@ func PledgeProvider(localAddress common.Address, hexKey string, money *big.Int) 
 	key, _ := crypto.HexToECDSA(hexKey)
 
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 
@@ -389,16 +377,26 @@ func PledgeProvider(localAddress common.Address, hexKey string, money *big.Int) 
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = money
 		auth.GasLimit = defaultGasLimit
-		tx, err := providerInstance.Pledge(auth, big.NewInt(0))
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = providerInstance.Pledge(auth, big.NewInt(0))
 		if err != nil {
-			return err
+			if retryCount > sendTransactionRetryCount {
+				log.Println("pledge provider Err:", err)
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("provider pledge transaction Err:", err)
-				return err
+				log.Println("provider pledge transaction Err:", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -411,7 +409,7 @@ func PledgeProvider(localAddress common.Address, hexKey string, money *big.Int) 
 }
 
 // GetAllProviders gets all provider addresses from chain
-func GetAllProviders(localAddr common.Address) ([]common.Address, error) {
+func GetAllProvidersAddr(localAddr common.Address) ([]common.Address, error) {
 	_, proContract, err := GetProviderContractFromIndexer(localAddr)
 	if err != nil {
 		log.Println("providerContracterr:", err)
