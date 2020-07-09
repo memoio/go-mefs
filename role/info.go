@@ -3,7 +3,6 @@ package role
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
@@ -18,41 +17,20 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 		return nil, totalMoney, err
 	}
 
-	kaddrs, err := contracts.GetAllKeepers(localAddress)
-	if err != nil {
-		return nil, totalMoney, err
-	}
-
-	_, keeperInstance, err := contracts.GetKeeperContractFromIndexer(localAddress)
+	kaddrs, err := contracts.GetAllKeepersAddr(localAddress)
 	if err != nil {
 		return nil, totalMoney, err
 	}
 
 	kItems := make([]*KeeperItem, 0, len(kaddrs))
 	for _, kaddr := range kaddrs {
-		isKeeper, isBanned, money, ptime, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, kaddr)
+		keeperID, err := address.GetIDFromAddress(kaddr.Hex())
 		if err != nil {
-			continue
+			return nil, totalMoney, err
 		}
-
-		if money.Sign() <= 0 {
-			continue
-		}
-
-		if isKeeper && !isBanned {
-			keeperID, err := address.GetIDFromAddress(kaddr.String())
-			if err != nil {
-				continue
-			}
-
-			item := &KeeperItem{
-				KeeperID:    keeperID,
-				PledgeMoney: money,
-				StartTime:   ptime.Int64(),
-			}
-			kItems = append(kItems, item)
-			totalMoney.Add(totalMoney, money)
-		}
+		item, err := GetKeeperInfo(localID, keeperID)
+		kItems = append(kItems, &item)
+		totalMoney.Add(totalMoney, item.PledgeMoney)
 	}
 
 	if len(kItems) > 0 {
@@ -69,17 +47,12 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 		return nil, totalMoney, err
 	}
 
-	paddrs, err := contracts.GetAllProviders(localAddress)
+	paddrs, err := contracts.GetAllProvidersAddr(localAddress)
 	if err != nil {
 		return nil, totalMoney, err
 	}
 
-	_, proInstance, err := contracts.GetProviderContractFromIndexer(localAddress)
-	if err != nil {
-		return nil, totalMoney, err
-	}
-
-	price, err := proInstance.GetPrice(&bind.CallOpts{From: localAddress})
+	price, err := contracts.GetProviderPrice(localAddress)
 	if err != nil {
 		return nil, totalMoney, err
 	}
@@ -93,30 +66,16 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 
 	pItems := make([]*ProviderItem, 0, len(paddrs))
 	for _, paddr := range paddrs {
-		isProvider, isBanned, money, ptime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, paddr)
+		providerID, err := address.GetIDFromAddress(paddr.Hex())
+		if err != nil {
+			return nil, totalMoney, err
+		}
+		item, err := GetProviderInfo(localID, providerID)
 		if err != nil {
 			continue
 		}
-
-		if money.Sign() <= 0 {
-			continue
-		}
-
-		if isProvider && !isBanned {
-			proID, err := address.GetIDFromAddress(paddr.String())
-			if err != nil {
-				continue
-			}
-
-			item := &ProviderItem{
-				ProviderID:  proID,
-				PledgeMoney: money,
-				StartTime:   ptime.Int64(),
-				Capacity:    new(big.Int).Quo(money, price).Int64(),
-			}
-			pItems = append(pItems, item)
-			totalMoney.Add(totalMoney, money)
-		}
+		pItems = append(pItems, &item)
+		totalMoney.Add(totalMoney, item.PledgeMoney)
 	}
 
 	if len(pItems) > 0 && price.Cmp(big.NewInt(0)) > 0 {

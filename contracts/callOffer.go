@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/market"
 )
@@ -38,10 +39,17 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 
 	//部署offer
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(duration), price) //提供存储容量 存储时段 存储单价
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
@@ -52,11 +60,11 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("deploy offer transaction fails", err)
-				return offerAddr, err
+				log.Println("deploy offer transaction fails", errTx)
+				return offerAddr, errTx
 			}
 			continue
 		}
@@ -86,30 +94,6 @@ func GetOfferAddrs(localAddress, ownerAddress common.Address) ([]common.Address,
 	return GetAddrsFromMapper(localAddress, mapperInstance)
 }
 
-//GetLatestOffer get latest query
-func GetLatestOffer(localAddress, userAddress common.Address) (offerAddr common.Address, offerInstance *market.Offer, err error) {
-	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, offerKey, "", false)
-	if err != nil {
-		return offerAddr, nil, err
-	}
-
-	offers, err := GetAddrsFromMapper(localAddress, mapperInstance)
-	if err != nil {
-		return offerAddr, offerInstance, err
-	}
-
-	offerAddr = offers[len(offers)-1]
-
-	offerInstance, err = market.NewOffer(offerAddr, GetClient(EndPoint))
-	if err != nil {
-		log.Println("newQueryErr:", err)
-		return offerAddr, offerInstance, err
-	}
-
-	return offerAddr, offerInstance, nil
-}
-
 //ExtendOfferTime called by provider to extend the time in offer contract
 func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.Int) error {
 	offerInstance, err := market.NewOffer(offerAddress, GetClient(EndPoint))
@@ -124,12 +108,19 @@ func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.In
 	}
 
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.GasLimit = defaultGasLimit
-		tx, err := offerInstance.Extend(auth, addTime)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = offerInstance.Extend(auth, addTime)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("extendOfferTimeErr:", err)
@@ -139,11 +130,11 @@ func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.In
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("extendOfferTime fails", err)
-				return err
+				log.Println("extendOfferTime fails", errTx)
+				return errTx
 			}
 			continue
 		}

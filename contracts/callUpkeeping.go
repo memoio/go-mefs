@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 )
@@ -40,11 +41,18 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	// 用户需要支付的金额
 	client := GetClient(EndPoint)
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.Value = moneyAccount
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 s,存储大小 单位 MB
 		ukAddress, tx, _, err := upKeeping.DeployUpKeeping(auth, client, queryAddress, keeperAddress, providerAddress, big.NewInt(duration), big.NewInt(size), price, big.NewInt(cycle))
 		if err != nil {
@@ -56,11 +64,11 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("deploy UK transaction Err:", err)
-				return ukAddr, err
+				log.Println("deploy UK transaction Err:", errTx)
+				return ukAddr, errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -94,12 +102,7 @@ func GetUpkeepingAddrs(localAddress, userAddress common.Address) ([]common.Addre
 //GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
 func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
-	if err != nil {
-		return ukaddr, nil, err
-	}
-
-	uks, err := GetAddrsFromMapper(localAddress, mapperInstance)
+	uks, err := GetUpkeepingAddrs(localAddress, userAddress)
 	if err != nil {
 		return ukaddr, uk, err
 	}
@@ -166,15 +169,22 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 		return err
 	}
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(spaceTimePayGasPrice)
 		auth.GasLimit = spaceTimePayGasLimit
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		//合约余额不足会自动报错返回
-		tx, err := uk.SpaceTimePay(auth, providerAddr, stValue, stStart, stLength, merkleRoot, shareNew, sign)
+		tx, err = uk.SpaceTimePay(auth, providerAddr, stValue, stStart, stLength, merkleRoot, shareNew, sign)
 		if err != nil {
-			if retryCount > 2 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("spaceTimePayErr:", err)
 				return err
 			}
@@ -182,11 +192,11 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 			continue
 		}
 		// need async check, how?
-		err = CheckTx(tx)
-		if err != nil {
-			if retryCount > 2 {
-				log.Println("spaceTimePay transaction Err:", err)
-				return err
+		errTx = CheckTx(tx)
+		if errTx != nil {
+			if retryCount > checkTxRetryCount {
+				log.Println("spaceTimePay transaction Err:", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -205,13 +215,20 @@ func AddProvider(hexKey string, localAddress, ukAddr common.Address, providerAdd
 	}
 
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		key, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.GasLimit = defaultGasLimit
-		tx, err := uk.AddProvider(auth, providerAddress, sign)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = uk.AddProvider(auth, providerAddress, sign)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				return err
@@ -220,11 +237,11 @@ func AddProvider(hexKey string, localAddress, ukAddr common.Address, providerAdd
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("upkeeping add provider transaction fails", err)
-				return err
+				log.Println("upkeeping add provider transaction fails", errTx)
+				return errTx
 			}
 			continue
 		}
@@ -301,13 +318,19 @@ func ExtendTime(hexKey string, localAddress, userAddress common.Address, key str
 	}
 
 	retryCount := 0
-
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		sk, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := uk.ExtendTime(auth, big.NewInt(addTime))
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = uk.ExtendTime(auth, big.NewInt(addTime))
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				return err
@@ -316,10 +339,10 @@ func ExtendTime(hexKey string, localAddress, userAddress common.Address, key str
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				return err
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -339,13 +362,19 @@ func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, 
 	}
 
 	retryCount := 0
-
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		sk, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := uk.Destruct(auth)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = uk.Destruct(auth)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				return err
@@ -354,11 +383,11 @@ func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, 
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
 				log.Println("maybe you cannt destruct the contract now")
-				return err
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -378,13 +407,19 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 	}
 
 	retryCount := 0
-
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		sk, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := uk.SetKeeperStop(auth, keeperAddr, sign)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = uk.SetKeeperStop(auth, keeperAddr, sign)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("setKeeperStop fails, err: ", err)
@@ -394,11 +429,11 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("setKeeperStop tx fails, err: ", err)
-				return err
+				log.Println("setKeeperStop tx fails, err: ", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -418,13 +453,19 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr comm
 	}
 
 	retryCount := 0
-
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		sk, _ := crypto.HexToECDSA(hexKey)
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := uk.SetProviderStop(auth, providerAddr, sign)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = uk.SetProviderStop(auth, providerAddr, sign)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("setProviderStop fails, err: ", err)
@@ -434,11 +475,11 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr comm
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("setProviderStop tx fails, err: ", err)
-				return err
+				log.Println("setProviderStop tx fails, err: ", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue

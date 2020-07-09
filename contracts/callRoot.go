@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/root"
 )
@@ -40,10 +41,17 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 	// 用户需要支付的金额
 	client := GetClient(EndPoint)
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
 		rtAddress, tx, _, err := root.DeployRoot(auth, client, queryAddress)
 		if err != nil {
@@ -55,11 +63,11 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("deploy root transaction fails", err)
-				return rtAddr, err
+				log.Println("deploy root transaction fails", errTx)
+				return rtAddr, errTx
 			}
 			continue
 		}
@@ -155,13 +163,19 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 
 	skey, _ := crypto.HexToECDSA(hexKey)
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(skey)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
 		auth.GasLimit = spaceTimePayGasLimit
-
-		tx, err := rt.SetRoot(auth, key, value)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = rt.SetRoot(auth, key, value)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("set root Err:", err)
@@ -171,11 +185,11 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("set merkle root transaction fails", err)
-				return err
+				log.Println("set merkle root transaction fails", errTx)
+				return errTx
 			}
 			continue
 		}

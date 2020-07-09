@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/test"
@@ -118,7 +119,14 @@ func testKeeper() (err error) {
 		return err
 	}
 
-	active, banned, money, time, err := contracts.GetKeeperInfo(keeperAddr)
+	_, keeperContract, err := contracts.GetKeeperContractFromIndexer(keeperAddr)
+	if err != nil {
+		log.Println("keeperContracterr:", err)
+		return err
+	}
+	active, banned, money, time, err := keeperContract.Info(&bind.CallOpts{
+		From: keeperAddr,
+	}, keeperAddr)
 	if err != nil {
 		return err
 	}
@@ -197,7 +205,14 @@ func testProvider() (err error) {
 		return err
 	}
 
-	active, banned, money, time, err := contracts.GetProviderInfo(proAddr)
+	_, providerContract, err := contracts.GetProviderContractFromIndexer(common.HexToAddress(userAddr))
+	if err != nil {
+		log.Println("providerContracterr:", err)
+		return err
+	}
+	active, banned, money, time, err := providerContract.Info(&bind.CallOpts{
+		From: common.HexToAddress(userAddr),
+	}, proAddr)
 	if err != nil {
 		return err
 	}

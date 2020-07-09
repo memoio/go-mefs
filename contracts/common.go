@@ -37,7 +37,7 @@ const (
 	defaultGasPrice           = 100
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
-	checkTxRetryCount         = 3
+	checkTxRetryCount         = 8
 )
 
 const (
@@ -148,10 +148,17 @@ func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 	}
 
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		indexerAddr, tx, indexerInstance, err := indexer.DeployIndexer(auth, client)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
@@ -162,11 +169,11 @@ func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
-			log.Println("deploy user indexer transaction fails:", err)
+		errTx = CheckTx(tx)
+		if errTx != nil {
+			log.Println("deploy user indexer transaction fails:", errTx)
 			if retryCount > checkTxRetryCount {
-				return indexerAddr, indexerInstance, err
+				return indexerAddr, indexerInstance, errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -194,11 +201,18 @@ func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, admi
 	}
 
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := adminIndexer.Add(auth, key, addAddr)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = adminIndexer.Add(auth, key, addAddr)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("add role indexer err:", err)
@@ -208,11 +222,11 @@ func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, admi
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("add usroleer indexer transaction fails: ", err)
-				return err
+				log.Println("add usroleer indexer transaction fails: ", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -243,11 +257,18 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 	}
 
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := adminIndexer.AlterResolver(auth, key, addAddr)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = adminIndexer.AlterResolver(auth, key, addAddr)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("add role indexer err:", err)
@@ -257,11 +278,11 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("add usroleer indexer transaction fails: ", err)
-				return err
+				log.Println("add usroleer indexer transaction fails: ", errTx)
+				return errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -320,10 +341,17 @@ func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
 
 	client := GetClient(EndPoint)
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		resAddr, tx, resolverInstance, err := resolver.DeployResolver(auth, client)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
@@ -334,11 +362,11 @@ func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("deploy Resolver transaction fails:", err)
-				return resolverAddr, resolverInstance, err
+				log.Println("deploy Resolver transaction fails:", errTx)
+				return resolverAddr, resolverInstance, errTx
 			}
 			time.Sleep(time.Minute)
 			continue
@@ -357,12 +385,19 @@ func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolver
 		return err
 	}
 
+	var errTx error
+	tx := &types.Transaction{}
 	retryCount := 0
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := resolverInstance.Add(auth, addAddr)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = resolverInstance.Add(auth, addAddr)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("add to resolver err:", err)
@@ -372,11 +407,11 @@ func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolver
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("add to resolver transaction fails: ", err)
-				return err
+				log.Println("add to resolver transaction fails: ", errTx)
+				return errTx
 			}
 			continue
 		}
@@ -434,10 +469,17 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 	}
 	// 部署Mapper
 	retryCount := 0
+	var errTx error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(sk)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
 		mapperAddr, tx, mapperInstance, err := mapper.DeployMapperToResolver(auth, client)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
@@ -449,11 +491,11 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 		}
 
 		//检查交易
-		err = CheckTx(tx)
-		if err != nil {
-			log.Println("DeployMapper transaction fails:", err)
+		errTx = CheckTx(tx)
+		if errTx != nil {
+			log.Println("DeployMapper transaction fails:", errTx)
 			if retryCount > checkTxRetryCount {
-				return mapperAddr, mapperInstance, err
+				return mapperAddr, mapperInstance, errTx
 			}
 			continue
 		}
@@ -466,11 +508,18 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 	key, _ := crypto.HexToECDSA(hexKey)
 
 	retryCount := 0
+	var errTx, err error
+	tx := &types.Transaction{}
 	for {
 		retryCount++
 		auth := bind.NewKeyedTransactor(key)
 		auth.GasPrice = big.NewInt(defaultGasPrice)
-		tx, err := mapperInstance.Add(auth, addr)
+		if errTx == ErrTxFail {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+		tx, err = mapperInstance.Add(auth, addr)
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("add addr to Mapper Err:", err)
@@ -480,11 +529,11 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 			continue
 		}
 
-		err = CheckTx(tx)
-		if err != nil {
+		errTx = CheckTx(tx)
+		if errTx != nil {
 			if retryCount > checkTxRetryCount {
-				log.Println("add to mapper fails", err)
-				return err
+				log.Println("add to mapper fails", errTx)
+				return errTx
 			}
 			continue
 		}
@@ -504,6 +553,44 @@ func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstanc
 			return nil
 		}
 	}
+	// for {
+	// 	retryCount++
+	// 	auth := bind.NewKeyedTransactor(key)
+	// 	auth.GasPrice = big.NewInt(defaultGasPrice)
+	// 	tx, err := mapperInstance.Add(auth, addr)
+	// 	if err != nil {
+	// 		if retryCount > sendTransactionRetryCount {
+	// 			log.Println("add addr to Mapper Err:", err)
+	// 			return err
+	// 		}
+	// 		time.Sleep(time.Minute)
+	// 		continue
+	// 	}
+
+	// 	err = CheckTx(tx)
+	// 	if err != nil {
+	// 		if retryCount > checkTxRetryCount {
+	// 			log.Println("add to mapper fails", err)
+	// 			return err
+	// 		}
+	// 		continue
+	// 	}
+
+	// 	if retryCount > 20 {
+	// 		return errors.New("add address to mapper fail")
+	// 	}
+
+	// 	addrGetted, err := GetAddrsFromMapper(localAddress, mapperInstance)
+	// 	if err != nil {
+	// 		time.Sleep(60 * time.Second)
+	// 		continue
+	// 	}
+
+	// 	length := len(addrGetted)
+	// 	if length != 0 && addrGetted[length-1] == addr {
+	// 		return nil
+	// 	}
+	// }
 }
 
 // GetAddrsFromMapper gets
@@ -793,10 +880,10 @@ func GetMapperFromAdminV1(localAddr, userAddr common.Address, key, hexKey string
 
 //CheckTx 通过交易详情检查交易是否成功
 func CheckTx(tx *types.Transaction) error {
-	log.Println("Check Tx hash:", tx.Hash().Hex())
+	log.Println("Check Tx hash:", tx.Hash().Hex(), "nonce:", tx.Nonce(), "gasPrice:", tx.GasPrice())
 
 	var receipt *types.Receipt
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 10; i++ {
 		receipt = GetTransactionReceipt(tx.Hash())
 		if receipt != nil {
 			break

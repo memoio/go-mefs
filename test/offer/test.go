@@ -8,7 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 var (
@@ -65,13 +67,24 @@ func main() {
 
 	log.Println("start get offerInfo from remote")
 	contracts.EndPoint = qethEndPoint
-	offerGot, _, err := contracts.GetLatestOffer(localAddr, localAddr)
+	offerGot, err := contracts.GetOfferAddrs(localAddr, localAddr)
 	if err != nil {
 		log.Fatal("get offer from remote fails: ", err)
 	}
+	if len(offerGot) < 1 {
+		log.Fatal("get empty offerAddrs")
+	}
+	if offerGot[len(offerGot)-1].String() != offerAddr.String() {
+		log.Fatal(offerAddr.String(), "set different from got:", offerGot[len(offerGot)-1].String())
+	}
 
-	if offerGot.String() != offerAddr.String() {
-		log.Fatal(offerAddr.String(), "set different from got:", offerGot.String())
+	localID, _ := address.GetIDFromAddress(localAddr.String())
+	oItem, err := role.GetLatestOffer(localID, localID)
+	if err != nil {
+		log.Fatal("get offer item fails:", err)
+	}
+	if oItem.Capacity != capacity || oItem.Duration != duration || oItem.Price.Cmp(price) != 0 {
+		log.Fatal("offer info is different from set")
 	}
 
 	log.Println("start deploy offer again")
@@ -82,13 +95,24 @@ func main() {
 
 	log.Println("start get offerInfo from remote")
 	contracts.EndPoint = qethEndPoint
-	offerGot, _, err = contracts.GetLatestOffer(localAddr, localAddr)
+	offerGot, err = contracts.GetOfferAddrs(localAddr, localAddr)
 	if err != nil {
-		log.Fatal("get query from remote fails")
+		log.Fatal("get offer from remote fails")
+	}
+	if len(offerGot) < 1 {
+		log.Fatal("get empty offerAddrs")
 	}
 
-	if offerGot.String() != offerAddr.String() {
-		log.Fatal(offerAddr.String(), " set different from got:", offerGot.String())
+	if offerGot[len(offerGot)-1].String() != offerAddr.String() {
+		log.Fatal(offerAddr.String(), " set different from got:", offerGot[len(offerGot)-1].String())
+	}
+
+	oItem, err = role.GetLatestOffer(localID, localID)
+	if err != nil {
+		log.Fatal("get offer item fails:", err)
+	}
+	if oItem.Capacity != capacity || oItem.Duration != duration || oItem.Price.Cmp(price) != 0 {
+		log.Fatal("offer info is different from set")
 	}
 
 	log.Println("*****test pass*****")
