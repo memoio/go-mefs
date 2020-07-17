@@ -8,16 +8,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/root"
 )
 
 //DeployRoot deploy Root contracts fot users
 func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bool) (common.Address, error) {
-	log.Println("begin deploy root contract...")
-
-	var rtAddr common.Address
+	var rtAddr, rtAddress common.Address
 
 	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, rootKey, hexKey, true)
 	if err != nil {
@@ -31,57 +29,61 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 		}
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return rtAddr, err
-	}
-
-	// 部署UpKeeping
-	// 用户需要支付的金额
+	log.Println("begin deploy root contract...")
 	client := GetClient(EndPoint)
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return rtAddr, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
-		rtAddress, tx, _, err := root.DeployRoot(auth, client, queryAddress)
+		rtAddress, tx, _, err = root.DeployRoot(auth, client, queryAddress)
+		if rtAddress.String() != InvalidAddr{
+			rtAddr = rtAddress
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy Root Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deploy root contract fails:", err)
 				return rtAddr, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("deploy root transaction fails", errTx)
-				return rtAddr, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy Root transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return rtAddr, err
 			}
 			continue
 		}
-		rtAddr = rtAddress
 		break
 	}
+	log.Println("root-contract", rtAddr.String(), "have been successfully deployed!")
 
 	//uk放进mapper
-	err = AddToMapper(userAddress, rtAddr, hexKey, mapperInstance)
+	err = AddToMapper(rtAddr, hexKey, mapperInstance)
 	if err != nil {
 		log.Println("add root contract addr Err:", err)
 		return rtAddr, err
 	}
-	log.Println("root-contract have been successfully deployed!")
 	return rtAddr, nil
 }
 
@@ -161,42 +163,50 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 		return err
 	}
 
-	skey, _ := crypto.HexToECDSA(hexKey)
-	retryCount := 0
-	var errTx error
+	log.Println("begin set merkleRoot...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(skey)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = spaceTimePayGasLimit
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = rt.SetRoot(auth, key, value)
 		if err != nil {
+			retryCount++
+			log.Println("set MerkleRoot Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("set root Err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("set merkle root transaction fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("set MerkleRoot transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}
-
-		// need async check, how?
 		break
 	}
+
+	log.Println("merkleRoot have been successfuly set!")
 	return nil
 }
 
@@ -228,7 +238,7 @@ func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, 
 			return res, ErrEmpty
 		}
 
-		return res, err
+		return res, nil
 	}
 }
 
@@ -247,7 +257,7 @@ func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
 			From: localAddress,
 		})
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("get merkel keys err:", err)
 				return nil, err
 			}
@@ -259,7 +269,7 @@ func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
 			return nil, ErrEmpty
 		}
 
-		return res, err
+		return res, nil
 	}
 }
 
@@ -279,7 +289,7 @@ func GetLatestMerkleRoot(localAddress, rootAddr common.Address) (int64, [32]byte
 			From: localAddress,
 		})
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				log.Println("get merkel key Err:", err)
 				return 0, val, err
 			}
@@ -290,6 +300,6 @@ func GetLatestMerkleRoot(localAddress, rootAddr common.Address) (int64, [32]byte
 		if resKey == 0 {
 			return 0, val, ErrEmpty
 		}
-		return resKey, resVal, err
+		return resKey, resVal, nil
 	}
 }

@@ -50,7 +50,7 @@ func main() {
 	}
 
 	log.Println("start add to mapper")
-	err = contracts.AddToMapper(localAddr, resAddr, userSk, resInsatnce)
+	err = contracts.AddToMapper(resAddr, userSk, resInsatnce)
 	if err != nil {
 		log.Fatal("add mapper fails: ", err)
 	}

@@ -1,15 +1,14 @@
 package contracts
 
 import (
-	"errors"
 	"log"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/contracts/role"
 	id "github.com/memoio/go-mefs/crypto/identity"
@@ -18,10 +17,11 @@ import (
 
 // DeployKeeperAdmin deploy a keeper contract
 func DeployKeeperAdmin(hexKey string) (err error) {
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
+	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	if err != nil {
+		return err
+	}
 
 	deposit := big.NewInt(utils.KeeperDeposit)
 	keeperContractAddr, _, _, err := role.DeployKeeper(auth, client, deposit)
@@ -62,31 +62,61 @@ func GetKeeperContractFromIndexer(localAddress common.Address) (common.Address, 
 	return keeperContractAddr, keeperContract, nil
 }
 
-//SetKeeper set "localAddress" keeper in contract if isKeeper is true
-func SetKeeper(localAddress common.Address, hexKey string, isKeeper bool) (err error) {
-	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
+//SetKeeper set "accountAddress" keeper in contract if isKeeper is true
+func SetKeeper(accountAddress common.Address, hexKey string, isKeeper bool) (err error) {
+	_, keeperInstance, err := GetKeeperContractFromIndexer(accountAddress)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = defaultGasLimit
+	log.Println("begin set keeper...")
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = keeperInstance.Set(auth, localAddress, isKeeper)
-	if err != nil {
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = keeperInstance.Set(auth, accountAddress, isKeeper)
+		if err != nil {
+			retryCount++
+			log.Println("set keeper error:", err)
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("set keeper transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
+	log.Println("keeper has been successfully set!")
 	return nil
 }
 
-//IsKeeper judge if an account is keeper
+//IsKeeper judge if localAddress is keeper
 func IsKeeper(localAddress common.Address) (bool, error) {
 	_, keeperContract, err := GetKeeperContractFromIndexer(localAddress)
 	if err != nil {
-		log.Println("keeperContracterr:", err)
+		log.Println("get keeperContract err:", err)
 		return false, err
 	}
 
@@ -94,27 +124,55 @@ func IsKeeper(localAddress common.Address) (bool, error) {
 		From: localAddress,
 	}, localAddress)
 	if err != nil {
-		log.Println("isKeepererr:", err)
+		log.Println("get isKeeper info err:", err)
 		return false, err
 	}
 	return isKeeper, nil
 }
 
-func SetKeeperBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
-	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddress)
+func SetKeeperBanned(accountAddress common.Address, hexKey string, isBanned bool) (err error) {
+	_, keeperInstance, err := GetKeeperContractFromIndexer(accountAddress)
 	if err != nil {
-		log.Println("keeperContracterr:", err)
+		log.Println("get keeperContract err:", err)
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = defaultGasLimit
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = keeperInstance.SetBanned(auth, localAddress, isBanned)
-	if err != nil {
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = keeperInstance.SetBanned(auth, accountAddress, isBanned)
+		if err != nil {
+			retryCount++
+			log.Println("ban keeper error:", err)
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("ban keeper transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
 	return nil
 }
@@ -126,14 +184,42 @@ func SetKeeperPrice(localAddress common.Address, hexKey string, price *big.Int) 
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = defaultGasLimit
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = keeperInstance.SetPrice(auth, price)
-	if err != nil {
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = keeperInstance.SetPrice(auth, price)
+		if err != nil {
+			retryCount++
+			log.Println("set keeper price error:", err)
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("set keeper price transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
 	return nil
 }
@@ -161,40 +247,45 @@ func PledgeKeeper(localAddress common.Address, hexKey string, amount *big.Int) (
 		return err
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		return err
-	}
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
+		auth, errMA := MakeAuth(hexKey, amount, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = defaultGasLimit
-		auth.Value = amount
-		if errTx == ErrTxFail {
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = kInstance.Pledge(auth)
 		if err != nil {
-			return err
-		}
-
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("keeper pledge transaction Err:", errTx)
-				return errTx
+			retryCount++
+			log.Println("keeper pledge error:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
+			if retryCount > sendTransactionRetryCount {
+				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("keeper pledge transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
 		break
 	}
 
@@ -224,10 +315,11 @@ func GetAllKeepersAddr(localAddr common.Address) ([]common.Address, error) {
 
 //DeployProvider deploy a keeper contract
 func DeployProviderAdmin(hexKey string) (err error) {
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
+	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	if err != nil {
+		return err
+	}
 
 	//暂时将存储容量、质押金额设为1000
 	deposit := big.NewInt(utils.ProviderDeposit)
@@ -269,21 +361,52 @@ func GetProviderContractFromIndexer(localAddress common.Address) (common.Address
 	return providerContractAddr, providerContract, nil
 }
 
-//SetProvider set "localAddress" provider in contract if isProvider is true
-func SetProvider(localAddress common.Address, hexKey string, isProvider bool) (err error) {
-	_, provider, err := GetProviderContractFromIndexer(localAddress)
+//SetProvider set "accountAddress" provider in contract if isProvider is true
+func SetProvider(accountAddress common.Address, hexKey string, isProvider bool) (err error) {
+	_, providerInstance, err := GetProviderContractFromIndexer(accountAddress)
 	if err != nil {
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = defaultGasLimit
-	_, err = provider.Set(auth, localAddress, isProvider)
-	if err != nil {
-		return err
+	log.Println("begin set provider...")
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = providerInstance.Set(auth, accountAddress, isProvider)
+		if err != nil {
+			retryCount++
+			log.Println("set provider error:", err)
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("set provider transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
+	log.Println("provider has been successfully set!")
 	return nil
 }
 
@@ -304,21 +427,49 @@ func IsProvider(localaddress common.Address) (bool, error) {
 	return isProvider, nil
 }
 
-func SetProviderBanned(localAddress common.Address, hexKey string, isBanned bool) (err error) {
-	_, providerInstance, err := GetProviderContractFromIndexer(localAddress)
+func SetProviderBanned(accountAddress common.Address, hexKey string, isBanned bool) (err error) {
+	_, providerInstance, err := GetProviderContractFromIndexer(accountAddress)
 	if err != nil {
 		log.Println("providerContracterr:", err)
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = defaultGasLimit
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = providerInstance.SetBanned(auth, localAddress, isBanned)
-	if err != nil {
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = providerInstance.SetBanned(auth, accountAddress, isBanned)
+		if err != nil {
+			retryCount++
+			log.Println("ban provider error:", err)
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("ban provider transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
 	return nil
 }
@@ -346,14 +497,42 @@ func SetProviderPrice(localAddress common.Address, hexKey string, price *big.Int
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
-	auth.GasLimit = defaultGasLimit
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = providerInstance.SetPrice(auth, price)
-	if err != nil {
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = providerInstance.SetPrice(auth, price)
+		if err != nil {
+			retryCount++
+			log.Println("set provider price error:", err)
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("set provider price transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
 	return nil
 }
@@ -365,46 +544,49 @@ func PledgeProvider(localAddress common.Address, hexKey string, money *big.Int) 
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
+		auth, errMA := MakeAuth(hexKey, money, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
 
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.Value = money
-		auth.GasLimit = defaultGasLimit
-		if errTx == ErrTxFail {
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = providerInstance.Pledge(auth, big.NewInt(0))
 		if err != nil {
+			retryCount++
+			log.Println("provider pledge error:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("pledge provider Err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("provider pledge transaction Err:", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("provider pledge transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
-			time.Sleep(time.Minute)
 			continue
 		}
-
 		break
 	}
 
+	log.Println("pledge provider success")
 	return nil
 }
 
@@ -433,10 +615,11 @@ func DeployKPMap(hexKey string) error {
 	log.Println("begin deploy keeperProviderMap...")
 
 	//之前没有部署过，部署keeperProviderMap合约
-	key, _ := crypto.HexToECDSA(hexKey)
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
 	client := GetClient(EndPoint)
+	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	if err != nil {
+		return err
+	}
 
 	keeperProviderMapAddr, _, _, err := role.DeployKeeperProviderMap(auth, client)
 	if err != nil {
@@ -474,17 +657,18 @@ func getKPMap(localAddress common.Address) (common.Address, *role.KeeperProvider
 
 // AddKeeperProvidersToKPMap adds provider/keeper to kpmap
 func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddresses []common.Address) error {
+	log.Println("begin add keeperProviders to kpMap...")
 	res, err := IsKeeper(keeperAddress)
 	if err != nil || res == false {
 		log.Println(keeperAddress.String(), "is not a keeper")
-		return errors.New("addr is not a keeper")
+		return ErrNotKeeper
 	}
 
 	for _, proAddresses := range providerAddresses {
 		res, err = IsProvider(proAddresses)
 		if err != nil || res == false {
 			log.Println(proAddresses.String(), "is not a provider")
-			return errors.New("addr is not a provider")
+			return ErrNotProvider
 		}
 	}
 
@@ -494,67 +678,159 @@ func AddKeeperProvidersToKPMap(localAddress common.Address, hexKey string, keepe
 		return err
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return err
-	}
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = kpMapInstance.Add(auth, keeperAddress, providerAddresses)
-	if err != nil {
-		log.Println("addKeeperProviderTokpMapErr:", err)
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = kpMapInstance.Add(auth, keeperAddress, providerAddresses)
+		if err != nil {
+			retryCount++
+			log.Println("add kpMap error:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && tx.GasPrice().Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("add kpMap transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
+
+	log.Println("kp have been successfully added to kpMap!")
 	return nil
 }
 
 // DeleteKeeperFromKPMap deletes keeper from kpmap
 func DeleteKeeperFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address) error {
+	log.Println("begin delete keeper from kpMap...")
 	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return err
-	}
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = kpMapInstance.DelKeeper(auth, keeperAddress)
-	if err != nil {
-		log.Println("deleteKeeperInkpMapErr:", err)
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = kpMapInstance.DelKeeper(auth, keeperAddress)
+		if err != nil {
+			retryCount++
+			log.Println("delete keeper from kpMap error:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && tx.GasPrice().Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("delete keeper from kpMap transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
+
+	log.Println("keeper have been successfuly deleted from kpMap!")
 	return nil
 }
 
 // DeleteProviderFromKPMap deletes provider from kpmap
 func DeleteProviderFromKPMap(localAddress common.Address, hexKey string, keeperAddress common.Address, providerAddress common.Address) error {
+	log.Println("begin delete provider from kpMap...")
 	_, kpMapInstance, err := getKPMap(localAddress)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return err
-	}
-	auth := bind.NewKeyedTransactor(key)
-	auth.GasPrice = big.NewInt(defaultGasPrice)
+	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	for {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+		if errMA != nil {
+			return errMA
+		}
 
-	_, err = kpMapInstance.DelProvider(auth, keeperAddress, providerAddress)
-	if err != nil {
-		log.Println("deleteProviderInkpMapErr:", err)
-		return err
+		if err == ErrTxFail && tx != nil {
+			auth.Nonce = big.NewInt(int64(tx.Nonce()))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
+			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
+		}
+
+		tx, err = kpMapInstance.DelProvider(auth, keeperAddress, providerAddress)
+		if err != nil {
+			retryCount++
+			log.Println("delete provider from kpMap error:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && tx.GasPrice().Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
+			if retryCount > sendTransactionRetryCount {
+				return err
+			}
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("delete provider from kpMap transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
+			continue
+		}
+		break
 	}
+
+	log.Println("provider have been successfuly deleted from kpMap!")
 	return nil
 }
 

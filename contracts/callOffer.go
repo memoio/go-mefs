@@ -5,17 +5,15 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/market"
 )
 
 //DeployOffer provider use it to deploy offer-contract
 func DeployOffer(localAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, redo bool) (common.Address, error) {
-	log.Println("begin to deploy offer-contract...")
-	var offerAddr common.Address
+	var offerAddr, oAddr common.Address
 
 	_, mapperInstance, err := GetMapperFromAdmin(localAddress, localAddress, offerKey, hexKey, true)
 	if err != nil {
@@ -30,56 +28,59 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 		}
 	}
 
-	//部署mapper，如果部署过就直接返回
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return offerAddr, err
-	}
-
-	//部署offer
-	retryCount := 0
-	var errTx error
+	log.Println("begin to deploy offer-contract...")
+	client := GetClient(EndPoint)
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return offerAddr, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
-		oAddr, tx, _, err := market.DeployOffer(auth, GetClient(EndPoint), big.NewInt(capacity), big.NewInt(duration), price) //提供存储容量 存储时段 存储单价
+
+		oAddr, tx, _, err = market.DeployOffer(auth, client, big.NewInt(capacity), big.NewInt(duration), price) //提供存储容量 存储时段 存储单价
+		if oAddr.String() != InvalidAddr{
+			offerAddr = oAddr
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy Offer Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deploy Offer Err:", err)
 				return offerAddr, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("deploy offer transaction fails", errTx)
-				return offerAddr, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy Offer transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return offerAddr, err
 			}
 			continue
 		}
-
-		offerAddr = oAddr
 		break
 	}
+	log.Println("offer-contract", offerAddr.String(), "have been successfully deployed!")
 
 	//offerAddress放进mapper
-	err = AddToMapper(localAddress, offerAddr, hexKey, mapperInstance)
+	err = AddToMapper(offerAddr, hexKey, mapperInstance)
 	if err != nil {
 		return offerAddr, err
 	}
-
-	log.Println("offer-contract have been successfully deployed!")
 	return offerAddr, nil
 }
 
@@ -101,40 +102,43 @@ func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.In
 		return err
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HetoECDSA err:", err)
-		return err
-	}
-
-	retryCount := 0
-	var errTx error
+	log.Println("begin to extend offerTime...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = defaultGasLimit
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = offerInstance.Extend(auth, addTime)
 		if err != nil {
+			retryCount++
+			log.Println("extend Offer time Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("extendOfferTimeErr:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("extendOfferTime fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("extend Offer time transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}

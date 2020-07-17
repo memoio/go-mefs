@@ -186,7 +186,10 @@ func ukTest() error {
 		log.Fatal("spacetime pay err:", err)
 		return err
 	}
-	log.Println("spacetime pay trigger", "nowTime:", time.Now().Unix(), "createDate+3*cycle:", createDate.Int64()+3*cycle.Int64())
+
+	tNow := time.Now().Unix()
+	threeCycle := createDate.Int64() + 3*cycle.Int64()
+	log.Println("spacetime pay trigger", "nowTime:", tNow, "createDate+3*cycle:", threeCycle)
 
 	log.Println("6.begin to query results of first stPay")
 	retryCount = 0
@@ -213,6 +216,27 @@ func ukTest() error {
 				amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
 				if kBalanceMap[kAddrList[1]].Cmp(amountNow) == 0 {
 					log.Println("keeper[1] balance not change")
+				}
+				break //all is right
+			}
+		} else if tNow > threeCycle && amountUk.Cmp(big.NewInt(moneyToUK)) < 0 {
+			log.Println("contract balance reduce ", moneyToUK-amountUk.Int64())
+			_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+			if err != nil {
+				continue
+			}
+			if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*9) && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3/10) && (needPay.Int64() == 0) && (providers[0].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0) {
+				log.Println("parameters are right")
+				//检查provider的余额变化
+				amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
+				if pBalanceMap[pAddrList[0]].Cmp(amountNow) < 0 {
+					log.Println("provider balance increased")
+				}
+
+				//检查keeper[1]的余额变化
+				amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
+				if kBalanceMap[kAddrList[1]].Cmp(amountNow) < 0 {
+					log.Println("keeper[1] balance increased")
 				}
 				break //all is right
 			}
@@ -274,7 +298,7 @@ func ukTest() error {
 		if err != nil {
 			continue
 		}
-		if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3*2/10) && (needPay.Int64() == amount.Int64()*2) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
+		if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3*2/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
 			log.Println("parameters are right")
 			//检查provider[1]的余额变化
 			amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
@@ -283,6 +307,9 @@ func ukTest() error {
 			}
 			break //all is right
 		}
+		log.Println(keepers)
+		log.Println(providers)
+		log.Println(needPay)
 	}
 
 	log.Println("10.begin to test addProvider by user")
@@ -373,7 +400,7 @@ func ukTest() error {
 	}
 	log.Println("spacetime pay trigger")
 
-	log.Println("14.begin to query results of second stPay")
+	log.Println("12.begin to query results of second stPay")
 	retryCount = 0
 	for {
 		if beforeEnd {
