@@ -306,6 +306,15 @@ func ukTest() error {
 				log.Println("provider[1] balance not change")
 			}
 			break //all is right
+		} else if (tNow > threeCycle) && (amountUk.Int64() == moneyToUK-perMoney*11) {
+			if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
+				log.Println("parameters are right")
+				amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
+				if pBalanceMap[pAddrList[1]].Cmp(amountNow) == 0 {
+					log.Println("provider[1] balance not change")
+				}
+				break //all is right
+			}
 		}
 		log.Println(keepers)
 		log.Println(providers)
@@ -488,7 +497,7 @@ func ukTest() error {
 				amountCost.Sub(amountNow, amount)
 				log.Println(pAddrList[0].String(), ":", amountCost)
 				if amountCost.Cmp(big.NewInt(perMoney*9*3)) == 0 {
-					log.Println("provider's balance increased 3240")
+					log.Println("provider0's balance increased 3240")
 				}
 				//检查keeper[1]的余额变化
 				amount = kBalanceMap[kAddrList[1]]
@@ -501,6 +510,28 @@ func ukTest() error {
 				}
 
 				break //all is right
+			} else if tNow > threeCycle {
+				if (len(providers[0].Money) == 3) && (providers[0].Money[2].Int64() == perMoney*9) && (len(keepers[1].Money) == 4) && (keepers[1].Money[3].Int64() == perMoney*3/10) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*3))) == 0) {
+					//检查provider[0]的余额变化
+					amount := pBalanceMap[pAddrList[0]]
+					amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
+					amountCost := big.NewInt(0)
+					amountCost.Sub(amountNow, amount)
+					log.Println(pAddrList[0].String(), ":", amountCost)
+					if amountCost.Cmp(big.NewInt(perMoney*9*3)) == 0 {
+						log.Println("provider0's balance increased 3240")
+					}
+					//检查keeper[1]的余额变化
+					amount = kBalanceMap[kAddrList[1]]
+					amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
+					amountCost = big.NewInt(0)
+					amountCost.Sub(amountNow, amount)
+					log.Println(kAddrList[1].String(), ":", amountCost)
+					if amountCost.Cmp(big.NewInt(perMoney*3*4/10)) == 0 {
+						log.Println("keeper[1] balance increased 144")
+					}
+					break //all is right
+				}
 			}
 			log.Println(keepers)
 			log.Println(providers)
