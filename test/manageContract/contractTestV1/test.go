@@ -65,7 +65,7 @@ func main() {
 	log.Println("=====start add addr first=====")
 	contracts.EndPoint = ethEndPoint
 
-	err = contracts.AddToMapper(localAddr, localAddr, userSk, mapperInstance)
+	err = contracts.AddToMapper(localAddr, userSk, mapperInstance)
 	if err != nil {
 		log.Fatal("set addr fails", err)
 	}
@@ -86,7 +86,7 @@ func main() {
 	log.Println("=====start add addr second=====")
 	contracts.EndPoint = ethEndPoint
 
-	err = contracts.AddToMapper(localAddr, addrSet, userSk, mapperInstance)
+	err = contracts.AddToMapper(addrSet, userSk, mapperInstance)
 	if err != nil {
 		log.Fatal("set addr fails", err)
 	}

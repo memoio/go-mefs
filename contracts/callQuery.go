@@ -5,18 +5,15 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/market"
 )
 
 //DeployQuery user use it to deploy query-contract
 func DeployQuery(userAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, ks int, ps int, redo bool) (common.Address, error) {
-	log.Println("begin to deploy query-contract...")
-
-	var queryAddr common.Address
+	var queryAddr, qAddr common.Address
 
 	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, queryKey, hexKey, true)
 	if err != nil {
@@ -30,54 +27,58 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity, duration i
 		}
 	}
 
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return queryAddr, err
-	}
+	log.Println("begin to deploy query-contract...")
 	client := GetClient(EndPoint)
-	// 部署query
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return queryAddr, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
-		qAddr, tx, _, err := market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), price, big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+
+		qAddr, tx, _, err = market.DeployQuery(auth, client, big.NewInt(capacity), big.NewInt(duration), price, big.NewInt(int64(ks)), big.NewInt(int64(ps))) //提供存储容量 存储时段 存储单价
+		if qAddr.String() != InvalidAddr {
+			queryAddr = qAddr
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy Query Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deployQueryErr:", err)
 				return queryAddr, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("deploy query transaction fails", errTx)
-				return queryAddr, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy Query transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return queryAddr, err
 			}
 			continue
 		}
-
-		queryAddr = qAddr
 		break
 	}
+	log.Println("query-contract", queryAddr.String(), "have been successfully deployed!")
 
-	err = AddToMapper(userAddress, queryAddr, hexKey, mapperInstance)
+	err = AddToMapper(queryAddr, hexKey, mapperInstance)
 	if err != nil {
 		return queryAddr, err
 	}
-
-	log.Println("query-contract have been successfully deployed!")
 	return queryAddr, nil
 }
 
@@ -99,45 +100,50 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 		log.Println("newQueryErr:", err)
 		return err
 	}
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSAErr:", err)
-		return err
-	}
-	retryCount := 0
-	var errTx error
+
+	log.Println("begin to set query completed...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = query.SetCompleted(auth)
 		if err != nil {
+			retryCount++
+			log.Println("set query completed Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("set query Completed fails: ", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("set query completed transaction fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("set query completed transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
-			time.Sleep(time.Minute)
 			continue
 		}
-
 		break
 	}
 
+	log.Println("you have called setQueryCompleted successfully!")
 	return nil
 }

@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/memoio/go-mefs/contracts/channel"
@@ -30,58 +30,64 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		}
 	}
 
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return channelAddr, err
-	}
-
+	log.Println("begin deploy channel contract...")
 	client := GetClient(EndPoint)
 
 	//本user与指定的provider部署channel合约
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
+	var cAddr common.Address
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.Value = moneyToChannel //放进合约里的钱
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, moneyToChannel, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return channelAddr, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
-		cAddr, tx, _, err := channel.DeployChannel(auth, client, providerAddress, timeOut)
+
+		cAddr, tx, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
+		if cAddr.String() != InvalidAddr{
+			channelAddr = cAddr
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy Channel Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deploy Channel Err:", err)
 				return channelAddr, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("deploy channel transaction fails", errTx)
-				return channelAddr, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy channel transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return channelAddr, err
 			}
 			continue
 		}
-
-		channelAddr = cAddr
 		break
 	}
 
+	log.Println("channel contract", channelAddr.String(), "with", providerAddress.String(), "have been successfuly deployed!")
+
 	//将channel合约地址channelAddr放进上述的mapper中
-	err = AddToMapper(userAddress, channelAddr, hexKey, mapperInstance)
+	err = AddToMapper(channelAddr, hexKey, mapperInstance)
 	if err != nil {
-		return channelAddr, nil
+		return channelAddr, err
 	}
 
-	log.Println("channel-contract with", providerAddress.String(), "have been successfully deployed!")
 	return channelAddr, nil
 }
 
@@ -125,36 +131,43 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 		return err
 	}
 
-	key, _ := crypto.HexToECDSA(hexKey)
-
-	retryCount := 0
-	var errTx error
+	log.Println("begin call channelTimeout...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = defaultGasLimit
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = channelInstance.ChannelTimeout(auth)
 		if err != nil {
+			retryCount++
+			log.Println("channelTimeout Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("channelTimeOutErr:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("close channel fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("channelTimeout transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}
@@ -178,36 +191,43 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 	copy(hashNew[:], hash[:32])
 
 	//用user的签名来触发closeChannel()
-	key, _ := crypto.HexToECDSA(hexKey)
-
-	retryCount := 0
-	var errTx error
+	log.Println("begin call closeChannel...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = defaultGasLimit
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = channelInstance.CloseChannel(auth, hashNew, value, sig)
 		if err != nil {
+			retryCount++
+			log.Println("closeChannel Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("closeChannelErr:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("close channel fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("closeChannel transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}
@@ -225,40 +245,43 @@ func ExtendChannelTime(channelAddress common.Address, hexKey string, addTime *bi
 		return err
 	}
 
-	key, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HetoECDSA err:", err)
-		return err
-	}
-
-	retryCount := 0
-	var errTx error
+	log.Println("begin call extendChannelTime...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		auth.GasLimit = defaultGasLimit
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = channelInstance.Extend(auth, addTime)
 		if err != nil {
+			retryCount++
+			log.Println("extendChannelTime Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("extendChannelTimeErr:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("extendChannelTime fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("extendChannelTime transaction fails", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -76,6 +77,8 @@ var (
 	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
 	ErrTxFail           = errors.New("transaction fails")
 	ErrTxExecu          = errors.New("Transaction mined but execution failed")
+	ErrNotKeeper        = errors.New("addr is not a keeper")
+	ErrNotProvider      = errors.New("addr is not a provider")
 )
 
 type LogPay struct {
@@ -100,6 +103,23 @@ func GetClient(endPoint string) *ethclient.Client {
 		log.Println(err)
 	}
 	return ethclient.NewClient(client)
+}
+
+//MakeAuth make the transactOpts to call contract
+func MakeAuth(hexSk string, moneyToContract, nonce, gasPrice *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
+	auth := &bind.TransactOpts{}
+	sk, err := crypto.HexToECDSA(hexSk)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return auth, err
+	}
+
+	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = gasPrice
+	auth.Value = moneyToContract //放进合约里的钱
+	auth.Nonce = nonce
+	auth.GasLimit = gasLimit
+	return auth, nil
 }
 
 //QueryBalance query the balance of account
@@ -138,49 +158,59 @@ func GetLatestBlock() (*types.Block, error) {
 
 // DeployIndexer deploy role's indexer and add it to admin indexer
 func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
-	var indexerAddr common.Address
+	var indexerAddr, indexerAddress common.Address
+	var indexerInstance, indexerIns *indexer.Indexer
+	var err error
 
+	log.Println("begin deploy indexer contract...")
 	client := GetClient(EndPoint)
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return indexerAddr, nil, err
-	}
-
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return indexerAddr, nil, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
-		indexerAddr, tx, indexerInstance, err := indexer.DeployIndexer(auth, client)
+
+		indexerAddress, tx, indexerIns, err = indexer.DeployIndexer(auth, client)
+		if indexerAddress.String() != InvalidAddr {
+			indexerAddr = indexerAddress
+			indexerInstance = indexerIns
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy Indexer Err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deploy Indexer Err:", err)
 				return indexerAddr, indexerInstance, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			log.Println("deploy user indexer transaction fails:", errTx)
-			if retryCount > checkTxRetryCount {
-				return indexerAddr, indexerInstance, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy user indexer transaction fails:", err)
+			if checkRetryCount > checkTxRetryCount {
+				return indexerAddr, indexerInstance, err
 			}
-			time.Sleep(time.Minute)
 			continue
 		}
-
-		return indexerAddr, indexerInstance, nil
+		break
 	}
+	log.Println("indexer has been successfully deployed!")
+	return indexerAddr, indexerInstance, nil
 }
 
 // AddToIndexer adds
@@ -194,114 +224,99 @@ func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, admi
 		return nil
 	}
 
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return err
-	}
-
-	retryCount := 0
-	var errTx error
+	log.Println("begin add address to indexer...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = adminIndexer.Add(auth, key, addAddr)
 		if err != nil {
+			retryCount++
+			log.Println("add addr to indexer err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("add role indexer err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("add usroleer indexer transaction fails: ", errTx)
-				return errTx
-			}
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+		err = CheckTx(tx)
 		if err != nil {
-			time.Sleep(time.Minute)
+			checkRetryCount++
+			log.Println("add address to indexer transaction fails: ", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
 			continue
 		}
-
-		if addrGetted == addAddr {
-			return nil
-		}
-
-		if retryCount > 20 {
-			return ErrNotDeployedIndexer
-		}
+		break
 	}
+	log.Println("addr has been successfully added to indexer!")
+	return nil
 }
 
 // AlterAddrInIndexer alters
 func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string, adminIndexer *indexer.Indexer) error {
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return err
-	}
-
-	retryCount := 0
-	var errTx error
+	log.Println("begin alter addr in indexer...")
 	tx := &types.Transaction{}
+	var err error
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = adminIndexer.AlterResolver(auth, key, addAddr)
 		if err != nil {
+			retryCount++
+			log.Println("alter addr in indexer err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("add role indexer err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("add usroleer indexer transaction fails: ", errTx)
-				return errTx
-			}
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		if retryCount > 20 {
-			return ErrNotDeployedIndexer
-		}
-
-		addrGetted, _, err := GetAddrFromIndexer(localAddress, key, adminIndexer)
+		err = CheckTx(tx)
 		if err != nil {
-			time.Sleep(time.Minute)
+			checkRetryCount++
+			log.Println("add usroleer indexer transaction fails: ", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
+			}
 			continue
 		}
-
-		if addrGetted == addAddr {
-			return nil
-		}
+		break
 	}
+	log.Println("addr has been successfully added to indexer!")
+	return nil
 }
 
 // GetAddrFromIndexer gets addr
@@ -332,104 +347,111 @@ func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance
 
 // DeployResolver deploys
 func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
-	var resolverAddr common.Address
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return resolverAddr, nil, err
-	}
+	var resolverAddr, resolverAddress common.Address
+	var resolverInstance, resolverIns *resolver.Resolver
+	var err error
 
+	log.Println("begin deploy resolver...")
 	client := GetClient(EndPoint)
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return resolverAddr, resolverInstance, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
-		resAddr, tx, resolverInstance, err := resolver.DeployResolver(auth, client)
+
+		resolverAddress, tx, resolverIns, err = resolver.DeployResolver(auth, client)
+		if resolverAddress.String() != InvalidAddr {
+			resolverAddr = resolverAddress
+			resolverInstance = resolverIns
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy resolver err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deploy Resolver Err:", err)
 				return resolverAddr, resolverInstance, err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("deploy Resolver transaction fails:", errTx)
-				return resolverAddr, resolverInstance, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy resolver transaction fails: ", err)
+			if checkRetryCount > checkTxRetryCount {
+				return resolverAddr, resolverInstance, err
 			}
-			time.Sleep(time.Minute)
 			continue
 		}
-
-		return resAddr, resolverInstance, nil
+		break
 	}
+	log.Println("resolver", resolverAddr.String(), "has been successfully deployed!")
+	return resolverAddr, resolverInstance, nil
 }
 
 // AddToResolver adds
 // ownerAddress is according to hexKey
-func AddToResolver(ownerAddress, addAddr common.Address, hexKey string, resolverInstance *resolver.Resolver) error {
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return err
-	}
+func AddToResolver(addAddr common.Address, hexKey string, resolverInstance *resolver.Resolver) error {
+	var err error
 
-	var errTx error
+	log.Println("begin add address to resolver...")
+
 	tx := &types.Transaction{}
 	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = resolverInstance.Add(auth, addAddr)
 		if err != nil {
+			retryCount++
+			log.Println("add addr to resolver err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("add to resolver err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("add to resolver transaction fails: ", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("add addr to resolver transaction fails: ", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}
-
-		addrGetted, err := GetAddrFromResolver(ownerAddress, ownerAddress, resolverInstance)
-		if err != nil {
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		if addrGetted == addAddr {
-			return nil
-		}
-
-		if retryCount > 20 {
-			return ErrNotDeployedIndexer
-		}
+		break
 	}
+	log.Println("addr has been successfully added to resolver!")
+	return nil
 }
 
 // GetAddrFromResolver gets addr from resolver
@@ -458,139 +480,108 @@ func GetAddrFromResolver(localAddress common.Address, ownerAddress common.Addres
 
 // DeployMapper deploy a new mapper
 func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *mapper.Mapper, error) {
-	var mapperAddr common.Address
-	var mapperInstance *mapper.Mapper
+	var mapperAddr, mapperAddress common.Address
+	var mapperInstance, mapperIns *mapper.Mapper
+	var err error
 
+	log.Println("begin deploy mapper...")
 	client := GetClient(EndPoint)
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("Hex To ECDSA err: ", err)
-		return mapperAddr, mapperInstance, err
-	}
-	// 部署Mapper
-	retryCount := 0
-	var errTx error
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return mapperAddr, mapperInstance, errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
-		mapperAddr, tx, mapperInstance, err := mapper.DeployMapperToResolver(auth, client)
+
+		mapperAddress, tx, mapperIns, err = mapper.DeployMapperToResolver(auth, client)
+		if mapperAddress.String() != InvalidAddr {
+			mapperAddr = mapperAddress
+			mapperInstance = mapperIns
+		}
 		if err != nil {
+			retryCount++
+			log.Println("deploy mapper err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("deploy Mapper to indexer Err:", err)
 				return mapperAddr, mapperInstance, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(time.Minute)
 			continue
 		}
 
-		//检查交易
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			log.Println("DeployMapper transaction fails:", errTx)
-			if retryCount > checkTxRetryCount {
-				return mapperAddr, mapperInstance, errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("deploy mapper transaction fails: ", err)
+			if checkRetryCount > checkTxRetryCount {
+				return mapperAddr, mapperInstance, err
 			}
 			continue
 		}
-
-		return mapperAddr, mapperInstance, nil
+		break
 	}
+	log.Println("mapper has been successfully deployed!")
+	return mapperAddr, mapperInstance, nil
 }
 
-func AddToMapper(localAddress, addr common.Address, hexKey string, mapperInstance *mapper.Mapper) error {
-	key, _ := crypto.HexToECDSA(hexKey)
+func AddToMapper(addr common.Address, hexKey string, mapperInstance *mapper.Mapper) error {
+	var err error
 
-	retryCount := 0
-	var errTx, err error
+	log.Println("begin add addr to MapperContract...")
 	tx := &types.Transaction{}
+	retryCount := 0
+	checkRetryCount := 0
 	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		if errTx == ErrTxFail {
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		if errMA != nil {
+			return errMA
+		}
+
+		if err == ErrTxFail && tx != nil {
 			auth.Nonce = big.NewInt(int64(tx.Nonce()))
-			auth.GasPrice = new(big.Int).Mul(tx.GasPrice(), big.NewInt(2))
+			auth.GasPrice = new(big.Int).Add(tx.GasPrice(), big.NewInt(defaultGasPrice))
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
+
 		tx, err = mapperInstance.Add(auth, addr)
 		if err != nil {
+			retryCount++
+			log.Println("add addr to MapperContract err:", err)
+			if err.Error() == core.ErrNonceTooLow.Error() && auth.GasPrice.Cmp(big.NewInt(defaultGasPrice)) > 0 {
+				log.Println("previously pending transaction has successfully executed")
+				break
+			}
 			if retryCount > sendTransactionRetryCount {
-				log.Println("add addr to Mapper Err:", err)
 				return err
 			}
 			time.Sleep(time.Minute)
 			continue
 		}
 
-		errTx = CheckTx(tx)
-		if errTx != nil {
-			if retryCount > checkTxRetryCount {
-				log.Println("add to mapper fails", errTx)
-				return errTx
+		err = CheckTx(tx)
+		if err != nil {
+			checkRetryCount++
+			log.Println("add addr to mapperContract transaction fails: ", err)
+			if checkRetryCount > checkTxRetryCount {
+				return err
 			}
 			continue
 		}
-
-		if retryCount > 20 {
-			return errors.New("add address to mapper fail")
-		}
-
-		addrGetted, err := GetAddrsFromMapper(localAddress, mapperInstance)
-		if err != nil {
-			time.Sleep(60 * time.Second)
-			continue
-		}
-
-		length := len(addrGetted)
-		if length != 0 && addrGetted[length-1] == addr {
-			return nil
-		}
+		break
 	}
-	// for {
-	// 	retryCount++
-	// 	auth := bind.NewKeyedTransactor(key)
-	// 	auth.GasPrice = big.NewInt(defaultGasPrice)
-	// 	tx, err := mapperInstance.Add(auth, addr)
-	// 	if err != nil {
-	// 		if retryCount > sendTransactionRetryCount {
-	// 			log.Println("add addr to Mapper Err:", err)
-	// 			return err
-	// 		}
-	// 		time.Sleep(time.Minute)
-	// 		continue
-	// 	}
-
-	// 	err = CheckTx(tx)
-	// 	if err != nil {
-	// 		if retryCount > checkTxRetryCount {
-	// 			log.Println("add to mapper fails", err)
-	// 			return err
-	// 		}
-	// 		continue
-	// 	}
-
-	// 	if retryCount > 20 {
-	// 		return errors.New("add address to mapper fail")
-	// 	}
-
-	// 	addrGetted, err := GetAddrsFromMapper(localAddress, mapperInstance)
-	// 	if err != nil {
-	// 		time.Sleep(60 * time.Second)
-	// 		continue
-	// 	}
-
-	// 	length := len(addrGetted)
-	// 	if length != 0 && addrGetted[length-1] == addr {
-	// 		return nil
-	// 	}
-	// }
+	log.Println("addr has been successfully added to mapperContract!")
+	return nil
 }
 
 // GetAddrsFromMapper gets
@@ -603,21 +594,18 @@ func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapp
 		})
 		if err != nil {
 			if retryCount > 20 {
-				log.Println("get addr from mapper:", err)
+				log.Println("get addr from mapper err:", err)
 				return nil, err
 			}
 			time.Sleep(60 * time.Second)
 			continue
 		}
-		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
-			return channels, nil
+		if len(channels) == 0 || channels[len(channels)-1].String() == InvalidAddr {
+			log.Println("get empty addr from mapper")
+			return nil, ErrEmpty
 		}
 
-		if retryCount < 3 {
-			continue
-		}
-		log.Println("get empty addr from mapper")
-		return nil, ErrEmpty
+		return channels, nil
 	}
 }
 
@@ -756,7 +744,7 @@ func GetMapperFromAdmin(localAddr, userAddr common.Address, key, hexKey string, 
 
 		mapperInstance = mInstance
 
-		err = AddToResolver(userAddr, mapperAddr, hexKey, resInstance)
+		err = AddToResolver(mapperAddr, hexKey, resInstance)
 		if err != nil {
 			log.Println("add mapper to resolver err:", err)
 			return mapperAddr, nil, err
@@ -792,20 +780,17 @@ func GetResolverFromAdmin(localAddr, userAddr common.Address, key, hexKey string
 
 		resAddr, rInstance, err := DeployResolver(hexKey)
 		if err != nil {
-			log.Println("Deploy Role Indexer Err:", err)
+			log.Println("Deploy resolver Err:", err)
 			return resolverAddr, nil, err
 		}
 
-		log.Println("add resolver")
 		err = AddToIndexer(localAddr, resAddr, key, hexKey, adminIndexer)
 		if err != nil {
-			log.Println("add Role Indexer Err:", err)
+			log.Println("add resolver to indexer Err:", err)
 			return resolverAddr, nil, err
 		}
-
 		return resAddr, rInstance, nil
 	}
-
 	return resolverAddr, resInstance, nil
 }
 
@@ -846,7 +831,7 @@ func GetMapperFromAdminV1(localAddr, userAddr common.Address, key, hexKey string
 
 		indexerInstance = iInstance
 
-		log.Println("add Role Indexer")
+		log.Println("add Role Indexer to AdminIndexer")
 		err = AddToIndexer(localAddr, indexerAddr, userAddr.String(), hexKey, adminIndexer)
 		if err != nil {
 			log.Println("add Role Indexer Err:", err)
@@ -892,7 +877,6 @@ func CheckTx(tx *types.Transaction) error {
 	}
 
 	if receipt == nil { //30分钟获取不到交易信息，判定交易失败
-		log.Println("transaction fails")
 		return ErrTxFail
 	}
 
