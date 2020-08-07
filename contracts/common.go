@@ -531,7 +531,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 		}
 		break
 	}
-	log.Println("mapper has been successfully deployed!")
+	log.Println("mapper", mapperAddr.String(), "has been successfully deployed!")
 	return mapperAddr, mapperInstance, nil
 }
 

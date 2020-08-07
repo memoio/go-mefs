@@ -333,7 +333,7 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 			go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, cpay.hash, sign, kid)
 		}
 
-		cpay.Status = int32(len(g.keepers))
+		cpay.Status = int32(len(g.keepers) * 2 / 3)
 
 		cpay.Unlock()
 	}

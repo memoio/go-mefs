@@ -41,6 +41,7 @@ var keeperSk = []string{"25e5246b92c190dbf993ae4eeb1d3a27133d1ad3ed8109e4593bde8
 var serverPids = []string{"8MHXst83NnSfYHnyqWMVjwjt2GiutV", "8MGrkL5cUpPsPbePvCfwCx6HemwDvy", "8MJ71X96BcnUNkhSFjc6CCsemL6nSQ", "8MGZ5nYsYw3Kmt8zC44W4V1NYaTGcE", "8MGhVo1ib6C6PmFhfQK4Hr3hHwQjC9", "8MJcdk2cyQvZknpxYf2AmGKDHRSRJP", "8MG9ZMYoZrZxjc7bVMeqJkaxAdb3Wx", "8MGqojupxiCesALno7sA73NhJkcSY5", "8MKAiRexSQG4SpGrpEQb4s9wjxJimX", "8MKU1DT94SB3aHTrMqWcJa2oLRtTzv", "8MJaFY7yAyYAvnjnM5hTbTfpjXhTHx", "8MGUGzCk1RUvq1aTPd9uuorrZ7FRhx", "8MHSARkgxWkjx5hKPm9vhX2v1VZ6GT"}
 
 var ethEndPoint, qethEndPoint string
+var success bool
 
 func main() {
 	flag.String("testnet", "--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101", "testnet commands")
@@ -187,66 +188,45 @@ func ukTest() error {
 		return err
 	}
 
-	tNow := time.Now().Unix()
+	firstNow := time.Now().Unix()
 	threeCycle := createDate.Int64() + 3*cycle.Int64()
-	log.Println("spacetime pay trigger", "nowTime:", tNow, "createDate+3*cycle:", threeCycle)
+	log.Println("spacetime pay trigger", "nowTime:", firstNow, "createDate+3*cycle:", threeCycle)
 
 	log.Println("6.begin to query results of first stPay")
-	retryCount = 0
-	for {
-		retryCount++
-		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
-		log.Println("contract balance", amountUk)
-		//合约金额不变,时间未超过startTime+3*cycle,没有真实支付
-		if amountUk.Cmp(big.NewInt(moneyToUK)) == 0 {
-			log.Println("contract balance not change")
-			_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-			if err != nil {
-				continue
-			}
-			if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*9) && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3/10) && (needPay.Cmp(amount) == 0) && (providers[0].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0) {
-				log.Println("parameters are right")
-				//检查provider的余额变化
-				amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
-				if pBalanceMap[pAddrList[0]].Cmp(amountNow) == 0 {
-					log.Println("provider balance not change")
-				}
-
-				//检查keeper[1]的余额变化
-				amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
-				if kBalanceMap[kAddrList[1]].Cmp(amountNow) == 0 {
-					log.Println("keeper[1] balance not change")
-				}
-				break //all is right
-			}
-		} else if tNow > threeCycle && amountUk.Cmp(big.NewInt(moneyToUK)) < 0 {
-			log.Println("contract balance reduce ", moneyToUK-amountUk.Int64())
-			_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-			if err != nil {
-				continue
-			}
-			if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*9) && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3/10) && (needPay.Int64() == 0) && (providers[0].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0) {
-				log.Println("parameters are right")
-				//检查provider的余额变化
-				amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
-				if pBalanceMap[pAddrList[0]].Cmp(amountNow) < 0 {
-					log.Println("provider balance increased")
-				}
-
-				//检查keeper[1]的余额变化
-				amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
-				if kBalanceMap[kAddrList[1]].Cmp(amountNow) < 0 {
-					log.Println("keeper[1] balance increased")
-				}
-				break //all is right
-			}
-		}
-
-		if retryCount > 20 {
-			log.Fatal("first stPay fails")
-		}
-		time.Sleep(30 * time.Second)
+	amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
+	log.Println("contract balance", amountUk)
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	if err != nil {
+		log.Fatal("getOrder err: ", err)
 	}
+	log.Println(keepers)
+	log.Println(providers)
+	log.Println(needPay)
+	if amountUk.Cmp(big.NewInt(moneyToUK)) == 0 { //合约金额不变,时间未超过startTime+3*cycle,没有真实支付
+		log.Println("contract balance not change")
+		if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*9) && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3/10) && (needPay.Cmp(amount) == 0) && (providers[0].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0) {
+			log.Println("parameters are right")
+			success = true
+		}
+	} else if firstNow > threeCycle && amountUk.Cmp(big.NewInt(moneyToUK)) < 0 { //触发了真实支付
+		log.Println("contract balance reduce ", moneyToUK-amountUk.Int64())
+		if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*9) && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3/10) && (needPay.Int64() == 0) && (providers[0].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0) {
+			log.Println("parameters are right")
+			success = true
+		}
+	}
+
+	if !success {
+		log.Fatal("parameters not right")
+	}
+	success = false
+	//检查provider的余额变化
+	money := new(big.Int)
+	amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
+	log.Println("provider[0] balance increased:", money.Sub(amountNow, pBalanceMap[pAddrList[0]]))
+	//检查keeper[1]的余额变化
+	amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
+	log.Println("keeper[1] balance increased:", money.Sub(amountNow, kBalanceMap[kAddrList[1]]))
 
 	log.Println("7. begin to test setProviderStop to stop provider 1")
 	contracts.EndPoint = ethEndPoint
@@ -282,47 +262,53 @@ func ukTest() error {
 		log.Fatal("spacetime pay err:", err)
 		return err
 	}
-	log.Println("spacetime pay trigger")
+
+	stoppedNow := time.Now().Unix()
+	log.Println("spacetime pay trigger", "nowTime:", stoppedNow, "createDate+4*cycle:", threeCycle+cycle.Int64())
 
 	log.Println("9.begin to query results of stPay for stopped provider 1")
-	retryCount = 0
-	for {
-		if retryCount > 20 {
-			log.Fatal("stPay fails")
+	amountUk = test.QueryBalance(ukaddr.String(), qethEndPoint)
+	log.Println("contract balance", amountUk)
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	if err != nil {
+		log.Fatal("getOrder err:", err)
+	}
+	log.Println(keepers)
+	log.Println(providers)
+	log.Println(needPay)
+	if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3*2/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
+		log.Println("not pay, parameters are right")
+		//检查provider[1]的余额变化
+		amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
+		if pBalanceMap[pAddrList[1]].Cmp(amountNow) == 0 {
+			log.Println("provider[1] balance not change")
+			success = true
 		}
-		retryCount++
-		time.Sleep(30 * time.Second)
-		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
-		log.Println("contract balance", amountUk)
-		_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-		if err != nil {
-			continue
-		}
-		if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 1) && (keepers[1].Money[0].Int64() == perMoney*3*2/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
-			log.Println("parameters are right")
-			//检查provider[1]的余额变化
+	} else if (firstNow > threeCycle) && (amountUk.Int64() == moneyToUK-perMoney*11) { //触发两次支付
+		if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
+			log.Println("pay twice, parameters are right")
 			amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
 			if pBalanceMap[pAddrList[1]].Cmp(amountNow) == 0 {
 				log.Println("provider[1] balance not change")
-			}
-			break //all is right
-		} else if (tNow > threeCycle) && (amountUk.Int64() == moneyToUK-perMoney*11) {
-			if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
-				log.Println("parameters are right")
-				amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
-				if pBalanceMap[pAddrList[1]].Cmp(amountNow) == 0 {
-					log.Println("provider[1] balance not change")
-				}
-				break //all is right
+				success = true
 			}
 		}
-		log.Println(keepers)
-		log.Println(providers)
-		log.Println(needPay)
+	} else if (firstNow < threeCycle+cycle.Int64()) && (amountUk.Int64() == moneyToUK-perMoney*10) { //只触发第一次对provider0的支付
+		if (len(providers[1].Money) == 1) && (providers[1].Money[0].Int64() == perMoney*9 && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (providers[1].StEnd.Cmp(createdate.Add(createDate, stLength)) == 0)) {
+			log.Println("pay once, parameters are right")
+			amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
+			if pBalanceMap[pAddrList[1]].Cmp(amountNow) == 0 {
+				log.Println("provider[1] balance not change")
+				success = true
+			}
+		}
 	}
+	if !success {
+		log.Fatal("parameters not roight")
+	}
+	success = false
 
 	log.Println("10.begin to test addProvider by user")
-
 	providerAddr1, err := address.GetAddressFromID(serverPids[pCount])
 	if err != nil {
 		log.Println("ukAddProvider GetAddressFromID() error", err)
@@ -384,11 +370,6 @@ func ukTest() error {
 		time.Sleep(time.Duration(createDate.Int64()+3*defaultCycle+60-nowTime) * time.Second)
 	}
 
-	beforeEnd := false
-	if time.Now().Unix() >= endDate.Int64() {
-		beforeEnd = true
-	}
-
 	log.Println("11.begin to second initiate spacetime pay to provider 0 after 3 cycles, stLength is: ", sLength)
 	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
 	if err != nil {
@@ -407,38 +388,32 @@ func ukTest() error {
 		log.Fatal("spacetime pay err:", err)
 		return err
 	}
-	log.Println("spacetime pay trigger")
+	secondNow := time.Now().Unix()
+	log.Println("spacetime pay trigger", "nowTime:", secondNow)
 
 	log.Println("12.begin to query results of second stPay")
-	retryCount = 0
-	for {
-		if beforeEnd {
-			break
-		}
-
-		if retryCount > 20 {
-			log.Fatal("contract balance is not changed")
-		}
-		retryCount++
-		time.Sleep(30 * time.Second)
-		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
-		log.Println("contract balance", amountUk)
-		if amountUk.Int64() < moneyToUK {
-			_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-			if err != nil {
-				log.Println("get order fails")
-				continue
-			}
-
-			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*2))) == 0) { //参数结果符合要求
-				log.Println("parameters are right")
-			}
-			log.Println(keepers)
-			log.Println(providers)
-			log.Println(needPay)
-			break
+	amountUk = test.QueryBalance(ukaddr.String(), qethEndPoint)
+	log.Println("contract balance", amountUk)
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	if err != nil {
+		log.Fatal("get order fails")
+	}
+	log.Println(keepers)
+	log.Println(providers)
+	log.Println(needPay)
+	if amountUk.Int64() < moneyToUK {
+		if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*2))) == 0) { //参数结果符合要求
+			log.Println("parameters are right")
+			success = true
+		} else if (len(providers[0].Money) == 1) && (providers[0].Money[0].Int64() == perMoney*18) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*2))) == 0) {
+			log.Println("parameters are right")
+			success = true
 		}
 	}
+	if !success {
+		log.Fatal("parameters not right")
+	}
+	success = false
 
 	log.Println("wait enddate")
 	//等待now > endDate + 60,触发第三次时空支付
@@ -472,76 +447,45 @@ func ukTest() error {
 	log.Println("spacetime pay trigger")
 
 	log.Println("14.begin to query results of third stPay")
-	retryCount = 0
-	for {
-		if retryCount > 20 {
-			log.Fatal("third stPay fails")
-		}
-		retryCount++
-		time.Sleep(30 * time.Second)
-		amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
-		log.Println("contract balance", amountUk)
-		if amountUk.Int64() == (moneyToUK - amount.Int64()*3 - perMoney) { //合约金额理应减少amount*3(三次时空支付pro[0])和amount/10(一次时空支付pro[1],只有keeper拿到了)
-			log.Println("contract balance reduce ", amount.Int64()*3+perMoney)
-			_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
-			if err != nil {
-				log.Println("get order fails")
-				continue
-			}
-			if (len(providers[0].Money) == 2) && (providers[0].Money[1].Int64() == perMoney*9) && (len(keepers[1].Money) == 2) && (keepers[1].Money[1].Int64() == perMoney*3/10) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*3))) == 0) { //参数结果符合要求
-				log.Println("parameters are right")
-				//检查provider[0]的余额变化
-				amount := pBalanceMap[pAddrList[0]]
-				amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
-				amountCost := big.NewInt(0)
-				amountCost.Sub(amountNow, amount)
-				log.Println(pAddrList[0].String(), ":", amountCost)
-				if amountCost.Cmp(big.NewInt(perMoney*9*3)) == 0 {
-					log.Println("provider0's balance increased 3240")
-				}
-				//检查keeper[1]的余额变化
-				amount = kBalanceMap[kAddrList[1]]
-				amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
-				amountCost = big.NewInt(0)
-				amountCost.Sub(amountNow, amount)
-				log.Println(kAddrList[1].String(), ":", amountCost)
-				if amountCost.Cmp(big.NewInt(perMoney*3*4/10)) == 0 {
-					log.Println("keeper[1] balance increased 144")
-				}
+	amountUk = test.QueryBalance(ukaddr.String(), qethEndPoint)
+	log.Println("contract balance", amountUk)
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	if err != nil {
+		log.Fatal("get order fails")
+	}
+	log.Println(keepers)
+	log.Println(providers)
+	log.Println(needPay)
+	if amountUk.Int64() == (moneyToUK - amount.Int64()*3 - perMoney) { //合约金额理应减少amount*3(三次时空支付pro[0])和amount/10(一次时空支付pro[1],只有keeper拿到了)
+		log.Println("contract balance reduce ", amount.Int64()*3+perMoney)
 
-				break //all is right
-			} else if tNow > threeCycle {
-				if (len(providers[0].Money) == 3) && (providers[0].Money[2].Int64() == perMoney*9) && (len(keepers[1].Money) == 4) && (keepers[1].Money[3].Int64() == perMoney*3/10) && (needPay.Int64() == amount.Int64()/10*9) && (providers[0].StEnd.Cmp(createdate.Add(createDate, big.NewInt(sLength*3))) == 0) {
-					//检查provider[0]的余额变化
-					amount := pBalanceMap[pAddrList[0]]
-					amountNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
-					amountCost := big.NewInt(0)
-					amountCost.Sub(amountNow, amount)
-					log.Println(pAddrList[0].String(), ":", amountCost)
-					if amountCost.Cmp(big.NewInt(perMoney*9*3)) == 0 {
-						log.Println("provider0's balance increased 3240")
-					}
-					//检查keeper[1]的余额变化
-					amount = kBalanceMap[kAddrList[1]]
-					amountNow = test.QueryBalance(kAddrList[1].String(), ethEndPoint)
-					amountCost = big.NewInt(0)
-					amountCost.Sub(amountNow, amount)
-					log.Println(kAddrList[1].String(), ":", amountCost)
-					if amountCost.Cmp(big.NewInt(perMoney*3*4/10)) == 0 {
-						log.Println("keeper[1] balance increased 144")
-					}
-					break //all is right
-				}
-			}
-			log.Println(keepers)
-			log.Println(providers)
+		amountp := pBalanceMap[pAddrList[0]]
+		amountpNow := test.QueryBalance(pAddrList[0].String(), ethEndPoint)
+		amountpCost := big.NewInt(0)
+		amountpCost.Sub(amountpNow, amountp)
+		log.Println(pAddrList[0].String(), ":", amountpCost)
+
+		//检查keeper[1]的余额变化
+		amountk := kBalanceMap[kAddrList[1]]
+		amountkNow := test.QueryBalance(kAddrList[1].String(), ethEndPoint)
+		amountkCost := big.NewInt(0)
+		amountkCost.Sub(amountkNow, amountk)
+		log.Println(kAddrList[1].String(), ":", amountkCost)
+
+		if amountpCost.Cmp(big.NewInt(perMoney*9*3)) == 0 && amountkCost.Cmp(big.NewInt(perMoney*3*4/10)) == 0 {
+			log.Println("provider0's balance increased 3240")
+			log.Println("keeper[1] balance increased 144")
+			success = true
 		}
+	}
+	if !success {
+		log.Fatal("parameters not right")
 	}
 
 	log.Println("15. begin to query stopped provider's balance")
 	//检查provider[1]的余额变化
 	amountBefore := pBalanceMap[pAddrList[1]]
-	amountNow := test.QueryBalance(pAddrList[1].String(), ethEndPoint)
+	amountNow = test.QueryBalance(pAddrList[1].String(), ethEndPoint)
 	amountCost := big.NewInt(0)
 	amountCost.Sub(amountNow, amountBefore)
 	log.Println(pAddrList[1].String(), ":", amountCost)
