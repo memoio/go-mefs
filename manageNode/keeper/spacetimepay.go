@@ -168,6 +168,7 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 		}
 
 		amount, mroot := thisLinfo.stSummary(price, startTime, endTime)
+		chalfrequency := thisLinfo.stShare(startTime, endTime)
 		if amount.Sign() > 0 && len(mroot) >= 32 {
 			needPay := new(big.Int).Add(g.upkeeping.NeedPay, amount)
 			if needPay.Cmp(g.upkeeping.Money) > 0 {
@@ -189,15 +190,38 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 				checkNum: 0,
 			}
 
+			thisLinfo.currentPay = cpay
+
+			mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_StPayShare, g.userID, proID, localID, time.Unix(startTime, 0).Format(utils.BASETIME), time.Unix(endTime, 0).Format(utils.BASETIME))
+			if err != nil {
+				return err
+			}
+			key := mkey.ToString()
 			for i, kid := range g.keepers {
 				if kid == localID {
-					cpay.Share[i] = int64(100 - 100*(knum-1)/knum)
+					cpay.Share[i] = int64(chalfrequency)
 					continue
 				}
-				cpay.Share[i] = int64(100 / knum)
+				go ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, nil, nil, kid)
 			}
 
-			cpay.Share[knum] = int64(100)
+			var shareSum int64
+			for i := 0; i < 6; i++ {
+				shareSum = 0
+				time.Sleep(30 * time.Second)
+				tmp := 0
+				for j := 0; j < knum; j++ {
+					shareSum += cpay.Share[j]
+					if cpay.Share[j] != 0 {
+						tmp++
+					}
+				}
+				if tmp == knum {
+					break
+				}
+			}
+			cpay.Share[knum] = shareSum
+			utils.MLogger.Infof("get Share:", g.keepers, cpay.Share)
 
 			st := big.NewInt(cpay.Start)
 			sl := big.NewInt(cpay.Length)
@@ -212,16 +236,14 @@ func (g *groupInfo) stPrePay(ctx context.Context, proID, localSk, localID string
 				return err
 			}
 
-			mkey, err := metainfo.NewKey(g.groupID, mpb.KeyType_StPaySign, g.userID, proID, localID, st.String(), sl.String())
+			mkey, err = metainfo.NewKey(g.groupID, mpb.KeyType_StPaySign, g.userID, proID, localID, st.String(), sl.String())
 			if err != nil {
 				return err
 			}
 
-			thisLinfo.currentPay = cpay
-
 			// sync to other keepers？
 			// get enough signs; then
-			key := mkey.ToString()
+			key = mkey.ToString()
 			for i, kid := range g.keepers {
 				if kid == localID {
 					cpay.Lock()
@@ -470,4 +492,19 @@ func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	utils.MLogger.Debug("spacetime  calc is:", spacetime)
 	utils.MLogger.Debug(tsl)
 	return spacetime, mtree.Root()
+}
+
+//get challenge frequency
+func (l *lInfo) stShare(start, end int64) int {
+	chalFrequency := 0
+
+	l.chalMap.Range(func(k, value interface{}) bool {
+		key := k.(int64)
+		if key >= start && key < end {
+			chalFrequency++
+		}
+
+		return true
+	})
+	return chalFrequency
 }

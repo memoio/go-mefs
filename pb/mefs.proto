@@ -29,6 +29,7 @@ enum KeyType {
     Bucket = 14;   // handle and store user's lfs bucket information
     StPaySign = 15;  // handle spacetime pay sign 
     ProAddSign = 16; // hanle add provider sign
+    StPayShare = 17; //handle spacetime pay share
     
     HeartBeat = 20;  // handle user's heartBeat
     UserInit = 21;   // handle user's lfs init request

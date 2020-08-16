@@ -179,6 +179,7 @@ func (u *Info) KillUser(userID string) error {
 				return err
 			}
 			u.fsMap.Delete(queryID)
+			u.qMap.Delete(userID)
 		}
 	}
 	return nil
