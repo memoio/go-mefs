@@ -35,7 +35,7 @@ const (
 	InvalidAddr               = "0x0000000000000000000000000000000000000000"
 	spaceTimePayGasLimit      = uint64(8000000)
 	spaceTimePayGasPrice      = 2 * defaultGasPrice
-	defaultGasPrice           = 100
+	defaultGasPrice           = 200
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
 	checkTxRetryCount         = 8
