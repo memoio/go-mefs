@@ -553,6 +553,17 @@ func ukTest() error {
 		log.Fatal("query providers[0]'s storageIncome failed, it is not equal to 3240")
 	}
 
+	//query keeper[0]'s income
+	log.Println("19. begin to test getManageIncome")
+	total, _, err = contracts.GetStorageIncome(upAddrs, kAddrList[0], oldBlock.Number().Int64(), newblk.Number().Int64())
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("totalIncome: ", total.String())
+	if total.Cmp(big.NewInt(perMoney*4/10*4)) != 0 {
+		log.Fatal("query keepers[0]'s manageIncome failed, it is not equal to 192")
+	}
+
 	log.Println("upkeeping's tests pass")
 
 	return nil

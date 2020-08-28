@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/big"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/manageNode/keeper"
+	"github.com/memoio/go-mefs/utils"
 )
 
 type StringList struct {
@@ -36,6 +38,7 @@ var KeeperCmd = &cmds.Command{
 		"list_users":     KeeperListUsersCmd,
 		"list_providers": KeeperListProvidersCmd,
 		"list_keepers":   KeeperListKeepersCmd,
+		"list_income":    KeeperListIncomeCmd,
 		"flush":          KeeperFlushCmd,
 	},
 }
@@ -151,6 +154,52 @@ var KeeperListKeepersCmd = &cmds.Command{
 		list := &StringList{
 			ChildLists: keepers,
 		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+//KeeperListIncomeCmd list income
+var KeeperListIncomeCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "List keeper's income",
+		ShortDescription: `
+'mefs-keeper info list_income' is a plumbing command for printing income for a keeper.
+`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		mi := big.NewInt(0)
+		pi := big.NewInt(0)
+
+		keeperIns, ok := node.Inst.(*keeper.Info)
+		if !ok {
+			return ErrNotReady
+		}
+
+		mi = keeperIns.ManageIncome
+		pi = keeperIns.PosIncome
+
+		stringList := []string{"manageIncome: " + utils.FormatWei(mi), "posIncome: " + utils.FormatWei(pi)}
+		list := &StringList{
+			ChildLists: stringList,
+		}
+
 		return cmds.EmitOnce(res, list)
 	},
 	Type: StringList{},

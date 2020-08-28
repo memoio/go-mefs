@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -31,7 +30,7 @@ var (
 const QueryABI = "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"ks\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"ps\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"setCompleted\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // QueryBin is the compiled bytecode used for deploying new contracts.
-var QueryBin = "0x608060405234801561001057600080fd5b5060405161034e38038061034e833981810160405260a081101561003357600080fd5b508051602080830151604080850151606080870151608097880151600080546001600160a01b03191633178155855160c08101875298895288880196875288860194855285518089018752928352928801918252845196870190945292855295850184905260a085019590955292516001555160025591516003555151600455516005556006805460ff1916905561027e806100d06000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80630ca05f9f146100515780632e5295ee1461008b5780636d4ce63c14610093578063893d20e8146100d0575b600080fd5b6100776004803603602081101561006757600080fd5b50356001600160a01b03166100f4565b604080519115158252519081900360200190f35b6100776101b2565b61009b61021c565b6040805196875260208701959095528585019390935260608501919091526080840152151560a0830152519081900360c00190f35b6100d8610239565b604080516001600160a01b039092168252519081900360200190f35b600080546001600160a01b0316331461014a576040805162461bcd60e51b81526020600482015260136024820152721bdb9b1e481bdddb995c8818d85b8818d85b1b606a1b604482015290519081900360640190fd5b600080546001600160a01b038481166001600160a01b0319831681179093556040805191909216808252602082019390935281517f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90929181900390910190a150600192915050565b600080546001600160a01b03163314610208576040805162461bcd60e51b81526020600482015260136024820152721bdb9b1e481bdddb995c8818d85b8818d85b1b606a1b604482015290519081900360640190fd5b506006805460ff1916600190811790915590565b60015460025460035460045460055460065460ff16909192939495565b6000546001600160a01b03169056fea2646970667358221220d62508bc8dae0075a2b96b4bff8080bdcbab080b74fa972a3e2ead9ddb7001e564736f6c63430006030033"
+var QueryBin = "0x608060405234801561001057600080fd5b506040516105f43803806105f4833981810160405260a081101561003357600080fd5b810190808051906020019092919080519060200190929190805190602001909291908051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506040518060c001604052808681526020018581526020018481526020016040518060200160405280858152508152602001604051806020016040528084815250815260200160001515815250600160008201518160000155602082015181600101556040820151816002015560608201518160030160008201518160000155505060808201518160040160008201518160000155505060a08201518160050160006101000a81548160ff021916908315150217905550905050505050505061047b806101796000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80630ca05f9f146100515780632e5295ee146100ab5780636d4ce63c146100cb578063893d20e81461010e575b600080fd5b6100936004803603602081101561006757600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610142565b60405180821515815260200191505060405180910390f35b6100b36102e1565b60405180821515815260200191505060405180910390f35b6100d36103c9565b604051808781526020018681526020018581526020018481526020018381526020018215158152602001965050505050505060405180910390f35b61011661041c565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610206576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146103a5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60018060050160006101000a81548160ff0219169083151502179055506001905090565b6000806000806000806001600001546001800154600160020154600160030160000154600160040160000154600160050160009054906101000a900460ff16955095509550955095509550909192939495565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690509056fea2646970667358221220f6e0997ae8973635c0edcd80fe70da7bc7ad56f3a914fddfb5b96a4bd212adb164736f6c63430007000033"
 
 // DeployQuery deploys a new Ethereum contract, binding an instance of Query to it.
 func DeployQuery(auth *bind.TransactOpts, backend bind.ContractBackend, capacity *big.Int, duration *big.Int, price *big.Int, ks *big.Int, ps *big.Int) (common.Address, *types.Transaction, *Query, error) {
@@ -191,7 +190,7 @@ func (_Query *QueryTransactorRaw) Transact(opts *bind.TransactOpts, method strin
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256, uint256, uint256, bool)
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256, uint256, bool)
 func (_Query *QueryCaller) Get(opts *bind.CallOpts) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	var (
 		ret0 = new(*big.Int)
@@ -215,21 +214,21 @@ func (_Query *QueryCaller) Get(opts *bind.CallOpts) (*big.Int, *big.Int, *big.In
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256, uint256, uint256, bool)
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256, uint256, bool)
 func (_Query *QuerySession) Get() (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	return _Query.Contract.Get(&_Query.CallOpts)
 }
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256, uint256, uint256, bool)
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256, uint256, bool)
 func (_Query *QueryCallerSession) Get() (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	return _Query.Contract.Get(&_Query.CallOpts)
 }
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Query *QueryCaller) GetOwner(opts *bind.CallOpts) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
@@ -241,14 +240,14 @@ func (_Query *QueryCaller) GetOwner(opts *bind.CallOpts) (common.Address, error)
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Query *QuerySession) GetOwner() (common.Address, error) {
 	return _Query.Contract.GetOwner(&_Query.CallOpts)
 }
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Query *QueryCallerSession) GetOwner() (common.Address, error) {
 	return _Query.Contract.GetOwner(&_Query.CallOpts)
 }

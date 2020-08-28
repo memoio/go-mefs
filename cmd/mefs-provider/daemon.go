@@ -266,8 +266,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
-	contracts.EndPoint = cfg.Eth
-
 	// start logger
 	utils.StartLogger()
 
@@ -313,6 +311,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
+			if nKey == "testnet" {
+				cfg.Eth = "http://39.100.146.21:8101"
+			} else {
+				cfg.Eth = "http://39.100.146.165:8101"
+			}
 		} else {
 			isProvider, err := role.IsProvider(nid)
 			if err != nil {
@@ -321,6 +324,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}
 			if isProvider {
 				cfg.Role = metainfo.RoleProvider
+				if nKey == "testnet" {
+					cfg.Eth = "http://39.100.146.21:8101"
+				} else {
+					cfg.Eth = "http://39.100.146.165:8101"
+				}
 			} else {
 				cfg.Role = metainfo.RoleUser
 			}
@@ -336,6 +344,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if err != nil {
 		utils.MLogger.Error("Put role key falied: ", err)
 	}
+
+	contracts.EndPoint = cfg.Eth
 
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children
