@@ -1,8 +1,11 @@
 package keeper
 
 import (
+	"bytes"
+	"encoding/binary"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	id "github.com/memoio/go-mefs/crypto/identity"
@@ -85,6 +88,13 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 			go k.handlePutStPaySign(km, metaValue, sig, from)
 		case mpb.OpType_Get:
 			go k.handleGetStPaySign(km, metaValue, sig, from)
+		}
+	case mpb.KeyType_StPayShare:
+		switch opType {
+		case mpb.OpType_Put:
+			go k.handlePutStPayShare(km, metaValue, from)
+		case mpb.OpType_Get:
+			go k.handleGetStPayShare(km, metaValue, from)
 		}
 	case mpb.KeyType_ProAddSign:
 		switch opType {
@@ -169,6 +179,73 @@ func (k *Info) handleGetStPaySign(km *metainfo.Key, metaValue, sig []byte, from 
 	}
 
 	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), []byte(k.localID), nsig, from)
+}
+
+func (k *Info) handlePutStPayShare(km *metainfo.Key, metaValue []byte, from string) {
+	utils.MLogger.Info("handlePutShare: ", km.ToString())
+
+	ops := km.GetOptions()
+	if len(ops) < 5 {
+		return
+	}
+	gp := k.getGroupInfo(ops[0], km.GetMainID(), false)
+	if gp == nil {
+		return
+	}
+	linfo := gp.getLInfo(ops[1], false)
+	if linfo == nil || linfo.currentPay == nil || len(linfo.currentPay.Share) < len(gp.keepers) {
+		return
+	}
+	cpay := linfo.currentPay
+
+	buf := bytes.NewBuffer(metaValue)
+	var chalfrequency int64
+	binary.Read(buf, binary.BigEndian, &chalfrequency)
+	utils.MLogger.Debug("handlePutShare: ", km.ToString(), "chalfrequency:", chalfrequency)
+
+	for i, kid := range gp.keepers {
+		if kid == ops[2] {
+			cpay.Share[i] = chalfrequency
+			return
+		}
+	}
+}
+
+func (k *Info) handleGetStPayShare(km *metainfo.Key, metaValue []byte, from string) {
+	utils.MLogger.Info("handleGetShare: ", km.ToString())
+
+	ops := km.GetOptions()
+	if len(ops) < 5 {
+		return
+	}
+	gp := k.getGroupInfo(ops[0], km.GetMainID(), false)
+	if gp == nil {
+		return
+	}
+	linfo := gp.getLInfo(ops[1], false)
+	if linfo == nil {
+		return
+	}
+
+	stStart, err := time.Parse(utils.BASETIME, ops[3])
+	if err != nil {
+		return
+	}
+	stEnd, err := time.Parse(utils.BASETIME, ops[4])
+	if err != nil {
+		return
+	}
+	chalfrequency := linfo.stShare(stStart.Unix(), stEnd.Unix())
+
+	km.Options[2] = k.localID
+
+	tmp := make([]byte, 0)
+	buf := bytes.NewBuffer(tmp)
+	binary.Write(buf, binary.BigEndian, chalfrequency)
+
+	utils.MLogger.Debug("handleGetShare: ", km.ToString(), "chalfrequency:", chalfrequency, buf.Bytes())
+
+	k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), buf.Bytes(), nil, from)
 }
 
 func (k *Info) handleGetProAddSign(km *metainfo.Key, metaValue, sig []byte, from string) ([]byte, error) {

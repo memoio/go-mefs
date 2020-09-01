@@ -35,15 +35,15 @@ const (
 	InvalidAddr               = "0x0000000000000000000000000000000000000000"
 	spaceTimePayGasLimit      = uint64(8000000)
 	spaceTimePayGasPrice      = 2 * defaultGasPrice
-	defaultGasPrice           = 100
+	defaultGasPrice           = 200
 	defaultGasLimit           = uint64(8000000)
 	sendTransactionRetryCount = 5
 	checkTxRetryCount         = 8
 )
 
 const (
-	keeperKey   = "keeperV1"
-	providerKey = "providerV1"
+	keeperKey   = "keeperV2"
+	providerKey = "providerV2"
 	kpMapKey    = "kpMapV1"
 
 	offerKey   = "offerV1"
@@ -139,7 +139,7 @@ func QueryBalance(account string) (balance *big.Int, err error) {
 	return balance, nil
 }
 
-//GetLatestBlock query the balance of account
+//GetLatestBlock get latest block from chain
 func GetLatestBlock() (*types.Block, error) {
 	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
@@ -307,7 +307,7 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 		err = CheckTx(tx)
 		if err != nil {
 			checkRetryCount++
-			log.Println("add usroleer indexer transaction fails: ", err)
+			log.Println("alter addr in indexer transaction fails: ", err)
 			if checkRetryCount > checkTxRetryCount {
 				return err
 			}
@@ -324,24 +324,24 @@ func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance
 	retryCount := 0
 	for {
 		retryCount++
-		ownAddr, indexerAddr, err := indexerInstance.Get(&bind.CallOpts{
+		ownAddr, resolverAddr, err := indexerInstance.Get(&bind.CallOpts{
 			From: localAddress,
 		}, key)
 		if err != nil {
 			if retryCount > 10 {
 				log.Println("get addr from indexer err: ", err)
-				return indexerAddr, ownAddr, err
+				return resolverAddr, ownAddr, err
 			}
 			time.Sleep(60 * time.Second)
 			continue
 		}
 
-		if len(indexerAddr) == 0 || indexerAddr.String() == InvalidAddr {
+		if len(resolverAddr) == 0 || resolverAddr.String() == InvalidAddr {
 			log.Println("get empty addr from indexer")
-			return indexerAddr, ownAddr, ErrEmpty
+			return resolverAddr, ownAddr, ErrEmpty
 		}
 
-		return indexerAddr, ownAddr, nil
+		return resolverAddr, ownAddr, nil
 	}
 }
 
@@ -531,7 +531,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 		}
 		break
 	}
-	log.Println("mapper has been successfully deployed!")
+	log.Println("mapper", mapperAddr.String(), "has been successfully deployed!")
 	return mapperAddr, mapperInstance, nil
 }
 

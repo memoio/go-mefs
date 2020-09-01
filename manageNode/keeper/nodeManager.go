@@ -258,6 +258,10 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 
 		if ntime-thisInfo.availTime > expireTime {
 			thisInfo.online = false
+			thisInfo.credit--
+			if thisInfo.credit < -100 {
+				thisInfo.credit = -100
+			}
 		}
 	}
 }

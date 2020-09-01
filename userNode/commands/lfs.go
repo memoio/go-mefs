@@ -1796,6 +1796,11 @@ var lfsInfoCmd = &cmds.Command{
 			return role.ErrEmptyData
 		}
 
+		ukItem, err := role.GetUpkeepingInfo(userid, uk.UpKeepingID)
+		if err == nil {
+			uk = &ukItem
+		}
+
 		balance, err := role.QueryBalance(userid)
 		if err != nil {
 			return err
@@ -1831,23 +1836,28 @@ var lfsInfoCmd = &cmds.Command{
 				continue
 			}
 
+			var ci proInfo
+
 			cItem := gp.GetProChannel(pid)
 			if cItem == nil {
+				ci = proInfo{
+					ProviderAddr: pi.Addr.String(),
+				}
 				continue
-			}
+			} else {
+				channerAddr, err := address.GetAddressFromID(cItem.ChannelID)
+				if err != nil {
+					continue
+				}
 
-			channerAddr, err := address.GetAddressFromID(cItem.ChannelID)
-			if err != nil {
-				continue
-			}
-
-			ci := proInfo{
-				ProviderAddr: pi.Addr.String(),
-				ChannelAddr:  channerAddr.String(),
-				StartTime:    time.Unix(cItem.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
-				Duration:     utils.FormatSecond(cItem.Duration),
-				Money:        utils.FormatWei(cItem.Money),
-				CostValue:    utils.FormatWei(cItem.Value),
+				ci = proInfo{
+					ProviderAddr: pi.Addr.String(),
+					ChannelAddr:  channerAddr.String(),
+					StartTime:    time.Unix(cItem.StartTime, 0).In(time.Local).Format(utils.SHOWTIME),
+					Duration:     utils.FormatSecond(cItem.Duration),
+					Money:        utils.FormatWei(cItem.Money),
+					CostValue:    utils.FormatWei(cItem.Value),
+				}
 			}
 
 			providers = append(providers, ci)

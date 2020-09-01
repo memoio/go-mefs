@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -31,7 +30,7 @@ var (
 const ChannelABI = "[{\"inputs\":[{\"internalType\":\"addresspayable\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"timeout\",\"type\":\"uint256\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"closeChannel\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"ChannelTimeout\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"hash\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"sign\",\"type\":\"bytes\"}],\"name\":\"CloseChannel\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"addTime\",\"type\":\"uint256\"}],\"name\":\"extend\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getInfo\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]"
 
 // ChannelBin is the compiled bytecode used for deploying new contracts.
-var ChannelBin = "0x608060405273aa3f46999474c4a39a597157956db2c1883b52e3600560006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550604051610ce7380380610ce78339818101604052604081101561007b57600080fd5b810190808051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555081600260006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555042600381905550806004819055505050610b70806101776000396000f3fe6080604052600436106100595760003560e01c80630ca05f9f146100655780632b7fa6be146100ce578063396582451461019d5780635a9b0b89146101b4578063893d20e81461024c5780639714378c146102a357610060565b3661006057005b600080fd5b34801561007157600080fd5b506100b46004803603602081101561008857600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506102de565b604051808215151515815260200191505060405180910390f35b61019b600480360360608110156100e457600080fd5b8101908080359060200190929190803590602001909291908035906020019064010000000081111561011557600080fd5b82018360208201111561012757600080fd5b8035906020019184600183028401116401000000008311171561014957600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600081840152601f19601f8201169050808301925050505050505091929192905050506104a9565b005b3480156101a957600080fd5b506101b2610917565b005b3480156101c057600080fd5b506101c96109ce565b604051808581526020018481526020018373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200194505050505060405180910390f35b34801561025857600080fd5b50610261610a34565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b3480156102af57600080fd5b506102dc600480360360208110156102c657600080fd5b8101908080359060200190929190505050610a5d565b005b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146103a2576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461056c576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600e8152602001807f696c6c6567616c2063616c6c657200000000000000000000000000000000000081525060200191505060405180910390fd5b60003083604051602001808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1660601b815260140182815260200192505050604051602081830303815290604052805190602001209050838114610643576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600c8152602001807f696c6c6567616c2068617368000000000000000000000000000000000000000081525060200191505060405180910390fd5b6000600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166319045a2586856040518363ffffffff1660e01b81526004018083815260200180602001828103825283818151815260200191508051906020019080838360005b838110156106da5780820151818401526020810190506106bf565b50505050905090810190601f1680156107075780820380516001836020036101000a031916815260200191505b50935050505060206040518083038186803b15801561072557600080fd5b505afa158015610739573d6000803e3d6000fd5b505050506040513d602081101561074f57600080fd5b81019080805190602001909291905050509050600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614610825576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600b8152602001807f696c6c6567616c2073696700000000000000000000000000000000000000000081525060200191505060405180910390fd5b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166108fc859081150290604051600060405180830381858888f1935050505015801561088d573d6000803e3d6000fd5b503373ffffffffffffffffffffffffffffffffffffffff167f01d42a9c1bb0e1a3464994bd2306368ef80e0dcf460c6123b5f7cbbcbf169fbb856040518082815260200191505060405180910390a2600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b42600454600354011115610993576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600e8152602001807f54696d65206973206e6f7420757000000000000000000000000000000000000081525060200191505060405180910390fd5b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b600080600080600354600454600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16819150809050935093509350935090919293565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610b1f576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008111610b2c57600080fd5b80600454016004819055505056fea26469706673582212200d07dbe6ccb5f30fca6026e0d252a768411bb0e7aa04b9b8d99a070195143bd564736f6c63430006030033"
+var ChannelBin = "0x608060405273aa3f46999474c4a39a597157956db2c1883b52e3600560006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550604051610c8f380380610c8f8339818101604052604081101561007b57600080fd5b810190808051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550600081116100e357600080fd5b81600260006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555042600381905550806004819055505050610b0b806101846000396000f3fe6080604052600436106100595760003560e01c80630ca05f9f146100655780632b7fa6be146100cc578063396582451461019b5780635a9b0b89146101b2578063893d20e81461021e5780639714378c1461025f57610060565b3661006057005b600080fd5b34801561007157600080fd5b506100b46004803603602081101561008857600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919050505061029a565b60405180821515815260200191505060405180910390f35b610199600480360360608110156100e257600080fd5b8101908080359060200190929190803590602001909291908035906020019064010000000081111561011357600080fd5b82018360208201111561012557600080fd5b8035906020019184600183028401116401000000008311171561014757600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600081840152601f19601f820116905080830192505050505050509192919290505050610439565b005b3480156101a757600080fd5b506101b0610891565b005b3480156101be57600080fd5b506101c761095c565b604051808581526020018481526020018373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff16815260200194505050505060405180910390f35b34801561022a57600080fd5b506102336109bc565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b34801561026b57600080fd5b506102986004803603602081101561028257600080fd5b81019080803590602001909291905050506109e5565b005b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461035e576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146104fc576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600e8152602001807f696c6c6567616c2063616c6c657200000000000000000000000000000000000081525060200191505060405180910390fd5b60003083604051602001808373ffffffffffffffffffffffffffffffffffffffff1660601b8152601401828152602001925050506040516020818303038152906040528051906020012090508381146105bd576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600c8152602001807f696c6c6567616c2068617368000000000000000000000000000000000000000081525060200191505060405180910390fd5b6000600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166319045a2586856040518363ffffffff1660e01b81526004018083815260200180602001828103825283818151815260200191508051906020019080838360005b83811015610654578082015181840152602081019050610639565b50505050905090810190601f1680156106815780820380516001836020036101000a031916815260200191505b50935050505060206040518083038186803b15801561069f57600080fd5b505afa1580156106b3573d6000803e3d6000fd5b505050506040513d60208110156106c957600080fd5b81019080805190602001909291905050509050600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff161461079f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600b8152602001807f696c6c6567616c2073696700000000000000000000000000000000000000000081525060200191505060405180910390fd5b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166108fc859081150290604051600060405180830381858888f19350505050158015610807573d6000803e3d6000fd5b503373ffffffffffffffffffffffffffffffffffffffff167f01d42a9c1bb0e1a3464994bd2306368ef80e0dcf460c6123b5f7cbbcbf169fbb856040518082815260200191505060405180910390a2600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b60035460045460035401116108a557600080fd5b42600454600354011115610921576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600e8152602001807f54696d65206973206e6f7420757000000000000000000000000000000000000081525060200191505060405180910390fd5b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b600080600080600354600454600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16935093509350935090919293565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610aa6576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008111610ab357600080fd5b6000816004540190506004548111610aca57600080fd5b80600481905550505056fea264697066735822122035078f8f36d74c03e1a30648aa86c619eed78b709659fe22cc441e497d7bf0e064736f6c63430007000033"
 
 // DeployChannel deploys a new Ethereum contract, binding an instance of Channel to it.
 func DeployChannel(auth *bind.TransactOpts, backend bind.ContractBackend, to common.Address, timeout *big.Int) (common.Address, *types.Transaction, *Channel, error) {
@@ -191,7 +190,7 @@ func (_Channel *ChannelTransactorRaw) Transact(opts *bind.TransactOpts, method s
 
 // GetInfo is a free data retrieval call binding the contract method 0x5a9b0b89.
 //
-// Solidity: function getInfo() constant returns(uint256, uint256, address, address)
+// Solidity: function getInfo() view returns(uint256, uint256, address, address)
 func (_Channel *ChannelCaller) GetInfo(opts *bind.CallOpts) (*big.Int, *big.Int, common.Address, common.Address, error) {
 	var (
 		ret0 = new(*big.Int)
@@ -211,21 +210,21 @@ func (_Channel *ChannelCaller) GetInfo(opts *bind.CallOpts) (*big.Int, *big.Int,
 
 // GetInfo is a free data retrieval call binding the contract method 0x5a9b0b89.
 //
-// Solidity: function getInfo() constant returns(uint256, uint256, address, address)
+// Solidity: function getInfo() view returns(uint256, uint256, address, address)
 func (_Channel *ChannelSession) GetInfo() (*big.Int, *big.Int, common.Address, common.Address, error) {
 	return _Channel.Contract.GetInfo(&_Channel.CallOpts)
 }
 
 // GetInfo is a free data retrieval call binding the contract method 0x5a9b0b89.
 //
-// Solidity: function getInfo() constant returns(uint256, uint256, address, address)
+// Solidity: function getInfo() view returns(uint256, uint256, address, address)
 func (_Channel *ChannelCallerSession) GetInfo() (*big.Int, *big.Int, common.Address, common.Address, error) {
 	return _Channel.Contract.GetInfo(&_Channel.CallOpts)
 }
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Channel *ChannelCaller) GetOwner(opts *bind.CallOpts) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
@@ -237,14 +236,14 @@ func (_Channel *ChannelCaller) GetOwner(opts *bind.CallOpts) (common.Address, er
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Channel *ChannelSession) GetOwner() (common.Address, error) {
 	return _Channel.Contract.GetOwner(&_Channel.CallOpts)
 }
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Channel *ChannelCallerSession) GetOwner() (common.Address, error) {
 	return _Channel.Contract.GetOwner(&_Channel.CallOpts)
 }
@@ -272,21 +271,21 @@ func (_Channel *ChannelTransactorSession) ChannelTimeout() (*types.Transaction, 
 
 // CloseChannel is a paid mutator transaction binding the contract method 0x2b7fa6be.
 //
-// Solidity: function CloseChannel(bytes32 hash, uint256 value, bytes sign) returns()
+// Solidity: function CloseChannel(bytes32 hash, uint256 value, bytes sign) payable returns()
 func (_Channel *ChannelTransactor) CloseChannel(opts *bind.TransactOpts, hash [32]byte, value *big.Int, sign []byte) (*types.Transaction, error) {
 	return _Channel.contract.Transact(opts, "CloseChannel", hash, value, sign)
 }
 
 // CloseChannel is a paid mutator transaction binding the contract method 0x2b7fa6be.
 //
-// Solidity: function CloseChannel(bytes32 hash, uint256 value, bytes sign) returns()
+// Solidity: function CloseChannel(bytes32 hash, uint256 value, bytes sign) payable returns()
 func (_Channel *ChannelSession) CloseChannel(hash [32]byte, value *big.Int, sign []byte) (*types.Transaction, error) {
 	return _Channel.Contract.CloseChannel(&_Channel.TransactOpts, hash, value, sign)
 }
 
 // CloseChannel is a paid mutator transaction binding the contract method 0x2b7fa6be.
 //
-// Solidity: function CloseChannel(bytes32 hash, uint256 value, bytes sign) returns()
+// Solidity: function CloseChannel(bytes32 hash, uint256 value, bytes sign) payable returns()
 func (_Channel *ChannelTransactorSession) CloseChannel(hash [32]byte, value *big.Int, sign []byte) (*types.Transaction, error) {
 	return _Channel.Contract.CloseChannel(&_Channel.TransactOpts, hash, value, sign)
 }
@@ -331,6 +330,27 @@ func (_Channel *ChannelSession) Extend(addTime *big.Int) (*types.Transaction, er
 // Solidity: function extend(uint256 addTime) returns()
 func (_Channel *ChannelTransactorSession) Extend(addTime *big.Int) (*types.Transaction, error) {
 	return _Channel.Contract.Extend(&_Channel.TransactOpts, addTime)
+}
+
+// Receive is a paid mutator transaction binding the contract receive function.
+//
+// Solidity: receive() payable returns()
+func (_Channel *ChannelTransactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _Channel.contract.RawTransact(opts, nil) // calldata is disallowed for receive function
+}
+
+// Receive is a paid mutator transaction binding the contract receive function.
+//
+// Solidity: receive() payable returns()
+func (_Channel *ChannelSession) Receive() (*types.Transaction, error) {
+	return _Channel.Contract.Receive(&_Channel.TransactOpts)
+}
+
+// Receive is a paid mutator transaction binding the contract receive function.
+//
+// Solidity: receive() payable returns()
+func (_Channel *ChannelTransactorSession) Receive() (*types.Transaction, error) {
+	return _Channel.Contract.Receive(&_Channel.TransactOpts)
 }
 
 // ChannelAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the Channel contract.

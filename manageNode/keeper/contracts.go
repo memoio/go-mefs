@@ -2,6 +2,9 @@ package keeper
 
 import (
 	"context"
+	"math/big"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -12,6 +15,7 @@ import (
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
+	"github.com/memoio/go-mefs/utils/pos"
 )
 
 // force update if mode is set true
@@ -199,8 +203,50 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 	return nil
 }
 
+//getFromChainRegular loadPeers and getIncome
 func (k *Info) getFromChainRegular(ctx context.Context) {
 	utils.MLogger.Info("Get infos from chain start!")
+
+	localAddr, err := address.GetAddressFromID(k.localID)
+	if err != nil {
+		return
+	}
+
+	lastBlock := int64(0)
+
+	km, err := metainfo.NewKey(k.localID, mpb.KeyType_Income)
+	if err == nil {
+		res, err := k.ds.GetKey(k.context, km.ToString(), "local")
+		if err == nil && len(res) > 0 {
+			utils.MLogger.Infof("Load %s income info: %s", km.ToString(), string(res))
+			ins := strings.Split(string(res), metainfo.DELIMITER)
+			if len(ins) == 3 {
+				lb, err := strconv.ParseInt(ins[0], 10, 0)
+				if err == nil {
+					lastBlock = lb
+				}
+
+				mi, ok := new(big.Int).SetString(ins[1], 10)
+				if ok {
+					k.ManageIncome = mi
+				}
+
+				pi, ok := new(big.Int).SetString(ins[2], 10)
+				if ok {
+					k.PosIncome = pi
+				}
+			}
+		}
+	}
+
+	k.loadPeersFromChain()
+
+	time.Sleep(5 * time.Minute)
+	lb, err := k.getIncome(localAddr, lastBlock)
+	if err == nil {
+		lastBlock = lb
+	}
+
 	ticker := time.NewTicker(kpMapTime)
 	defer ticker.Stop()
 	for {
@@ -209,6 +255,152 @@ func (k *Info) getFromChainRegular(ctx context.Context) {
 			return
 		case <-ticker.C:
 			k.loadPeersFromChain()
+			lb, err := k.getIncome(localAddr, lastBlock)
+			if err == nil {
+				lastBlock = lb
+			}
 		}
 	}
+}
+
+//getIncome get keeper's income from user
+func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) {
+	b, err := contracts.GetLatestBlock()
+	if err != nil {
+		return 0, err
+	}
+
+	latestBlock := b.Number().Int64()
+	endBlock := b.Number().Int64()
+	ukaddrs, posAddrs := k.GetIncomeAddress()
+
+	startBlock := pBlock
+	if len(ukaddrs) > 0 && latestBlock > startBlock {
+		utils.MLogger.Infof("get manage income from chain")
+		endBlock = latestBlock
+
+		for endBlock <= latestBlock {
+			if endBlock > startBlock+1024 {
+				endBlock = startBlock + 1024
+			}
+
+			mIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, startBlock, endBlock)
+			if err != nil {
+				utils.MLogger.Info("get ukpay log err:", err)
+				break
+			}
+
+			k.ManageIncome.Add(k.ManageIncome, mIncome)
+			startBlock = endBlock
+
+			if endBlock == latestBlock {
+				break
+			}
+
+			if endBlock < latestBlock {
+				endBlock = latestBlock
+			}
+		}
+	}
+
+	posStartBlock := pBlock
+	if len(posAddrs) > 0 && latestBlock > posStartBlock {
+		utils.MLogger.Infof("get pos income from chain")
+
+		endBlock = latestBlock
+
+		for endBlock <= latestBlock {
+			if endBlock > posStartBlock+1024 {
+				endBlock = posStartBlock + 1024
+			}
+
+			posMIncome, _, err := contracts.GetStorageIncome(posAddrs, localAddr, posStartBlock, endBlock)
+			if err != nil {
+				utils.MLogger.Info("get pos ukpay log err:", err)
+				break
+			}
+
+			k.PosIncome.Add(k.PosIncome, posMIncome)
+			posStartBlock = endBlock
+
+			if endBlock == latestBlock {
+				break
+			}
+
+			if endBlock < latestBlock {
+				endBlock = latestBlock
+			}
+		}
+	}
+
+	km, err := metainfo.NewKey(k.localID, mpb.KeyType_Income)
+	if err == nil {
+		var res strings.Builder
+		res.WriteString(strconv.FormatInt(latestBlock, 10))
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(k.ManageIncome.String())
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(k.PosIncome.String())
+
+		k.ds.PutKey(k.context, km.ToString(), []byte(res.String()), nil, "local")
+	}
+
+	utils.MLogger.Infof("get income from chain finished at block %d", latestBlock)
+	return latestBlock, nil
+}
+
+//GetIncomeAddress get upkeepingAddress and posAddress of this keeper to filter logs in chain
+func (k *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
+	ukAddr := []common.Address{}
+	posAddr := []common.Address{}
+	pus := k.getQUKeys()
+	for _, pu := range pus {
+		if pu.uid == pu.qid { //test
+			continue
+		}
+
+		gp := k.getGroupInfo(pu.uid, pu.qid, false)
+		if gp == nil || gp.upkeeping == nil {
+			continue
+		}
+
+		tmp, err := address.GetAddressFromID(gp.upkeeping.UpKeepingID)
+		if err != nil {
+			continue
+		}
+
+		if pu.uid == pos.GetPosId() {
+			posAddr = append(posAddr, tmp)
+			continue
+		} else {
+			ukAddr = append(ukAddr, tmp)
+		}
+	}
+
+	if len(posAddr) == 0 {
+		qItem, err := role.GetLatestQuery(pos.GetPosId())
+		if err != nil {
+			return ukAddr, posAddr
+		}
+		uItem, err := role.GetUpKeeping(pos.GetPosId(), qItem.QueryID)
+		if err != nil {
+			return ukAddr, posAddr
+		}
+		localAddr, err := address.GetAddressFromID(k.localID)
+		if err != nil {
+			return ukAddr, posAddr
+		}
+		for _, ki := range uItem.Keepers {
+			if ki.Addr.String() == localAddr.String() {
+				uAddr, err := address.GetAddressFromID(uItem.UpKeepingID)
+				if err != nil {
+					return ukAddr, posAddr
+				}
+				posAddr = append(posAddr, uAddr)
+			}
+		}
+
+	}
+
+	return ukAddr, posAddr
 }

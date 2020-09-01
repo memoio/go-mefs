@@ -896,6 +896,7 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	timeOut := big.NewInt(int64(storeDays * 24 * 60 * 60))
 	// read ps times
 	moneyToChannel := new(big.Int).Mul(big.NewInt(utils.READPRICE), big.NewInt(storeSize))
+	moneyToChannel.Mul(moneyToChannel, big.NewInt(3))
 
 	weiPrice := new(big.Float).SetInt(moneyToChannel)
 	weiPrice.Quo(weiPrice, GetMemoPrice())

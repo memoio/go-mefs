@@ -47,6 +47,8 @@ type Info struct {
 	userConfigs   *lru.ARCCache
 	kItem         *role.KeeperItem
 	ms            *measure
+	ManageIncome  *big.Int //keeper's manage-income
+	PosIncome     *big.Int //keeper's pos-manage-income
 }
 
 type measure struct {
@@ -86,6 +88,8 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		context:       ctx,
 		ms:            mea,
 		pledgeStorage: big.NewInt(0),
+		ManageIncome:  big.NewInt(0),
+		PosIncome:     big.NewInt(0),
 	}
 
 	balance := role.GetBalance(m.localID)

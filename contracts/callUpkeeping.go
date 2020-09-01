@@ -416,7 +416,7 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -470,7 +470,7 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr comm
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}

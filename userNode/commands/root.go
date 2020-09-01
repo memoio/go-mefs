@@ -33,6 +33,7 @@ ADVANCED COMMANDS
   lfs           Manage User Log FileSystem
   repo          Manipulate the MEFS repository
   contract      Some contract functions
+  gateway 		start gateWay
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
