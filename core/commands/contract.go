@@ -60,6 +60,8 @@ var ContractCmd = &cmds.Command{
 		"deleteKeeperInKPMap":      deleteKeeperInKPMapCmd,      //删除keeperProviderMap里的指定keeper
 		"getProviderInKPMap":       getProviderInKPMapCmd,       //获得keeperProviderMap合约中与指定keeper关联的所有provider
 		"getAllKeeperInKPMap":      getAllKeeperInKPMapCmd,      //获得keeperProviderMap合约中的所有keeper
+		"isKeeper":                 isKeeperCmd,
+		"isProvider":               isProviderCmd,
 	},
 }
 
@@ -205,6 +207,86 @@ var setKeeperCmd = &cmds.Command{
 	},
 }
 
+var isKeeperCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test isKeeper",
+		ShortDescription: "the account'Role is keeper?",
+	},
+
+	Arguments: []cmds.Argument{ //参数列表
+		cmds.StringArg("address", true, true, "The address to test if it is Role keeper."),
+	},
+	Options: []cmds.Option{ //选项列表
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		localAddr := common.HexToAddress(req.Arguments[0][2:])
+
+		isKeeper, err := contracts.IsKeeper(localAddr)
+		if err != nil {
+			fmt.Println("isKeeper err:", err)
+			return err
+		}
+
+		return cmds.EmitOnce(res, isKeeper)
+	},
+}
+
+var isProviderCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test isProvider",
+		ShortDescription: "the account'Role is provider?",
+	},
+
+	Arguments: []cmds.Argument{ //参数列表
+		cmds.StringArg("address", true, true, "The address to test if it is Role provider."),
+	},
+	Options: []cmds.Option{ //选项列表
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		localAddr := common.HexToAddress(req.Arguments[0][2:])
+
+		isProvider, err := contracts.IsProvider(localAddr)
+		if err != nil {
+			fmt.Println("isProvider err:", err)
+			return err
+		}
+
+		return cmds.EmitOnce(res, isProvider)
+	},
+}
+
 var setKeeperPriceCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "test set Keeper price",
@@ -287,10 +369,10 @@ var deployProviderCmd = &cmds.Command{
 
 		err := contracts.DeployProviderAdmin(hexPk)
 		if err != nil {
-			fmt.Println("keeper合约部署错误:", err)
+			fmt.Println("provider合约部署错误:", err)
 			return err
 		}
-		fmt.Println("keeper部署合约成功")
+		fmt.Println("provider部署合约成功")
 
 		list := &StringList{}
 		return cmds.EmitOnce(res, list)

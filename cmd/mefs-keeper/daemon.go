@@ -257,6 +257,8 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
+	contracts.EndPoint = cfg.Eth
+
 	// start logger
 	utils.StartLogger()
 
