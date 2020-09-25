@@ -394,7 +394,7 @@ func (k *KeySet) GenProof(chal Challenge, segments, tags [][]byte, typ int) (*Pr
 	for _, segment := range segments {
 		atoms, err := splitSegmentToAtoms(segment, typ)
 		if err != nil {
-			return nil, ErrSplitSegmentToAtoms
+			return nil, err
 		}
 
 		for j, atom := range atoms { // 扫描各segment
@@ -556,7 +556,7 @@ func (k *KeySet) VerifyDataForUser(indices []string, segments, tags [][]byte, ty
 	for _, segment := range segments {
 		atoms, err := splitSegmentToAtoms(segment, typ)
 		if err != nil {
-			return false, ErrSplitSegmentToAtoms
+			return false, err
 		}
 
 		for j, atom := range atoms { // 扫描各segment
