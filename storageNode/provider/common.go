@@ -1,6 +1,10 @@
 package provider
 
 import (
+	"errors"
+	"strconv"
+	"time"
+
 	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
@@ -10,6 +14,23 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
+
+var (
+	ErrGroupNotReady     = errors.New("group is nil")
+	ErrUpkeepingNotReady = errors.New("upkeeping contract is not deployed")
+)
+
+type GInfoOutput struct {
+	GroupID        string
+	UserID         string
+	Keepers        []string
+	Providers      []string
+	UpkeepingID    string
+	UpkeepingStart string
+	UpkeepingEnd   string
+	UpkeepingPrice string
+	ChannelValue   []string
+}
 
 func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
 	value, ok := p.userConfigs.Get(groupID)
@@ -98,4 +119,73 @@ func (p *Info) getDiskTotal() uint64 {
 		maxSpaceInByte = uint64(p.proContract.Capacity) * 1024 * 1024
 	}
 	return maxSpaceInByte
+}
+
+//GetGroupInfoOutput get ginfo for show
+func (p *Info) GetGroupInfoOutput(uid, qid string) (*GInfoOutput, error) {
+	gpInfo := p.getGroupInfo(uid, qid, false)
+	if gpInfo == nil {
+		return nil, ErrGroupNotReady
+	}
+
+	if gpInfo.upkeeping == nil {
+		return nil, ErrUpkeepingNotReady
+	}
+
+	var channelValue []string
+
+	gpInfo.channel.Range(func(key, value interface{}) bool {
+		cItem, ok := value.(*role.ChannelItem)
+		if !ok {
+			return true
+		}
+		channelValue = append(channelValue, utils.FormatWei(cItem.Value))
+		return true
+	})
+
+	res := &GInfoOutput{
+		GroupID:        qid,
+		UserID:         uid,
+		Keepers:        gpInfo.keepers,
+		Providers:      gpInfo.providers,
+		UpkeepingID:    gpInfo.upkeeping.UpKeepingID,
+		UpkeepingStart: time.Unix(gpInfo.upkeeping.StartTime, 0).Format(utils.SHOWTIME),
+		UpkeepingEnd:   time.Unix(gpInfo.upkeeping.EndTime, 0).Format(utils.SHOWTIME),
+		UpkeepingPrice: utils.FormatStorePrice(gpInfo.upkeeping.Price),
+		ChannelValue:   channelValue,
+	}
+
+	return res, nil
+}
+
+func (p *Info) ShowUserInfo() []string {
+	var res []string
+	res = append(res, "uid/qid:")
+	num := 0
+
+	p.users.Range(func(key, value interface{}) bool {
+		num++
+		uid, ok := key.(string)
+		if !ok {
+			return true
+		}
+
+		ui, ok := value.(*uInfo)
+		if !ok {
+			return true
+		}
+
+		qus := ui.getQuery()
+
+		tmp := uid
+		for _, qid := range qus {
+			tmp = tmp + "/" + qid
+		}
+
+		res = append(res, tmp)
+		return true
+	})
+
+	res = append(res, "sum: "+strconv.Itoa(num))
+	return res
 }

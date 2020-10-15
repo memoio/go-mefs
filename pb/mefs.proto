@@ -40,6 +40,7 @@ enum KeyType {
 	  Repair = 26;     // handle repair request
     ExternalAddress = 27; // handle node's ip request
     Storage = 28;  // handle node's storage information
+    ProQuit = 29;  //handle provider quit group
 
 	  Query = 30;  // record query contract
 	  Offer = 31;
@@ -52,6 +53,7 @@ enum KeyType {
     PosMeta = 42; // record pos metainfomation
     Session = 43;  // record user's session information
     BucketStripes = 44; // record bucket and their stripes
+    MoveData = 45; //provider move data to another provider
 }
 
 // record key meta 

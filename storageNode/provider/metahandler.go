@@ -8,6 +8,7 @@ import (
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
@@ -57,6 +58,8 @@ func (p *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		}
 	case mpb.KeyType_UserInit:
 		return nil, metainfo.ErrWrongType
+	case mpb.KeyType_ProQuit:
+		return p.handleProQuit(km, from)
 	default: //没有匹配的信息，报错
 		switch opType {
 		case mpb.OpType_Put:
@@ -224,4 +227,27 @@ func (p *Info) handleHeartBeat(km *metainfo.Key, metaValue []byte, from string) 
 	}
 
 	return
+}
+
+func (p *Info) handleProQuit(km *metainfo.Key, from string) ([]byte, error) {
+	utils.MLogger.Info("handleProQuit: ", km.ToString(), " from:", from, "successfully")
+
+	qid := km.GetMainID()
+	gp := p.getGroupInfo(qid, qid, false)
+
+	if gp != nil {
+		localAddr, err := address.GetAddressFromID(p.localID)
+		if err != nil {
+			utils.MLogger.Error("handleProQuit getAddr ", p.localID, " err:", err)
+			return nil, nil
+		}
+
+		for _, pItem := range gp.upkeeping.Providers {
+			if pItem.Addr.String() == localAddr.String() {
+				pItem.Stop = true
+				break
+			}
+		}
+	}
+	return nil, nil
 }

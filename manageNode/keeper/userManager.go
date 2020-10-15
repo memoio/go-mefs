@@ -410,6 +410,7 @@ type lInfo struct {
 	lastChalTime int64
 	lastPay      *chalpay // stores result of last pay
 	currentPay   *chalpay // current
+	stopSign     map[string][]byte
 }
 
 type blockInfo struct {

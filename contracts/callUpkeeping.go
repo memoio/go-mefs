@@ -459,10 +459,20 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 }
 
 //SetProviderStop keeper call to set providerAddr stop
-func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr common.Address, key string, sign [][]byte) error {
-	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
-	if err != nil {
-		return err
+func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr, ukAddr common.Address, key string, sign [][]byte) error {
+	var uk *upKeeping.UpKeeping
+	var err error
+	if ukAddr.String() == InvalidAddr {
+		_, uk, err = GetUpkeeping(localAddress, userAddress, key)
+		if err != nil {
+			return err
+		}
+	} else {
+		client := GetClient(EndPoint)
+		uk, err = upKeeping.NewUpKeeping(ukAddr, client)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Println("begin set provider in upkeeping stop...")
