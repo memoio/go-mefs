@@ -1732,6 +1732,7 @@ type ukInfo struct {
 
 type keeperInfo struct {
 	KeeperAddr string
+	Stop       bool
 }
 
 type proInfo struct {
@@ -1741,6 +1742,7 @@ type proInfo struct {
 	Duration     string
 	Money        string
 	CostValue    string
+	Stop         bool
 }
 
 var lfsInfoCmd = &cmds.Command{
@@ -1825,6 +1827,7 @@ var lfsInfoCmd = &cmds.Command{
 		for _, ki := range uk.Keepers {
 			kinfo := keeperInfo{
 				KeeperAddr: ki.Addr.String(),
+				Stop:       ki.Stop,
 			}
 			keepers = append(keepers, kinfo)
 		}
@@ -1857,6 +1860,7 @@ var lfsInfoCmd = &cmds.Command{
 					Duration:     utils.FormatSecond(cItem.Duration),
 					Money:        utils.FormatWei(cItem.Money),
 					CostValue:    utils.FormatWei(cItem.Value),
+					Stop:         pi.Stop,
 				}
 			}
 

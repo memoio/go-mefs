@@ -141,7 +141,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	go m.repairRegular(ctx)
 	go m.stPrePayRegular(ctx)
 	go m.stPayRegular(ctx)
-	go m.checkPeers(ctx)
+	go m.checkPeers(ctx) //check if connect
 	go m.getFromChainRegular(ctx)
 
 	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
@@ -189,6 +189,7 @@ func (k *Info) persistRegular(ctx context.Context) {
 	}
 }
 
+//persist k.keepers、k.providers、k.users、k.users.uInfo.querys、lastPay to local;
 func (k *Info) save(ctx context.Context) error {
 	localID := k.localID
 
@@ -706,6 +707,8 @@ func (k *Info) loadPeers(ctx context.Context) error {
 	return nil
 }
 
+//loadPeersFromChain: load all keepers and providers from keeper/provider contract and save in k.keepers/k.providers
+//load kp from kpMap-contract and save in KpMap
 func (k *Info) loadPeersFromChain() error {
 	keepers, _, err := role.GetAllKeepers(k.localID)
 	if err != nil {

@@ -11,15 +11,17 @@ import (
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
+//rpids: cid1_pid1/cid2_pid2
 func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error {
 	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
 	blockID := km.GetMainID()
-	ops := km.GetOptions()
+	ops := km.GetOptions()  // uid/offset
 	if len(ops) < 2 {
 		return role.ErrWrongKey
 	}
 
+	//qid_bid_sid_cid
 	blkInfo := strings.Split(blockID, metainfo.BlockDelimiter)
 	if len(blkInfo) < 4 {
 		return role.ErrWrongKey
@@ -46,6 +48,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	if err != nil {
 		return err
 	}
+	//先从本地尝试获取
 	block, err := p.ds.GetBlock(ctx, bid.ToString(), nil, "local")
 	if err == nil {
 		ok, err := df.VerifyBlockLength(block.RawData(), 0, segNeed)
@@ -70,14 +73,14 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	}
 
 	cpids := strings.Split(string(rpids), metainfo.DELIMITER)
-	stripe := make([][]byte, len(cpids)+1)
+	stripe := make([][]byte, len(cpids)+1)  //用来存放每一个chunkID对应的block数据
 	for _, cpid := range cpids {
 		if len(cpid) > 0 {
 			splitcpid := strings.Split(cpid, metainfo.BlockDelimiter)
-			if len(splitcpid) != 2 {
+			if len(splitcpid) != 2 { // chunkid pid
 				continue
 			}
-			blkInfo[3] = splitcpid[0]
+			blkInfo[3] = splitcpid[0] //cid
 			blkid := strings.Join(blkInfo, metainfo.BlockDelimiter)
 
 			bid, err := metainfo.NewKey(blkid, mpb.KeyType_Block, "0", ops[1])
@@ -85,7 +88,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 				continue
 			}
 
-			if splitcpid[0] == chunkID {
+			if splitcpid[0] == chunkID { //表示待修复block
 				nbid, err = strconv.Atoi(chunkID)
 				if err != nil {
 					utils.MLogger.Info("strconv.Atoi error :", err)

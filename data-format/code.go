@@ -121,9 +121,9 @@ func (d *DataCoder) Encode(data []byte, ncidPrefix string, start int) ([][]byte,
 
 	endSegment := 1 + (len(data)-1)/(d.segSize*dc)
 
-	blockSize := d.fieldSize * endSegment
+	blockSize := d.fieldSize * endSegment //加上tag之后的size
 
-	d.Prefix.Start = int32(start)
+	d.Prefix.Start = int32(start) //curoffset
 	preData, preLen, err := bf.PrefixEncode(d.Prefix)
 	if err != nil {
 		return nil, 0, err

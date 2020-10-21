@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,7 +42,34 @@ type pInfoOutput struct {
 	PosIncome       string
 }
 
+type StringList struct {
+	ChildLists []string
+}
+
+func (list StringList) String() string {
+	var buffer bytes.Buffer
+	for i := 0; i < len(list.ChildLists); i++ {
+		buffer.WriteString(list.ChildLists[i])
+		buffer.WriteString("\n")
+	}
+	return buffer.String()
+}
+
 var InfoCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "list infomations",
+		ShortDescription: `
+`,
+	},
+
+	Subcommands: map[string]*cmds.Command{
+		"self":  SelfCmd, //命令行操作写法示例
+		"users": userCmd,
+		"group": gpInfoCmd,
+	},
+}
+
+var SelfCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Interact with provider.",
 		ShortDescription: `
@@ -172,4 +200,89 @@ var InfoCmd = &cmds.Command{
 		}),
 	},
 	Type: pInfoOutput{},
+}
+
+var gpInfoCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "show group information.",
+		ShortDescription: `
+		'mefs-provider groupInfo' is a plumbing command used to show information of group which provider participate.
+		`,
+	},
+	Arguments: []cmds.Argument{
+		cmds.StringArg("uid", true, false, "The user's id"),
+		cmds.StringArg("qid", true, false, "The user's query id"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+
+		providerIns, ok := node.Inst.(*provider.Info)
+		if !ok || providerIns == nil {
+			return role.ErrServiceNotReady
+		}
+
+		uid := req.Arguments[0]
+		qid := req.Arguments[1]
+
+		output, err := providerIns.GetGroupInfoOutput(uid, qid)
+		if err != nil {
+			return err
+		}
+
+		return cmds.EmitOnce(res, output)
+	},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *provider.GInfoOutput) error {
+			marshaled, err := json.MarshalIndent(out, "", "\t")
+			if err != nil {
+				return err
+			}
+			marshaled = append(marshaled, byte('\n'))
+			fmt.Fprintln(w, string(marshaled))
+			return nil
+		}),
+	},
+	Type: provider.GInfoOutput{},
+}
+
+var userCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "list all users this provider served",
+		ShortDescription: `list all users that this provider has offered storage resource to`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Options:   []cmds.Option{},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		providerIns, ok := n.Inst.(*provider.Info)
+		if !ok {
+			return role.ErrServiceNotReady
+		}
+
+		output := providerIns.ShowUserInfo()
+
+		list := &StringList{
+			ChildLists: output,
+		}
+
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, list *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", list)
+			return err
+		}),
+	},
 }

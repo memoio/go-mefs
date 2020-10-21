@@ -3,16 +3,19 @@ package keeper
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/memoio/go-mefs/contracts"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/instance"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	ma "github.com/multiformats/go-multiaddr"
 	mdns "github.com/multiformats/go-multiaddr-dns"
@@ -100,6 +103,18 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		switch opType {
 		case mpb.OpType_Get:
 			return k.handleGetProAddSign(km, metaValue, sig, from)
+		}
+	case mpb.KeyType_ProQuit:
+		switch opType {
+		case mpb.OpType_Put:
+			return k.handleProQuit(km, metaValue, from)
+		case mpb.OpType_Get:
+			return k.handleProQuitSign(km, sig, from)
+		}
+	case mpb.KeyType_MoveData:
+		switch opType {
+		case mpb.OpType_Get:
+			return k.handleMoveData(km, from)
 		}
 	default:
 		switch opType {
@@ -473,4 +488,241 @@ func (k *Info) handleChalTime(km *metainfo.Key) ([]byte, error) {
 	}
 
 	return []byte(utils.UnixToString(avail)), nil
+}
+
+//value: /bid_sid_cid_offset_newPid/bid_sid_cid_offset_newPid..
+func (k *Info) handleProQuit(km *metainfo.Key, value []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handle provider quit: ", km.ToString())
+
+	groupID := km.GetMainID()
+	ops := km.GetOptions() //uid
+	if len(ops) != 1 {
+		utils.MLogger.Debug("handleProQuit km's length is wrong")
+		return nil, nil
+	}
+
+	utils.MLogger.Debug("handle provider quit, the value: ", string(value))
+	responses := strings.Split(string(value), metainfo.DELIMITER)
+	for _, res := range responses {
+		mes := strings.Split(res, metainfo.BlockDelimiter)
+		if len(mes) != 5 {
+			continue
+		}
+
+		//bid: bucketid_stripeid_chunkid
+		bid := mes[0] + metainfo.BlockDelimiter + mes[1] + metainfo.BlockDelimiter + mes[2]
+		offset, err := strconv.Atoi(mes[3])
+		if err != nil {
+			continue
+		}
+		utils.MLogger.Info("begin update local blockMeta: ", res)
+		k.deleteBlockMeta(groupID, bid, true)
+		k.addBlockMeta(groupID, bid, mes[4], offset, true)
+	}
+
+	gp := k.getGroupInfo(ops[0], groupID, true)
+	if gp == nil {
+		utils.MLogger.Debug("handleProQuit gp is nil")
+		return nil, nil
+	}
+
+	proAddr, err := address.GetAddressFromID(from)
+	if err != nil {
+		utils.MLogger.Debug("transfer proID to addr fails")
+		return nil, err
+	}
+
+	ukAddr, err := address.GetAddressFromID(gp.upkeeping.UpKeepingID)
+	if err != nil {
+		utils.MLogger.Debug("transfer ukID to addr fails")
+		return nil, err
+	}
+
+	localAddr, err := address.GetAddressFromID(k.localID)
+	if err != nil {
+		utils.MLogger.Debug("transfer localID to addr fails")
+		return nil, err
+	}
+
+	userAddr, err := address.GetAddressFromID(ops[0])
+	if err != nil {
+		utils.MLogger.Debug("transfer uid to addr fails")
+		return nil, err
+	}
+
+	sign, err := role.SignForSetStop(ukAddr, proAddr, k.sk)
+	if err != nil {
+		utils.MLogger.Debug("signForSetStop fails")
+		return nil, err
+	}
+
+	if !gp.isMaster(from) {
+		utils.MLogger.Info("not master Keeper, ", km.ToString(), "begin send sign of setProviderStop")
+
+		//send setProviderStop sign to masterKeeper
+
+		km, err := metainfo.NewKey(gp.groupID, mpb.KeyType_ProQuit, from)
+		if err != nil {
+			utils.MLogger.Debug("newKey error:", err)
+			return nil, err
+		}
+		k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Get), km.ToString(), nil, sign, gp.masterKeeper)
+
+		utils.MLogger.Info("send sign of setProviderStop success: ", km.ToString())
+		return nil, nil
+	}
+
+	//master keeper, get signs to call setProviderStop in upkeeping
+	utils.MLogger.Info("begin get sign for set provider ", from, " stop in group ", groupID)
+
+	linfo := gp.getLInfo(from, false)
+	if linfo == nil {
+		utils.MLogger.Debug("handleProQuit getLInfo is nil")
+		return nil, errors.New("get sign for set provider stop, linfo is nil")
+	}
+	if linfo.stopSign == nil {
+		linfo.stopSign = make(map[string][]byte)
+	}
+	linfo.stopSign[k.localID] = sign
+
+	for i := 0; i < 20; i++ {
+		time.Sleep(time.Minute)
+		if len(linfo.stopSign) >= len(gp.keepers)*2/3 {
+			break
+		}
+	}
+
+	if len(linfo.stopSign) >= len(gp.keepers)*2/3 {
+		sigs := make([][]byte, len(gp.keepers))
+		for i, kid := range gp.keepers {
+			sig := linfo.stopSign[kid]
+			sigs[i] = sig
+		}
+
+		err = contracts.SetProviderStop(k.sk, localAddr, userAddr, proAddr, ukAddr, "", sigs)
+		if err != nil {
+			utils.MLogger.Debug("setProviderStop fails, provider: ", proAddr.String(), "ukAddr: ", ukAddr.String(), "err: ", err)
+			return nil, err
+		}
+
+		utils.MLogger.Info("successfully set provider ", from, " stop in group ", groupID)
+		
+		//tell provider finished setStop successfully
+		km, err := metainfo.NewKey(gp.groupID, mpb.KeyType_ProQuit)
+		if err != nil {
+			utils.MLogger.Debug("newKey error:", err)
+			return nil, err
+		}
+		k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), nil, nil, from)
+
+		return []byte("ok"), nil
+	}
+
+	utils.MLogger.Warn("sigs of setProviderStop is not enough")
+	return nil, errors.New("signs of setProvidderStop is not enough")
+}
+
+func (k *Info) handleProQuitSign(km *metainfo.Key, sig []byte, from string) ([]byte, error) {
+	utils.MLogger.Info("handle get sign of proQuit ", km.ToString(), " from ", from)
+
+	groupID := km.GetMainID()
+	ops := km.GetOptions() // pid
+	if len(ops) != 1 {
+		utils.MLogger.Debug("handleProQuitSign km's length is wrong")
+		return nil, errors.New("handleProQuitSign km's length is wrong")
+	}
+
+	gp := k.getGroupInfo(ops[0], groupID, false)
+	if gp == nil {
+		utils.MLogger.Debug("handleProQuitSign gp is nil")
+		return nil, errors.New("handleProQuitSign gp is nil")
+	}
+
+	linfo := gp.getLInfo(ops[0], false)
+	if linfo == nil {
+		return nil, errors.New("handleProQuitSign linfo is nil")
+	}
+
+	if linfo.stopSign == nil {
+		linfo.stopSign = make(map[string][]byte)
+	}
+	linfo.stopSign[from] = sig
+
+	return nil, nil
+}
+
+func (k *Info) handleMoveData(km *metainfo.Key, from string) ([]byte, error) {
+	utils.MLogger.Info("handle moveData for groupID ", km.GetMainID, "and for provider ", km.GetOptions())
+
+	groupID := km.GetMainID()
+	ops := km.GetOptions()
+	if len(ops) != 1 {
+		utils.MLogger.Debug("handleMoveData km's length is wrong")
+		return nil, nil
+	}
+
+	gp := k.getGroupInfo(groupID, groupID, false)
+	if gp == nil {
+		utils.MLogger.Debug("handleProQuit gp is nil")
+		return nil, nil
+	}
+
+	thisLinfo := gp.getLInfo(ops[0], false)
+	if thisLinfo == nil {
+		utils.MLogger.Debug("handleMoveData getLInfo fails")
+		return nil, errors.New("get linfo fails")
+	}
+
+	var res string
+	thisLinfo.blockMap.Range(func(key, value interface{}) bool {
+		cInfo := value.(*blockInfo)
+		//bid_sid_cid_offset
+		bID := key.(string) + metainfo.BlockDelimiter + strconv.Itoa(cInfo.offset)
+		utils.MLogger.Info("get provider ", ops[0], " block: ", bID)
+
+		binfo := strings.Split(bID, metainfo.BlockDelimiter)
+		if len(binfo) != 4 {
+			return false
+		}
+
+		//search new provider; 1. getproviders
+		thisbucket := gp.getBucketInfo(binfo[0], false)
+		if thisbucket == nil {
+			return false
+		}
+
+		count := thisbucket.chunkNum
+
+		var r strings.Builder
+		ugid := make([]string, 0, count)
+		for i := 0; i < count; i++ {
+			r.Reset()
+			r.WriteString(binfo[1])
+			r.WriteString(metainfo.BlockDelimiter)
+			r.WriteString(strconv.Itoa(i))
+			thisinfo, ok := thisbucket.stripes.Load(r.String())
+			if !ok {
+				continue
+			}
+
+			pid := thisinfo.(*blockInfo).storedOn
+			ugid = append(ugid, pid)
+		}
+
+		if len(ugid) == 0 {
+			utils.MLogger.Debug("the ugid of block", bID, "is nil, information is not enough")
+			return false
+		}
+
+		//search new provider; 2. search
+		response := k.searchNewProvider(k.context, groupID, ugid)
+
+		//bid_sid_cid_offset_newPid
+		bID += metainfo.BlockDelimiter + response
+		res = res + bID + metainfo.DELIMITER
+
+		return true
+	})
+
+	return []byte(res[:len(res)-1]), nil
 }

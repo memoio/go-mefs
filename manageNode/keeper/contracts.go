@@ -203,7 +203,7 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 	return nil
 }
 
-//getFromChainRegular loadPeers and getIncome
+//getFromChainRegular loadPeers from keeper/provider/kpMap contract and getIncome
 func (k *Info) getFromChainRegular(ctx context.Context) {
 	utils.MLogger.Info("Get infos from chain start!")
 

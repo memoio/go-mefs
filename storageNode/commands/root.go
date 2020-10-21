@@ -92,6 +92,7 @@ var rootSubcommands = map[string]*cmds.Command{
 	"test":      newcmd.TestCmd,
 	"list":      newcmd.ListCmd,
 	"sys":       newcmd.SysDiagCmd,
+	"quit":      QuitCmd,
 }
 
 // RootRO is the readonly version of Root

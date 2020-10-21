@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"net"
 	"strconv"
@@ -1117,4 +1118,163 @@ func (p *Info) storageSync(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+//SetProviderStop send 'quit' message to keepers, so they can set provider stop in upkeeping
+func (p *Info) SetProviderStop(ctx context.Context, groupID string, response string) error {
+	utils.MLogger.Info("Send 'quit' message to keeper start!")
+	gpInfo := p.getGroupInfo("", groupID, false)
+	if gpInfo == nil {
+		return ErrGroupNotReady
+	}
+
+	km, err := metainfo.NewKey(groupID, mpb.KeyType_ProQuit, gpInfo.userID)
+	if err != nil {
+		return err
+	}
+	key := km.ToString()
+
+	var wg sync.WaitGroup
+	for _, keeperID := range gpInfo.keepers {
+		wg.Add(1)
+		go func(k, kID string, data []byte) {
+			defer wg.Done()
+			utils.MLogger.Info("Send 'quit' message to keeper:", kID)
+			p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), k, data, nil, kID)
+		}(key, keeperID, []byte(response))
+	}
+	wg.Wait()
+
+	localAddr, err := address.GetAddressFromID(p.localID)
+	if err != nil {
+		return err
+	}
+
+	index := 0
+	for i, pItem := range gpInfo.upkeeping.Providers {
+		if pItem.Addr.String() == localAddr.String() {
+			index = i
+			break
+		}
+	}
+
+	i := 0
+	for ; i < 10; i++ {
+		time.Sleep(30 * time.Second)
+		if gpInfo.upkeeping.Providers[index].Stop {
+			break
+		}
+	}
+	if i > 9 {
+		return errors.New("set provider stop failed")
+	}
+
+	utils.MLogger.Info("have been successfully set stop in upkeeping ", gpInfo.upkeeping.UpKeepingID)
+	return nil
+}
+
+//MoveData provider want to quit group, so need move its data to another provider
+func (p *Info) MoveData(ctx context.Context, groupID string) (string, error) {
+	utils.MLogger.Info("move data to another provider start!")
+	gpInfo := p.getGroupInfo("", groupID, false)
+	if gpInfo == nil || len(gpInfo.keepers) <= 0 {
+		return "", ErrGroupNotReady
+	}
+
+	km, err := metainfo.NewKey(groupID, mpb.KeyType_MoveData, p.localID)
+	if err != nil {
+		return "", err
+	}
+
+	//get blockMeta from keepers
+	var res []byte
+	for _, keeperID := range gpInfo.keepers {
+		res, err = p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), nil, nil, keeperID)
+		if err == nil && res != nil {
+			break
+		}
+	}
+
+	if err != nil {
+		utils.MLogger.Error("get move data response err:", err)
+		return "", err
+	}
+	// res: bid_sid_cid_offset_newPid/bid_sid_cid_offset_newPid..
+	if res == nil {
+		utils.MLogger.Info("get move data response is nil")
+		return "", nil
+	}
+	utils.MLogger.Info("get move data infomation: ", string(res))
+	response := strings.Split(string(res), metainfo.DELIMITER)
+
+	for _, r := range response {
+		//binfo: [bid sid cid offset newPid]
+		binfo := strings.Split(r, metainfo.BlockDelimiter)
+		if len(binfo) != 5 {
+			utils.MLogger.Warn("get length of moveData binfo error ", r)
+			return "", errors.New("get length of moveData binfo error")
+		}
+
+		//send block to another provider: 1. get block from local
+		bm, err := metainfo.NewBlockMeta(groupID, binfo[0], binfo[1], binfo[2])
+		if err != nil {
+			utils.MLogger.Warn("get bm of moveData error: ", err)
+			return "", err
+		}
+
+		bk, err := metainfo.NewKey(bm.ToString(), mpb.KeyType_Block, "0", binfo[3])
+		if err != nil {
+			utils.MLogger.Warn("get newKey of moveData-getBlock error: ", err)
+			return "", err
+		}
+
+		b, err := p.ds.GetBlock(ctx, bk.ToString(), nil, "local")
+		if err != nil {
+			utils.MLogger.Warn("get block ", bk.ToString(), "of moveData error: ", err)
+			return "", err
+		}
+		utils.MLogger.Info("get block", bk.ToString(), "from local to move")
+
+		//send block to another provider: 2. move block to another provider
+		cid := bm.ToString()
+		km, err := metainfo.NewKey(cid, mpb.KeyType_Block)
+		if err != nil {
+			utils.MLogger.Warn("get newKey of moveData-putBlock error: ", err)
+			return "", err
+		}
+
+		for i := 0; i < 10; i++ {
+			err = p.ds.PutBlock(ctx, km.ToString(), b.RawData(), binfo[4])
+			if err != nil {
+				utils.MLogger.Warn("put block", km.ToString(), "of moveData-putBlock error: ", err)
+				continue
+			} else {
+				utils.MLogger.Info("put block ", km.ToString(), " for moving data")
+				break
+			}
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+
+	//delete local block
+	for _, r := range response {
+		//binfo: [bid sid cid offset newPid]
+		binfo := strings.Split(r, metainfo.BlockDelimiter)
+
+		bm, err := metainfo.NewBlockMeta(groupID, binfo[0], binfo[1], binfo[2])
+		if err != nil {
+			utils.MLogger.Warn("get bm of moveData-deleteBlock error: ", err)
+			return "", err
+		}
+
+		err = p.ds.DeleteBlock(p.context, bm.ToString(), "local")
+		if err != nil {
+			utils.MLogger.Warn("delete block ", bm.ToString(), "from local error: ", err)
+			return "", err
+		}
+		utils.MLogger.Info("delete block", bm.ToString(), "from local success")
+	}
+	return string(res), nil
 }

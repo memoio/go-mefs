@@ -240,7 +240,8 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("get setStopSigns error:", err)
 	}
-	err = contracts.SetProviderStop(kSkList[0], kAddrList[0], localAddr, pAddrList[1], localAddr.String(), setStopSigns)
+	invalidAddr := common.HexToAddress(contracts.InvalidAddr)
+	err = contracts.SetProviderStop(kSkList[0], kAddrList[0], localAddr, pAddrList[1], invalidAddr, localAddr.String(), setStopSigns)
 	if err != nil {
 		log.Fatal("set provider stop fails: ", err)
 	}

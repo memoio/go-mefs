@@ -9,7 +9,7 @@ import (
 	"github.com/memoio/go-mefs/utils/address"
 )
 
-// GetAllKeepers gets all
+// GetAllKeepers gets all keepers from keeper-contract
 func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 	totalMoney := new(big.Int)
 	localAddress, err := address.GetAddressFromID(localID)
@@ -39,7 +39,7 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 	return kItems, totalMoney, ErrEmptyData
 }
 
-// GetAllProviders gets all providers and total storage
+// GetAllProviders gets all providers from provider-contract and total storage
 func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 	totalMoney := new(big.Int)
 	localAddress, err := address.GetAddressFromID(localID)
