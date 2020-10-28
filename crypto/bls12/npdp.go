@@ -12,9 +12,9 @@ type NPublicKey struct {
 	BlsPk   G2
 	G1Base  G1
 	G2Base  G2
+	ElemGt  GT
 	ElemG1s []G1
 	ElemG2s []G2
-	ElemGt  GT
 }
 
 // SecretKey is bls secret key
@@ -75,18 +75,6 @@ func GenKeySetWithSeedForNPDP(seed []byte, count int) (*NKeySet, error) {
 
 	ks.Calculate()
 
-	var gttmp GT
-	var x_nPlusOne Fr
-	x_nPlusOne.SetInt64(1)
-	Pairing(&gttmp, &pk.G1Base, &pk.G2Base)
-	for i := 0; i < pk.Count+1; i++ {
-		FrMul(&x_nPlusOne, &x_nPlusOne, &sk.ElemSk)
-	}
-	GTPow(&gttmp, &gttmp, &x_nPlusOne)
-
-	if ok := gttmp.IsEqual(&pk.ElemGt); !ok {
-		panic("Gt not equal")
-	}
 	// return instance
 	return ks, nil
 }
