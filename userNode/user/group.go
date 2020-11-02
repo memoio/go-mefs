@@ -114,19 +114,23 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		var keepers []string
 		var providers []string
 		for _, keeper := range uItem.Keepers {
-			kid, err := address.GetIDFromAddress(keeper.Addr.String())
-			if err != nil {
-				return false, err
+			if !keeper.Stop {
+				kid, err := address.GetIDFromAddress(keeper.Addr.String())
+				if err != nil {
+					return false, err
+				}
+				keepers = append(keepers, kid)
 			}
-			keepers = append(keepers, kid)
 		}
 
 		for _, provider := range uItem.Providers {
-			pid, err := address.GetIDFromAddress(provider.Addr.String())
-			if err != nil {
-				return false, err
+			if !provider.Stop {
+				pid, err := address.GetIDFromAddress(provider.Addr.String())
+				if err != nil {
+					return false, err
+				}
+				providers = append(providers, pid)
 			}
-			providers = append(providers, pid)
 		}
 
 		g.tempKeepers = keepers
@@ -919,6 +923,12 @@ func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []stri
 	if g == nil || g.state < groupStarted {
 		return nil, nil, ErrLfsServiceNotReady
 	}
+
+	err := g.updateUpKeepingItem(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	num := count
 	if count < 0 {
 		num = len(g.tempKeepers)
@@ -952,6 +962,12 @@ func (g *groupInfo) GetProviders(ctx context.Context, count int) ([]string, []st
 	if g.state < groupStarted {
 		return nil, nil, ErrLfsServiceNotReady
 	}
+
+	err := g.updateUpKeepingItem(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	num := count
 	if count < 0 {
 		num = len(g.tempProviders)
@@ -1361,5 +1377,40 @@ func (g *groupInfo) saveChannelValue(ctx context.Context) error {
 		}
 	}
 
+	return nil
+}
+
+//当setStop、addProvider被触发时，user的upKeepingItem需要被更新以应对putBlock操作
+func (g *groupInfo) updateUpKeepingItem(ctx context.Context) error {
+	uItem, err := role.GetUpKeeping(g.userID, g.groupID)
+	if err != nil {
+		return err
+	}
+	g.upKeepingItem = &uItem
+
+	var keepers []string
+	var providers []string
+	for _, keeper := range uItem.Keepers {
+		if !keeper.Stop {
+			kid, err := address.GetIDFromAddress(keeper.Addr.String())
+			if err != nil {
+				continue
+			}
+			keepers = append(keepers, kid)
+		}
+	}
+
+	for _, provider := range uItem.Providers {
+		if !provider.Stop {
+			pid, err := address.GetIDFromAddress(provider.Addr.String())
+			if err != nil {
+				continue
+			}
+			providers = append(providers, pid)
+		}
+	}
+
+	g.tempKeepers = keepers
+	g.tempProviders = providers
 	return nil
 }

@@ -47,19 +47,23 @@ func (g *groupInfo) loadContracts(mode bool) error {
 		var keepers []string
 		var providers []string
 		for _, keeper := range uItem.Keepers {
-			kid, err := address.GetIDFromAddress(keeper.Addr.String())
-			if err != nil {
-				return err
+			if !keeper.Stop {
+				kid, err := address.GetIDFromAddress(keeper.Addr.String())
+				if err != nil {
+					return err
+				}
+				keepers = append(keepers, kid)
 			}
-			keepers = append(keepers, kid)
 		}
 
 		for _, provider := range uItem.Providers {
-			pid, err := address.GetIDFromAddress(provider.Addr.String())
-			if err != nil {
-				return err
+			if !provider.Stop {
+				pid, err := address.GetIDFromAddress(provider.Addr.String())
+				if err != nil {
+					return err
+				}
+				providers = append(providers, pid)
 			}
-			providers = append(providers, pid)
 		}
 
 		flag := false

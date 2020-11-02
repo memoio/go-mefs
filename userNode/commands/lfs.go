@@ -1845,8 +1845,8 @@ var lfsInfoCmd = &cmds.Command{
 			if cItem == nil {
 				ci = proInfo{
 					ProviderAddr: pi.Addr.String(),
+					Stop:         pi.Stop,
 				}
-				continue
 			} else {
 				channerAddr, err := address.GetAddressFromID(cItem.ChannelID)
 				if err != nil {

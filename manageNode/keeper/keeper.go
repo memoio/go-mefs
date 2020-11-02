@@ -64,7 +64,6 @@ type measure struct {
 }
 
 // New is
-// TODO:Keeper出问题重启后，应该能自动将所有user的信息恢复到内存中
 func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing) (instance.Service, error) {
 	mea := &measure{
 		balance:        metrics.New("keeper.balance", "Balance of this keeper").Gauge(),
