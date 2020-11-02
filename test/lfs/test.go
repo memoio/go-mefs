@@ -60,13 +60,10 @@ func lfsTest() error {
 
 	log.Println("create user sk: ", testuser.Sk, ",addr: ", testuser.Address)
 
-	flag := true
-	if flag {
-		err := test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, qethEndPoint)
-		if err != nil {
-			log.Println("trnasfer fails: ", err)
-			return err
-		}
+	err = test.TransferTo(big.NewInt(moneyTo), addr, ethEndPoint, qethEndPoint)
+	if err != nil {
+		log.Println("trnasfer fails: ", err)
+		return err
 	}
 
 	log.Println("2. test start lfs")

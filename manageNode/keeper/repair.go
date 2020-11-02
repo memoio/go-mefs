@@ -705,10 +705,46 @@ func (k *Info) handleRepairResult(km *metainfo.Key, metaValue []byte, provider s
 		k.deleteBlockMeta(qid, bid, true)
 		k.addBlockMeta(qid, bid, newPid, newOffset, true)
 
+		gp := k.getGroupInfo(qid, qid, false)
+		if gp == nil {
+			utils.MLogger.Info("get group is nil")
+			return
+		}
+
+		for _, keeper := range gp.keepers {
+			if keeper != k.localID {
+				k.ds.SendMetaRequest(k.context, int32(mpb.OpType_BroadCast), km.ToString(), metaValue, nil, keeper)
+			}
+		}
+
 		return
 	}
 
 	return
+}
+
+func (k *Info) handleRepairUpdate(km *metainfo.Key, metaValue []byte, keeper string) {
+	utils.MLogger.Info("handleRepairUpdate: ", km.ToString(), " From: ", keeper)
+
+	blockID := km.GetMainID()
+	splitedValue := strings.Split(string(metaValue), metainfo.DELIMITER)
+	if len(splitedValue) != 3 {
+		return
+	}
+
+	splitedKey := strings.SplitN(blockID, metainfo.BlockDelimiter, 2)
+	qid := splitedKey[0]
+	bid := splitedKey[1]
+
+	newPid := splitedValue[1]
+	newOffset, err := strconv.Atoi(splitedValue[2])
+	if err != nil {
+		utils.MLogger.Info("handleRepairUpdate strconv.Atoi offset error: ", err)
+		return
+	}
+
+	k.deleteBlockMeta(qid, bid, true)
+	k.addBlockMeta(qid, bid, newPid, newOffset, true)
 }
 
 //searchNewProvider find a NEW provider for user

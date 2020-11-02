@@ -60,8 +60,11 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 			go k.handleProof(km, metaValue)
 		}
 	case mpb.KeyType_Repair: //provider 修复回复
-		if opType == mpb.OpType_Put {
+		switch opType {
+		case mpb.OpType_Put:
 			go k.handleRepairResult(km, metaValue, from)
+		case mpb.OpType_BroadCast:
+			go k.handleRepairUpdate(km, metaValue, from)
 		}
 	case mpb.KeyType_Storage:
 		go k.handleStorage(km, metaValue, from)
@@ -569,6 +572,10 @@ func (k *Info) handleProQuit(km *metainfo.Key, value []byte, from string) ([]byt
 		k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Get), km.ToString(), nil, sign, gp.masterKeeper)
 
 		utils.MLogger.Info("send sign of setProviderStop success: ", km.ToString())
+
+		// update uk info
+		//有可能更新时，masterKeeper还未完成setStop操作..
+		gp.loadContracts(true)
 		return nil, nil
 	}
 
@@ -606,7 +613,7 @@ func (k *Info) handleProQuit(km *metainfo.Key, value []byte, from string) ([]byt
 		}
 
 		utils.MLogger.Info("successfully set provider ", from, " stop in group ", groupID)
-		
+
 		//tell provider finished setStop successfully
 		km, err := metainfo.NewKey(gp.groupID, mpb.KeyType_ProQuit)
 		if err != nil {
@@ -615,7 +622,20 @@ func (k *Info) handleProQuit(km *metainfo.Key, value []byte, from string) ([]byt
 		}
 		k.ds.SendMetaRequest(k.context, int32(mpb.OpType_Put), km.ToString(), nil, nil, from)
 
-		return []byte("ok"), nil
+		//add provider:1.find a new provider
+		newPro, err := k.findNewProvider(gp.upkeeping.Price, gp.upkeeping.Capacity, gp.upkeeping.Duration, gp.providers)
+		if err != nil {
+			utils.MLogger.Error("findNewProvider fails:", err)
+			return nil, err
+		}
+
+		//add provider:2.add
+		err = k.ukAddProvider(ops[0], groupID, newPro)
+		if err != nil {
+			utils.MLogger.Error("ukAddProvider fails:", err)
+		}
+
+		return nil, err
 	}
 
 	utils.MLogger.Warn("sigs of setProviderStop is not enough")

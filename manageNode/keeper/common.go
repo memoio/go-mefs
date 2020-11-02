@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"errors"
+	"math/big"
 	"time"
 
 	mcl "github.com/memoio/go-mefs/crypto/bls12"
@@ -85,4 +87,37 @@ func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {
 	}
 
 	return nil, role.ErrEmptyBlsKey
+}
+
+//findNewProvider to add provider in upkeeping-contract
+func (k *Info) findNewProvider(price *big.Int, capacity, duration int64, providers []string) (string, error) {
+	pros, err := k.GetProviders()
+	if err != nil {
+		return "", err
+	}
+
+	var has bool
+	for _, proID := range pros {
+		has = false
+		for _, oldPro := range providers {
+			if proID == oldPro {
+				has = true
+				break
+			}
+		}
+		
+		if !has {
+			thisinfo, ok := k.providers.Load(proID)
+			if ok {
+				thisP := thisinfo.(*pInfo)
+				if thisP.online && thisP.offerItem != nil && thisP.credit > 0 {
+					if thisP.offerItem.Price.Cmp(price) <= 0 && thisP.offerItem.Capacity >= capacity && thisP.offerItem.Duration >= duration {
+						return proID, nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", errors.New("has not found eligible provider")
 }

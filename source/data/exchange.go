@@ -842,7 +842,7 @@ func (n *impl) GetAddrAndConnect(ctx context.Context, to string) bool {
 			Addrs: []ma.Multiaddr{pai},
 		}
 
-		utils.MLogger.Debug(to, "has extern ip: ", npi.String())
+		utils.MLogger.Debug(to, " has extern ip: ", npi.String())
 
 		for i := 0; i < 3; i++ {
 			if swrm, ok := n.ph.Network().(*swarm.Swarm); ok {

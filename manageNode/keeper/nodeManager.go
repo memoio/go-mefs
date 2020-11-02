@@ -92,14 +92,14 @@ func (p *pInfo) setOffer(flag bool) error {
 	return nil
 }
 
-func (k *Info) getUInfo(pid string) (*uInfo, error) {
-	thisInfoI, ok := k.users.Load(pid)
+func (k *Info) getUInfo(uid string) (*uInfo, error) {
+	thisInfoI, ok := k.users.Load(uid)
 	if !ok {
 		tempInfo := &uInfo{
-			userID: pid,
+			userID: uid,
 		}
 		k.ms.userNum.Inc()
-		k.users.Store(pid, tempInfo)
+		k.users.Store(uid, tempInfo)
 		return tempInfo, nil
 	}
 
