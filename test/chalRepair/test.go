@@ -72,7 +72,11 @@ func challengeTest() error {
 		}
 	}
 
-	err = sh.StartUser(addr)
+	//set ks:3, ps:6
+	var startOpts []func(*shell.RequestBuilder) error
+	startOpts = append(startOpts, shell.SetOp("ks", "3"))
+	startOpts = append(startOpts, shell.SetOp("ps", "6"))
+	err = sh.StartUser(addr, startOpts...)
 	if err != nil {
 		log.Println("Start user failed :", err)
 		return err
