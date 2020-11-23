@@ -126,6 +126,10 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 		}
 
 		return newResponse.String(), nil
+		//暂时不使用
+		// res := k.fillKPsToInitUser(kc, pc, price)
+		// utils.MLogger.Debug("fillKPsToInitUser, res:", res)
+		// return res, nil
 	}
 
 	// user has init
@@ -139,6 +143,97 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 		newResponse.WriteString(pid)
 	}
 	return newResponse.String(), nil
+}
+
+//尽量挑选ip不同的keepers和ip不同的providers
+func (k *Info) fillKPsToInitUser(kc, pc int, price *big.Int) string {
+	var response strings.Builder
+
+	localID := k.localID
+	kCount := kc * 2
+	pCount := pc * 2
+
+	response.WriteString(localID) //fill self
+	kCount--
+
+	//fill other keepers
+	utils.MLogger.Debug("fillKPsToInitUser, groupedKs:", k.groupedKeepers)
+	for i := 0; kCount != 0; i++ {
+		has := false //选择多轮，直到选够为止
+		for ip, ids := range k.groupedKeepers {
+			if kCount == 0 {
+				break
+			}
+
+			if len(ids) >= i+1 {
+				has = true
+				if i == 0 { //选第一轮的时候，给当前的节点集合乱序
+					k.groupedKeepers[ip] = utils.DisorderArray(ids)
+				}
+
+				kid := k.groupedKeepers[ip][i] //取同一ip的节点集合中第i+1个节点id
+				if kid == localID {
+					continue
+				}
+
+				thisInfo, ok := k.keepers.Load(kid)
+				if ok && thisInfo.(*kInfo).online {
+					response.WriteString(kid)
+					kCount--
+				}
+			}
+		}
+
+		if !has {
+			break
+		}
+	}
+
+	response.WriteString(metainfo.DELIMITER)
+
+	//fill providers
+	utils.MLogger.Debug("fillKPsToInitUser, groupedPs:", k.groupedProviders)
+	for i := 0; pCount != 0; i++ {
+		has := false
+
+		for ip, ids := range k.groupedProviders {
+			if pCount == 0 {
+				break
+			}
+
+			if len(ids) >= i+1 {
+				has = true
+
+				if i == 0 {
+					k.groupedProviders[ip] = utils.DisorderArray(ids)
+				}
+
+				pid := k.groupedProviders[ip][i]
+				if pid == localID {
+					continue
+				}
+
+				thisInfo, ok := k.providers.Load(pid)
+				if ok {
+					thisP := thisInfo.(*pInfo)
+					if thisP.online && thisP.offerItem != nil {
+						if thisP.offerItem.Price.Cmp(price) <= 0 && thisP.credit > 0 {
+							response.WriteString(pid)
+							pCount--
+						} else {
+							utils.MLogger.Debugf("provider %s need price %d, but %d; has credit: %d", pid, thisP.offerItem.Price, price, thisP.credit)
+						}
+					}
+				}
+			}
+		}
+
+		if !has {
+			break
+		}
+	}
+
+	return response.String()
 }
 
 // handleUserNotify return kv,

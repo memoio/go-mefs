@@ -186,7 +186,7 @@ func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data,
 		return err
 	}
 
-	if !n.Connect(ctx, to) {
+	if _, success := n.Connect(ctx, to); !success {
 		return errNoConnection
 	}
 
@@ -208,7 +208,7 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 		return nil, err
 	}
 
-	if !n.Connect(ctx, to) {
+	if _, success := n.Connect(ctx, to); !success {
 		return nil, errNoConnection
 	}
 
@@ -330,7 +330,7 @@ func (n *impl) GetKey(ctx context.Context, key string, to string) ([]byte, error
 	}
 
 	if to != "" {
-		if !n.Connect(ctx, to) {
+		if _, success := n.Connect(ctx, to); !success {
 			return nil, errNoConnection
 		}
 	}
@@ -375,7 +375,7 @@ func (n *impl) PutKey(ctx context.Context, key string, data, sig []byte, to stri
 	}
 
 	if to != "" {
-		if !n.Connect(ctx, to) {
+		if _, success := n.Connect(ctx, to); !success {
 			return errNoConnection
 		}
 	}
@@ -746,18 +746,18 @@ func (n *impl) FastConnect(ctx context.Context, to string) bool {
 }
 
 //连接试三次
-func (n *impl) Connect(ctx context.Context, to string) bool {
+func (n *impl) Connect(ctx context.Context, to string) (string, bool) {
 	if n.ph == nil || n.rt == nil {
-		return false
+		return "", false
 	}
 
 	id, err := peer.IDB58Decode(to)
 	if err != nil {
-		return false
+		return "", false
 	}
 
 	if n.ph.Network().Connectedness(id) == inet.Connected {
-		return true
+		return "", true
 	}
 
 	connectTryCount := 1
@@ -775,34 +775,40 @@ func (n *impl) Connect(ctx context.Context, to string) bool {
 			err = n.ph.Connect(ctx, pi)
 			if err == nil {
 				if n.ph.Network().Connectedness(id) == inet.Connected {
-					return true
+					//get external address
+					mAddr, err := peer.AddrInfoToP2pAddrs(&pi)
+					if err != nil || len(mAddr) < 1 {
+						utils.MLogger.Debug("AddrInfo ", pi, " to p2pAddrs err: ", err)
+						return "", true
+					}
+					return mAddr[0].String(), true
 				}
 			}
 		}
 	}
 
 	for i := 0; i < connectTryCount; i++ {
-		res := n.GetAddrAndConnect(ctx, id.Pretty())
+		eAddr, res := n.GetAddrAndConnect(ctx, id.Pretty())
 		if res {
-			return true
+			return eAddr, true
 		}
 	}
-	return false
+	return "", false
 }
 
-func (n *impl) GetAddrAndConnect(ctx context.Context, to string) bool {
+func (n *impl) GetAddrAndConnect(ctx context.Context, to string) (string, bool) {
 	if n.ph == nil || n.rt == nil {
-		return false
+		return "", false
 	}
 
 	km, err := metainfo.NewKey(to, mpb.KeyType_ExternalAddress)
 	if err != nil {
-		return false
+		return "", false
 	}
 
 	toID, err := peer.IDB58Decode(to)
 	if err != nil {
-		return false
+		return "", false
 	}
 
 	for _, defaultBootstrapAddress := range config.DefaultBootstrapAddresses {
@@ -851,11 +857,11 @@ func (n *impl) GetAddrAndConnect(ctx context.Context, to string) bool {
 
 			err = n.ph.Connect(ctx, npi)
 			if err == nil {
-				return true
+				return pai.String(), true
 			}
 		}
 	}
-	return false
+	return "", false
 }
 
 func (n *impl) GetPublicAddr(ctx context.Context, need string) (ma.Multiaddr, error) {

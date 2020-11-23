@@ -260,7 +260,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	for i := 0; i < connectTryCount; i++ {
 		failNum = 0
 		for _, kinfo := range g.keepers {
-			if !g.ds.Connect(ctx, kinfo.keeperID) {
+			if _, success := g.ds.Connect(ctx, kinfo.keeperID); !success {
 				failNum++
 				kinfo.connected = false
 				if i == connectTryCount-1 {
@@ -288,7 +288,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 	for i := 0; i < connectTryCount; i++ {
 		failNum = 0
 		for _, pinfo := range g.providers {
-			if !g.ds.Connect(ctx, pinfo.providerID) {
+			if _, success := g.ds.Connect(ctx, pinfo.providerID); !success {
 				failNum++
 				pinfo.connected = false
 				if i == connectTryCount-1 {
@@ -504,7 +504,7 @@ func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaVa
 			continue
 		}
 
-		if g.ds.Connect(ctx, kid) {
+		if _, success := g.ds.Connect(ctx, kid); success {
 			g.tempKeepers = append(g.tempKeepers, kid)
 			kcount++
 		}
@@ -517,7 +517,7 @@ func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaVa
 			continue
 		}
 
-		if g.ds.Connect(ctx, pid) {
+		if _, success := g.ds.Connect(ctx, pid); success {
 			g.tempProviders = append(g.tempProviders, pid)
 			pcount++
 		}
@@ -540,13 +540,13 @@ func (g *groupInfo) collect(ctx context.Context) bool {
 	pcount := 0
 
 	for _, kid := range g.tempKeepers {
-		if g.ds.Connect(ctx, kid) {
+		if _, success := g.ds.Connect(ctx, kid); success {
 			kcount++
 		}
 	}
 
 	for _, kid := range g.tempProviders {
-		if g.ds.Connect(ctx, kid) {
+		if _, success := g.ds.Connect(ctx, kid); success {
 			pcount++
 		}
 	}
@@ -579,7 +579,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 			break
 		}
 
-		if !g.ds.Connect(ctx, kidStr) {
+		if _, success := g.ds.Connect(ctx, kidStr); !success {
 			continue
 		}
 		i++
@@ -600,7 +600,7 @@ func (g *groupInfo) notify(ctx context.Context) {
 			break
 		}
 
-		if !g.ds.Connect(ctx, pidStr) {
+		if _, success := g.ds.Connect(ctx, pidStr); !success {
 			continue
 		}
 
@@ -885,7 +885,7 @@ func (g *groupInfo) CheckKeepersConn(ctx context.Context) (int, error) {
 	}
 	count := 0
 	for _, kp := range g.tempKeepers {
-		if g.ds.Connect(ctx, kp) { //连接不上此keeper
+		if _, success := g.ds.Connect(ctx, kp); success { //连接的上此keeper
 			count++
 		}
 	}
@@ -943,7 +943,7 @@ func (g *groupInfo) GetKeepers(ctx context.Context, count int) ([]string, []stri
 			break
 		}
 
-		if !g.ds.Connect(ctx, kp) { //连接不上此keeper
+		if _, success := g.ds.Connect(ctx, kp); !success { //连接不上此keeper
 			unconKeepers = append(unconKeepers, kp)
 		} else {
 			conKeepers = append(conKeepers, kp)
@@ -982,7 +982,7 @@ func (g *groupInfo) GetProviders(ctx context.Context, count int) ([]string, []st
 			break
 		}
 
-		if !g.ds.Connect(ctx, pro) { //连接不上此provider
+		if _, success := g.ds.Connect(ctx, pro); !success { //连接不上此provider
 			unconPro = append(unconPro, pro)
 			continue
 		} else {

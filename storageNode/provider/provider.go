@@ -229,14 +229,14 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 			if net.ParseIP(eaddr[0]) != nil {
 				ips := strings.Split(eaddr[0], ".")
 				if len(ips) == 4 {
-					// example:= /ip4/123.123.234.123/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
+					// example:= /ip4/123.123.234.123/tcp/50272/p2p/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
 					m.ExtAddr = "/ip4/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
 				} else {
-					// example:= /ip4/123.123.234.123/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
+					// example:= /ip4/123.123.234.123/tcp/50272/p2p/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
 					m.ExtAddr = "/ip6/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
 				}
 			} else {
-				// example:= /dns/239v39e500.zicp.vip/tcp/50272/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
+				// example:= /dns/239v39e500.zicp.vip/tcp/50272/p2p/8MH3B8DT14cJrVFpZ8TjmJ6NRUfVew
 				m.ExtAddr = "/dns/" + eaddr[0] + "/tcp/" + eaddr[1] + "/p2p/" + m.localID
 			}
 		}
@@ -458,7 +458,7 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 			keepItem: &kItem,
 		}
 
-		if p.ds.Connect(p.context, pid) {
+		if _, success := p.ds.Connect(p.context, pid); success {
 			utils.MLogger.Infof("add new keeper %s", pid)
 			ui.availTime = time.Now().Unix()
 			ui.online = true
@@ -492,7 +492,7 @@ func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 			providerID: pid,
 		}
 
-		if p.ds.Connect(p.context, pid) {
+		if _, success := p.ds.Connect(p.context, pid); success {
 			utils.MLogger.Infof("add new provider %s", pid)
 			ui.availTime = time.Now().Unix()
 			ui.online = true
