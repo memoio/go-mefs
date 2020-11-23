@@ -35,10 +35,10 @@ type Service interface {
 	BroadcastMessage(ctx context.Context, key string) error
 
 	TestConnect() error
-	Connect(ctx context.Context, to string) bool
+	Connect(ctx context.Context, to string) (string, bool)
 	FastConnect(ctx context.Context, to string) bool
 	GetPeers() ([]peer.ID, error)
-	GetAddrAndConnect(ctx context.Context, to string) bool
+	GetAddrAndConnect(ctx context.Context, to string) (string, bool)
 	GetExternalAddr(p string) (ma.Multiaddr, error)
 	GetPublicAddr(ctx context.Context, need string) (ma.Multiaddr, error)
 	BlockStore() bs.Blockstore

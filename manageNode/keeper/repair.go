@@ -652,7 +652,7 @@ func (k *Info) repairBlock(ctx context.Context, rBlockID string) {
 			credit = proInfo.(*pInfo).credit
 		}
 
-		if !k.ds.Connect(ctx, response) {
+		if _, success := k.ds.Connect(ctx, response); !success {
 			utils.MLogger.Info("Repair: need choose a new provider to replace old: ", response)
 			response = ""
 		}
@@ -771,7 +771,7 @@ func (k *Info) searchNewProvider(ctx context.Context, gid string, ugid []string)
 		}
 
 		if flag == len(ugid) {
-			if k.ds.Connect(ctx, tmpPro) {
+			if _, success := k.ds.Connect(ctx, tmpPro); success {
 				proInfo, ok := k.providers.Load(tmpPro)
 				if ok {
 					if proInfo.(*pInfo).credit < 0 {

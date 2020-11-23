@@ -388,15 +388,21 @@ func (k *Info) handleDelExAddr(km *metainfo.Key) {
 	if err != nil {
 		ki, err := k.getKInfo(pid, false)
 		if err == nil {
+			k.deleteIDByIP(pid, ki.eAddr, true)
 			ki.eAddr = ""
 		}
 	} else {
+		k.deleteIDByIP(pid, pi.eAddr, false)
 		pi.eAddr = ""
 	}
 }
 
 func (k *Info) handlePutExAddr(km *metainfo.Key, value []byte, from string) ([]byte, error) {
 	utils.MLogger.Info("handlePutExternnalAddr: ", km.ToString(), string(value))
+
+	if string(value) == "" {
+		return []byte(instance.MetaHandlerComplete), nil
+	}
 
 	ea := strings.Split(string(value), "/")
 	if len(ea) >= 5 {
@@ -411,9 +417,11 @@ func (k *Info) handlePutExAddr(km *metainfo.Key, value []byte, from string) ([]b
 	if err != nil {
 		ki, err := k.getKInfo(pid, false)
 		if err == nil {
+			k.putPeerIDByIP(ki.eAddr, string(value), pid, true)
 			ki.eAddr = string(value)
 		}
 	} else {
+		k.putPeerIDByIP(pi.eAddr, string(value), pid, false)
 		pi.eAddr = string(value)
 	}
 
@@ -464,6 +472,7 @@ func (k *Info) handleExternalAddr(km *metainfo.Key) ([]byte, error) {
 		}
 	}
 
+	//neither keeper nor provider, users or self
 	maddr, err := k.ds.GetExternalAddr(pid)
 	if err != nil {
 		return nil, err

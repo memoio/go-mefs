@@ -126,9 +126,12 @@ func (k *Info) getKInfo(pid string, managed bool) (*kInfo, error) {
 			keeperID: pid,
 		}
 
-		if k.ds.Connect(k.context, pid) {
+		if exAddr, success := k.ds.Connect(k.context, pid); success {
 			tempInfo.availTime = time.Now().Unix()
 			tempInfo.online = true
+			if exAddr != "" {
+				tempInfo.eAddr = exAddr
+			}
 			k.ms.keeperNum.Inc()
 			k.keepers.Store(pid, tempInfo)
 			return tempInfo, nil
@@ -174,9 +177,12 @@ func (k *Info) getPInfo(pid string, managed bool) (*pInfo, error) {
 
 		tempInfo.proItem = &pItem
 
-		if k.ds.Connect(k.context, pid) {
+		if exAddr, success := k.ds.Connect(k.context, pid); success {
 			tempInfo.availTime = time.Now().Unix()
 			tempInfo.online = true
+			if exAddr != "" {
+				tempInfo.eAddr = exAddr
+			}
 			k.ms.providerNum.Inc()
 			k.providers.Store(pid, tempInfo)
 			return tempInfo, nil
@@ -229,9 +235,13 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 		thisInfo := thisInfoI.(*kInfo)
 
 		ntime := time.Now().Unix()
-		if k.ds.Connect(ctx, kid) {
+		if exAddr, success := k.ds.Connect(ctx, kid); success {
 			thisInfo.online = true
 			thisInfo.availTime = ntime
+			if exAddr != "" {
+				k.putPeerIDByIP(thisInfo.eAddr, exAddr, kid, true)
+				thisInfo.eAddr = exAddr
+			}
 			continue
 		}
 
@@ -250,9 +260,13 @@ func (k *Info) checkLocalPeers(ctx context.Context) {
 		thisInfo := thisInfoI.(*pInfo)
 
 		ntime := time.Now().Unix()
-		if k.ds.Connect(ctx, pid) {
+		if exAddr, success := k.ds.Connect(ctx, pid); success {
 			thisInfo.online = true
 			thisInfo.availTime = ntime
+			if exAddr != "" {
+				k.putPeerIDByIP(thisInfo.eAddr, exAddr, pid, false)
+				thisInfo.eAddr = exAddr
+			}
 			continue
 		}
 

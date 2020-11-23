@@ -49,6 +49,9 @@ type Info struct {
 	ms            *measure
 	ManageIncome  *big.Int //keeper's manage-income
 	PosIncome     *big.Int //keeper's pos-manage-income
+	//groupedK/P's purpose is to make the keepers and providers in one upkeeping-contract as dispersed as possible
+	groupedKeepers   map[string][]string //divide keepers into different groups according to the ip address
+	groupedProviders map[string][]string //divide providers into different groups according to the ip address
 }
 
 type measure struct {
@@ -78,17 +81,19 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 	}
 
 	m := &Info{
-		localID:       nid,
-		sk:            sk,
-		state:         false,
-		ds:            d,
-		repch:         make(chan string, 1024),
-		netIDs:        make(map[string]struct{}),
-		context:       ctx,
-		ms:            mea,
-		pledgeStorage: big.NewInt(0),
-		ManageIncome:  big.NewInt(0),
-		PosIncome:     big.NewInt(0),
+		localID:          nid,
+		sk:               sk,
+		state:            false,
+		ds:               d,
+		repch:            make(chan string, 1024),
+		netIDs:           make(map[string]struct{}),
+		context:          ctx,
+		ms:               mea,
+		pledgeStorage:    big.NewInt(0),
+		ManageIncome:     big.NewInt(0),
+		PosIncome:        big.NewInt(0),
+		groupedKeepers:   make(map[string][]string),
+		groupedProviders: make(map[string][]string),
 	}
 
 	balance := role.GetBalance(m.localID)
@@ -349,6 +354,7 @@ func (k *Info) load(ctx context.Context) error {
 	k.loadPeers(ctx)
 	k.loadPeersFromChain()
 	k.loadUser(ctx)
+	k.dividePeersByIP(ctx)
 	return nil
 }
 
@@ -1083,5 +1089,153 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 		}
 	}
 
+	return
+}
+
+func (k *Info) dividePeersByIP(ctx context.Context) error {
+	//divide keepers
+	k.keepers.Range(func(key, value interface{}) bool {
+		exAddr := value.(*kInfo).eAddr
+		kid := value.(*kInfo).keeperID
+		if exAddr == "" || kid == "" {
+			return true
+		}
+
+		ip := getIPFromEAddr(exAddr)
+		if ip == "" {
+			return true
+		}
+
+		k.groupedKeepers[ip] = append(k.groupedKeepers[ip], kid)
+		return true
+	})
+
+	//divide providers
+	k.providers.Range(func(key, value interface{}) bool {
+		exAddr := value.(*pInfo).eAddr
+		pid := value.(*pInfo).providerID
+		if exAddr == "" || pid == "" {
+			return true
+		}
+
+		ip := getIPFromEAddr(exAddr)
+		if ip == "" {
+			return true
+		}
+
+		k.groupedProviders[ip] = append(k.groupedProviders[ip], pid)
+		return true
+	})
+
+	utils.MLogger.Debug("dividePeersByIP, k.groupedKeepers:", k.groupedKeepers, " k.groupedProviders:", k.groupedProviders)
+
+	return nil
+}
+
+func getIPFromEAddr(eAddr string) string {
+	var ip string
+	exAddr := strings.Split(eAddr, "/")
+	if len(exAddr) != 7 {
+		utils.MLogger.Debug("split eAddr ", eAddr, "err")
+		return ip
+	}
+	ip = exAddr[2]
+	return ip
+}
+
+func getIDFromEAddr(eAddr string) string {
+	var id string
+	exAddr := strings.Split(eAddr, "/")
+	if len(exAddr) != 7 {
+		utils.MLogger.Debug("split eAddr ", eAddr, "err")
+		return id
+	}
+	id = exAddr[6]
+	return id
+}
+
+//putEAddrByIP put the peerID into k.groupedKeepers/k.groupedProviders by ip
+func (k *Info) putPeerIDByIP(oldeAddr, eAddr, id string, isKeeper bool) {
+	utils.MLogger.Debug("putPeerIDByIP, old:", oldeAddr, " new:", eAddr)
+
+	if eAddr == "" {
+		return
+	}
+
+	ip := getIPFromEAddr(eAddr)
+	if ip == "" || id == "" {
+		return
+	}
+
+	oldIP := getIPFromEAddr(oldeAddr)
+	if ip == oldIP {
+		return
+	}
+
+	if isKeeper {
+		if oldIP != "" { //需要将id从原来的位置删掉
+			k.deleteIDByIP(id, oldeAddr, true)
+		}
+
+		k.groupedKeepers[ip] = append(k.groupedKeepers[ip], id)
+
+		utils.MLogger.Debug("putPeerIDByIP groupedKs:", k.groupedKeepers)
+		return
+	}
+
+	//节点为provider
+	if oldIP != "" { //需要将id从原来的位置删掉
+		k.deleteIDByIP(id, oldeAddr, false)
+	}
+
+	k.groupedProviders[ip] = append(k.groupedProviders[ip], id)
+	utils.MLogger.Debug("putPeerIDByIP groupedPs:", k.groupedProviders)
+	return
+}
+
+func (k *Info) deleteIDByIP(pid, eAddr string, isKeeper bool) {
+	if eAddr == "" {
+		return
+	}
+
+	ip := getIPFromEAddr(eAddr)
+
+	if isKeeper {
+		if len(k.groupedKeepers[ip]) == 1 && k.groupedKeepers[ip][0] == pid {
+			delete(k.groupedKeepers, ip)
+		}
+
+		for i, id := range k.groupedKeepers[ip] {
+			if id == pid {
+				if i == 0 {
+					k.groupedKeepers[ip] = k.groupedKeepers[ip][1:]
+				} else if i == len(k.groupedKeepers[ip])-1 {
+					k.groupedKeepers[ip] = k.groupedKeepers[ip][:i]
+				} else {
+					k.groupedKeepers[ip] = append(k.groupedKeepers[ip][:i], k.groupedKeepers[ip][i+1:]...)
+				}
+			}
+		}
+
+		utils.MLogger.Debug("deleteIDByIP groupedKs:", k.groupedKeepers)
+		return
+	}
+
+	if len(k.groupedProviders[ip]) == 1 && k.groupedProviders[ip][0] == pid {
+		delete(k.groupedProviders, ip)
+	}
+
+	for i, id := range k.groupedProviders[ip] {
+		if id == pid {
+			if i == 0 {
+				k.groupedProviders[ip] = k.groupedProviders[ip][1:]
+			} else if i == len(k.groupedProviders[ip])-1 {
+				k.groupedProviders[ip] = k.groupedProviders[ip][:i]
+			} else {
+				k.groupedProviders[ip] = append(k.groupedProviders[ip][:i], k.groupedProviders[ip][i+1:]...)
+			}
+		}
+	}
+	utils.MLogger.Debug("deleteIDByIP groupedPs:", k.groupedProviders)
 	return
 }
