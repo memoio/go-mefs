@@ -46,7 +46,6 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
 
-		// 用户地址,keeper地址数组,provider地址数组,存储时长 单位 天,存储大小 单位 MB
 		rtAddress, tx, _, err = root.DeployRoot(auth, client, queryAddress)
 		if rtAddress.String() != InvalidAddr{
 			rtAddr = rtAddress

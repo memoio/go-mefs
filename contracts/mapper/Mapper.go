@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	//_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -28,17 +27,18 @@ var (
 )
 
 // MapperABI is the input ABI used to generate the binding from.
-const MapperABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"add\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"name\":\"\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"Add\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\"}]"
+const MapperABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"Add\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"add\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]"
 
 // MapperBin is the compiled bytecode used for deploying new contracts.
-const MapperBin = `0x6080604052600080546001600160a01b0319163317905561041b806100256000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80630a3b0a4f146100515780630ca05f9f1461008b5780636d4ce63c146100b1578063893d20e814610109575b600080fd5b6100776004803603602081101561006757600080fd5b50356001600160a01b031661012d565b604080519115158252519081900360200190f35b610077600480360360208110156100a157600080fd5b50356001600160a01b03166102a6565b6100b9610323565b60408051602080825283518183015283519192839290830191858101910280838360005b838110156100f55781810151838201526020016100dd565b505050509050019250505060405180910390f35b610111610385565b604080516001600160a01b039092168252519081900360200190f35b600080546001600160a01b03163314156102405761014a82610394565b156101b757604080516020808252600f908201527fe5b7b2e69c89e6ada4e59cb0e59d8000000000000000000000000000000000008183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a150600061023b565b6001805480820182556000919091527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf60180546001600160a01b0384166001600160a01b0319909116811790915560408051918252517f87dc5eecd6d6bdeae407c426da6bfba5b7190befc554ed5d4d62dd5cf939fbae9181900360200190a15060015b6102a1565b604080516020808252600e908201527fe4bda0e4b88de698af6f776e65720000000000000000000000000000000000008183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a15b919050565b600080546001600160a01b031633141561024057600080546001600160a01b038481166001600160a01b0319831681179093556040805191909216808252602082019390935281517f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90929181900390910190a160019150506102a1565b6060600180548060200260200160405190810160405280929190818152602001828054801561037b57602002820191906000526020600020905b81546001600160a01b0316815260019091019060200180831161035d575b5050505050905090565b6000546001600160a01b031690565b6000805b6001548110156103e657826001600160a01b0316600182815481106103b957fe5b6000918252602090912001546001600160a01b031614156103de5760019150506102a1565b600101610398565b5060009291505056fea165627a7a723058209d9341ff2d768aeaf4eb29bb08bf056e9900807aea51b345a69923a22225440e0029`
+var MapperBin = "0x6080604052738391984e2f1cc8f6b916f566c1d0a6bb8a15c73a600260006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555034801561006557600080fd5b50336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506107e0806100b56000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80630a3b0a4f146100515780630ca05f9f146100ab5780636d4ce63c14610105578063893d20e814610164575b600080fd5b6100936004803603602081101561006757600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610198565b60405180821515815260200191505060405180910390f35b6100ed600480360360208110156100c157600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506104b2565b60405180821515815260200191505060405180910390f35b61010d610651565b6040518080602001828103825283818151815260200191508051906020019060200280838360005b83811015610150578082015181840152602081019050610135565b505050509050019250505060405180910390f35b61016c6106df565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461025c576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b6000600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663368e63216040518163ffffffff1660e01b815260040160206040518083038186803b1580156102c657600080fd5b505afa1580156102da573d6000803e3d6000fd5b505050506040513d60208110156102f057600080fd5b810190808051906020019092919050505090508015610377576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600d8152602001807f6164642069732062616e6e65640000000000000000000000000000000000000081525060200191505060405180910390fd5b61038083610708565b156103f7577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa60405180806020018281038252600b8152602001807f68617320616c726561647900000000000000000000000000000000000000000081525060200191505060405180910390a160009150506104ad565b6001839080600181540180825580915050600190039060005260206000200160009091909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f87dc5eecd6d6bdeae407c426da6bfba5b7190befc554ed5d4d62dd5cf939fbae83604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390a160019150505b919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610576576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b606060018054806020026020016040519081016040528092919081815260200182805480156106d557602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001906001019080831161068b575b5050505050905090565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b600080600090505b60018054905081101561079f578273ffffffffffffffffffffffffffffffffffffffff166001828154811061074157fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614156107925760019150506107a5565b8080600101915050610710565b50600090505b91905056fea26469706673582212202ac8e1a1138e28ee1df4f26229933bcee5b9c3bed79a156950093de13e8d7c2a64736f6c63430007030033"
 
-// DeployMapperToResolver deploys a new Ethereum contract, binding an instance of Mapper to it.
-func DeployMapperToResolver(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Mapper, error) {
+// DeployMapper deploys a new Ethereum contract, binding an instance of Mapper to it.
+func DeployMapper(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Mapper, error) {
 	parsed, err := abi.JSON(strings.NewReader(MapperABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+
 	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(MapperBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -190,7 +190,7 @@ func (_Mapper *MapperTransactorRaw) Transact(opts *bind.TransactOpts, method str
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(address[])
+// Solidity: function get() view returns(address[])
 func (_Mapper *MapperCaller) Get(opts *bind.CallOpts) ([]common.Address, error) {
 	var (
 		ret0 = new([]common.Address)
@@ -202,21 +202,21 @@ func (_Mapper *MapperCaller) Get(opts *bind.CallOpts) ([]common.Address, error) 
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(address[])
+// Solidity: function get() view returns(address[])
 func (_Mapper *MapperSession) Get() ([]common.Address, error) {
 	return _Mapper.Contract.Get(&_Mapper.CallOpts)
 }
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(address[])
+// Solidity: function get() view returns(address[])
 func (_Mapper *MapperCallerSession) Get() ([]common.Address, error) {
 	return _Mapper.Contract.Get(&_Mapper.CallOpts)
 }
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Mapper *MapperCaller) GetOwner(opts *bind.CallOpts) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
@@ -228,14 +228,14 @@ func (_Mapper *MapperCaller) GetOwner(opts *bind.CallOpts) (common.Address, erro
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Mapper *MapperSession) GetOwner() (common.Address, error) {
 	return _Mapper.Contract.GetOwner(&_Mapper.CallOpts)
 }
 
 // GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
 //
-// Solidity: function getOwner() constant returns(address)
+// Solidity: function getOwner() view returns(address)
 func (_Mapper *MapperCallerSession) GetOwner() (common.Address, error) {
 	return _Mapper.Contract.GetOwner(&_Mapper.CallOpts)
 }
@@ -404,6 +404,17 @@ func (_Mapper *MapperFilterer) WatchAdd(opts *bind.WatchOpts, sink chan<- *Mappe
 	}), nil
 }
 
+// ParseAdd is a log parse operation binding the contract event 0x87dc5eecd6d6bdeae407c426da6bfba5b7190befc554ed5d4d62dd5cf939fbae.
+//
+// Solidity: event Add(address addr)
+func (_Mapper *MapperFilterer) ParseAdd(log types.Log) (*MapperAdd, error) {
+	event := new(MapperAdd)
+	if err := _Mapper.contract.UnpackLog(event, "Add", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 // MapperAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the Mapper contract.
 type MapperAlterOwnerIterator struct {
 	Event *MapperAlterOwner // Event containing the contract specifics and raw log
@@ -527,6 +538,17 @@ func (_Mapper *MapperFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink chan<-
 	}), nil
 }
 
+// ParseAlterOwner is a log parse operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
+//
+// Solidity: event AlterOwner(address from, address to)
+func (_Mapper *MapperFilterer) ParseAlterOwner(log types.Log) (*MapperAlterOwner, error) {
+	event := new(MapperAlterOwner)
+	if err := _Mapper.contract.UnpackLog(event, "AlterOwner", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 // MapperErrorIterator is returned from FilterError and is used to iterate over the raw logs and unpacked data for Error events raised by the Mapper contract.
 type MapperErrorIterator struct {
 	Event *MapperError // Event containing the contract specifics and raw log
@@ -647,4 +669,15 @@ func (_Mapper *MapperFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *Map
 			}
 		}
 	}), nil
+}
+
+// ParseError is a log parse operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+//
+// Solidity: event Error(string data)
+func (_Mapper *MapperFilterer) ParseError(log types.Log) (*MapperError, error) {
+	event := new(MapperError)
+	if err := _Mapper.contract.UnpackLog(event, "Error", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }

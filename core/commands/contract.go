@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -17,12 +18,15 @@ import (
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 const (
 	adminSk   = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
 	codeName  = "whoisyourdaddy"
 	adminAddr = "0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6"
+	//Dev链和testnet链上的AdminOwned合约地址
+	adminOwnedContractAddr = "0x8391984e2F1cC8F6b916F566C1D0a6bb8a15C73A"
 )
 
 type StringList struct {
@@ -62,6 +66,11 @@ var ContractCmd = &cmds.Command{
 		"getAllKeeperInKPMap":      getAllKeeperInKPMapCmd,      //获得keeperProviderMap合约中的所有keeper
 		"isKeeper":                 isKeeperCmd,
 		"isProvider":               isProviderCmd,
+		"deployAdminOwned":         deployAdminOwnedCmd, //部署adminOwned合约
+		"getAdminOwner":            getAdminOwnerCmd,
+		"alterAdminOwner":          alterAdminOwnerCmd,
+		"setBanned":                setBannedCmd,
+		"getBanned":                getBannedCmd,
 	},
 }
 
@@ -914,6 +923,265 @@ var getAllKeeperInKPMapCmd = &cmds.Command{
 
 		list := &StringList{
 			ChildLists: keeperIDsList,
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var deployAdminOwnedCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test deployAdminOwned",
+		ShortDescription: "deploy adminOwned contract，we need remember the address of adminOwned contract",
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		hexPk := adminSk
+		adminOwnedAddr, err := contracts.DeployAdminOwned(hexPk)
+		if err != nil {
+			fmt.Println("AdminOwned合约部署错误:", err)
+			return err
+		}
+		fmt.Println("AdminOwned合约部署合约成功")
+
+		list := &StringList{
+			ChildLists: []string{adminOwnedAddr.String()},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "contract address: %s", fl)
+			return err
+		}),
+	},
+}
+
+var getAdminOwnerCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test get owner of AdminOwned",
+		ShortDescription: "get the owner of AdminOwned-contract",
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		n, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		peerID := n.Identity.Pretty()
+		localAddress, _ := address.GetAddressFromID(peerID)
+
+		adminOwner, err := contracts.GetAdminOwner(common.HexToAddress(adminOwnedContractAddr), localAddress)
+		if err != nil {
+			return err
+		}
+
+		list := &StringList{
+			ChildLists: []string{adminOwner.String()},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "owner of adminOwned address: %s", fl)
+			return err
+		}),
+	},
+}
+
+var alterAdminOwnerCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test alter owner of AdminOwned",
+		ShortDescription: "alter the owner of AdminOwned-contract",
+	},
+	Arguments: []cmds.Argument{
+		cmds.StringArg("addr", true, false, "The new owner of AdminOwner-contract."),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		newOwner := req.Arguments[0]
+		hexPk := adminSk
+
+		err := contracts.AlterOwner(hexPk, common.HexToAddress(adminOwnedContractAddr), common.HexToAddress(newOwner))
+		if err != nil {
+			return err
+		}
+
+		list := &StringList{
+			ChildLists: []string{},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var setBannedCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test set param 'banned' of AdminOwned",
+		ShortDescription: "set the param 'banned' of AdminOwned-contract",
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+		cmds.BoolOption("ParamBanned", "banned", "Set the param 'banned'").WithDefault(false),
+		cmds.StringOption("ParamKey", "k", "Specify parameter index, can be: mapper、offer、query、channel、upkeeping、root、keeper、provider、kpMap").WithDefault("root"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		hexPk := adminSk
+		banned, ok := req.Options["ParamBanned"].(bool)
+		if !ok {
+			fmt.Println("ParamBanned is wrong")
+			return nil
+		}
+		key, ok := req.Options["ParamKey"].(string)
+		if !ok {
+			fmt.Println("ParamKey is wrong")
+			return nil
+		}
+
+		err := contracts.SetBanned(hexPk, key, common.HexToAddress(adminOwnedContractAddr), banned)
+		if err != nil {
+			return err
+		}
+
+		list := &StringList{
+			ChildLists: []string{},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var getBannedCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test get param 'banned' of AdminOwned",
+		ShortDescription: "get the param 'banned' of AdminOwned-contract",
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+		cmds.StringOption("ParamKey", "k", "Specify parameter index, can be: mapper、offer、query、channel、upkeeping、root、keeper、provider、kpMap").WithDefault("root"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		n, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		peerID := n.Identity.Pretty()
+		localAddress, _ := address.GetAddressFromID(peerID)
+
+		key, ok := req.Options["ParamKey"].(string)
+		if !ok {
+			fmt.Println("ParamKey is wrong")
+			return nil
+		}
+
+		banned, err := contracts.GetBanned(key, common.HexToAddress(adminOwnedContractAddr), localAddress)
+		if err != nil {
+			return err
+		}
+
+		list := &StringList{
+			ChildLists: []string{key + "Banned is:", strconv.FormatBool(banned)},
 		}
 		return cmds.EmitOnce(res, list)
 	},
