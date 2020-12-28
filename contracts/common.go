@@ -501,7 +501,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 			log.Println("rebuild transaction... nonce is ", auth.Nonce, " gasPrice is ", auth.GasPrice)
 		}
 
-		mapperAddress, tx, mapperIns, err = mapper.DeployMapperToResolver(auth, client)
+		mapperAddress, tx, mapperIns, err = mapper.DeployMapper(auth, client)
 		if mapperAddress.String() != InvalidAddr {
 			mapperAddr = mapperAddress
 			mapperInstance = mapperIns
@@ -685,7 +685,7 @@ func GetRoleIndexer(localAddress, userAddress common.Address) (common.Address, *
 	return indexerAddr, indexerInstance, nil
 }
 
-// getMapperFromResolver 返回已经部署的Mapper，若Mapper没部署则返回err
+// GetMapperFromIndexer 返回已经部署的Mapper，若Mapper没部署则返回err
 // 特别地，当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
 // 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
 func GetMapperFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, *mapper.Mapper, error) {
