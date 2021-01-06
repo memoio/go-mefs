@@ -25,8 +25,10 @@ const (
 	adminSk   = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
 	codeName  = "whoisyourdaddy"
 	adminAddr = "0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6"
+	//adminOwnedSk   = "610325c06962bd42f90c28f8883c679072856a00768e9067dfbafc93a38a4ef3"
+	//adminOwnedAddr = "0xe21A916e23164D1f3E342399dAB1b5F9F81ED486"
 	//Dev链和testnet链上的AdminOwned合约地址
-	adminOwnedContractAddr = "0x8391984e2F1cC8F6b916F566C1D0a6bb8a15C73A"
+	adminOwnedContractAddr = "0xAcF8e37D9e3Dcb47423f2938069c11D75dE17A20"
 )
 
 type StringList struct {
@@ -69,8 +71,8 @@ var ContractCmd = &cmds.Command{
 		"deployAdminOwned":         deployAdminOwnedCmd, //部署adminOwned合约
 		"getAdminOwner":            getAdminOwnerCmd,
 		"alterAdminOwner":          alterAdminOwnerCmd,
-		"setBanned":                setBannedCmd,
-		"getBanned":                getBannedCmd,
+		"setBannedVersion":         setBannedCmd,
+		"getBannedVersion":         getBannedCmd,
 	},
 }
 
@@ -1088,7 +1090,7 @@ var setBannedCmd = &cmds.Command{
 	Options: []cmds.Option{
 		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.BoolOption("ParamBanned", "banned", "Set the param 'banned'").WithDefault(false),
+		cmds.UintOption("BannedVersion", "bv", "Set the bannedVersion").WithDefault(0),
 		cmds.StringOption("ParamKey", "k", "Specify parameter index, can be: mapper、offer、query、channel、upkeeping、root、keeper、provider、kpMap").WithDefault("root"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -1107,7 +1109,7 @@ var setBannedCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		banned, ok := req.Options["ParamBanned"].(bool)
+		bannedVersion, ok := req.Options["BannedVersion"].(uint)
 		if !ok {
 			fmt.Println("ParamBanned is wrong")
 			return nil
@@ -1118,7 +1120,7 @@ var setBannedCmd = &cmds.Command{
 			return nil
 		}
 
-		err := contracts.SetBanned(hexPk, key, common.HexToAddress(adminOwnedContractAddr), banned)
+		err := contracts.SetBannedVersion(hexPk, key, common.HexToAddress(adminOwnedContractAddr), uint16(bannedVersion))
 		if err != nil {
 			return err
 		}
@@ -1175,13 +1177,13 @@ var getBannedCmd = &cmds.Command{
 			return nil
 		}
 
-		banned, err := contracts.GetBanned(key, common.HexToAddress(adminOwnedContractAddr), localAddress)
+		bannedVersion, err := contracts.GetBannedVersion(key, common.HexToAddress(adminOwnedContractAddr), localAddress)
 		if err != nil {
 			return err
 		}
 
 		list := &StringList{
-			ChildLists: []string{key + "Banned is:", strconv.FormatBool(banned)},
+			ChildLists: []string{key + "BannedVersion is:", strconv.Itoa(int(bannedVersion))},
 		}
 		return cmds.EmitOnce(res, list)
 	},
