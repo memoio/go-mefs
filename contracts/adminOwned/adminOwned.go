@@ -27,10 +27,10 @@ var (
 )
 
 // AdminOwnedABI is the input ABI used to generate the binding from.
-const AdminOwnedABI = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterAdminOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"SetBanned\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAdminOwner\",\"type\":\"address\"}],\"name\":\"alterAdminOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAdminOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getChannelBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getKPMapBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getKeeperBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getMapperBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOfferBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getProviderBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getQueryBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRootBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getUpkeepingBanned\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setChannelBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setKPMapBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setKeeperBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setMapperBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setOfferBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setProviderBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setQueryBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setRootBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setUpkeepingBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const AdminOwnedABI = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterAdminOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"version\",\"type\":\"uint16\"}],\"name\":\"SetBanned\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAdminOwner\",\"type\":\"address\"}],\"name\":\"alterAdminOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAdminOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getChannelBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getKPMapBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getKeeperBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getMapperBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOfferBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getProviderBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getQueryBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRootBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getUpkeepingBannedVersion\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setChannelBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setKPMapBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setKeeperBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setMapperBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setOfferBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setProviderBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setQueryBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setRootBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"v\",\"type\":\"uint16\"}],\"name\":\"setUpkeepingBannedVersion\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // AdminOwnedBin is the compiled bytecode used for deploying new contracts.
-var AdminOwnedBin = "0x608060405234801561001057600080fd5b50336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550611431806100606000396000f3fe608060405234801561001057600080fd5b506004361061012c5760003560e01c806372857ce2116100ad578063d9d6389e11610071578063d9d6389e146103bb578063e44efb90146103db578063e922e4ce146103fb578063f23cc21c1461042b578063fc3b6a391461045f5761012c565b806372857ce2146102eb578063902b218d1461030b5780639db22ae61461033b578063c04ff8491461036b578063cc893e971461038b5761012c565b8063349a3de2116100f4578063349a3de214610211578063368e63211461023157806353e6d3921461025157806357b6bde6146102ab5780636778d3cb146102cb5761012c565b806306909ba71461013157806316ec989c1461016157806317ef9444146101815780631fed1561146101b15780632321b8ae146101e1575b600080fd5b61015f6004803603602081101561014757600080fd5b8101908080351515906020019092919050505061048f565b005b6101696105fd565b60405180821515815260200191505060405180910390f35b6101af6004803603602081101561019757600080fd5b81019080803515159060200190929190505050610613565b005b6101df600480360360208110156101c757600080fd5b81019080803515159060200190929190505050610781565b005b61020f600480360360208110156101f757600080fd5b810190808035151590602001909291905050506108ef565b005b610219610a5d565b60405180821515815260200191505060405180910390f35b610239610a73565b60405180821515815260200191505060405180910390f35b6102936004803603602081101561026757600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610a89565b60405180821515815260200191505060405180910390f35b6102b3610c28565b60405180821515815260200191505060405180910390f35b6102d3610c3e565b60405180821515815260200191505060405180910390f35b6102f3610c54565b60405180821515815260200191505060405180910390f35b6103396004803603602081101561032157600080fd5b81019080803515159060200190929190505050610c6a565b005b6103696004803603602081101561035157600080fd5b81019080803515159060200190929190505050610dd8565b005b610373610f46565b60405180821515815260200191505060405180910390f35b6103b9600480360360208110156103a157600080fd5b81019080803515159060200190929190505050610f5c565b005b6103c36110ca565b60405180821515815260200191505060405180910390f35b6103e36110e0565b60405180821515815260200191505060405180910390f35b6104296004803603602081101561041157600080fd5b810190808035151590602001909291905050506110f6565b005b610433611264565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b61048d6004803603602081101561047557600080fd5b8101908080351515906020019092919050505061128d565b005b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610550576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060176101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260058152602001807f6f66666572000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060169054906101000a900460ff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146106d4576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b806000601c6101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260058152602001807f6b704d6170000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610842576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060186101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260098152602001807f75706b656570696e670000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146109b0576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060166101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260058152602001807f7175657279000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b600080601a9054906101000a900460ff16905090565b60008060159054906101000a900460ff16905090565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610b4d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f88632f39007912d02dba5583fb689a48338d8a1b0358c8287259a22516517d898184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b600080601b9054906101000a900460ff16905090565b60008060149054906101000a900460ff16905090565b60008060189054906101000a900460ff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610d2b576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b806000601a6101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260068152602001807f6b65657065720000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610e99576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b806000601b6101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260088152602001807f70726f7669646572000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060179054906101000a900460ff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461101d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060196101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260078152602001807f6368616e6e656c00000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b600080601c9054906101000a900460ff16905090565b60008060199054906101000a900460ff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146111b7576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060156101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260068152602001807f6d61707065720000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461134e576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060146101000a81548160ff0219169083151502179055507f88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018315158152602001828103825260048152602001807f726f6f7400000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a15056fea2646970667358221220c62c4f5c712095a520bc4aabd3f92778c741d37e9654c014e88fe41ea07b362764736f6c63430007030033"
+var AdminOwnedBin = "0x608060405234801561001057600080fd5b50336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555061148e806100606000396000f3fe608060405234801561001057600080fd5b506004361061012c5760003560e01c80637efa8370116100ad578063d715c85e11610071578063d715c85e146103e7578063de60908a14610409578063e99680b11461042b578063f23cc21c1461045d578063f49ded5a146104915761012c565b80637efa8370146102fd5780638044c8011461032f578063a06b7cfa14610361578063af484b3814610383578063c304b43f146103b55761012c565b806350523e07116100f457806350523e07146101eb57806350d38a991461021d57806353e6d3921461024f578063597e409d146102a95780637ce82a90146102cb5761012c565b8063073eeb531461013157806326b3eb761461015357806333c767721461018557806334b9d634146101a75780634410bb05146101c9575b600080fd5b6101396104b3565b604051808261ffff16815260200191505060405180910390f35b6101836004803603602081101561016957600080fd5b81019080803561ffff1690602001909291905050506104cb565b005b61018d61063e565b604051808261ffff16815260200191505060405180910390f35b6101af610655565b604051808261ffff16815260200191505060405180910390f35b6101d161066c565b604051808261ffff16815260200191505060405180910390f35b61021b6004803603602081101561020157600080fd5b81019080803561ffff169060200190929190505050610683565b005b61024d6004803603602081101561023357600080fd5b81019080803561ffff1690602001909291905050506107f6565b005b6102916004803603602081101561026557600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610969565b60405180821515815260200191505060405180910390f35b6102b1610b08565b604051808261ffff16815260200191505060405180910390f35b6102fb600480360360208110156102e157600080fd5b81019080803561ffff169060200190929190505050610b20565b005b61032d6004803603602081101561031357600080fd5b81019080803561ffff169060200190929190505050610c93565b005b61035f6004803603602081101561034557600080fd5b81019080803561ffff169060200190929190505050610e06565b005b610369610f79565b604051808261ffff16815260200191505060405180910390f35b6103b36004803603602081101561039957600080fd5b81019080803561ffff169060200190929190505050610f90565b005b6103e5600480360360208110156103cb57600080fd5b81019080803561ffff169060200190929190505050611103565b005b6103ef611276565b604051808261ffff16815260200191505060405180910390f35b61041161128e565b604051808261ffff16815260200191505060405180910390f35b61045b6004803603602081101561044157600080fd5b81019080803561ffff1690602001909291905050506112a5565b005b610465611418565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b610499611441565b604051808261ffff16815260200191505060405180910390f35b6000600160009054906101000a900461ffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461058c576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b806000601e6101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260078152602001807f6368616e6e656c00000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060169054906101000a900461ffff16905090565b600080601c9054906101000a900461ffff16905090565b600080601a9054906101000a900461ffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610744576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600160046101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260058152602001807f6b704d6170000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146108b7576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060146101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260048152602001807f726f6f7400000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610a2d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f88632f39007912d02dba5583fb689a48338d8a1b0358c8287259a22516517d898184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b6000600160029054906101000a900461ffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610be1576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060186101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260058152602001807f7175657279000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610d54576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600060166101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260068152602001807f6d61707065720000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610ec7576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b806000601a6101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260058152602001807f6f66666572000000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060149054906101000a900461ffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614611051576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600160006101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260068152602001807f6b65657065720000000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146111c4576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b806000601c6101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260098152602001807f75706b656570696e670000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b6000600160049054906101000a900461ffff16905090565b600080601e9054906101000a900461ffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614611366576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f6f6e6c792061646d696e4f776e65722063616e2063616c6c000000000000000081525060200191505060405180910390fd5b80600160026101000a81548161ffff021916908361ffff1602179055507fefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9338260405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018361ffff168152602001828103825260088152602001807f70726f7669646572000000000000000000000000000000000000000000000000815250602001935050505060405180910390a150565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60008060189054906101000a900461ffff1690509056fea2646970667358221220c5d3754eb2696df3b3be194d0af6131de5bc67fc7d185526b06bb34d677447e564736f6c63430007030033"
 
 // DeployAdminOwned deploys a new Ethereum contract, binding an instance of AdminOwned to it.
 func DeployAdminOwned(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *AdminOwned, error) {
@@ -214,238 +214,238 @@ func (_AdminOwned *AdminOwnedCallerSession) GetAdminOwner() (common.Address, err
 	return _AdminOwned.Contract.GetAdminOwner(&_AdminOwned.CallOpts)
 }
 
-// GetChannelBanned is a free data retrieval call binding the contract method 0xe44efb90.
+// GetChannelBannedVersion is a free data retrieval call binding the contract method 0xde60908a.
 //
-// Solidity: function getChannelBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetChannelBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getChannelBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetChannelBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getChannelBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getChannelBannedVersion")
 	return *ret0, err
 }
 
-// GetChannelBanned is a free data retrieval call binding the contract method 0xe44efb90.
+// GetChannelBannedVersion is a free data retrieval call binding the contract method 0xde60908a.
 //
-// Solidity: function getChannelBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetChannelBanned() (bool, error) {
-	return _AdminOwned.Contract.GetChannelBanned(&_AdminOwned.CallOpts)
+// Solidity: function getChannelBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetChannelBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetChannelBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetChannelBanned is a free data retrieval call binding the contract method 0xe44efb90.
+// GetChannelBannedVersion is a free data retrieval call binding the contract method 0xde60908a.
 //
-// Solidity: function getChannelBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetChannelBanned() (bool, error) {
-	return _AdminOwned.Contract.GetChannelBanned(&_AdminOwned.CallOpts)
+// Solidity: function getChannelBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetChannelBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetChannelBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetKPMapBanned is a free data retrieval call binding the contract method 0xd9d6389e.
+// GetKPMapBannedVersion is a free data retrieval call binding the contract method 0xd715c85e.
 //
-// Solidity: function getKPMapBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetKPMapBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getKPMapBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetKPMapBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getKPMapBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getKPMapBannedVersion")
 	return *ret0, err
 }
 
-// GetKPMapBanned is a free data retrieval call binding the contract method 0xd9d6389e.
+// GetKPMapBannedVersion is a free data retrieval call binding the contract method 0xd715c85e.
 //
-// Solidity: function getKPMapBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetKPMapBanned() (bool, error) {
-	return _AdminOwned.Contract.GetKPMapBanned(&_AdminOwned.CallOpts)
+// Solidity: function getKPMapBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetKPMapBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetKPMapBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetKPMapBanned is a free data retrieval call binding the contract method 0xd9d6389e.
+// GetKPMapBannedVersion is a free data retrieval call binding the contract method 0xd715c85e.
 //
-// Solidity: function getKPMapBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetKPMapBanned() (bool, error) {
-	return _AdminOwned.Contract.GetKPMapBanned(&_AdminOwned.CallOpts)
+// Solidity: function getKPMapBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetKPMapBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetKPMapBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetKeeperBanned is a free data retrieval call binding the contract method 0x349a3de2.
+// GetKeeperBannedVersion is a free data retrieval call binding the contract method 0x073eeb53.
 //
-// Solidity: function getKeeperBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetKeeperBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getKeeperBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetKeeperBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getKeeperBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getKeeperBannedVersion")
 	return *ret0, err
 }
 
-// GetKeeperBanned is a free data retrieval call binding the contract method 0x349a3de2.
+// GetKeeperBannedVersion is a free data retrieval call binding the contract method 0x073eeb53.
 //
-// Solidity: function getKeeperBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetKeeperBanned() (bool, error) {
-	return _AdminOwned.Contract.GetKeeperBanned(&_AdminOwned.CallOpts)
+// Solidity: function getKeeperBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetKeeperBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetKeeperBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetKeeperBanned is a free data retrieval call binding the contract method 0x349a3de2.
+// GetKeeperBannedVersion is a free data retrieval call binding the contract method 0x073eeb53.
 //
-// Solidity: function getKeeperBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetKeeperBanned() (bool, error) {
-	return _AdminOwned.Contract.GetKeeperBanned(&_AdminOwned.CallOpts)
+// Solidity: function getKeeperBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetKeeperBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetKeeperBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetMapperBanned is a free data retrieval call binding the contract method 0x368e6321.
+// GetMapperBannedVersion is a free data retrieval call binding the contract method 0x33c76772.
 //
-// Solidity: function getMapperBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetMapperBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getMapperBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetMapperBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getMapperBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getMapperBannedVersion")
 	return *ret0, err
 }
 
-// GetMapperBanned is a free data retrieval call binding the contract method 0x368e6321.
+// GetMapperBannedVersion is a free data retrieval call binding the contract method 0x33c76772.
 //
-// Solidity: function getMapperBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetMapperBanned() (bool, error) {
-	return _AdminOwned.Contract.GetMapperBanned(&_AdminOwned.CallOpts)
+// Solidity: function getMapperBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetMapperBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetMapperBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetMapperBanned is a free data retrieval call binding the contract method 0x368e6321.
+// GetMapperBannedVersion is a free data retrieval call binding the contract method 0x33c76772.
 //
-// Solidity: function getMapperBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetMapperBanned() (bool, error) {
-	return _AdminOwned.Contract.GetMapperBanned(&_AdminOwned.CallOpts)
+// Solidity: function getMapperBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetMapperBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetMapperBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetOfferBanned is a free data retrieval call binding the contract method 0xc04ff849.
+// GetOfferBannedVersion is a free data retrieval call binding the contract method 0x4410bb05.
 //
-// Solidity: function getOfferBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetOfferBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getOfferBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetOfferBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getOfferBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getOfferBannedVersion")
 	return *ret0, err
 }
 
-// GetOfferBanned is a free data retrieval call binding the contract method 0xc04ff849.
+// GetOfferBannedVersion is a free data retrieval call binding the contract method 0x4410bb05.
 //
-// Solidity: function getOfferBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetOfferBanned() (bool, error) {
-	return _AdminOwned.Contract.GetOfferBanned(&_AdminOwned.CallOpts)
+// Solidity: function getOfferBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetOfferBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetOfferBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetOfferBanned is a free data retrieval call binding the contract method 0xc04ff849.
+// GetOfferBannedVersion is a free data retrieval call binding the contract method 0x4410bb05.
 //
-// Solidity: function getOfferBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetOfferBanned() (bool, error) {
-	return _AdminOwned.Contract.GetOfferBanned(&_AdminOwned.CallOpts)
+// Solidity: function getOfferBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetOfferBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetOfferBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetProviderBanned is a free data retrieval call binding the contract method 0x57b6bde6.
+// GetProviderBannedVersion is a free data retrieval call binding the contract method 0x597e409d.
 //
-// Solidity: function getProviderBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetProviderBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getProviderBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetProviderBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getProviderBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getProviderBannedVersion")
 	return *ret0, err
 }
 
-// GetProviderBanned is a free data retrieval call binding the contract method 0x57b6bde6.
+// GetProviderBannedVersion is a free data retrieval call binding the contract method 0x597e409d.
 //
-// Solidity: function getProviderBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetProviderBanned() (bool, error) {
-	return _AdminOwned.Contract.GetProviderBanned(&_AdminOwned.CallOpts)
+// Solidity: function getProviderBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetProviderBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetProviderBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetProviderBanned is a free data retrieval call binding the contract method 0x57b6bde6.
+// GetProviderBannedVersion is a free data retrieval call binding the contract method 0x597e409d.
 //
-// Solidity: function getProviderBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetProviderBanned() (bool, error) {
-	return _AdminOwned.Contract.GetProviderBanned(&_AdminOwned.CallOpts)
+// Solidity: function getProviderBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetProviderBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetProviderBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetQueryBanned is a free data retrieval call binding the contract method 0x16ec989c.
+// GetQueryBannedVersion is a free data retrieval call binding the contract method 0xf49ded5a.
 //
-// Solidity: function getQueryBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetQueryBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getQueryBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetQueryBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getQueryBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getQueryBannedVersion")
 	return *ret0, err
 }
 
-// GetQueryBanned is a free data retrieval call binding the contract method 0x16ec989c.
+// GetQueryBannedVersion is a free data retrieval call binding the contract method 0xf49ded5a.
 //
-// Solidity: function getQueryBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetQueryBanned() (bool, error) {
-	return _AdminOwned.Contract.GetQueryBanned(&_AdminOwned.CallOpts)
+// Solidity: function getQueryBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetQueryBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetQueryBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetQueryBanned is a free data retrieval call binding the contract method 0x16ec989c.
+// GetQueryBannedVersion is a free data retrieval call binding the contract method 0xf49ded5a.
 //
-// Solidity: function getQueryBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetQueryBanned() (bool, error) {
-	return _AdminOwned.Contract.GetQueryBanned(&_AdminOwned.CallOpts)
+// Solidity: function getQueryBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetQueryBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetQueryBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetRootBanned is a free data retrieval call binding the contract method 0x6778d3cb.
+// GetRootBannedVersion is a free data retrieval call binding the contract method 0xa06b7cfa.
 //
-// Solidity: function getRootBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetRootBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getRootBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetRootBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getRootBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getRootBannedVersion")
 	return *ret0, err
 }
 
-// GetRootBanned is a free data retrieval call binding the contract method 0x6778d3cb.
+// GetRootBannedVersion is a free data retrieval call binding the contract method 0xa06b7cfa.
 //
-// Solidity: function getRootBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetRootBanned() (bool, error) {
-	return _AdminOwned.Contract.GetRootBanned(&_AdminOwned.CallOpts)
+// Solidity: function getRootBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetRootBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetRootBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetRootBanned is a free data retrieval call binding the contract method 0x6778d3cb.
+// GetRootBannedVersion is a free data retrieval call binding the contract method 0xa06b7cfa.
 //
-// Solidity: function getRootBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetRootBanned() (bool, error) {
-	return _AdminOwned.Contract.GetRootBanned(&_AdminOwned.CallOpts)
+// Solidity: function getRootBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetRootBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetRootBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetUpkeepingBanned is a free data retrieval call binding the contract method 0x72857ce2.
+// GetUpkeepingBannedVersion is a free data retrieval call binding the contract method 0x34b9d634.
 //
-// Solidity: function getUpkeepingBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCaller) GetUpkeepingBanned(opts *bind.CallOpts) (bool, error) {
+// Solidity: function getUpkeepingBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCaller) GetUpkeepingBannedVersion(opts *bind.CallOpts) (uint16, error) {
 	var (
-		ret0 = new(bool)
+		ret0 = new(uint16)
 	)
 	out := ret0
-	err := _AdminOwned.contract.Call(opts, out, "getUpkeepingBanned")
+	err := _AdminOwned.contract.Call(opts, out, "getUpkeepingBannedVersion")
 	return *ret0, err
 }
 
-// GetUpkeepingBanned is a free data retrieval call binding the contract method 0x72857ce2.
+// GetUpkeepingBannedVersion is a free data retrieval call binding the contract method 0x34b9d634.
 //
-// Solidity: function getUpkeepingBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedSession) GetUpkeepingBanned() (bool, error) {
-	return _AdminOwned.Contract.GetUpkeepingBanned(&_AdminOwned.CallOpts)
+// Solidity: function getUpkeepingBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedSession) GetUpkeepingBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetUpkeepingBannedVersion(&_AdminOwned.CallOpts)
 }
 
-// GetUpkeepingBanned is a free data retrieval call binding the contract method 0x72857ce2.
+// GetUpkeepingBannedVersion is a free data retrieval call binding the contract method 0x34b9d634.
 //
-// Solidity: function getUpkeepingBanned() view returns(bool)
-func (_AdminOwned *AdminOwnedCallerSession) GetUpkeepingBanned() (bool, error) {
-	return _AdminOwned.Contract.GetUpkeepingBanned(&_AdminOwned.CallOpts)
+// Solidity: function getUpkeepingBannedVersion() view returns(uint16)
+func (_AdminOwned *AdminOwnedCallerSession) GetUpkeepingBannedVersion() (uint16, error) {
+	return _AdminOwned.Contract.GetUpkeepingBannedVersion(&_AdminOwned.CallOpts)
 }
 
 // AlterAdminOwner is a paid mutator transaction binding the contract method 0x53e6d392.
@@ -469,193 +469,193 @@ func (_AdminOwned *AdminOwnedTransactorSession) AlterAdminOwner(newAdminOwner co
 	return _AdminOwned.Contract.AlterAdminOwner(&_AdminOwned.TransactOpts, newAdminOwner)
 }
 
-// SetChannelBanned is a paid mutator transaction binding the contract method 0xcc893e97.
+// SetChannelBannedVersion is a paid mutator transaction binding the contract method 0x26b3eb76.
 //
-// Solidity: function setChannelBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetChannelBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setChannelBanned", param)
+// Solidity: function setChannelBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetChannelBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setChannelBannedVersion", v)
 }
 
-// SetChannelBanned is a paid mutator transaction binding the contract method 0xcc893e97.
+// SetChannelBannedVersion is a paid mutator transaction binding the contract method 0x26b3eb76.
 //
-// Solidity: function setChannelBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetChannelBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetChannelBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setChannelBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetChannelBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetChannelBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetChannelBanned is a paid mutator transaction binding the contract method 0xcc893e97.
+// SetChannelBannedVersion is a paid mutator transaction binding the contract method 0x26b3eb76.
 //
-// Solidity: function setChannelBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetChannelBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetChannelBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setChannelBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetChannelBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetChannelBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetKPMapBanned is a paid mutator transaction binding the contract method 0x17ef9444.
+// SetKPMapBannedVersion is a paid mutator transaction binding the contract method 0x50523e07.
 //
-// Solidity: function setKPMapBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetKPMapBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setKPMapBanned", param)
+// Solidity: function setKPMapBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetKPMapBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setKPMapBannedVersion", v)
 }
 
-// SetKPMapBanned is a paid mutator transaction binding the contract method 0x17ef9444.
+// SetKPMapBannedVersion is a paid mutator transaction binding the contract method 0x50523e07.
 //
-// Solidity: function setKPMapBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetKPMapBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetKPMapBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setKPMapBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetKPMapBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetKPMapBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetKPMapBanned is a paid mutator transaction binding the contract method 0x17ef9444.
+// SetKPMapBannedVersion is a paid mutator transaction binding the contract method 0x50523e07.
 //
-// Solidity: function setKPMapBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetKPMapBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetKPMapBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setKPMapBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetKPMapBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetKPMapBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetKeeperBanned is a paid mutator transaction binding the contract method 0x902b218d.
+// SetKeeperBannedVersion is a paid mutator transaction binding the contract method 0xaf484b38.
 //
-// Solidity: function setKeeperBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetKeeperBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setKeeperBanned", param)
+// Solidity: function setKeeperBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetKeeperBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setKeeperBannedVersion", v)
 }
 
-// SetKeeperBanned is a paid mutator transaction binding the contract method 0x902b218d.
+// SetKeeperBannedVersion is a paid mutator transaction binding the contract method 0xaf484b38.
 //
-// Solidity: function setKeeperBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetKeeperBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetKeeperBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setKeeperBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetKeeperBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetKeeperBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetKeeperBanned is a paid mutator transaction binding the contract method 0x902b218d.
+// SetKeeperBannedVersion is a paid mutator transaction binding the contract method 0xaf484b38.
 //
-// Solidity: function setKeeperBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetKeeperBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetKeeperBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setKeeperBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetKeeperBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetKeeperBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetMapperBanned is a paid mutator transaction binding the contract method 0xe922e4ce.
+// SetMapperBannedVersion is a paid mutator transaction binding the contract method 0x7efa8370.
 //
-// Solidity: function setMapperBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetMapperBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setMapperBanned", param)
+// Solidity: function setMapperBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetMapperBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setMapperBannedVersion", v)
 }
 
-// SetMapperBanned is a paid mutator transaction binding the contract method 0xe922e4ce.
+// SetMapperBannedVersion is a paid mutator transaction binding the contract method 0x7efa8370.
 //
-// Solidity: function setMapperBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetMapperBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetMapperBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setMapperBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetMapperBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetMapperBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetMapperBanned is a paid mutator transaction binding the contract method 0xe922e4ce.
+// SetMapperBannedVersion is a paid mutator transaction binding the contract method 0x7efa8370.
 //
-// Solidity: function setMapperBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetMapperBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetMapperBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setMapperBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetMapperBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetMapperBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetOfferBanned is a paid mutator transaction binding the contract method 0x06909ba7.
+// SetOfferBannedVersion is a paid mutator transaction binding the contract method 0x8044c801.
 //
-// Solidity: function setOfferBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetOfferBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setOfferBanned", param)
+// Solidity: function setOfferBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetOfferBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setOfferBannedVersion", v)
 }
 
-// SetOfferBanned is a paid mutator transaction binding the contract method 0x06909ba7.
+// SetOfferBannedVersion is a paid mutator transaction binding the contract method 0x8044c801.
 //
-// Solidity: function setOfferBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetOfferBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetOfferBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setOfferBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetOfferBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetOfferBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetOfferBanned is a paid mutator transaction binding the contract method 0x06909ba7.
+// SetOfferBannedVersion is a paid mutator transaction binding the contract method 0x8044c801.
 //
-// Solidity: function setOfferBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetOfferBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetOfferBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setOfferBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetOfferBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetOfferBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetProviderBanned is a paid mutator transaction binding the contract method 0x9db22ae6.
+// SetProviderBannedVersion is a paid mutator transaction binding the contract method 0xe99680b1.
 //
-// Solidity: function setProviderBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetProviderBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setProviderBanned", param)
+// Solidity: function setProviderBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetProviderBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setProviderBannedVersion", v)
 }
 
-// SetProviderBanned is a paid mutator transaction binding the contract method 0x9db22ae6.
+// SetProviderBannedVersion is a paid mutator transaction binding the contract method 0xe99680b1.
 //
-// Solidity: function setProviderBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetProviderBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetProviderBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setProviderBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetProviderBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetProviderBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetProviderBanned is a paid mutator transaction binding the contract method 0x9db22ae6.
+// SetProviderBannedVersion is a paid mutator transaction binding the contract method 0xe99680b1.
 //
-// Solidity: function setProviderBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetProviderBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetProviderBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setProviderBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetProviderBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetProviderBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetQueryBanned is a paid mutator transaction binding the contract method 0x2321b8ae.
+// SetQueryBannedVersion is a paid mutator transaction binding the contract method 0x7ce82a90.
 //
-// Solidity: function setQueryBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetQueryBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setQueryBanned", param)
+// Solidity: function setQueryBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetQueryBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setQueryBannedVersion", v)
 }
 
-// SetQueryBanned is a paid mutator transaction binding the contract method 0x2321b8ae.
+// SetQueryBannedVersion is a paid mutator transaction binding the contract method 0x7ce82a90.
 //
-// Solidity: function setQueryBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetQueryBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetQueryBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setQueryBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetQueryBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetQueryBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetQueryBanned is a paid mutator transaction binding the contract method 0x2321b8ae.
+// SetQueryBannedVersion is a paid mutator transaction binding the contract method 0x7ce82a90.
 //
-// Solidity: function setQueryBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetQueryBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetQueryBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setQueryBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetQueryBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetQueryBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetRootBanned is a paid mutator transaction binding the contract method 0xfc3b6a39.
+// SetRootBannedVersion is a paid mutator transaction binding the contract method 0x50d38a99.
 //
-// Solidity: function setRootBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetRootBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setRootBanned", param)
+// Solidity: function setRootBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetRootBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setRootBannedVersion", v)
 }
 
-// SetRootBanned is a paid mutator transaction binding the contract method 0xfc3b6a39.
+// SetRootBannedVersion is a paid mutator transaction binding the contract method 0x50d38a99.
 //
-// Solidity: function setRootBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetRootBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetRootBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setRootBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetRootBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetRootBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetRootBanned is a paid mutator transaction binding the contract method 0xfc3b6a39.
+// SetRootBannedVersion is a paid mutator transaction binding the contract method 0x50d38a99.
 //
-// Solidity: function setRootBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetRootBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetRootBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setRootBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetRootBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetRootBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetUpkeepingBanned is a paid mutator transaction binding the contract method 0x1fed1561.
+// SetUpkeepingBannedVersion is a paid mutator transaction binding the contract method 0xc304b43f.
 //
-// Solidity: function setUpkeepingBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactor) SetUpkeepingBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
-	return _AdminOwned.contract.Transact(opts, "setUpkeepingBanned", param)
+// Solidity: function setUpkeepingBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactor) SetUpkeepingBannedVersion(opts *bind.TransactOpts, v uint16) (*types.Transaction, error) {
+	return _AdminOwned.contract.Transact(opts, "setUpkeepingBannedVersion", v)
 }
 
-// SetUpkeepingBanned is a paid mutator transaction binding the contract method 0x1fed1561.
+// SetUpkeepingBannedVersion is a paid mutator transaction binding the contract method 0xc304b43f.
 //
-// Solidity: function setUpkeepingBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedSession) SetUpkeepingBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetUpkeepingBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setUpkeepingBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedSession) SetUpkeepingBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetUpkeepingBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
-// SetUpkeepingBanned is a paid mutator transaction binding the contract method 0x1fed1561.
+// SetUpkeepingBannedVersion is a paid mutator transaction binding the contract method 0xc304b43f.
 //
-// Solidity: function setUpkeepingBanned(bool param) returns()
-func (_AdminOwned *AdminOwnedTransactorSession) SetUpkeepingBanned(param bool) (*types.Transaction, error) {
-	return _AdminOwned.Contract.SetUpkeepingBanned(&_AdminOwned.TransactOpts, param)
+// Solidity: function setUpkeepingBannedVersion(uint16 v) returns()
+func (_AdminOwned *AdminOwnedTransactorSession) SetUpkeepingBannedVersion(v uint16) (*types.Transaction, error) {
+	return _AdminOwned.Contract.SetUpkeepingBannedVersion(&_AdminOwned.TransactOpts, v)
 }
 
 // AdminOwnedAlterAdminOwnerIterator is returned from FilterAlterAdminOwner and is used to iterate over the raw logs and unpacked data for AlterAdminOwner events raised by the AdminOwned contract.
@@ -861,15 +861,15 @@ func (it *AdminOwnedSetBannedIterator) Close() error {
 
 // AdminOwnedSetBanned represents a SetBanned event raised by the AdminOwned contract.
 type AdminOwnedSetBanned struct {
-	Key   string
-	From  common.Address
-	Param bool
-	Raw   types.Log // Blockchain specific contextual infos
+	Key     string
+	From    common.Address
+	Version uint16
+	Raw     types.Log // Blockchain specific contextual infos
 }
 
-// FilterSetBanned is a free log retrieval operation binding the contract event 0x88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca.
+// FilterSetBanned is a free log retrieval operation binding the contract event 0xefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9.
 //
-// Solidity: event SetBanned(string key, address from, bool param)
+// Solidity: event SetBanned(string key, address from, uint16 version)
 func (_AdminOwned *AdminOwnedFilterer) FilterSetBanned(opts *bind.FilterOpts) (*AdminOwnedSetBannedIterator, error) {
 
 	logs, sub, err := _AdminOwned.contract.FilterLogs(opts, "SetBanned")
@@ -879,9 +879,9 @@ func (_AdminOwned *AdminOwnedFilterer) FilterSetBanned(opts *bind.FilterOpts) (*
 	return &AdminOwnedSetBannedIterator{contract: _AdminOwned.contract, event: "SetBanned", logs: logs, sub: sub}, nil
 }
 
-// WatchSetBanned is a free log subscription operation binding the contract event 0x88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca.
+// WatchSetBanned is a free log subscription operation binding the contract event 0xefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9.
 //
-// Solidity: event SetBanned(string key, address from, bool param)
+// Solidity: event SetBanned(string key, address from, uint16 version)
 func (_AdminOwned *AdminOwnedFilterer) WatchSetBanned(opts *bind.WatchOpts, sink chan<- *AdminOwnedSetBanned) (event.Subscription, error) {
 
 	logs, sub, err := _AdminOwned.contract.WatchLogs(opts, "SetBanned")
@@ -916,9 +916,9 @@ func (_AdminOwned *AdminOwnedFilterer) WatchSetBanned(opts *bind.WatchOpts, sink
 	}), nil
 }
 
-// ParseSetBanned is a log parse operation binding the contract event 0x88a2f5ad849982851810463cc052ff32213c45ba95d13cf29e38f09c5c0c4eca.
+// ParseSetBanned is a log parse operation binding the contract event 0xefd4f42e8a20becead4ea7727277fe199cfedb91fea800d50aa1466e01b4a1c9.
 //
-// Solidity: event SetBanned(string key, address from, bool param)
+// Solidity: event SetBanned(string key, address from, uint16 version)
 func (_AdminOwned *AdminOwnedFilterer) ParseSetBanned(log types.Log) (*AdminOwnedSetBanned, error) {
 	event := new(AdminOwnedSetBanned)
 	if err := _AdminOwned.contract.UnpackLog(event, "SetBanned", log); err != nil {

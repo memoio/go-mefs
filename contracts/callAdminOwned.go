@@ -74,8 +74,8 @@ func AlterOwner(hexKey string, adminOwnedAddress, newAdminOwner common.Address) 
 	return nil
 }
 
-//SetBanned set parameter represented by key
-func SetBanned(hexKey, key string, adminOwnedAddress common.Address, banned bool) error {
+//SetBannedVersion set bannedVersion represented by key
+func SetBannedVersion(hexKey, key string, adminOwnedAddress common.Address, version uint16) error {
 	client := GetClient(EndPoint)
 	adminOwnedContract, err := adminOwned.NewAdminOwned(adminOwnedAddress, client)
 	if err != nil {
@@ -92,23 +92,23 @@ func SetBanned(hexKey, key string, adminOwnedAddress common.Address, banned bool
 
 	switch key {
 	case "channel":
-		tx, err = adminOwnedContract.SetChannelBanned(auth, banned)
+		tx, err = adminOwnedContract.SetChannelBannedVersion(auth, version)
 	case "mapper":
-		tx, err = adminOwnedContract.SetMapperBanned(auth, banned)
+		tx, err = adminOwnedContract.SetMapperBannedVersion(auth, version)
 	case "query":
-		tx, err = adminOwnedContract.SetQueryBanned(auth, banned)
+		tx, err = adminOwnedContract.SetQueryBannedVersion(auth, version)
 	case "offer":
-		tx, err = adminOwnedContract.SetOfferBanned(auth, banned)
+		tx, err = adminOwnedContract.SetOfferBannedVersion(auth, version)
 	case "upkeeping":
-		tx, err = adminOwnedContract.SetUpkeepingBanned(auth, banned)
+		tx, err = adminOwnedContract.SetUpkeepingBannedVersion(auth, version)
 	case "root":
-		tx, err = adminOwnedContract.SetRootBanned(auth, banned)
+		tx, err = adminOwnedContract.SetRootBannedVersion(auth, version)
 	case "keeper":
-		tx, err = adminOwnedContract.SetKeeperBanned(auth, banned)
+		tx, err = adminOwnedContract.SetKeeperBannedVersion(auth, version)
 	case "provider":
-		tx, err = adminOwnedContract.SetProviderBanned(auth, banned)
+		tx, err = adminOwnedContract.SetProviderBannedVersion(auth, version)
 	case "kpMap":
-		tx, err = adminOwnedContract.SetKPMapBanned(auth, banned)
+		tx, err = adminOwnedContract.SetKPMapBannedVersion(auth, version)
 	default:
 		log.Println("unsupported key")
 		return nil
@@ -133,7 +133,7 @@ func SetBanned(hexKey, key string, adminOwnedAddress common.Address, banned bool
 	event := struct {
 		Key   string
 		From  common.Address
-		Param bool
+		Version uint16
 	}{}
 
 	err = contractABI.Unpack(&event, "SetBanned", receipt.Logs[0].Data)
@@ -141,57 +141,57 @@ func SetBanned(hexKey, key string, adminOwnedAddress common.Address, banned bool
 		log.Println("setBanned tx err:", err)
 		return err
 	}
-	fmt.Println("Log.key:", event.Key, "Log.from:", event.From.String(), "Log.param:", event.Param)
+	fmt.Println("Log.key:", event.Key, "Log.from:", event.From.String(), "Log.version:", event.Version)
 
 	return nil
 }
 
-//GetBanned get parameter represented by key
-func GetBanned(key string, adminOwnedAddress, localAddress common.Address) (bool, error) {
+//GetBannedVersion get bannedVersion represented by key
+func GetBannedVersion(key string, adminOwnedAddress, localAddress common.Address) (uint16, error) {
 	client := GetClient(EndPoint)
 	adminOwnedContract, err := adminOwned.NewAdminOwned(adminOwnedAddress, client)
 	if err != nil {
 		log.Println("getAdminOwnedErr:", err)
-		return false, err
+		return 0, err
 	}
 
-	var banned bool
+	var bannedVersion uint16
 
 	switch key {
 	case "channel":
-		banned, err = adminOwnedContract.GetChannelBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetChannelBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "mapper":
-		banned, err = adminOwnedContract.GetMapperBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetMapperBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "query":
-		banned, err = adminOwnedContract.GetQueryBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetQueryBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "offer":
-		banned, err = adminOwnedContract.GetOfferBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetOfferBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "upkeeping":
-		banned, err = adminOwnedContract.GetUpkeepingBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetUpkeepingBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "root":
-		banned, err = adminOwnedContract.GetRootBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetRootBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "keeper":
-		banned, err = adminOwnedContract.GetKeeperBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetKeeperBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "provider":
-		banned, err = adminOwnedContract.GetProviderBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetProviderBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	case "kpMap":
-		banned, err = adminOwnedContract.GetKPMapBanned(&bind.CallOpts{
+		bannedVersion, err = adminOwnedContract.GetKPMapBannedVersion(&bind.CallOpts{
 			From: localAddress,
 		})
 	default:
@@ -200,7 +200,7 @@ func GetBanned(key string, adminOwnedAddress, localAddress common.Address) (bool
 
 	if err != nil {
 		log.Println("get Banned error:", err)
-		return false, err
+		return 0, err
 	}
-	return banned, nil
+	return bannedVersion, nil
 }
