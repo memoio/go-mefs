@@ -30,7 +30,7 @@ var EndPoint string
 
 const (
 	//indexerHex indexerAddress, it is well known
-	indexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
+	indexerHex = "0xA36D0F4e56b76B89532eBbca8108d90d8cA006c2"
 	//InvalidAddr implements invalid contracts-address
 	InvalidAddr               = "0x0000000000000000000000000000000000000000"
 	spaceTimePayGasLimit      = uint64(8000000)
@@ -42,15 +42,15 @@ const (
 )
 
 const (
-	keeperKey   = "keeperV2"
-	providerKey = "providerV2"
-	kpMapKey    = "kpMapV1"
+	keeperKey   = "keeperV0"
+	providerKey = "providerV0"
+	kpMapKey    = "kpMapV0"
 
-	offerKey   = "offerV1"
-	queryKey   = "queryV1"
-	ukey       = "upKeepingV2"
-	rootKey    = "rootV1"
-	channelKey = "channelV1"
+	offerKey   = "offerV0"
+	queryKey   = "queryV0"
+	ukey       = "upKeepingV0"
+	rootKey    = "rootV0"
+	channelKey = "channelV0"
 )
 
 var (
@@ -93,7 +93,7 @@ type LogCloseChannel struct {
 }
 
 func init() {
-	EndPoint = "http://212.64.28.207:8101"
+	EndPoint = "http://119.147.213.219:8101"
 }
 
 //GetClient get rpc-client based the endPoint
@@ -156,7 +156,7 @@ func GetLatestBlock() (*types.Block, error) {
 	return b, nil
 }
 
-// DeployIndexer deploy role's indexer and add it to admin indexer
+// DeployIndexer deploy indexer-contract
 func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 	var indexerAddr, indexerAddress common.Address
 	var indexerInstance, indexerIns *indexer.Indexer
@@ -194,7 +194,7 @@ func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 			if retryCount > sendTransactionRetryCount {
 				return indexerAddr, indexerInstance, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -211,6 +211,32 @@ func DeployIndexer(hexKey string) (common.Address, *indexer.Indexer, error) {
 	}
 	log.Println("indexer has been successfully deployed!")
 	return indexerAddr, indexerInstance, nil
+}
+
+//GetIndexerOwner get the owner's address of indexer-contract
+func GetIndexerOwner(localAddress common.Address, indexerInstance *indexer.Indexer) (common.Address, error) {
+	retryCount := 0
+	for {
+		retryCount++
+		indexerOwnerAddr, err := indexerInstance.GetOwner(&bind.CallOpts{
+			From: localAddress,
+		})
+		if err != nil {
+			if retryCount > 10 {
+				log.Println("get indexerOwner err: ", err)
+				return indexerOwnerAddr, err
+			}
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if len(indexerOwnerAddr) == 0 || indexerOwnerAddr.String() == InvalidAddr {
+			log.Println("get empty indexerOwner addr")
+			return indexerOwnerAddr, ErrEmpty
+		}
+
+		return indexerOwnerAddr, nil
+	}
 }
 
 // AddToIndexer adds
@@ -251,7 +277,7 @@ func AddToIndexer(localAddress, addAddr common.Address, key, hexKey string, admi
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -300,7 +326,7 @@ func AlterAddrInIndexer(localAddress, addAddr common.Address, key, hexKey string
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -332,7 +358,7 @@ func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance
 				log.Println("get addr from indexer err: ", err)
 				return resolverAddr, ownAddr, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -383,7 +409,7 @@ func DeployResolver(hexKey string) (common.Address, *resolver.Resolver, error) {
 			if retryCount > sendTransactionRetryCount {
 				return resolverAddr, resolverInstance, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -435,7 +461,7 @@ func AddToResolver(addAddr common.Address, hexKey string, resolverInstance *reso
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -467,7 +493,7 @@ func GetAddrFromResolver(localAddress common.Address, ownerAddress common.Addres
 				log.Println("getMapperAddrErr:", err)
 				return mapperAddr, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 		if len(mapperAddr) == 0 || mapperAddr.String() == InvalidAddr {
@@ -516,7 +542,7 @@ func DeployMapper(localAddress common.Address, hexKey string) (common.Address, *
 			if retryCount > sendTransactionRetryCount {
 				return mapperAddr, mapperInstance, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -565,7 +591,7 @@ func AddToMapper(addr common.Address, hexKey string, mapperInstance *mapper.Mapp
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -597,7 +623,7 @@ func GetAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapp
 				log.Println("get addr from mapper err:", err)
 				return nil, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 		if len(channels) == 0 || channels[len(channels)-1].String() == InvalidAddr {
@@ -873,7 +899,7 @@ func CheckTx(tx *types.Transaction) error {
 		if receipt != nil {
 			break
 		}
-		time.Sleep(60 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 
 	if receipt == nil { //30分钟获取不到交易信息，判定交易失败

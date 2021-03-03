@@ -19,9 +19,9 @@ const (
 )
 
 func main() {
-	//--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101      testnet网
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;")               //dev网
-	addr := flag.String("addr", "0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6", "transfer to") //dev网，用于keeper、provider连接
+	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")             //dev网
+	addr := flag.String("addr", "0x1a249DB4cc739BD53b05E2082D3724b7e033F74F", "transfer to") //dev网，用于keeper、provider连接
 	money := flag.Int64("money", 6, "transfer money")
 
 	flag.Parse()
@@ -32,7 +32,7 @@ func main() {
 	contracts.EndPoint = ethEndPoint
 	qethEndPoint = ethEndPoint
 
-	num := test.QueryBalance("0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6", ethEndPoint)
+	num := test.QueryBalance("0x1a249DB4cc739BD53b05E2082D3724b7e033F74F", ethEndPoint)
 
 	moneyTo := new(big.Int).Mul(big.NewInt(eth2Wei), big.NewInt(toMoney))
 

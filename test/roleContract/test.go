@@ -17,16 +17,16 @@ import (
 const (
 	kpAddr  = "0x208649111Fd9253B76950e9f827a5A6dd616340d"
 	kpSk    = "8f9eb151ffaebf2fe963e6185f0d1f8c1e8397e5905b616958d765e7753329ea"
-	adminSk = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
+	adminSk = "aca26228a9ed5ca4da2dd08d225b1b1e049d80e1b126c0d7e644d04d0fb910a3"
 	moneyTo = 1000000000000000000
 )
 
 var ethEndPoint, qethEndPoint string
 
 func main() {
-	flag.String("testnet", "--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101", "testnet commands")
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
-	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+	flag.String("testnet", "--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101", "testnet commands")
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query;")
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
@@ -92,7 +92,7 @@ func testKeeper() (err error) {
 	retryCount := 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsKeeper(keeperAddr)
 		if err != nil || res == false {
 			if retryCount > 20 {
@@ -177,7 +177,7 @@ func testProvider() (err error) {
 	retryCount := 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsProvider(proAddr)
 		if err != nil || res == false {
 			if retryCount > 20 {
@@ -251,7 +251,7 @@ func testRole() (err error) {
 	retryCount := 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsKeeper(keeperAddr)
 		if err != nil || res == false {
 			if retryCount > 20 {
@@ -291,7 +291,7 @@ func testRole() (err error) {
 	retryCount = 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsProvider(providerAddr)
 		if err != nil || res == false {
 			if retryCount > 20 {
@@ -324,7 +324,7 @@ func testRole() (err error) {
 	flag := false
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		kps, err := contracts.GetAllKeeperInKPMap(keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -357,7 +357,7 @@ func testRole() (err error) {
 	flag = false
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		pids, err := contracts.GetProviderInKPMap(providerAddr, keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -406,7 +406,7 @@ func testRole() (err error) {
 	retryCount = 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsProvider(providerAddr2)
 		if err != nil || res == false {
 			if retryCount > 20 {
@@ -432,7 +432,7 @@ func testRole() (err error) {
 	flag = false
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		pids, err := contracts.GetProviderInKPMap(providerAddr2, keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -474,7 +474,7 @@ func testRole() (err error) {
 	flag = false
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		pids, err := contracts.GetProviderInKPMap(providerAddr, keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -515,7 +515,7 @@ func testRole() (err error) {
 	flag = false
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		kps, err := contracts.GetAllKeeperInKPMap(keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -555,7 +555,7 @@ func testRole() (err error) {
 	retryCount = 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsKeeper(keeperAddr)
 		if err != nil || res == true {
 			if retryCount > 20 {
@@ -579,7 +579,7 @@ func testRole() (err error) {
 	retryCount = 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsProvider(providerAddr)
 		if err != nil || res == true {
 			if retryCount > 20 {
@@ -603,7 +603,7 @@ func testRole() (err error) {
 	retryCount = 0
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		res, err := contracts.IsProvider(providerAddr2)
 		if err != nil || res == true {
 			if retryCount > 20 {

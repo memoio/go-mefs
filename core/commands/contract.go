@@ -22,13 +22,11 @@ import (
 )
 
 const (
-	adminSk   = "928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4"
+	adminSk   = "aca26228a9ed5ca4da2dd08d225b1b1e049d80e1b126c0d7e644d04d0fb910a3"
 	codeName  = "whoisyourdaddy"
-	adminAddr = "0x0eb5b66c31b3c5a12aae81a9d629540b6433cac6"
-	//adminOwnedSk   = "610325c06962bd42f90c28f8883c679072856a00768e9067dfbafc93a38a4ef3"
-	//adminOwnedAddr = "0xe21A916e23164D1f3E342399dAB1b5F9F81ED486"
+	adminAddr = "0x1a249DB4cc739BD53b05E2082D3724b7e033F74F"
 	//Dev链和testnet链上的AdminOwned合约地址
-	adminOwnedContractAddr = "0xAcF8e37D9e3Dcb47423f2938069c11D75dE17A20"
+	adminOwnedContractAddr = "0x8026796Fd7cE63EAe824314AA5bacF55643e893d"
 )
 
 type StringList struct {
@@ -73,6 +71,7 @@ var ContractCmd = &cmds.Command{
 		"alterAdminOwner":          alterAdminOwnerCmd,
 		"setBannedVersion":         setBannedCmd,
 		"getBannedVersion":         getBannedCmd,
+		"deployRecover":            deployRecoverCmd, //部署recover合约
 	},
 }
 
@@ -85,7 +84,7 @@ var deployResolverCmd = &cmds.Command{
 		cmds.StringArg("key", true, true, "The resolver key."),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -134,7 +133,7 @@ var deployKeeperCmd = &cmds.Command{
 		ShortDescription: "deploy keeper contract，we need remember the hexPk for testing setKeeper",
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -183,7 +182,7 @@ var setKeeperCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{ //选项列表
 		cmds.BoolOption("isKeeper", "isk", "set the address is keeper when it is true").WithDefault(true),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -228,7 +227,7 @@ var isKeeperCmd = &cmds.Command{
 		cmds.StringArg("address", true, true, "The address to test if it is Role keeper."),
 	},
 	Options: []cmds.Option{ //选项列表
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -268,7 +267,7 @@ var isProviderCmd = &cmds.Command{
 		cmds.StringArg("address", true, true, "The address to test if it is Role provider."),
 	},
 	Options: []cmds.Option{ //选项列表
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -306,7 +305,7 @@ var setKeeperPriceCmd = &cmds.Command{
 
 	Options: []cmds.Option{ //选项列表
 		cmds.Int64Option("depositPrice", "price", "deposit price").WithDefault(utils.KeeperDeposit),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -358,7 +357,7 @@ var deployProviderCmd = &cmds.Command{
 		ShortDescription: "deploy provider contract，we need remember the hexPk for testing setProvider",
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -407,7 +406,7 @@ var setProviderCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{ //选项列表
 		cmds.BoolOption("isProvider", "isp", "set the address is provider when it is true").WithDefault(true),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -449,7 +448,7 @@ var setProviderPriceCmd = &cmds.Command{
 
 	Options: []cmds.Option{ //选项列表
 		cmds.Int64Option("depositPrice", "price", "deposit price").WithDefault(utils.ProviderDeposit),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -501,7 +500,7 @@ var deployKeeperProviderMapCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
@@ -548,7 +547,7 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
@@ -712,7 +711,7 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
@@ -769,7 +768,7 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
@@ -824,7 +823,7 @@ var getProviderInKPMapCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
@@ -886,7 +885,7 @@ var getAllKeeperInKPMapCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
@@ -943,7 +942,7 @@ var deployAdminOwnedCmd = &cmds.Command{
 		ShortDescription: "deploy adminOwned contract，we need remember the address of adminOwned contract",
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -989,7 +988,7 @@ var getAdminOwnerCmd = &cmds.Command{
 		ShortDescription: "get the owner of AdminOwned-contract",
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -1042,7 +1041,7 @@ var alterAdminOwnerCmd = &cmds.Command{
 		cmds.StringArg("addr", true, false, "The new owner of AdminOwner-contract."),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -1088,7 +1087,7 @@ var setBannedCmd = &cmds.Command{
 		ShortDescription: "set the param 'banned' of AdminOwned-contract",
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 		cmds.UintOption("BannedVersion", "bv", "Set the bannedVersion").WithDefault(0),
 		cmds.StringOption("ParamKey", "k", "Specify parameter index, can be: mapper、offer、query、channel、upkeeping、root、keeper、provider、kpMap").WithDefault("root"),
@@ -1145,7 +1144,7 @@ var getBannedCmd = &cmds.Command{
 		ShortDescription: "get the param 'banned' of AdminOwned-contract",
 	},
 	Options: []cmds.Option{
-		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://212.64.28.207:8101"),
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 		cmds.StringOption("ParamKey", "k", "Specify parameter index, can be: mapper、offer、query、channel、upkeeping、root、keeper、provider、kpMap").WithDefault("root"),
 	},
@@ -1191,6 +1190,52 @@ var getBannedCmd = &cmds.Command{
 	Encoders: cmds.EncoderMap{
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
 			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+var deployRecoverCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "test deployRecover",
+		ShortDescription: "deploy recover contract，we need remember the address of recover contract, and then write it in other contract",
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.219:8101"),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		hexSk := adminSk
+		recoverAddr, err := contracts.DeployRecover(hexSk)
+		if err != nil {
+			fmt.Println("recover合约部署错误:", err)
+			return err
+		}
+		fmt.Println("recover合约部署合约成功")
+
+		list := &StringList{
+			ChildLists: []string{recoverAddr.String()},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "contract address: %s", fl)
 			return err
 		}),
 	},

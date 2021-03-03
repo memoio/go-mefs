@@ -52,7 +52,7 @@ func Init(out io.Writer, sk string) (*Config, string, error) {
 		},
 
 		IsInit: true,
-		Eth:    "http://212.64.28.207:8101",
+		Eth:    "http://119.147.213.219:8101",
 		Test:   false,
 
 		Gateway: Gateway{
@@ -118,7 +118,7 @@ func InitTestnet(out io.Writer, sk string) (*Config, string, error) {
 		},
 
 		IsInit: true,
-		Eth:    "http://47.92.5.51:8101",
+		Eth:    "http://119.147.213.219:8101",
 		Test:   false,
 
 		Gateway: Gateway{

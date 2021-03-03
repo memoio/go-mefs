@@ -9,8 +9,8 @@ stages:
 variables:
   UPCOUNT: "50"
   NETKEY: "dev"
-  ETHENDPOINT: "http://212.64.28.207:8101"
-  QETHENDPOINT: "http://39.100.146.165:8101"
+  ETHENDPOINT: "http://119.147.213.219:8101"
+  QETHENDPOINT: "http://119.147.213.219:8101"
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
@@ -26,7 +26,7 @@ role-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/role
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -38,7 +38,7 @@ bls12-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/crypto/bls12
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -50,7 +50,7 @@ contracts-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/contracts
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -62,7 +62,7 @@ data_format-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/data-format
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -74,7 +74,7 @@ utils-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/utils
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -86,7 +86,7 @@ mefs-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/cmd
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -100,7 +100,7 @@ compile:
     - GO111MODULE=off make keeper
     - GO111MODULE=off make provider
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
 
 unit_test:
   stage: short-test
@@ -110,7 +110,7 @@ unit_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off make test
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
 
 role_test:
   stage: short-test
@@ -121,7 +121,7 @@ role_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/roleContract/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -134,7 +134,7 @@ query_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/query/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -147,7 +147,7 @@ offer_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/offer/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -160,7 +160,7 @@ upkeeping_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/upkeeping/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -173,7 +173,7 @@ channel_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/channel/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -186,7 +186,7 @@ root_test:
     - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/root/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -206,7 +206,7 @@ lfs_test:
     - cat ~/.mefs/logs/info.log
     - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -226,7 +226,7 @@ share_test:
     - cat ~/.mefs/logs/info.log
     - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -246,7 +246,7 @@ challenge_test:
     - cat ~/.mefs/logs/info.log
     - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -267,6 +267,6 @@ upload_test:
     - cat ~/.mefs/logs/info.log
     - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules

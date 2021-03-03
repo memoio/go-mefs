@@ -27,8 +27,8 @@ const (
 var ethEndPoint, qethEndPoint string
 
 func main() {
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
-	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query;")
 
 	flag.Parse()
 	ethEndPoint = *eth
