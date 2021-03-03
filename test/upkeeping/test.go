@@ -50,9 +50,9 @@ var ethEndPoint, qethEndPoint string
 var success bool
 
 func main() {
-	flag.String("testnet", "--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101", "testnet commands")
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;")
-	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address;")
+	flag.String("testnet", "--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101", "testnet commands")
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")
+	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;")
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
@@ -157,7 +157,7 @@ func ukTest() error {
 			log.Fatal("Upkeeping has no balance")
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 
 	log.Println("4.begin to query upkeeping's information")

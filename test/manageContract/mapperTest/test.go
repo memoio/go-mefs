@@ -16,14 +16,14 @@ var (
 )
 
 const ( //indexerHex indexerAddress, it is well known
-	indexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
+	indexerHex = "0xA36D0F4e56b76B89532eBbca8108d90d8cA006c2"
 	moneyTo    = 1000000000000000
 )
 
 func main() {
-	//--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101      testnet网
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address;")    //dev网，用于user连接
-	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address;") //dev网，用于keeper、provider连接
+	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")   //dev网，用于user连接
+	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;") //dev网，用于keeper、provider连接
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth

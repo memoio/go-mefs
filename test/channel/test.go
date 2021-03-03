@@ -22,9 +22,9 @@ const (
 var ethEndPoint, qethEndPoint string
 
 func main() {
-	flag.String("testnet", "--eth=http://47.92.5.51:8101 --qeth=http://39.100.146.21:8101", "testnet commands")
-	eth := flag.String("eth", "http://212.64.28.207:8101", "eth api address for set;")
-	qeth := flag.String("qeth", "http://39.100.146.165:8101", "eth api address for query;")
+	flag.String("testnet", "--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101", "testnet commands")
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set;")
+	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query;")
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
@@ -68,7 +68,7 @@ func testChannelTimeout() (err error) {
 	providerAddr := common.HexToAddress(proAddr[2:])
 	localAddr := common.HexToAddress(userAddr[2:])
 
-	timeout := big.NewInt(5 * 60)
+	timeout := big.NewInt(3 * 60)
 	moneyToChannel := big.NewInt(1000000)
 
 	log.Println("test deploy channel contract")
@@ -78,13 +78,13 @@ func testChannelTimeout() (err error) {
 		return err
 	}
 
-	log.Println("test query channel balance: ", channelAddr.String())
+	log.Println("test query channel balance of ", channelAddr.String())
 	contracts.EndPoint = qethEndPoint
 	retryCount := 0
 	cbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		cbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if cbalance.Cmp(big.NewInt(0)) == 0 {
 			if retryCount > 20 {
@@ -110,6 +110,7 @@ func testChannelTimeout() (err error) {
 	}
 
 	log.Println("test channel timeout")
+	time.Sleep(3 * time.Minute)
 	//触发channelTimeout()
 	contracts.EndPoint = ethEndPoint
 	err = contracts.ChannelTimeout(channelAddr, userSk)
@@ -122,7 +123,7 @@ func testChannelTimeout() (err error) {
 	nbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		nbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if nbalance.Cmp(cbalance) == 0 {
 			if retryCount > 20 {
@@ -192,7 +193,7 @@ func testCloseChannel() (err error) {
 	cbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		cbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if cbalance.Cmp(big.NewInt(0)) == 0 {
 			if retryCount > 20 {
@@ -249,7 +250,7 @@ func testCloseChannel() (err error) {
 	nbalance := test.QueryBalance(channelAddr.String(), qethEndPoint)
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		nbalance = test.QueryBalance(channelAddr.String(), qethEndPoint) //查看部署的channel合约的账户余额
 		if nbalance.Cmp(big.NewInt(0)) > 0 {
 			if retryCount > 20 {
@@ -266,7 +267,7 @@ func testCloseChannel() (err error) {
 	ubalance := test.QueryBalance(userAddr, qethEndPoint)
 	for {
 		retryCount++
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 		ubalance = test.QueryBalance(userAddr, qethEndPoint)
 		if ubalance.Cmp(balance) == 0 {
 			if retryCount > 20 {

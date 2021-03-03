@@ -17,8 +17,8 @@ var ethEndPoint, qethEndPoint string
 
 func main() {
 	count := flag.Int("count", 20, "count of files downloaded each time")
-	eth := flag.String("eth", "http://47.92.5.51:8101", "eth api address for set")
-	qeth := flag.String("qeth", "http://39.100.146.21:8101", "eth api address for query")
+	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set")
+	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query")
 
 	flag.Parse()
 	ethEndPoint = *eth

@@ -25,7 +25,7 @@ type Config struct {
 	API       API       // local node's API settings
 	Swarm     SwarmConfig
 	IsInit    bool   //local node's status:init or not
-	Eth       string //ethereum private chain, default is "http://212.64.28.207:8101"
+	Eth       string //ethereum private chain, default is "http://119.147.213.219:8101"
 	Test      bool   //if Test is true, run for testing
 
 	Experimental Experiments

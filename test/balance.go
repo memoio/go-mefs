@@ -26,7 +26,7 @@ func TransferTo(value *big.Int, addr, eth, qeth string) error {
 		log.Fatal(err)
 	}
 
-	privateKey, err := crypto.HexToECDSA("928969b4eb7fbca964a41024412702af827cbc950dbe9268eae9f5df668c85b4")
+	privateKey, err := crypto.HexToECDSA("aca26228a9ed5ca4da2dd08d225b1b1e049d80e1b126c0d7e644d04d0fb910a3")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,7 +54,6 @@ func TransferTo(value *big.Int, addr, eth, qeth string) error {
 		if retry > 10 {
 			return errors.New("fail to transfer")
 		}
-		time.Sleep(60 * time.Second)
 		retry++
 		nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 		if err != nil {
@@ -81,12 +80,12 @@ func TransferTo(value *big.Int, addr, eth, qeth string) error {
 
 		qCount := 0
 		for qCount < 10 {
-			time.Sleep(60 * time.Second)
 			balance := QueryBalance(addr, qeth)
 			if balance.Cmp(value) >= 0 {
 				break
 			}
 			fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
+			time.Sleep(20 * time.Second)
 		}
 
 		if qCount < 10 {

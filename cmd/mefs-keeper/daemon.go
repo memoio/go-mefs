@@ -304,9 +304,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 			if nKey == "testnet" {
-				cfg.Eth = "http://39.100.146.21:8101"
+				cfg.Eth = "http://119.147.213.219:8101"
 			} else {
-				cfg.Eth = "http://39.100.146.165:8101"
+				cfg.Eth = "http://119.147.213.219:8101"
 			}
 		} else {
 			isProvider, err := role.IsProvider(nid)
@@ -317,9 +317,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			if isProvider {
 				cfg.Role = metainfo.RoleProvider
 				if nKey == "testnet" {
-					cfg.Eth = "http://39.100.146.21:8101"
+					cfg.Eth = "http://119.147.213.219:8101"
 				} else {
-					cfg.Eth = "http://39.100.146.165:8101"
+					cfg.Eth = "http://119.147.213.219:8101"
 				}
 			} else {
 				cfg.Role = metainfo.RoleUser
