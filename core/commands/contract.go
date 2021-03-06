@@ -332,7 +332,7 @@ var setKeeperPriceCmd = &cmds.Command{
 
 		localAddr := common.HexToAddress(adminAddr[2:])
 
-		oldPrice, err := contracts.GetProviderPrice(localAddr)
+		oldPrice, err := contracts.GetKeeperPrice(localAddr)
 		if err != nil {
 			fmt.Println("get Keeper price err:", err)
 			return err

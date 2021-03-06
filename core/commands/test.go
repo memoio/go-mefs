@@ -8,12 +8,19 @@ package commands
 import (
 	"fmt"
 	"io"
+	"math/big"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
+	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
+)
+
+const (
+	moneyTo  = 1100000000000000000
+	multiple = 1000
 )
 
 var TestCmd = &cmds.Command{
@@ -24,10 +31,37 @@ var TestCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"helloworld":  helloWorldCmd, //命令行操作写法示例
-		"localinfo":   infoCmd,
-		"showBalance": showBalanceCmd, //用于测试，查看自己的余额或者指定账户的余额
-		"mcl":         mclCmd,
+		"helloworld":    helloWorldCmd, //命令行操作写法示例
+		"localinfo":     infoCmd,
+		"showBalance":   showBalanceCmd, //用于测试，查看自己的余额或者指定账户的余额
+		"mcl":           mclCmd,
+		"transferMoney": transferCmd, //用于给指定账户转账
+	},
+}
+
+var transferCmd = &cmds.Command{
+
+	Helptext: cmds.HelpText{
+		Tagline: "transfer money to the account",
+		ShortDescription: `
+		'
+		mefs test transferMoney transfer money to the account
+		`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Options: []cmds.Option{
+		cmds.StringOption("address", "addr", "The practice user's addressid that you want to transfer to").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		toAddr, _ := req.Options["address"].(string)
+		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.219:8101", "http://119.147.213.219:8101")
+
+		balances, err := contracts.QueryBalance(toAddr)
+		if err != nil {
+			return err
+		}
+		return cmds.EmitOnce(res, balances)
 	},
 }
 
