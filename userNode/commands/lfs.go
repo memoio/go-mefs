@@ -370,7 +370,7 @@ var lfsStartUserCmd = &cmds.Command{
 					return errWrongInput
 				}
 
-				deUnit := cap[len(cap)-2 : len(cap)]
+				deUnit := cap[len(cap)-2:]
 				switch deUnit {
 				case "MB":
 					capacity = res
