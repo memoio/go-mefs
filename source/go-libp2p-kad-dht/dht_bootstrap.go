@@ -20,10 +20,10 @@ func init() {
 	for _, s := range []string{
 		"/ip4/119.3.159.159/tcp/4001/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp",
 		"/ip4/39.100.145.251/tcp/4001/p2p/8MGRqoRZisBforqyu8eCim2e1MiohV",
-		"/ip4/47.90.212.117/tcp/4001/p2p/8MHsfVNmRYiCNUaofa1b34VoymnRm4",
+		"/ip4/212.64.28.207/tcp/4001/p2p/8MHsfVNmRYiCNUaofa1b34VoymnRm4",
 		"/ip4/39.98.240.7/tcp/4001/p2p/8MK6qHvAfayLQy4d2684NTLAVLpQFk",
 		"/ip4/39.100.0.162/tcp/4001/p2p/8MJ5cAWfAP86cHmAcC3dxqzK41dh4a",
-		"/ip4/47.90.252.189/tcp/4001/p2p/8MH4Woxb2FkM5nFr86dHj21fLgEybi",
+		"/ip4/47.92.5.51/tcp/4001/p2p/8MH4Woxb2FkM5nFr86dHj21fLgEybi",
 	} {
 		ma, err := multiaddr.NewMultiaddr(s)
 		if err != nil {

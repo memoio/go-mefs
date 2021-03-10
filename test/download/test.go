@@ -30,7 +30,7 @@ func main() {
 	}
 }
 
-//从指定user节点上重复下载文件
+//指定user节点,重复下载文件
 func downloadTest(count int) error {
 	sh := shell.NewShell("http://121.37.158.192:5001")
 
