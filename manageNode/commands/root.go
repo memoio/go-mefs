@@ -32,6 +32,7 @@ BASIC COMMANDS
 ADVANCED COMMANDS
   daemon        Start a long-running daemon process
   repo          Manipulate the MEFS repository
+  create		Create a new account
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
@@ -42,6 +43,12 @@ NETWORK COMMANDS
 TOOL COMMANDS
   config        Manage configuration
   version       Show MEfs version information
+  info			List information about Keeper
+  shutdown		Shutdown mefs-keeper daemon
+  contract		Some contract functions 
+  test			Some test functions
+  list			List keepers and providers
+  sys			Print system diagnostic information
   commands      List all available commands
 
 Use 'mefs-keeper <command> --help' to learn more about each command.

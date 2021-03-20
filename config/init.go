@@ -207,7 +207,7 @@ func DefaultDatastoreConfig() Datastore {
 	}
 }
 
-// identityConfig initializes a new identity.
+// CreateIdentity initializes a new identity.
 func CreateIdentity(out io.Writer, hexSk string) (Identity, error) {
 	// TODO guard higher up
 	ident := Identity{}
@@ -254,6 +254,7 @@ func CreateIdentity(out io.Writer, hexSk string) (Identity, error) {
 	}
 	ident.PeerID = pid
 	ident.PrivKey = id.ECDSAByteToString(id.ToECDSAByte(sk))
+	fmt.Fprintf(out, "peer secretKey: %s\n", ident.PrivKey)
 
 	return ident, nil
 }

@@ -33,7 +33,8 @@ ADVANCED COMMANDS
   lfs           Manage User Log FileSystem
   repo          Manipulate the MEFS repository
   contract      Some contract functions
-  gateway 		start gateWay
+  gateway 		Start gateWay
+  create		Create a new account
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
@@ -45,6 +46,10 @@ TOOL COMMANDS
   config        Manage configuration
   version       Show MEfs version information
   commands      List all available commands
+  shutdown		Kill mefs-user daemon
+  test			Some test functions
+  list			List keepers and providers
+  sys			Print system diagnostic information
 
 Use 'mefs-user <command> --help' to learn more about each command.
 
@@ -85,7 +90,7 @@ var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
 	"lfs":       LfsCmd,
 	"gateway":   GatewayCmd,
-	"block":     newcmd.BlockCmd,
+	"block":     newcmd.BlockCmd,  //not use
 	"bootstrap": newcmd.BootstrapCmd,
 	"config":    newcmd.ConfigCmd,
 	"dht":       newcmd.DhtCmd,
