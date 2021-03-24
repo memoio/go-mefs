@@ -12,7 +12,7 @@ import (
 
 // 自/data-format/common.go，目前segment的default size为4KB
 const (
-	AtomCount = 1024
+	SCount = 1024
 )
 
 // the data structures for the Proof of data possession
@@ -100,11 +100,11 @@ func GenKeySetV1WithSeed(seed []byte, count int) (*KeySetV1, error) {
 // GenKeySetV1 create instance
 func GenKeySetV1() (*KeySetV1, error) {
 	pk := &PublicKeyV1{
-		Count:      AtomCount,
-		ElemAlphas: make([]G1, AtomCount),
+		Count:      SCount,
+		ElemAlphas: make([]G1, SCount),
 	}
 	sk := &SecretKeyV1{
-		ElemAlpha: make([]Fr, AtomCount),
+		ElemAlpha: make([]Fr, SCount),
 	}
 	ks := &KeySetV1{pk, sk}
 

@@ -300,25 +300,20 @@ func TestVerifyProof(t *testing.T) {
 		panic(err)
 	}
 
-	segments := make([][]byte, SegNum/2)
-	blocks := make([]string, SegNum/2)
-	for i := 0; i < SegNum/4; i++ {
+	segments := make([][]byte, SegNum)
+	blocks := make([]string, SegNum)
+	for i := 0; i < SegNum; i++ {
 		segments[i] = data[SegSize*i : SegSize*(i+1)]
 		blocks[i] = strconv.Itoa(i)
 	}
 
-	for i := 0; i < SegNum/4; i++ {
-		segments[SegNum/4+i] = data[SegSize*(SegNum/4+2*i) : SegSize*(SegNum/4+2*i+2)]
-		blocks[SegNum/4+i] = strconv.Itoa(i)
-	}
-
 	// ------------- the data owner --------------- //
-	tags := make([][]byte, SegNum/2)
+	tags := make([][]byte, SegNum)
 	for i, segment := range segments {
 		// generate the data tag
 		tag, err := keySet.GenTag([]byte(blocks[i]), segment, 0, 32, true)
 		if err != nil {
-			panic("gentag Error")
+			panic("gentag Error" + err.Error())
 		}
 
 		boo := keySet.VerifyTag([]byte(blocks[i]), segment, tag)
