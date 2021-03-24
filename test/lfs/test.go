@@ -14,6 +14,7 @@ import (
 
 	df "github.com/memoio/go-mefs/data-format"
 	"github.com/memoio/go-mefs/test"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	shell "github.com/memoio/mefs-go-http-client"
 )
@@ -27,6 +28,7 @@ const (
 var ethEndPoint, qethEndPoint string
 
 func main() {
+	utils.StartLogger()
 	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set;")
 	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query;")
 

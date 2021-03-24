@@ -10,12 +10,14 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/memoio/go-mefs/utils"
 	shell "github.com/memoio/mefs-go-http-client"
 )
 
 var ethEndPoint, qethEndPoint string
 
 func main() {
+	utils.StartLogger()
 	count := flag.Int("count", 20, "count of files downloaded each time")
 	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set")
 	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query")

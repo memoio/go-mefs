@@ -19,6 +19,7 @@ import (
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/test"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	shell "github.com/memoio/mefs-go-http-client"
@@ -35,6 +36,7 @@ const moneyTo = 6000000000000000000
 var ethEndPoint, qethEndPoint string
 
 func main() {
+	utils.StartLogger()
 	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set;")
 	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query;")
 

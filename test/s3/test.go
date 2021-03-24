@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/memoio/go-mefs/utils"
 	"github.com/minio/minio-go/v6"
 )
 
@@ -26,6 +27,7 @@ var bucketName = "test"
 var objectName = "test.go"
 
 func main() {
+	utils.StartLogger()
 	listBuckets()
 }
 

@@ -8,7 +8,7 @@ import (
 
 func TestEncode(t *testing.T) {
 	rand.Seed(time.Now().Unix())
-	var size int64 = 1 << 25 //8M
+	var size int64 = 1 << 25 //4M
 	n, ok := GetN(size)
 	if !ok {
 		t.Fatal("")
