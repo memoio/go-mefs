@@ -208,12 +208,12 @@ func BenchmarkPairing(tb *testing.B) {
 		tb.Errorf("ErrInit")
 	}
 	var a, b, ab Fr
-	err = a.SetString("123", 10)
+	err = a.SetString("49957504", 10)
 	if err != nil {
 		tb.Error(err)
 		return
 	}
-	err = b.SetString("456", 10)
+	err = b.SetString("10394947", 10)
 	if err != nil {
 		tb.Error(err)
 		return
@@ -242,6 +242,7 @@ func BenchmarkPairing(tb *testing.B) {
 	for i := 0; i < tb.N; i++ {
 		Pairing(&e1, &aP, &bQ)
 	}
+	fmt.Printf("e1=%s\n", e1.GetString(16))
 }
 
 func BenchmarkG1Mul(b *testing.B) {

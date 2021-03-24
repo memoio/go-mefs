@@ -173,6 +173,12 @@ var LfsCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
+		"start":          lfsStartUserCmd,
+		"kill":           lfsKillUserCmd,
+		"online":         lfsOnlineCmd,
+		"info":           lfsInfoCmd,
+		"fsync":          lfsFsyncCmd,
+		"show_storage":   lfsShowStorageCmd,
 		"head_object":    lfsHeadObjectCmd,
 		"put_object":     lfsPutObjectCmd,
 		"get_object":     lfsGetObjectCmd,
@@ -185,12 +191,6 @@ var LfsCmd = &cmds.Command{
 		"list_keepers":   lfsListKeepersCmd,
 		"list_providers": lfsListProviderrsCmd,
 		"list_users":     lfsListUsersCmd,
-		"fsync":          lfsFsyncCmd,
-		"online":         lfsOnlineCmd,
-		"start":          lfsStartUserCmd,
-		"kill":           lfsKillUserCmd,
-		"show_storage":   lfsShowStorageCmd,
-		"info":           lfsInfoCmd,
 		"get_share":      lfsGetShareCmd,
 		"gen_share":      lfsGenShareCmd,
 	},
@@ -210,72 +210,6 @@ const (
 	OutputPath   = "output"
 	ForceFlush   = "force" //设置这个选项，会强制刷新给Provider，无论是否表示为脏
 )
-
-// 关闭代理节点上user的服务
-var lfsKillUserCmd = &cmds.Command{
-	Helptext: cmds.HelpText{
-		Tagline:          "End groupService and lfsService by user's address",
-		ShortDescription: ``,
-	},
-
-	Arguments: []cmds.Argument{
-		cmds.StringArg("addr", false, false, "The practice user's addressid that you want to kill"),
-	},
-	Options: []cmds.Option{
-		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
-	},
-	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		node, err := cmdenv.GetNode(env)
-		if err != nil {
-			return err
-		}
-		if !node.OnlineMode() {
-			return ErrNotOnline
-		}
-		userIns, ok := node.Inst.(*user.Info)
-		if !ok {
-			return ErrNotReady
-		}
-		var uid string
-		if len(req.Arguments) > 0 {
-			addr := req.Arguments[0]
-			uid, err = address.GetIDFromAddress(addr)
-			if err != nil {
-				return err
-			}
-		} else {
-			uid = node.Identity.Pretty()
-		}
-
-		// 查看pwd是否能获取sk，确定是user发起的kill命令
-		pwd := req.Options[PassWord].(string)
-		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
-		if err != nil {
-			return err
-		}
-		err = userIns.KillUser(uid)
-		if err != nil {
-			return err
-		}
-
-		addr, err := address.GetAddressFromID(uid)
-		if err != nil {
-			return err
-		}
-		// lfsService
-		list := &StringList{
-			ChildLists: []string{"Kill User: " + addr.String()},
-		}
-		return cmds.EmitOnce(res, list)
-	},
-	Type: StringList{},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
-			_, err := fmt.Fprintf(w, "%s", fl)
-			return err
-		}),
-	},
-}
 
 var errTimeOut = errors.New("Time Out")
 var lfsStartUserCmd = &cmds.Command{
@@ -479,6 +413,72 @@ var lfsStartUserCmd = &cmds.Command{
 
 		list := &StringList{
 			ChildLists: []string{"User is started, the address is : " + addr},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+// 关闭代理节点上user的服务
+var lfsKillUserCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "End groupService and lfsService by user's address",
+		ShortDescription: ``,
+	},
+
+	Arguments: []cmds.Argument{
+		cmds.StringArg("addr", false, false, "The practice user's addressid that you want to kill"),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(utils.DefaultPassword),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
+		var uid string
+		if len(req.Arguments) > 0 {
+			addr := req.Arguments[0]
+			uid, err = address.GetIDFromAddress(addr)
+			if err != nil {
+				return err
+			}
+		} else {
+			uid = node.Identity.Pretty()
+		}
+
+		// 查看pwd是否能获取sk，确定是user发起的kill命令
+		pwd := req.Options[PassWord].(string)
+		_, err = fsrepo.GetPrivateKeyFromKeystore(uid, pwd)
+		if err != nil {
+			return err
+		}
+		err = userIns.KillUser(uid)
+		if err != nil {
+			return err
+		}
+
+		addr, err := address.GetAddressFromID(uid)
+		if err != nil {
+			return err
+		}
+		// lfsService
+		list := &StringList{
+			ChildLists: []string{"Kill User: " + addr.String()},
 		}
 		return cmds.EmitOnce(res, list)
 	},

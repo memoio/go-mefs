@@ -8,21 +8,73 @@ import (
 
 func TestEncode(t *testing.T) {
 	rand.Seed(time.Now().Unix())
-	coord, _ := Latin(13, 2)
-	filecontent1 := make([]byte, 1<<23)
+	var size int64 = 1 << 25 //8M
+	n, ok := GetN(size)
+	if !ok {
+		t.Fatal("")
+	}
+	coord, _ := Latin(n, 2)
+	filecontent1 := make([]byte, size)
 	fillRandom(filecontent1)
-	filecontent2, err := Encode(filecontent1, coord, 13)
+	filecontent2, err := Encode(filecontent1, coord, n)
 	if err != nil {
 		t.Error(err)
 	}
-	filecontent3, err := Decode(filecontent2, coord, 13)
+	filecontent3, err := Decode(filecontent2, coord, n)
 	if err != nil {
 		t.Error(err)
 	}
+
 	for i := 0; i < 20; i++ {
 		if filecontent1[i] != filecontent3[i] {
 			t.Error("not equal")
 			return
+		}
+	}
+}
+
+func BenchmarkLatin(b *testing.B) {
+	rand.Seed(time.Now().Unix())
+	var size int64 = 1 << 25 //32M
+	n, ok := GetN(size)
+	if !ok {
+		b.Fatal("")
+	}
+
+	b.ResetTimer()
+	b.SetBytes(size)
+	for i := 0; i < b.N; i++ {
+		_, _ = Latin(n, 2)
+	}
+}
+
+func BenchmarkEncode(b *testing.B) {
+	rand.Seed(time.Now().Unix())
+	var size int64 = 1 << 25 //32M
+	n, ok := GetN(size)
+	if !ok {
+		b.Fatal("")
+	}
+	coord, _ := Latin(n, 2)
+	b.ResetTimer()
+	b.SetBytes(size)
+	for i := 0; i < b.N; i++ {
+		filecontent1 := make([]byte, size)
+		fillRandom(filecontent1)
+		filecontent2, err := Encode(filecontent1, coord, n)
+		if err != nil {
+			b.Error(err)
+		}
+		filecontent3, err := Decode(filecontent2, coord, n)
+		if err != nil {
+			b.Error(err)
+		}
+
+		for i := 0; i < 20; i++ {
+			if filecontent1[i] != filecontent3[i] {
+				b.Error("not equal")
+				return
+			}
 		}
 	}
 }

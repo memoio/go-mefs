@@ -30,6 +30,7 @@ var (
 	ErrUpload               = errors.New("upload fails")
 	ErrResourceUnavailable  = errors.New("resource unavailable")
 	ErrWrongParameters      = errors.New("Wrong parameters")
+	ErrTaskCanceled         = errors.New("task canceled")
 
 	ErrNoProviders      = errors.New("there is no providers")
 	ErrNoKeepers        = errors.New("there is no keepers")

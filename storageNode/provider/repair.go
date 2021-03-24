@@ -16,7 +16,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	utils.MLogger.Info("handleRepair: ", km.ToString(), " from: ", keeper)
 
 	blockID := km.GetMainID()
-	ops := km.GetOptions()  // uid/offset
+	ops := km.GetOptions() // uid/offset
 	if len(ops) < 2 {
 		return role.ErrWrongKey
 	}
@@ -73,7 +73,7 @@ func (p *Info) handleRepair(km *metainfo.Key, rpids []byte, keeper string) error
 	}
 
 	cpids := strings.Split(string(rpids), metainfo.DELIMITER)
-	stripe := make([][]byte, len(cpids)+1)  //用来存放每一个chunkID对应的block数据
+	stripe := make([][]byte, len(cpids)+1) //用来存放每一个chunkID对应的block数据
 	for _, cpid := range cpids {
 		if len(cpid) > 0 {
 			splitcpid := strings.Split(cpid, metainfo.BlockDelimiter)
