@@ -151,8 +151,8 @@ func (l *LfsInfo) ListObjects(ctx context.Context, bucketName, prefix string, op
 	if !ok || bucket == nil || bucket.Deletion {
 		return nil, ErrBucketNotExist
 	}
-	bucket.RLock()
-	defer bucket.RUnlock()
+	// bucket.RLock()
+	// defer bucket.RUnlock()
 	var objects []*mpb.ObjectInfo
 	objectIter := bucket.Objects.Iterator()
 	for objectIter != nil {

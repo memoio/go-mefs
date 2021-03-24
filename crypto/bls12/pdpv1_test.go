@@ -8,18 +8,14 @@ import (
 	"time"
 )
 
-var SegSize = 32 * 1024
-var FileSize = 8 * 1024 * 1024
-var SegNum = FileSize / SegSize
-
 // 测试tag的形成
-func BenchmarkGenTag(b *testing.B) {
+func BenchmarkGenTagV1(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
 	}
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySet()
+	keySet, err := GenKeySetV1()
 	if err != nil {
 		panic(err)
 	}
@@ -53,12 +49,12 @@ func BenchmarkGenTag(b *testing.B) {
 	}
 }
 
-func BenchmarkGenOneTag(b *testing.B) {
+func BenchmarkGenOneTagV1(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
 	}
-	keySet, err := GenKeySet()
+	keySet, err := GenKeySetV1()
 	if err != nil {
 		panic(err)
 	}
@@ -82,7 +78,7 @@ func BenchmarkGenOneTag(b *testing.B) {
 	}
 }
 
-func benchmarkGenOneTag(keySet *KeySet) func(b *testing.B) {
+func benchmarkGenOneTagV1(keySet *KeySetV1) func(b *testing.B) {
 	return func(b *testing.B) {
 		// sample data
 		data := make([]byte, SegSize)
@@ -105,29 +101,29 @@ func benchmarkGenOneTag(keySet *KeySet) func(b *testing.B) {
 	}
 }
 
-func BenchmarkMultiGenTag(b *testing.B) {
+func BenchmarkMultiGenTagV1(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
 	}
-	keySet, err := GenKeySet()
+	keySet, err := GenKeySetV1()
 	if err != nil {
 		panic(err)
 	}
 	SegSize = 4 * 1024
 	for i := 0; i < 8; i++ {
-		b.Run("SegSize:"+strconv.Itoa(SegSize/1024)+"Kb", benchmarkGenOneTag(keySet))
+		b.Run("SegSize:"+strconv.Itoa(SegSize/1024)+"Kb", benchmarkGenOneTagV1(keySet))
 		SegSize = SegSize * 2
 	}
 }
-func BenchmarkGenChallenge(b *testing.B) {
+func BenchmarkGenChallengeV1(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
 	}
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySet()
+	keySet, err := GenKeySetV1()
 	if err != nil {
 		panic(err)
 	}
@@ -167,14 +163,14 @@ func BenchmarkGenChallenge(b *testing.B) {
 	}
 }
 
-func BenchmarkGenProof(b *testing.B) {
+func BenchmarkGenProofV1(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
 	}
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySet()
+	keySet, err := GenKeySetV1()
 	if err != nil {
 		panic(err)
 	}
@@ -202,8 +198,8 @@ func BenchmarkGenProof(b *testing.B) {
 
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
-	chal := Challenge{
-		Seed:    0,
+	chal := ChallengeV1{
+		R:       0,
 		Indices: blocks,
 	}
 
@@ -211,14 +207,14 @@ func BenchmarkGenProof(b *testing.B) {
 	b.SetBytes(int64(FileSize))
 	for i := 0; i < b.N; i++ {
 		// generate the proof
-		_, err = keySet.GenProof(chal, segments, tags, 32)
+		_, err = keySet.Pk.GenProof(chal, segments, tags, 32)
 		if err != nil {
 			panic("Error")
 		}
 	}
 }
 
-func BenchmarkVerifyProof(b *testing.B) {
+func BenchmarkVerifyProofV1(b *testing.B) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
@@ -230,7 +226,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 	fillRandom(data)
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySetWithSeed(data[:32], 1024, 2048)
+	keySet, err := GenKeySetV1WithSeed(data[:32], 1024)
 	if err != nil {
 		panic(err)
 	}
@@ -251,21 +247,21 @@ func BenchmarkVerifyProof(b *testing.B) {
 			panic(err)
 		}
 
-		boo := keySet.VerifyTag([]byte(blocks[i]), segment, tags[i])
-		if boo == false {
-			panic("VerifyTag false")
-		}
+		// boo := keySet.VerifyTag([]byte(blocks[i]), segment, tags[i])
+		// if boo == false {
+		// 	panic("VerifyTag false")
+		// }
 	}
 
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
-	chal := Challenge{
-		Seed:    time.Now().Unix(),
+	chal := ChallengeV1{
+		R:       time.Now().Unix(),
 		Indices: blocks,
 	}
 
 	// generate the proof
-	proof, err := keySet.GenProof(chal, segments, tags, 32)
+	proof, err := keySet.Pk.GenProof(chal, segments, tags, 32)
 	if err != nil {
 		panic("Error")
 	}
@@ -273,8 +269,9 @@ func BenchmarkVerifyProof(b *testing.B) {
 	// -------------- TPA --------------- //
 	// Verify the proof
 	b.ResetTimer()
+	b.SetBytes(int64(FileSize))
 	for i := 0; i < b.N; i++ {
-		result, err := keySet.VerifyProof(chal, proof, true)
+		result, err := keySet.Pk.VerifyProof(chal, proof)
 		if err != nil {
 			panic("Error")
 		}
@@ -284,7 +281,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 	}
 }
 
-func TestVerifyProof(t *testing.T) {
+func TestVerifyProofV1(t *testing.T) {
 	err := Init(BLS12_381)
 	if err != nil {
 		panic(err)
@@ -295,7 +292,7 @@ func TestVerifyProof(t *testing.T) {
 	fillRandom(data)
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySetWithSeed(data[:32], 1024, 2048)
+	keySet, err := GenKeySetV1WithSeed(data[:32], 1024)
 	if err != nil {
 		panic(err)
 	}
@@ -313,25 +310,25 @@ func TestVerifyProof(t *testing.T) {
 		// generate the data tag
 		tag, err := keySet.GenTag([]byte(blocks[i]), segment, 0, 32, true)
 		if err != nil {
-			panic("gentag Error" + err.Error())
+			panic("gentag Error")
 		}
 
-		boo := keySet.VerifyTag([]byte(blocks[i]), segment, tag)
-		if boo == false {
-			panic("VerifyTag1")
+		res := keySet.VerifyTag([]byte(blocks[i]), segment, tag)
+		if !res {
+			panic("VerifyTag failed")
 		}
 		tags[i] = tag
 	}
 
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
-	chal := Challenge{
-		Seed:    time.Now().Unix(),
+	chal := ChallengeV1{
+		R:       time.Now().Unix(),
 		Indices: blocks,
 	}
 
 	// generate the proof
-	proof, err := keySet.GenProof(chal, segments, tags, 32)
+	proof, err := keySet.Pk.GenProof(chal, segments, tags, 32)
 	if err != nil {
 		panic(err)
 	}
@@ -340,92 +337,11 @@ func TestVerifyProof(t *testing.T) {
 
 	// -------------- TPA --------------- //
 	// Verify the proof
-
-	result, err := keySet.VerifyProof(chal, proof, true)
+	result, err := keySet.Pk.VerifyProof(chal, proof)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !result {
 		t.Errorf("Verificaition failed!")
-	}
-}
-
-func TestEvaluatePolynomial(t *testing.T) {
-	err := Init(BLS12_381)
-	if err != nil {
-		panic(err)
-	}
-	k, err := GenKeySet()
-	if err != nil {
-		panic(err)
-	}
-	SegSize = 32 * 1024
-	// sample data
-	segment := make([]byte, SegSize)
-	rand.Seed(time.Now().UnixNano())
-	fillRandom(segment)
-	atoms, err := splitSegmentToAtoms(segment, 32)
-	if err != nil {
-		t.Error(err)
-	}
-	var power1 Fr
-	power1.Clear() // Set0
-	FrEvaluatePolynomial(&power1, atoms, &(k.Sk.ElemPowerSk[1]))
-	var power2 Fr
-	power2.Clear() // Set0
-	for j, atom := range atoms {
-		var mid Fr
-		FrMul(&mid, &(k.Sk.ElemPowerSk[j]), &atom) // Xi * Mi
-		FrAdd(&power2, &power2, &mid)              // power = Sigma(Xi*Mi)
-	}
-	ok := power1.IsEqual(&power2)
-	if !ok {
-		t.Error("Not Equal")
-	}
-}
-
-func benchmarkEvaluatePolynomial(k *KeySet) func(b *testing.B) {
-	return func(b *testing.B) {
-		// sample data
-		segment := make([]byte, SegSize)
-		rand.Seed(time.Now().UnixNano())
-		fillRandom(segment)
-		b.SetBytes(int64(SegSize))
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			atoms, err := splitSegmentToAtoms(segment, 32)
-			if err != nil {
-				b.Error(err)
-			}
-			var power1 Fr
-			power1.Clear() // Set0
-			FrEvaluatePolynomial(&power1, atoms, &(k.Sk.ElemPowerSk[1]))
-		}
-	}
-}
-
-func BenchmarkMultiEP(b *testing.B) {
-	err := Init(BLS12_381)
-	if err != nil {
-		panic(err)
-	}
-	keySet, err := GenKeySet()
-	if err != nil {
-		panic(err)
-	}
-	SegSize = 4 * 1024
-	for i := 0; i < 8; i++ {
-		b.Run("SegSize:"+strconv.Itoa(SegSize/1024)+"KB", benchmarkEvaluatePolynomial(keySet))
-		SegSize = SegSize * 2
-	}
-}
-
-func fillRandom(p []byte) {
-	for i := 0; i < len(p); i += 7 {
-		val := rand.Int63()
-		for j := 0; i+j < len(p) && j < 7; j++ {
-			p[i+j] = byte(val)
-			val >>= 8
-		}
 	}
 }

@@ -1,6 +1,27 @@
 package latin
 
+import "math"
+
 const n uint64 = 1 << 16
+
+// var Table = map[int64]int64{
+// 	2:    2,
+// 	32:   4,
+// 	2048: 7,
+// }
+
+//以Byte计数的大小
+func GetN(size int64) (int, bool) {
+	if n&(n-1) != 0 {
+		return 0, false
+	}
+	bits := float64(size << 3)
+	twoN := int(math.Log2(bits))
+	if twoN%2 != 0 {
+		return 0, false
+	}
+	return twoN / 2, true
+}
 
 // var F [65536]uint32
 
