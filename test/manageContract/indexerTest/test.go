@@ -11,6 +11,7 @@ import (
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/test"
+	"github.com/memoio/go-mefs/utils"
 )
 
 var (
@@ -28,6 +29,7 @@ const (
 )
 
 func main() {
+	utils.StartLogger()
 	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")
 	flag.Parse()
 	ethEndPoint = *eth

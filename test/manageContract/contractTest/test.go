@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/test"
+	"github.com/memoio/go-mefs/utils"
 )
 
 var (
@@ -20,6 +21,7 @@ const (
 )
 
 func main() {
+	utils.StartLogger()
 	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
 	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")   //dev网
 	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;") //dev网，用于keeper、provider连接

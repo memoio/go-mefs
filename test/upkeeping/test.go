@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
@@ -50,6 +51,7 @@ var ethEndPoint, qethEndPoint string
 var success bool
 
 func main() {
+	utils.StartLogger()
 	flag.String("testnet", "--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101", "testnet commands")
 	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")
 	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;")

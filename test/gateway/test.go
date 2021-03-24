@@ -4,10 +4,12 @@ import (
 	"log"
 	"os"
 
+	"github.com/memoio/go-mefs/utils"
 	"github.com/minio/minio-go/v6"
 )
 
 func main() {
+	utils.StartLogger()
 	// Use a secure connection.
 	ssl := false
 
