@@ -11,6 +11,7 @@ import (
 
 	"github.com/memoio/go-mefs/crypto/aes"
 	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 )
 
 // 全局配置
@@ -30,7 +31,7 @@ func BenchmarkEncode(b *testing.B) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	keyset, err := mcl.GenKeySet()
+	keyset, err := pdp.GenKeySetV0()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func BenchmarkEncode(b *testing.B) {
 }
 
 func CodeAndRepair(policy, dc, pc, size int) {
-	keyset, err := mcl.GenKeySet()
+	keyset, err := pdp.GenKeySetV0()
 	if err != nil {
 		log.Fatal(err)
 	}

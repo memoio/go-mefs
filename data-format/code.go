@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	proto "github.com/gogo/protobuf/proto"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	"github.com/memoio/go-mefs/data-format/reedsolomon"
 	mpb "github.com/memoio/go-mefs/pb"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
@@ -17,7 +17,7 @@ import (
 
 type DataCoder struct {
 	Prefix     *mpb.BlockOptions
-	BlsKey     *mcl.KeySet
+	BlsKey     pdp.KeySet
 	Repair     bool
 	RLength    int // recover how long
 	blockCount int
@@ -29,7 +29,7 @@ type DataCoder struct {
 }
 
 // NewDataCoder 构建一个dataformat配置
-func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount, encrpto int, userID, fsID string) (*DataCoder, error) {
+func NewDataCoder(keyset pdp.KeySet, policy, dataCount, parityCount, version, tagFlag, segmentSize, segCount, encrpto int, userID, fsID string) (*DataCoder, error) {
 	if segmentSize < DefaultSegmentSize {
 		segmentSize = DefaultSegmentSize
 	}
@@ -58,12 +58,12 @@ func NewDataCoder(keyset *mcl.KeySet, policy, dataCount, parityCount, version, t
 }
 
 // NewDataCoderWithDefault creates a new datacoder with default
-func NewDataCoderWithDefault(keyset *mcl.KeySet, policy, dataCount, pairtyCount int, userID, fsID string) (*DataCoder, error) {
+func NewDataCoderWithDefault(keyset pdp.KeySet, policy, dataCount, pairtyCount int, userID, fsID string) (*DataCoder, error) {
 	return NewDataCoder(keyset, policy, dataCount, pairtyCount, CurrentVersion, DefaultTagFlag, DefaultSegmentSize, DefaultSegmentCount, DefaultCrypt, userID, fsID)
 }
 
 // NewDataCoderWithBopts contructs a new datacoder with bucketops
-func NewDataCoderWithBopts(keyset *mcl.KeySet, bo *mpb.BucketOptions, userID, fsID string) (*DataCoder, error) {
+func NewDataCoderWithBopts(keyset pdp.KeySet, bo *mpb.BucketOptions, userID, fsID string) (*DataCoder, error) {
 	pre := &mpb.BlockOptions{
 		Bopts:   bo,
 		Start:   0,
@@ -75,7 +75,7 @@ func NewDataCoderWithBopts(keyset *mcl.KeySet, bo *mpb.BucketOptions, userID, fs
 }
 
 // NewDataCoderWithPrefix creates a new datacoder with prefix
-func NewDataCoderWithPrefix(keyset *mcl.KeySet, p *mpb.BlockOptions) (*DataCoder, error) {
+func NewDataCoderWithPrefix(keyset pdp.KeySet, p *mpb.BlockOptions) (*DataCoder, error) {
 	d := &DataCoder{
 		Prefix: p,
 		BlsKey: keyset,
@@ -99,7 +99,7 @@ func (d *DataCoder) PreCompute() error {
 	d.blockCount = dc + pc
 	d.tagCount = 2 + (pc-1)/dc
 
-	s, ok := TagMap[int(d.Prefix.Bopts.TagFlag)]
+	s, ok := pdp.TagMap[int(d.Prefix.Bopts.TagFlag)]
 	if !ok {
 		s = 48
 	}

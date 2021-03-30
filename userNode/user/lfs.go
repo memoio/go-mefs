@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
@@ -24,7 +24,7 @@ type LfsInfo struct {
 	privateKey string // of userID
 	gInfo      *groupInfo
 	ds         data.Service
-	keySet     *mcl.KeySet
+	keySet     pdp.KeySet
 	meta       *lfsMeta            //内存数据结构，存有当前的IpfsNode、SuperBlock和全部的Inode
 	Sm         *semaphore.Weighted //用来控制对lfs的操作，目前设置为总量100，stop需要100资源，上传下载需要10，其他需要1
 	online     bool
@@ -74,7 +74,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 		}
 
 		if l.gInfo.userID == l.gInfo.shareToID {
-			if l.keySet == nil || l.keySet.Sk == nil {
+			if l.keySet == nil || l.keySet.SecreteKey() == nil {
 				seed := sha256.Sum256([]byte(l.privateKey + l.fsID))
 				mkey, err := initBLS12Config(seed[:])
 				if err != nil {

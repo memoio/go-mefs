@@ -3,12 +3,12 @@ package role
 import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/gogo/protobuf/proto"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils"
 )
 
-func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
+func BLS12KeysetToByte(mkey *pdp.KeySetV0, privKey []byte) ([]byte, error) {
 	if mkey == nil || mkey.Pk == nil || mkey.Sk == nil {
 		return nil, ErrEmptyBlsKey
 	}
@@ -61,12 +61,12 @@ func BLS12KeysetToByte(mkey *mcl.KeySet, privKey []byte) ([]byte, error) {
 	return userBLS12Config, nil
 }
 
-func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, error) {
+func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*pdp.KeySetV0, error) {
 	if len(userBLS12config) == 0 {
 		return nil, ErrEmptyBlsKey
 	}
 
-	mkey := new(mcl.KeySet)
+	mkey := new(pdp.KeySetV0)
 
 	userBLS12ConfigProto := new(mpb.UserBLS12Config)
 	err := proto.Unmarshal(userBLS12config, userBLS12ConfigProto)
@@ -74,7 +74,7 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 		return mkey, err
 	}
 
-	pk := new(mcl.PublicKey)
+	pk := new(pdp.PublicKeyV0)
 
 	err = pk.BlsPk.Deserialize(userBLS12ConfigProto.PubkeyBls)
 	if err != nil {
@@ -86,16 +86,16 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 	}
 
 	if userBLS12ConfigProto.GetTagCount() == 0 {
-		pk.TagCount = mcl.TagAtomNum
+		pk.TagCount = pdp.TagAtomNum
 	} else {
-		pk.TagCount = int(userBLS12ConfigProto.GetTagCount())
+		pk.TagCount = int64(userBLS12ConfigProto.GetTagCount())
 	}
 
-	pk.TagCount = len(userBLS12ConfigProto.PubkeyU)
+	pk.TagCount = int64(len(userBLS12ConfigProto.PubkeyU))
 
-	pk.ElemG1s = make([]mcl.G1, pk.TagCount)
+	pk.ElemG1s = make([]pdp.G1, pk.TagCount)
 	for i, u := range userBLS12ConfigProto.PubkeyU {
-		var temp mcl.G1
+		var temp pdp.G1
 		err = temp.Deserialize(u)
 		if err != nil {
 			utils.MLogger.Info("Deserialize failed: ", err)
@@ -105,16 +105,16 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 
 	// version is user for different default
 	if userBLS12ConfigProto.GetCount() == 0 {
-		pk.Count = mcl.PDPCount
+		pk.Count = pdp.PDPCount
 	} else {
-		pk.Count = int(userBLS12ConfigProto.GetCount())
+		pk.Count = int64(userBLS12ConfigProto.GetCount())
 	}
 
-	pk.Count = len(userBLS12ConfigProto.PubkeyW)
+	pk.Count = int64(len(userBLS12ConfigProto.PubkeyW))
 
-	pk.ElemG2s = make([]mcl.G2, pk.Count)
+	pk.ElemG2s = make([]pdp.G2, pk.Count)
 	for i, w := range userBLS12ConfigProto.PubkeyW {
-		var temp mcl.G2
+		var temp pdp.G2
 		err = temp.Deserialize(w)
 		if err != nil {
 			utils.MLogger.Info("Deserialize failed: ", err)
@@ -125,8 +125,8 @@ func BLS12ByteToKeyset(userBLS12config []byte, privKey []byte) (*mcl.KeySet, err
 	mkey.Pk = pk
 
 	if len(privKey) > 0 {
-		sk := &mcl.SecretKey{
-			ElemPowerSk: make([]mcl.Fr, pk.Count),
+		sk := &pdp.SecretKeyV0{
+			ElemPowerSk: make([]pdp.Fr, pk.Count),
 		}
 		c := btcec.S256()
 		seck, _ := btcec.PrivKeyFromBytes(c, privKey)

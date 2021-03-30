@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -40,7 +40,7 @@ var opt = &df.DataCoder{
 			Policy:       df.MulPolicy,
 			DataCount:    1,
 			ParityCount:  pos.Reps - 1,
-			TagFlag:      df.BLS12,
+			TagFlag:      pdp.PDPV0,
 			SegmentSize:  pos.SegSize,
 			Encryption:   0,
 			SegmentCount: pos.SegCount,
@@ -133,7 +133,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	}
 
 	//填充opt.KeySet
-	mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNumV1, mcl.PDPCountV1)
+	mkey, err := pdp.GenKeySetV0WithSeed(pos.GetPosSeed(), pdp.TagAtomNumV1, pdp.PDPCountV1)
 	if err != nil {
 		utils.MLogger.Info("Init bls config for pos user fail: ", err)
 		return err

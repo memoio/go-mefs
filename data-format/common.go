@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strconv"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	"github.com/memoio/go-mefs/utils"
@@ -16,7 +16,7 @@ const (
 	MulPolicy           = 2
 	DefaultSegmentSize  = 32 * 1024
 	DefaultSegmentCount = 64
-	DefaultTagFlag      = BLS12
+	DefaultTagFlag      = pdp.PDPV0
 	CurrentVersion      = 1
 	DefaultCrypt        = 1
 	BlockSize           = DefaultSegmentSize * DefaultSegmentCount
@@ -42,7 +42,7 @@ func DefaultBucketOptions() *mpb.BucketOptions {
 		DataCount:    3,
 		ParityCount:  2,
 		SegmentSize:  DefaultSegmentSize,
-		TagFlag:      BLS12,
+		TagFlag:      DefaultTagFlag,
 		SegmentCount: DefaultSegmentCount,
 		Encryption:   1,
 	}
@@ -56,7 +56,7 @@ func DefaultSuperBucketOptions() *mpb.BucketOptions {
 		DataCount:    1,
 		ParityCount:  2,
 		SegmentSize:  DefaultSegmentSize,
-		TagFlag:      BLS12,
+		TagFlag:      DefaultTagFlag,
 		SegmentCount: DefaultSegmentCount,
 		Encryption:   0,
 	}
@@ -79,7 +79,7 @@ func VerifyBlockLength(data []byte, start, length int) (bool, error) {
 
 	dataLen := len(data) - preLen
 
-	s, ok := TagMap[int(pre.GetBopts().GetTagFlag())]
+	s, ok := pdp.TagMap[int(pre.GetBopts().GetTagFlag())]
 	if !ok {
 		s = 48
 	}
@@ -128,7 +128,7 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, i
 		tags[i] = append(tags[i], noPreRawdata[i*d.fieldSize+d.segSize:i*d.fieldSize+d.segSize+d.tagSize]...)
 	}
 
-	ok, err := d.BlsKey.VerifyDataForUser(indices, segments, tags, 32)
+	ok, err := d.BlsKey.VerifyData(indices, segments, tags, 32)
 	if !ok || err != nil {
 		utils.MLogger.Error("Tag is wrong: ", err)
 		return nil, nil, 0, false
@@ -136,8 +136,8 @@ func (d *DataCoder) VerifyBlock(data []byte, ncid string) ([][]byte, [][]byte, i
 	return segments, tags, int(pre.Start), true
 }
 
-func VerifyBlock(data []byte, ncid string, k *mcl.KeySet) bool {
-	if data == nil || len(data) == 0 || k == nil || k.Pk == nil {
+func VerifyBlock(data []byte, ncid string, k pdp.KeySet) bool {
+	if data == nil || len(data) == 0 || k == nil || k.PublicKey() == nil {
 		return false
 	}
 
@@ -149,8 +149,8 @@ func VerifyBlock(data []byte, ncid string, k *mcl.KeySet) bool {
 	return ok
 }
 
-func GetSegAndTag(data []byte, ncid string, k *mcl.KeySet) ([][]byte, [][]byte, int, bool) {
-	if data == nil || len(data) == 0 || k == nil || k.Pk == nil {
+func GetSegAndTag(data []byte, ncid string, k pdp.KeySet) ([][]byte, [][]byte, int, bool) {
+	if data == nil || len(data) == 0 || k == nil || k.PublicKey() == nil {
 		return nil, nil, 0, false
 	}
 

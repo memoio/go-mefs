@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -29,14 +29,14 @@ const (
 var MarketingMoney int64 = 1
 
 //---config----
-func (k *Info) getUserBLS12Config(userID, groupID string) (*mcl.KeySet, error) {
+func (k *Info) getUserBLS12Config(userID, groupID string) (*pdp.KeySetV0, error) {
 	value, ok := k.userConfigs.Get(groupID)
 	if ok {
-		return value.(*mcl.KeySet), nil
+		return value.(*pdp.KeySetV0), nil
 	}
 
 	if userID == pos.GetPosId() {
-		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNumV1, mcl.PDPCountV1)
+		mkey, err := pdp.GenKeySetV0WithSeed(pos.GetPosSeed(), pdp.TagAtomNumV1, pdp.PDPCountV1)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +105,7 @@ func (k *Info) findNewProvider(price *big.Int, capacity, duration int64, provide
 				break
 			}
 		}
-		
+
 		if !has {
 			thisinfo, ok := k.providers.Load(proID)
 			if ok {

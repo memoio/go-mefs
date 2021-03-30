@@ -3,16 +3,16 @@ package user
 import (
 	"context"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
-func initBLS12Config(seed []byte) (*mcl.KeySet, error) {
+func initBLS12Config(seed []byte) (pdp.KeySet, error) {
 	utils.MLogger.Info("Generating BLS12 Sk and Pk")
-	kset, err := mcl.GenKeySetWithSeed(seed, mcl.TagAtomNumV1, mcl.PDPCountV1)
+	kset, err := pdp.GenKeySetV0WithSeed(seed, pdp.TagAtomNumV1, pdp.PDPCountV1)
 	if err != nil {
 		utils.MLogger.Error("Init BlS12 keyset error: ", err)
 		return nil, err
@@ -26,7 +26,7 @@ func (l *LfsInfo) putUserConfig(ctx context.Context) {
 		return
 	}
 
-	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet, []byte(l.privateKey))
+	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet.(*pdp.KeySetV0), []byte(l.privateKey))
 	if err != nil {
 		return
 	}

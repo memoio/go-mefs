@@ -22,6 +22,7 @@ import (
 
 	logging "github.com/ipfs/go-log"
 	"github.com/jbenet/goprocess"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
@@ -562,7 +563,7 @@ func (fs *Datastore) doAppend(key datastore.Key, fields []byte, begin, length in
 	}
 	tagCount := 2 + (pre.Bopts.ParityCount-1)/pre.Bopts.DataCount
 
-	tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
+	tagSize, ok := pdp.TagMap[int(pre.Bopts.TagFlag)]
 	if !ok {
 		return dataformat.ErrWrongTagFlag
 	}
@@ -790,7 +791,7 @@ func (fs *Datastore) Get(key datastore.Key) (value []byte, err error) {
 			return nil, err
 		}
 
-		tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
+		tagSize, ok := pdp.TagMap[int(pre.Bopts.TagFlag)]
 		if !ok {
 			return nil, dataformat.ErrWrongTagFlag
 		}

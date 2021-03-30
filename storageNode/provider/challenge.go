@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -58,12 +58,12 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return err
 	}
 
-	if blskey == nil || blskey.Pk == nil {
+	if blskey == nil || blskey.PublicKey() == nil {
 		utils.MLogger.Warn("get empty user`s config for: ", fsID)
 		return nil
 	}
 
-	var proof *mcl.Proof
+	var proof pdp.Proof
 	var faultValue string
 	switch cr.GetPolicy() {
 	case "smart", "meta":
@@ -89,9 +89,10 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
 
-	mustr := b58.Encode(proof.Mu)
-	nustr := b58.Encode(proof.Nu)
-	deltastr := b58.Encode(proof.Delta)
+	pf := proof.(*pdp.ProofV0)
+	mustr := b58.Encode(pf.Mu)
+	nustr := b58.Encode(pf.Nu)
+	deltastr := b58.Encode(pf.Delta)
 
 	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr + faultValue
 
@@ -103,12 +104,12 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	return nil
 }
 
-func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl.Proof, error) {
+func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, error) {
 	var data, tag [][]byte
 	failchunk := false
 
-	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(cr)
+	var chal pdp.ChallengeV0
+	chal.Seed = pdp.GenChallengeV0(cr)
 
 	bset := bitset.New(0)
 	err := bset.UnmarshalBinary(cr.GetChunkMap())
@@ -302,14 +303,14 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl.Proof
 		return nil, role.ErrEmptyData
 	}
 
-	proof, err := blskey.GenProof(chal, data, tag, 32)
+	proof, err := blskey.PublicKey().GenProof(&chal, data, tag, 32)
 	if err != nil {
 		utils.MLogger.Error("GenProof err: ", err)
 		return nil, err
 	}
 
 	// 在发送之前检查生成的proof
-	boo, err := blskey.VerifyProof(chal, proof, true)
+	boo, err := blskey.PublicKey().VerifyProof(&chal, proof, true)
 	if err != nil {
 		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
 		return nil, err
@@ -326,13 +327,13 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl.Proof
 		}
 		cr.FailMap = failMap
 	}
-
-	return proof, nil
+	pf := proof.(*pdp.ProofV0)
+	return pf, nil
 }
 
-func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl.Proof, error) {
-	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(cr)
+func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, error) {
+	var chal pdp.ChallengeV0
+	chal.Seed = pdp.GenChallengeV0(cr)
 
 	// 聚合
 	var data, tag [][]byte
@@ -398,13 +399,13 @@ func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey *mcl.KeySet) (*mcl
 		return nil, role.ErrEmptyData
 	}
 
-	proof, err := blskey.GenProof(chal, data, tag, 32)
+	proof, err := blskey.PublicKey().GenProof(&chal, data, tag, 32)
 	if err != nil {
 		utils.MLogger.Error("GenProof err: ", err)
 		return nil, err
 	}
 
-	boo, err := blskey.VerifyProof(chal, proof, true)
+	boo, err := blskey.PublicKey().VerifyProof(&chal, proof, true)
 	if err != nil {
 		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
 		return nil, err
