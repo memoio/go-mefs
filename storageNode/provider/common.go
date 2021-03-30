@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
@@ -32,14 +32,14 @@ type GInfoOutput struct {
 	ChannelValue   []string
 }
 
-func (p *Info) getNewUserConfig(userID, groupID string) (*mcl.KeySet, error) {
+func (p *Info) getNewUserConfig(userID, groupID string) (pdp.KeySet, error) {
 	value, ok := p.userConfigs.Get(groupID)
 	if ok {
-		return value.(*mcl.KeySet), nil
+		return value.(*pdp.KeySetV0), nil
 	}
 
 	if userID == pos.GetPosId() {
-		mkey, err := mcl.GenKeySetWithSeed(pos.GetPosSeed(), mcl.TagAtomNumV1, mcl.PDPCountV1)
+		mkey, err := pdp.GenKeySetV0WithSeed(pos.GetPosSeed(), pdp.TagAtomNumV1, pdp.PDPCountV1)
 		if err != nil {
 			utils.MLogger.Info("Init bls config for pos user fail: ", err)
 			return nil, err

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/crypto/pdp"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	bf "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
@@ -140,7 +141,7 @@ func (c *Cache) Get(k string, start, length int) ([]byte, error) {
 					return nil, err
 				}
 
-				tagSize, ok := dataformat.TagMap[int(pre.Bopts.TagFlag)]
+				tagSize, ok := pdp.TagMap[int(pre.Bopts.TagFlag)]
 				if !ok {
 					return nil, dataformat.ErrWrongTagFlag
 				}

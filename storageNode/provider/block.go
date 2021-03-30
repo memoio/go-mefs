@@ -40,7 +40,7 @@ func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error
 
 		if role.Debug {
 			blskey, _ := p.getNewUserConfig(gp.userID, qid)
-			if blskey != nil && blskey.Pk != nil {
+			if blskey != nil && blskey.PublicKey() != nil {
 				ok := df.VerifyBlock(value, splitedNcid[0], blskey)
 				if !ok {
 					utils.MLogger.Errorf("Verify data for %s fails, delete it", splitedNcid[0])

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
@@ -12,7 +12,7 @@ import (
 )
 
 // VerifyChallenge verifies ChalInfo
-func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, []string, []string, error) {
+func VerifyChallenge(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []string, []string, error) {
 	switch cr.GetPolicy() {
 	case "smart", "meta":
 		return VerifyChallengeData(cr, blsKey, strict)
@@ -23,7 +23,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, [
 	}
 }
 
-func VerifyChallengeData(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, []string, []string, error) {
+func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []string, []string, error) {
 	var sucCid, faultCid []string
 	var slength, chalLength int64 //success length
 	var electedOffset int
@@ -45,8 +45,8 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (boo
 		return false, sucCid, faultCid, err
 	}
 
-	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(cr)
+	var chal pdp.ChallengeV0
+	chal.Seed = pdp.GenChallengeV0(cr)
 
 	chalNum := bset.Count()
 	startPos := uint(chal.Seed) % bset.Len()
@@ -201,7 +201,7 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (boo
 	}
 
 	// recheck the status again
-	if len(chal.Indices) == 0 {
+	if len(chal.GetIndices()) == 0 {
 		return false, sucCid, faultCid, ErrEmptyData
 	}
 
@@ -253,13 +253,13 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (boo
 		return false, sucCid, faultCid, err
 	}
 
-	pf := &mcl.Proof{
+	pf := &pdp.ProofV0{
 		Mu:    muByte,
 		Nu:    nuByte,
 		Delta: deltaByte,
 	}
 
-	res, err := blsKey.VerifyProof(chal, pf, true)
+	res, err := blsKey.PublicKey().VerifyProof(&chal, pf, true)
 	if err != nil {
 		return false, sucCid, faultCid, err
 	}
@@ -278,15 +278,15 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (boo
 	return false, sucCid, faultCid, nil
 }
 
-func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (bool, []string, []string, error) {
+func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []string, []string, error) {
 	var slength int64 //success length
 	var electedOffset int
 	var buf strings.Builder
 
 	var sucCid, faultCid []string
 
-	var chal mcl.Challenge
-	chal.Seed = mcl.GenChallenge(cr)
+	var chal pdp.ChallengeV0
+	chal.Seed = pdp.GenChallengeV0(cr)
 
 	// key: bucketid_stripeid_blockid_offset
 	set := make(map[string]struct{}, len(cr.GetFaultBlocks()))
@@ -362,13 +362,13 @@ func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey *mcl.KeySet, strict bool) (b
 		return false, sucCid, faultCid, err
 	}
 
-	pf := &mcl.Proof{
+	pf := &pdp.ProofV0{
 		Mu:    muByte,
 		Nu:    nuByte,
 		Delta: deltaByte,
 	}
 
-	res, err := blsKey.VerifyProof(chal, pf, true)
+	res, err := blsKey.PublicKey().VerifyProof(&chal, pf, true)
 	if err != nil {
 		return false, sucCid, faultCid, err
 	}

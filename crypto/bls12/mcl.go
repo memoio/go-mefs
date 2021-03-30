@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"unsafe"
 )
+
 // CurveFp254BNb -- 254 bit curve
 const CurveFp254BNb = C.mclBn_CurveFp254BNb
 
@@ -204,8 +205,6 @@ func FrMul(out *Fr, x *Fr, y *Fr) {
 func FrDiv(out *Fr, x *Fr, y *Fr) {
 	C.mclBnFr_div(out.getPointer(), x.getPointer(), y.getPointer())
 }
-
-
 
 // G1 --
 type G1 struct {

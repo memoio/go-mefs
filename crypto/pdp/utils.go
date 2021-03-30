@@ -1,6 +1,8 @@
-package mcl
+package pdp
 
-import "errors"
+import (
+	"errors"
+)
 
 // customized errors
 var (
@@ -43,20 +45,4 @@ func splitSegmentToAtoms(data []byte, typ int) ([]Fr, error) {
 	atom[num-1].SetLittleEndian(data[typ*(num-1):])
 
 	return atom, nil
-}
-
-func Polydiv(poly []Fr, fr_r Fr) []Fr {
-	// poly(x) - poly(r) always divides (x - r) since the latter is a root of the former.
-	// With that infomation we can jump into the division.
-	quotient := make([]Fr, len(poly)-1)
-	if len(quotient) > 0 {
-		// q_(n - 1) = p_n
-		quotient[len(quotient)-1] = poly[len(quotient)]
-		for j := len(quotient) - 2; j >= 0; j-- {
-			// q_j = p_(j + 1) + q_(j + 1) * r
-			FrMul(&quotient[j], &quotient[j+1], &fr_r)
-			FrAdd(&quotient[j], &quotient[j], &poly[j+1])
-		}
-	}
-	return quotient
 }

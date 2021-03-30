@@ -68,8 +68,8 @@ func (l *LfsInfo) CreateBucket(ctx context.Context, bucketName string, options *
 	}
 
 	// tagCount决定了最大的segmentSize
-	if int(options.GetSegmentSize()) > 32*l.keySet.Pk.TagCount {
-		utils.MLogger.Errorf("segmentSize is set large than: %d", 32*l.keySet.Pk.TagCount)
+	if int64(options.GetSegmentSize()) > 32*l.keySet.PublicKey().GetTagCount() {
+		utils.MLogger.Errorf("segmentSize is set large than: %d", 32*l.keySet.PublicKey().GetTagCount())
 		return nil, ErrPolicy
 	}
 

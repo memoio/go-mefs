@@ -68,6 +68,13 @@ type FileSyetem interface {
 	ShowBucketStorage(ctx context.Context, bucketName string) (uint64, error)
 }
 
+// BlockSyetem defines user's function
+type BlockSyetem interface {
+	PutBlocks(ctx context.Context, reader io.Reader, opts PutObjectOptions) (*mpb.ShareLink, error)
+	GetBlocks(ctx context.Context, fileMeta string, writer io.Writer, completeFuncs []CompleteFunc, opts DownloadObjectOptions) error
+	HeadBlocks(ctx context.Context, fileMeta string) (*mpb.ShareLink, error)
+}
+
 // service is user's service
 type service interface {
 	Stop() error

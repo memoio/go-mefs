@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/crypto/aes"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	dataformat "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -295,7 +296,7 @@ func (do *downloadTask) rangeRead(ctx context.Context, start, length int64) ([]b
 	segSize := do.decoder.Prefix.Bopts.SegmentSize
 	segStripeSize := int64(do.decoder.Prefix.Bopts.SegmentSize * dataCount)
 	stripeSize := int64(do.decoder.Prefix.Bopts.SegmentCount) * segStripeSize
-	tagSize, ok := dataformat.TagMap[int(do.decoder.Prefix.Bopts.TagFlag)]
+	tagSize, ok := pdp.TagMap[int(do.decoder.Prefix.Bopts.TagFlag)]
 	if !ok {
 		tagSize = 48
 	}

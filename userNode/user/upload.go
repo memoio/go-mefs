@@ -13,8 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sync/semaphore"
-
 	"github.com/gogo/protobuf/proto"
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/memoio/go-mefs/crypto/aes"
@@ -371,28 +369,14 @@ func (u *uploadTask) Start(ctx context.Context) error {
 	}
 
 	h := md5.New()
-	var wg sync.WaitGroup
 	rdata := make([]byte, stripeSize)
-	var extra []byte
+	// var extra []byte
 	errc := make(chan error)
 	var errrt error
 	breakFlag = false
 	//减少内存分配
 	poolbuf := new(pool.BufferPool)
-	//任务分配管道
-	workerc := make(chan struct{})
-	sm := semaphore.NewWeighted(u.taskWorkerCount)
-	//申请资源
-	sm.Acquire(ctx, 1)
-	//第一次任务分配
-	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case workerc <- struct{}{}:
-		}
-	}()
-	//循环执行任务
+
 	for !breakFlag {
 		select {
 		case <-ctx.Done():
@@ -401,43 +385,27 @@ func (u *uploadTask) Start(ctx context.Context) error {
 		case errrt = <-errc:
 			utils.MLogger.Warn("upload encounter an err:", errrt)
 			return errrt
-		case <-workerc:
+		default:
 			// clear itself
 			data := poolbuf.Get(stripeSize)
 			data = data[:0]
-			extraLen := len(extra)
-			readLen := stripeSize - int(curOffset)*segStripeSize - extraLen
-			if extraLen > 0 {
-				data = append(data, extra...)
-				poolbuf.Put(extra)
-			}
+			readLen := stripeSize - int(curOffset)*segStripeSize
 
 			utils.MLogger.Debugf("Upload object: stripe: %d, seg offset: %d, expected length: %d", curStripe, curOffset, readLen)
 
-			n, err := io.ReadAtLeast(u.reader, rdata, readLen)
+			n, err := io.ReadAtLeast(u.reader, rdata[:readLen], readLen)
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				breakFlag = true
 			} else if err != nil {
 				return err
+			} else if n != readLen {
+				return ErrUpload
 			}
 
-			// need handle n > readLen
-			if n > readLen {
-				data = append(data, rdata[:readLen]...)
-				extra = poolbuf.Get(stripeSize)
-				extra = extra[:0]
-				extra = append(extra, rdata[readLen:n]...)
-				n = readLen
-			} else {
-				data = append(data, rdata[:n]...)
-			}
-
+			data = append(data, rdata[:n]...)
 			if len(data) == 0 {
 				break
 			}
-
-			// plus extra
-			n += extraLen
 
 			// 对整个文件的数据进行MD5校验
 			h.Write(data)
@@ -468,124 +436,112 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			// transfer to different providers
 			newpro := utils.DisorderArray(pros)
 
-			wg.Add(1)
-			go func(data []byte, stripeID, start int, proIDs []string) {
-				defer wg.Done()
-				defer sm.Release(1)
+			bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(curStripe), "0")
 
-				bm, _ := metainfo.NewBlockMeta(u.gInfo.groupID, strconv.Itoa(int(u.bucketID)), strconv.Itoa(stripeID), "0")
-
-				blockMetas := make([]blockMeta, bc)
-				for i := 0; i < bc; i++ {
-					bm.SetCid(strconv.Itoa(i))
-					ncid := bm.ToString()
-					blockMetas[i].cid = ncid
-					if i < len(proIDs) {
-						blockMetas[i].provider = proIDs[i]
-					} else {
-						blockMetas[i].provider = u.gInfo.groupID
-					}
-
-					if start != 0 {
-						provider, _, err := u.gInfo.getBlockProviders(ctx, ncid)
-						if err != nil {
-							continue
-						}
-						blockMetas[i].provider = provider
-					}
-				}
-				count := int32(0)
-				for be := 0; be*segStripeSize < len(data); be += transNum {
-					var transData []byte
-					if len(data) > (be+transNum)*segStripeSize {
-						transData = data[be*segStripeSize : (be+transNum)*segStripeSize]
-					} else {
-						// last one
-						transData = data[be*segStripeSize:]
-					}
-
-					encodedData, offset, err := enc.Encode(transData, bm.ToString(3), start)
-					if err != nil {
-						errrt = err
-						errc <- err
-						return
-					}
-
-					count = 0
-					var pwg sync.WaitGroup
-					for i := 0; i < bc; i++ {
-						blockMetas[i].end = int(offset)
-						blockMetas[i].start = int(start)
-						provider := blockMetas[i].provider
-						if provider == u.gInfo.groupID {
-							continue
-						}
-						pwg.Add(1)
-						if start == 0 {
-							go func(num int, edata []byte, proID string) {
-								defer pwg.Done()
-								km, _ := metainfo.NewKey(blockMetas[num].cid, mpb.KeyType_Block)
-								for k := 0; k < 10; k++ {
-									err := u.gInfo.ds.PutBlock(ctx, km.ToString(), edata, proID)
-									if err != nil {
-										utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", proID, "  failed: ", err)
-										if _, success := u.gInfo.ds.Connect(ctx, proID); success {
-											tdelay := rand.Int63n(int64(k+1) * 60000000000)
-											time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
-											continue
-										}
-										break
-									} else {
-										atomic.AddInt32(&count, 1)
-										break
-									}
-								}
-							}(i, encodedData[i], provider)
-						} else {
-							go func(num int, edata []byte, proID string) {
-								defer pwg.Done()
-								km, _ := metainfo.NewKey(blockMetas[num].cid, mpb.KeyType_Block, strconv.Itoa(blockMetas[num].start), strconv.Itoa(blockMetas[num].end-blockMetas[num].start))
-								for k := 0; k < 10; k++ {
-									err := u.gInfo.ds.AppendBlock(ctx, km.ToString(), edata, proID)
-									if err != nil {
-										utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", proID, " failed: ", err)
-										if _, success := u.gInfo.ds.Connect(ctx, proID); success {
-											tdelay := rand.Int63n(int64(k+1) * 60000000000)
-											time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
-											continue
-										}
-										break
-									} else {
-										atomic.AddInt32(&count, 1)
-										break
-									}
-								}
-							}(i, encodedData[i], provider)
-						}
-					}
-
-					pwg.Wait()
-					start = offset
-					if count >= dc {
-						atomic.AddInt64(&u.sucLen, int64(len(transData)))
-					}
-				}
-				if count >= dc {
-					for _, v := range blockMetas {
-						err := u.gInfo.putDataMetaToKeepers(ctx, v.cid, v.provider, v.end)
-						if err != nil {
-							errrt = err
-							errc <- err
-							return
-						}
-					}
-					poolbuf.Put(data)
+			blockMetas := make([]blockMeta, bc)
+			for i := 0; i < bc; i++ {
+				bm.SetCid(strconv.Itoa(i))
+				ncid := bm.ToString()
+				blockMetas[i].cid = ncid
+				if i < len(newpro) {
+					blockMetas[i].provider = newpro[i]
 				} else {
-					errrt = ErrNoEnoughBlockUpload
-					errc <- ErrNoEnoughBlockUpload
-					return
+					blockMetas[i].provider = u.gInfo.groupID
 				}
-			}(data, curStripe, curOffset, newpro)
+
+				if curOffset != 0 {
+					provider, _, err := u.gInfo.getBlockProviders(ctx, ncid)
+					if err != nil {
+						continue
+					}
+					blockMetas[i].provider = provider
+				}
+			}
+			count := int32(0)
+			for be := 0; be*segStripeSize < len(data); be += transNum {
+				var transData []byte
+				if len(data) > (be+transNum)*segStripeSize {
+					transData = data[be*segStripeSize : (be+transNum)*segStripeSize]
+				} else {
+					// last one
+					transData = data[be*segStripeSize:]
+				}
+
+				encodedData, offset, err := enc.Encode(transData, bm.ToString(3), curOffset)
+				if err != nil {
+					return err
+				}
+
+				count = 0
+				var pwg sync.WaitGroup
+				for i := 0; i < bc; i++ {
+					blockMetas[i].end = int(offset)
+					blockMetas[i].start = int(curOffset)
+					provider := blockMetas[i].provider
+					if provider == u.gInfo.groupID {
+						continue
+					}
+					pwg.Add(1)
+					if curOffset == 0 {
+						go func(num int, edata []byte, proID string) {
+							defer pwg.Done()
+							km, _ := metainfo.NewKey(blockMetas[num].cid, mpb.KeyType_Block)
+							for k := 0; k < 10; k++ {
+								err := u.gInfo.ds.PutBlock(ctx, km.ToString(), edata, proID)
+								if err != nil {
+									utils.MLogger.Warn("Put Block: ", km.ToString(), " to: ", proID, "  failed: ", err)
+									if _, success := u.gInfo.ds.Connect(ctx, proID); success {
+										tdelay := rand.Int63n(int64(k+1) * 60000000000)
+										time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
+										continue
+									}
+									break
+								} else {
+									atomic.AddInt32(&count, 1)
+									break
+								}
+							}
+						}(i, encodedData[i], provider)
+					} else {
+						go func(num int, edata []byte, proID string) {
+							defer pwg.Done()
+							km, _ := metainfo.NewKey(blockMetas[num].cid, mpb.KeyType_Block, strconv.Itoa(blockMetas[num].start), strconv.Itoa(blockMetas[num].end-blockMetas[num].start))
+							for k := 0; k < 10; k++ {
+								err := u.gInfo.ds.AppendBlock(ctx, km.ToString(), edata, proID)
+								if err != nil {
+									utils.MLogger.Warn("Append Block: ", km.ToString(), " to: ", proID, " failed: ", err)
+									if _, success := u.gInfo.ds.Connect(ctx, proID); success {
+										tdelay := rand.Int63n(int64(k+1) * 60000000000)
+										time.Sleep(time.Duration(60000000000*int64(k) + tdelay))
+										continue
+									}
+									break
+								} else {
+									atomic.AddInt32(&count, 1)
+									break
+								}
+							}
+						}(i, encodedData[i], provider)
+					}
+				}
+
+				pwg.Wait()
+				curOffset = offset
+				if count >= dc {
+					atomic.AddInt64(&u.sucLen, int64(len(transData)))
+				}
+			}
+			if count >= dc {
+				for _, v := range blockMetas {
+					err := u.gInfo.putDataMetaToKeepers(ctx, v.cid, v.provider, v.end)
+					if err != nil {
+						return err
+					}
+				}
+				poolbuf.Put(data)
+			} else {
+				return ErrNoEnoughBlockUpload
+			}
 
 			if endOffset == int(u.encoder.Prefix.Bopts.GetSegmentCount()) { //如果写满了一个stripe
 				curStripe++
@@ -593,24 +549,10 @@ func (u *uploadTask) Start(ctx context.Context) error {
 			} else {
 				curOffset = endOffset
 			}
-
-			//给下一个传输任务指令
-			if !breakFlag {
-				sm.Acquire(ctx, 1)
-				go func() {
-					select {
-					case <-ctx.Done():
-						return
-					case workerc <- struct{}{}:
-					}
-				}()
-			}
 		}
 	}
 
 	u.etag = hex.EncodeToString(h.Sum(nil))
-
-	wg.Wait()
 
 	return errrt
 }
