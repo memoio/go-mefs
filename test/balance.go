@@ -18,6 +18,8 @@ import (
 	"github.com/memoio/go-mefs/utils"
 )
 
+const RetryGetInfoSleepTime = 5 * time.Second
+
 // TransferTo trans money
 func TransferTo(value *big.Int, addr, eth, qeth string) error {
 	client, err := ethclient.Dial(eth)
@@ -85,7 +87,8 @@ func TransferTo(value *big.Int, addr, eth, qeth string) error {
 				break
 			}
 			fmt.Println(addr, "'s Balance now:", balance.String(), ", waiting for transfer success")
-			time.Sleep(20 * time.Second)
+			t := 20 * (qCount + 1)
+			time.Sleep(time.Duration(t) * time.Second)
 		}
 
 		if qCount < 10 {

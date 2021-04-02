@@ -302,7 +302,8 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 
 			var root [32]byte
 			copy(root[:], cpay.Root[:32])
-			err = contracts.SpaceTimePay(ukAddr, pAddr, localSk, st, sl, sv, root, cpay.Share, cpay.Sign)
+			cu := contracts.NewCU(pAddr, localSk)
+			err = cu.SpaceTimePay(ukAddr, pAddr, st, sl, sv, root, cpay.Share, cpay.Sign)
 			if err != nil {
 				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s failed %s", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String(), err)
 				cpay.Unlock()
@@ -482,7 +483,7 @@ func (l *lInfo) stSummary(price *big.Int, start, end int64) (*big.Int, []byte) {
 	spacetime.Quo(spacetime, big.NewInt(1024*1024*60*60))
 
 	stWei := new(big.Float).SetInt(spacetime)
-	stWei.Quo(stWei, role.GetMemoPrice())
+	stWei.Quo(stWei, contracts.GetMemoPrice())
 	stWei.Int(spacetime)
 
 	if spacetime.Sign() <= 0 {

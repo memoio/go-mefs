@@ -25,7 +25,6 @@ import (
 	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
-	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/storageNode/commands"
 	"github.com/memoio/go-mefs/storageNode/corehttp"
 	"github.com/memoio/go-mefs/storageNode/provider"
@@ -304,9 +303,10 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	nid := node.Identity.Pretty()
 
+	r := contracts.NewCR(nid, "")
 	if !cfg.Test {
 		//从合约中获取账户角色
-		isKeeper, err := role.IsKeeper(nid)
+		isKeeper, err := r.IsKeeper(nid)
 		if err != nil {
 			utils.MLogger.Error("Got Keeper err: ", err)
 			return err
@@ -319,7 +319,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				cfg.Eth = "http://119.147.213.219:8101"
 			}
 		} else {
-			isProvider, err := role.IsProvider(nid)
+			isProvider, err := r.IsProvider(nid)
 			if err != nil {
 				utils.MLogger.Error("Got Provider role: ", err)
 				return err

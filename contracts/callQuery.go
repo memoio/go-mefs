@@ -9,19 +9,63 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/memoio/go-mefs/contracts/market"
+	"github.com/memoio/go-mefs/utils"
 )
 
-//DeployQuery user use it to deploy query-contract
-func DeployQuery(userAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, ks int, ps int, redo bool) (common.Address, error) {
+//DeployQuery user use it to deploy query-contract, price(wei/MB/hour)
+func (m *MarketInfo) DeployQuery(capacity, storeDays int64, price *big.Int, ks int, ps int, redo bool) (common.Address, error) {
+	utils.MLogger.Info("Begin to deploy query contract...")
+
 	var queryAddr, qAddr common.Address
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, queryKey, hexKey, true)
+	// getbalance
+	balance, err := QueryBalance(m.addr.String())
+	if err != nil {
+		return queryAddr, err
+	}
+
+	utils.MLogger.Infof("%s has balance: %s", m.addr.String(), balance)
+
+	//balance >? query + upKeeping + channel cost
+	weiPrice := new(big.Float).SetInt(price)
+	weiPrice.Quo(weiPrice, GetMemoPrice())
+	newPrice := big.NewInt(0)
+	weiPrice.Int(newPrice)
+
+	moneyAccount := big.NewInt(24)
+	moneyAccount.Mul(moneyAccount, newPrice)
+	moneyAccount.Mul(moneyAccount, big.NewInt(capacity))
+	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
+	// upKeeping cost
+	moneyAccount.Add(moneyAccount, big.NewInt(int64(600000000)))
+	moneyAccount.Add(moneyAccount, big.NewInt(1128277))
+
+	// channel cost; read 1 times
+	readPrice := big.NewInt(utils.READPRICE)
+	weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
+	weiRPrice.Quo(weiRPrice, GetMemoPrice())
+	weiRPrice.Int(readPrice)
+	moneyToChannel := new(big.Int).Mul(readPrice, big.NewInt(capacity))
+
+	moneyAccount.Add(moneyAccount, moneyToChannel)
+	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
+
+	if moneyAccount.Cmp(balance) > 0 { //余额不足
+		utils.MLogger.Infof("user %s has balance %d, but need more balance %d to start: ", m.addr.String(), balance, moneyAccount)
+		return queryAddr, ErrNotEnoughBalance
+	}
+
+	//将存储时间从‘天’换算成‘秒’
+	duration := storeDays * 24 * 60 * 60
+
+	ma := NewCManage(m.addr, m.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(m.addr, queryKey, true)
 	if err != nil {
 		return queryAddr, err
 	}
 
 	if !redo {
-		queryAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
+		queryAddr, err = ma.GetLatestFromMapper(mapperInstance)
 		if err == nil {
 			return queryAddr, nil
 		}
@@ -33,7 +77,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity, duration i
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return queryAddr, errMA
 		}
@@ -58,7 +102,7 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity, duration i
 			if retryCount > sendTransactionRetryCount {
 				return queryAddr, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -75,26 +119,30 @@ func DeployQuery(userAddress common.Address, hexKey string, capacity, duration i
 	}
 	log.Println("query-contract", queryAddr.String(), "have been successfully deployed!")
 
-	err = AddToMapper(queryAddr, hexKey, mapperInstance)
+	err = ma.AddToMapper(queryAddr, mapperInstance)
 	if err != nil {
 		return queryAddr, err
 	}
+
+	utils.MLogger.Info(m.addr.String(), " Finish deploy query contract: ", queryAddr.String)
+
 	return queryAddr, nil
 }
 
 //GetQueryAddrs get all querys
-func GetQueryAddrs(localAddress, userAddress common.Address) (queryAddr []common.Address, err error) {
+func (m *MarketInfo) GetQueryAddrs(userAddress common.Address) (queryAddr []common.Address, err error) {
+	ma := NewCManage(m.addr, m.hexSk)
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, queryKey, "", false)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, queryKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetAddrsFromMapper(localAddress, mapperInstance)
+	return ma.GetAddressFromMapper(mapperInstance)
 }
 
 //SetQueryCompleted when user has found providers and keepers needed, user call this function
-func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
+func (m *MarketInfo) SetQueryCompleted(queryAddress common.Address) error {
 	query, err := market.NewQuery(queryAddress, GetClient(EndPoint))
 	if err != nil {
 		log.Println("newQueryErr:", err)
@@ -106,7 +154,7 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -128,7 +176,7 @@ func SetQueryCompleted(hexKey string, queryAddress common.Address) error {
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 

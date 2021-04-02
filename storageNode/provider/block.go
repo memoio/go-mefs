@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/memoio/go-mefs/contracts"
 	df "github.com/memoio/go-mefs/data-format"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -196,7 +197,7 @@ func verifyChanValue(oldValue, newValue *big.Int, readLen int) bool {
 	//verify value;： value ?= oldValue + 100
 	readPrice := big.NewInt(utils.READPRICE)
 	weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
-	weiRPrice.Quo(weiRPrice, role.GetMemoPrice())
+	weiRPrice.Quo(weiRPrice, contracts.GetMemoPrice())
 	weiRPrice.Int(readPrice)
 
 	readPrice.Mul(readPrice, big.NewInt(int64(readLen)))

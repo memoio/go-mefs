@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
@@ -26,6 +27,7 @@ const (
 	localAddress    = "0x9Fe60D25A7D676C1Dabc65ECc1557F43acF83cAd"
 	localSk         = "124833f1b4b31a88cea6f82bbe42a92e1bc50c83aaff8142fee5ebee96e2dab5"
 	resolverAddress = "0x3395d0586D773DB7500FCa1b713cB99Fdc47f433"
+	waitTime        = 3 * time.Second
 )
 
 func main() {
@@ -61,7 +63,8 @@ func main() {
 
 	log.Println("start get owner of indexer-contract")
 	adminAddr := common.HexToAddress(adminAddrStr)
-	indexerOwnerAddr, err := contracts.GetIndexerOwner(adminAddr, indexerInstance)
+	cManage := contracts.NewCManage(adminAddr, adminSk)
+	indexerOwnerAddr, err := cManage.GetIndexerOwner(indexerInstance)
 	if err != nil {
 		log.Fatal("get owner of indexer fails: ", err)
 	}
@@ -80,10 +83,11 @@ func main() {
 	}
 	localAddrBalance := test.QueryBalance(localAddress, ethEndPoint)
 	fmt.Println("balance of localAddress is ", localAddrBalance)
-	err = contracts.AddToIndexer(common.HexToAddress(localAddress), common.HexToAddress(resolverAddress), resolverKey, localSk, indexerInstance)
+	err = cManage.AddToIndexer(common.HexToAddress(resolverAddress), resolverKey, indexerInstance)
 	if err != nil {
 		log.Fatal("add to indexer fails: ", err)
 	}
+	time.Sleep(waitTime)
 
 	log.Println("start get information from indexer-contract")
 	resolverAddr, resolverOwner, err := contracts.GetAddrFromIndexer(adminAddr, resolverKey, indexerInstance)

@@ -8,11 +8,13 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	mt "gitlab.com/NebulousLabs/merkletree"
 	"golang.org/x/sync/semaphore"
 )
@@ -379,7 +381,12 @@ func (l *LfsInfo) genRoot() {
 	if l.gInfo.userID != l.gInfo.rootID {
 		var val [32]byte
 		copy(val[:], lr.Root[:32])
-		role.SetMerkleRoot(l.privateKey, l.gInfo.rootID, ctime, val)
+		rootAddr, err := address.GetAddressFromID(l.gInfo.rootID)
+		if err != nil {
+			return
+		}
+		cRoot := contracts.NewCRoot(rootAddr, l.privateKey) //rootAddr is not used in setMerkleRoot
+		cRoot.SetMerkleRoot(rootAddr, ctime, val)
 
 		keyTime, res, err := role.GetLatestMerkleRoot(l.gInfo.rootID)
 		if err != nil {

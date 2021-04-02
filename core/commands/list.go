@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
+
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/role"
@@ -99,7 +101,9 @@ var keeperCmd = &cmds.Command{
 
 		var ons, offs []keeperInfo
 
-		price, err := role.GetKeeperPrice(n.Identity.Pretty())
+		cRole := contracts.NewCR(n.Identity.Pretty(), "")
+
+		price, err := cRole.GetKeeperPrice()
 		if err != nil {
 			return err
 		}

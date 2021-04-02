@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/crypto/aes"
 	"github.com/memoio/go-mefs/crypto/pdp"
 	dataformat "github.com/memoio/go-mefs/data-format"
@@ -491,7 +492,7 @@ func (do *downloadTask) getChannelSign(pInfo *providerInfo, readLen int) ([]byte
 	if cItem != nil {
 		readPrice := big.NewInt(utils.READPRICE)
 		weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
-		weiRPrice.Quo(weiRPrice, role.GetMemoPrice())
+		weiRPrice.Quo(weiRPrice, contracts.GetMemoPrice())
 		weiRPrice.Int(readPrice)
 
 		readPrice.Mul(readPrice, big.NewInt(int64(readLen)))
