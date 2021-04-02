@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
@@ -19,6 +20,7 @@ var (
 const ( //indexerHex indexerAddress, it is well known
 	indexerHex = "0xA36D0F4e56b76B89532eBbca8108d90d8cA006c2"
 	moneyTo    = 1000000000000000
+	waitTime   = 3 * time.Second
 )
 
 func main() {
@@ -46,20 +48,23 @@ func main() {
 	defer log.Println("============finish test mapper===========")
 
 	log.Println("start deploy mapper")
-	resAddr, resInsatnce, err := contracts.DeployMapper(localAddr, userSk)
+	cManage := contracts.NewCManage(localAddr, userSk)
+	resAddr, resInsatnce, err := cManage.DeployMapper()
 	if err != nil {
 		log.Fatal("deploy mapper fails:", err)
 	}
+	time.Sleep(waitTime)
 
 	log.Println("start add to mapper")
-	err = contracts.AddToMapper(resAddr, userSk, resInsatnce)
+	err = cManage.AddToMapper(resAddr, resInsatnce)
 	if err != nil {
 		log.Fatal("add mapper fails: ", err)
 	}
+	time.Sleep(waitTime)
 
 	log.Println("start get address from mapper remote")
 	contracts.EndPoint = qethEndPoint
-	mapperAddr, err := contracts.GetAddrsFromMapper(localAddr, resInsatnce)
+	mapperAddr, err := cManage.GetAddressFromMapper(resInsatnce)
 	if err != nil {
 		log.Fatal("get mapper fails: ", err)
 	}

@@ -25,6 +25,7 @@ const (
 	sPrice       = 111
 	sLength      = 290
 	perMoney     = 120
+	waitTime     = 10 * time.Second
 )
 
 var (
@@ -121,7 +122,8 @@ func ukTest() error {
 
 	log.Println("1.begin to deploy upkeeping first")
 	contracts.EndPoint = ethEndPoint
-	uAddr, err := contracts.DeployUpkeeping(userSk, localAddr, localAddr, kAddrList, pAddrList, sDuration, sSize, big.NewInt(sPrice), defaultCycle, big.NewInt(moneyToUK), false)
+	cu := contracts.NewCU(localAddr, userSk)
+	uAddr, err := cu.DeployUpkeeping(localAddr, kAddrList, pAddrList, sDuration, sSize, big.NewInt(sPrice), defaultCycle, big.NewInt(moneyToUK), false)
 	if err != nil {
 		log.Println("deploy Upkeping err:", err)
 		return err
@@ -129,8 +131,9 @@ func ukTest() error {
 	log.Println("upKeeping contract address:", uAddr.String())
 
 	log.Println("2.begin to reget upkeeping's addr")
+
 	contracts.EndPoint = qethEndPoint
-	ukaddr, _, err := contracts.GetUpkeeping(localAddr, localAddr, localAddr.String())
+	ukaddr, uk, err := contracts.GetUpkeeping(localAddr, localAddr, localAddr.String())
 	if err != nil {
 		log.Fatal("cannnot get upkeeping contract: ", err)
 		return err
@@ -159,11 +162,11 @@ func ukTest() error {
 			log.Fatal("Upkeeping has no balance")
 		}
 
-		time.Sleep(10 * time.Second)
+		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
 	}
 
 	log.Println("4.begin to query upkeeping's information")
-	queryAddrGet, _, providers, timeGet, sizeG, priceG, createDate, endDate, cycle, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	queryAddrGet, _, providers, timeGet, sizeG, priceG, createDate, endDate, cycle, needPay, _, err := cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
 		return err
@@ -190,7 +193,8 @@ func ukTest() error {
 		return err
 	}
 
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], kSkList[0], stStart, stLength, amount, merkleRoot, share, signs)
+	cu = contracts.NewCU(localAddr, kSkList[0])
+	err = cu.SpaceTimePay(ukaddr, pAddrList[0], stStart, stLength, amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -200,10 +204,11 @@ func ukTest() error {
 	threeCycle := createDate.Int64() + 3*cycle.Int64()
 	log.Println("spacetime pay trigger", "nowTime:", firstNow, "createDate+3*cycle:", threeCycle)
 
+	time.Sleep(waitTime)
 	log.Println("6.begin to query results of first stPay")
 	amountUk := test.QueryBalance(ukaddr.String(), qethEndPoint)
 	log.Println("contract balance", amountUk)
-	_, keepers, providers, _, _, _, _, _, _, needPay, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err := cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("getOrder err: ", err)
 	}
@@ -242,12 +247,13 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("get setStopSigns error:", err)
 	}
-	invalidAddr := common.HexToAddress(contracts.InvalidAddr)
-	err = contracts.SetProviderStop(kSkList[0], kAddrList[0], localAddr, pAddrList[1], invalidAddr, localAddr.String(), setStopSigns)
+
+	cu = contracts.NewCU(kAddrList[0], kSkList[0])
+	err = cu.SetProviderStop(localAddr, pAddrList[1], ukaddr, localAddr.String(), setStopSigns)
 	if err != nil {
 		log.Fatal("set provider stop fails: ", err)
 	}
-	_, _, providerInfo, _, _, _, _, _, _, _, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, _, providerInfo, _, _, _, _, _, _, _, _, err := cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
 	}
@@ -266,7 +272,8 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("getSigs error:", err)
 	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[1], kSkList[0], stStart, big.NewInt(sLength), amount, merkleRoot, share, signs)
+	cu = contracts.NewCU(kAddrList[0], kSkList[0])
+	err = cu.SpaceTimePay(ukaddr, pAddrList[1], stStart, big.NewInt(sLength), amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -275,10 +282,11 @@ func ukTest() error {
 	stoppedNow := time.Now().Unix()
 	log.Println("spacetime pay trigger", "nowTime:", stoppedNow, "createDate+4*cycle:", threeCycle+cycle.Int64())
 
+	time.Sleep(waitTime)
 	log.Println("9.begin to query results of stPay for stopped provider 1")
 	amountUk = test.QueryBalance(ukaddr.String(), qethEndPoint)
 	log.Println("contract balance", amountUk)
-	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("getOrder err:", err)
 	}
@@ -325,7 +333,8 @@ func ukTest() error {
 	}
 
 	var esigs [][]byte
-	err = contracts.AddProvider(userSk, localAddr, ukaddr, []common.Address{providerAddr1}, esigs)
+	cu = contracts.NewCU(localAddr, userSk)
+	err = cu.AddProvider(ukaddr, []common.Address{providerAddr1}, esigs)
 	if err != nil {
 		log.Fatal("ukAddProvider user AddProvider() error", err)
 		return err
@@ -346,13 +355,14 @@ func ukTest() error {
 		return err
 	}
 
-	err = contracts.AddProvider(kSkList[0], kAddrList[0], ukaddr, addProviderAddrs, sigs)
+	cu = contracts.NewCU(kAddrList[0], kSkList[0])
+	err = cu.AddProvider(ukaddr, addProviderAddrs, sigs)
 	if err != nil {
 		log.Fatal("ukAddProvider AddProvider() error", err)
 		return err
 	}
 
-	_, _, providers, _, _, _, _, _, _, _, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, _, providers, _, _, _, _, _, _, _, _, err = cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("getUk err:", err)
 	}
@@ -380,7 +390,7 @@ func ukTest() error {
 	}
 
 	log.Println("11.begin to second initiate spacetime pay to provider 0 after 3 cycles, stLength is: ", sLength)
-	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, _, providers, _, _, _, _, _, _, needPay, _, err = cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
 	}
@@ -392,7 +402,8 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("getSigs error:", err)
 	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], kSkList[0], stStart, stLength, amount, merkleRoot, share, signs)
+	cu = contracts.NewCU(kAddrList[0], kSkList[0])
+	err = cu.SpaceTimePay(ukaddr, pAddrList[0], stStart, stLength, amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
@@ -400,10 +411,11 @@ func ukTest() error {
 	secondNow := time.Now().Unix()
 	log.Println("spacetime pay trigger", "nowTime:", secondNow)
 
+	time.Sleep(waitTime)
 	log.Println("12.begin to query results of second stPay")
 	amountUk = test.QueryBalance(ukaddr.String(), qethEndPoint)
 	log.Println("contract balance", amountUk)
-	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("get order fails")
 	}
@@ -436,7 +448,7 @@ func ukTest() error {
 	fmt.Println("nowTime:", time.Now().Unix(), "endDate:", endDate.Int64())
 
 	log.Println("13.begin to third initiate spacetime pay to provider 0, stLength is: ", sLength)
-	_, _, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, _, providers, _, _, _, _, _, _, needPay, _, err = cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
 	}
@@ -448,17 +460,19 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("getSigs error:", err)
 	}
-	err = contracts.SpaceTimePay(ukaddr, pAddrList[0], kSkList[0], stStart, stLength, amount, merkleRoot, share, signs)
+	cu = contracts.NewCU(kAddrList[0], kSkList[0])
+	err = cu.SpaceTimePay(ukaddr, pAddrList[0], stStart, stLength, amount, merkleRoot, share, signs)
 	if err != nil {
 		log.Fatal("spacetime pay err:", err)
 		return err
 	}
 	log.Println("spacetime pay trigger")
 
+	time.Sleep(waitTime)
 	log.Println("14.begin to query results of third stPay")
 	amountUk = test.QueryBalance(ukaddr.String(), qethEndPoint)
 	log.Println("contract balance", amountUk)
-	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, keepers, providers, _, _, _, _, _, _, needPay, _, err = cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("get order fails")
 	}
@@ -507,11 +521,12 @@ func ukTest() error {
 	log.Println("16.begin to test extendTime")
 	contracts.EndPoint = ethEndPoint
 	addTime := time.Now().Unix() - endDate.Int64() + int64(300)
-	err = contracts.ExtendTime(userSk, localAddr, localAddr, localAddr.String(), addTime)
+	cu = contracts.NewCU(localAddr, userSk)
+	err = cu.ExtendTime(localAddr, localAddr.String(), addTime)
 	if err != nil {
 		log.Fatal("extend uk storage time error", err)
 	}
-	_, _, _, timeNewGet, _, _, _, endDateNew, _, _, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, _, _, timeNewGet, _, _, _, endDateNew, _, _, _, err := cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
 	}
@@ -526,11 +541,12 @@ func ukTest() error {
 	if err != nil {
 		log.Fatal("get setStopSigns error:", err)
 	}
-	err = contracts.SetKeeperStop(kSkList[0], kAddrList[0], localAddr, kAddrList[1], localAddr.String(), setStopSigns)
+	cu = contracts.NewCU(kAddrList[0], kSkList[0])
+	err = cu.SetKeeperStop(localAddr, kAddrList[1], localAddr.String(), setStopSigns)
 	if err != nil {
 		log.Fatal("set keeper stop fails: ", err)
 	}
-	_, keeperInfo, _, _, _, _, _, _, _, _, _, err := contracts.GetOrder(userSk, localAddr, localAddr, localAddr.String())
+	_, keeperInfo, _, _, _, _, _, _, _, _, _, err := cu.GetOrder(uk)
 	if err != nil {
 		log.Fatal("ukGetOrder error:", err)
 	}

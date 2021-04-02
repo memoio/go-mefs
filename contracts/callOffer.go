@@ -9,32 +9,59 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/memoio/go-mefs/contracts/market"
+	"github.com/memoio/go-mefs/utils"
 )
 
-//DeployOffer provider use it to deploy offer-contract
-func DeployOffer(localAddress common.Address, hexKey string, capacity, duration int64, price *big.Int, redo bool) (common.Address, error) {
-	var offerAddr, oAddr common.Address
+//MarketInfo  The basic information of node used for 'market' contract
+type MarketInfo struct {
+	addr  common.Address //local address
+	hexSk string         //local privateKey
+}
 
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, localAddress, offerKey, hexKey, true)
+//NewCM new a instance of contractMarket
+func NewCM(addr common.Address, hexSk string) ContractMarket {
+	MInfo := &MarketInfo{
+		addr:  addr,
+		hexSk: hexSk,
+	}
+
+	return MInfo
+}
+
+//DeployOffer provider use it to deploy offer-contract
+func (m *MarketInfo) DeployOffer(capacity, duration int64, price *big.Int, redo bool) (common.Address, error) {
+	var offerAddr, oAddr common.Address
+	utils.MLogger.Info("Begin to deploy offer contract...")
+
+	//获得用户的账户余额
+	balance, err := QueryBalance(m.addr.Hex())
+	if err != nil {
+		return offerAddr, err
+	}
+
+	utils.MLogger.Infof("%s has balance: %s", m.addr.Hex(), balance)
+
+	ma := NewCManage(m.addr, m.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(m.addr, offerKey, true)
 	if err != nil {
 		return offerAddr, err
 	}
 
 	if !redo {
-		offerAddr, err = GetLatestFromMapper(localAddress, mapperInstance)
+		offerAddr, err = ma.GetLatestFromMapper(mapperInstance)
 		if err == nil {
 			log.Println("you have deployed offer-contract")
 			return offerAddr, nil
 		}
 	}
 
-	log.Println("begin to deploy offer-contract...")
+	//开始部署offer合约，失败则多尝试几次
 	client := GetClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return offerAddr, errMA
 		}
@@ -46,7 +73,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 		}
 
 		oAddr, tx, _, err = market.DeployOffer(auth, client, big.NewInt(capacity), big.NewInt(duration), price) //提供存储容量 存储时段 存储单价
-		if oAddr.String() != InvalidAddr{
+		if oAddr.String() != InvalidAddr {
 			offerAddr = oAddr
 		}
 		if err != nil {
@@ -59,7 +86,7 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 			if retryCount > sendTransactionRetryCount {
 				return offerAddr, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -77,26 +104,30 @@ func DeployOffer(localAddress common.Address, hexKey string, capacity, duration 
 	log.Println("offer-contract", offerAddr.String(), "have been successfully deployed!")
 
 	//offerAddress放进mapper
-	err = AddToMapper(offerAddr, hexKey, mapperInstance)
+	err = ma.AddToMapper(offerAddr, mapperInstance)
 	if err != nil {
 		return offerAddr, err
 	}
+
+	utils.MLogger.Info("Finish deploy offer contract: ", offerAddr.Hex())
+
 	return offerAddr, nil
 }
 
 //GetOfferAddrs get all offers
-func GetOfferAddrs(localAddress, ownerAddress common.Address) ([]common.Address, error) {
+func (m *MarketInfo) GetOfferAddrs(ownerAddress common.Address) ([]common.Address, error) {
+	ma := NewCManage(m.addr, m.hexSk)
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, ownerAddress, offerKey, "", false)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(ownerAddress, offerKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetAddrsFromMapper(localAddress, mapperInstance)
+	return ma.GetAddressFromMapper(mapperInstance)
 }
 
 //ExtendOfferTime called by provider to extend the time in offer contract
-func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.Int) error {
+func (m *MarketInfo) ExtendOfferTime(offerAddress common.Address, addTime *big.Int) error {
 	offerInstance, err := market.NewOffer(offerAddress, GetClient(EndPoint))
 	if err != nil {
 		return err
@@ -107,7 +138,7 @@ func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.In
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -129,7 +160,7 @@ func ExtendOfferTime(offerAddress common.Address, hexKey string, addTime *big.In
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 

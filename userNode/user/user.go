@@ -5,6 +5,9 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/memoio/go-mefs/contracts"
+	"github.com/memoio/go-mefs/utils/address"
+
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/memoio/go-mefs/role"
 	"github.com/memoio/go-mefs/source/data"
@@ -90,10 +93,13 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int
 		}
 
 		if queryID == "" || rdo {
-			qid, err := role.DeployQuery(userID, sk, duration, capacity, price, ks, ps, rdo)
+			userAddr, _ := address.GetAddressFromID(userID)
+			m := contracts.NewCM(userAddr, sk)
+			qAddr, err := m.DeployQuery(duration, capacity, price, ks, ps, rdo)
 			if err != nil {
 				return nil, err
 			}
+			qid, _ := address.GetIDFromAddress(qAddr.Hex())
 			queryID = qid
 		}
 

@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/channel"
 	"github.com/memoio/go-mefs/contracts/market"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 	id "github.com/memoio/go-mefs/crypto/identity"
@@ -104,6 +103,8 @@ type kpItem struct {
 
 var kpMap sync.Map
 
+const retryGetInfoSleepTime = time.Minute
+
 func QueryBalance(localID string) (*big.Int, error) {
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
@@ -140,7 +141,7 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 			if retryCount > 10 {
 				return item, nil
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 		if isKeeper && !isBanned {
@@ -162,43 +163,6 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 	return item, ErrNotKeeper
 }
 
-func GetKeeperPrice(localID string) (*big.Int, error) {
-	localAddress, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return nil, err
-	}
-
-	return contracts.GetKeeperPrice(localAddress)
-}
-
-// PledgeKeeper pledgs
-func PledgeKeeper(localID, hexKey string, amount *big.Int) error {
-	localAddress, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return err
-	}
-
-	return contracts.PledgeKeeper(localAddress, hexKey, amount)
-}
-
-func IsKeeper(userID string) (bool, error) {
-	localAddress, err := address.GetAddressFromID(userID)
-	if err != nil {
-		return false, err
-	}
-
-	for i := 0; i < 3; i++ {
-		ok, err := contracts.IsKeeper(localAddress)
-		if err != nil {
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		return ok, nil
-	}
-	return false, ErrNotConnectd
-}
-
 // GetProviderInfo returns provider info
 func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	var item ProviderItem
@@ -218,6 +182,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	}
 
 	retryCount := 0
+	r := contracts.NewCR(localID, "")
 	for {
 		retryCount++
 		isProvider, isBanned, money, stime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, proAddress)
@@ -225,18 +190,18 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 			if retryCount > 10 {
 				return item, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 
-		price, err := GetProviderPrice(localID)
+		price, err := r.GetProviderPrice()
 		if err != nil {
 			return item, err
 		}
 
 		cap := int64(0)
 		weiPrice := new(big.Float).SetInt(price)
-		weiPrice.Quo(weiPrice, GetMemoPrice())
+		weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
 		weiPrice.Int(price)
 		if price.Sign() > 0 {
 			cap = money.Quo(money, price).Int64()
@@ -255,84 +220,6 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 	}
 
 	return item, ErrNotProvider
-}
-
-// PledgeProvider returns provider info
-func PledgeProvider(localID, hexKey string, size *big.Int) error {
-	localAddress, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return err
-	}
-
-	price, err := GetProviderPrice(localID)
-	if err != nil {
-		return err
-	}
-
-	weiPrice := new(big.Float).SetInt(price)
-	weiPrice.Quo(weiPrice, GetMemoPrice())
-	weiPrice.Int(price)
-	price.Mul(price, size)
-
-	return contracts.PledgeProvider(localAddress, hexKey, price)
-}
-
-func GetProviderPrice(localID string) (*big.Int, error) {
-	localAddress, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return nil, err
-	}
-
-	return contracts.GetProviderPrice(localAddress)
-}
-
-func IsProvider(userID string) (bool, error) {
-	localAddress, err := address.GetAddressFromID(userID)
-	if err != nil {
-		return false, err
-	}
-
-	for i := 0; i < 3; i++ {
-		ok, err := contracts.IsProvider(localAddress)
-		if err != nil {
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		return ok, nil
-	}
-	return false, ErrNotConnectd
-}
-
-// DeployOffer is
-func DeployOffer(localID, sk string, capacity, duration int64, price *big.Int, redo bool) (offerID string, err error) {
-	utils.MLogger.Info("Begin to deploy offer contract...")
-	localAddress, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return offerID, err
-	}
-
-	//获得用户的账户余额
-	balance, err := contracts.QueryBalance(localAddress.Hex())
-	if err != nil {
-		return offerID, err
-	}
-
-	utils.MLogger.Infof("%s (%s) has balance: %s", localID, localAddress.Hex(), balance)
-
-	offerAddr, err := contracts.DeployOffer(localAddress, sk, capacity, duration, price, redo)
-	if err != nil {
-		utils.MLogger.Error("Fail to deploy offer contract: ", err)
-		return offerID, err
-	}
-
-	offerID, err = address.GetIDFromAddress(offerAddr.String())
-	if err != nil {
-		return offerID, err
-	}
-	utils.MLogger.Info("Finish deploy offer contract: ", offerID)
-
-	return offerID, nil
 }
 
 //GetOfferInfo get provider's offer-info
@@ -364,7 +251,7 @@ func GetOfferInfo(localID, offerID string) (OfferItem, error) {
 			if retryCount > 10 {
 				return item, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 
@@ -394,7 +281,8 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 		return item, err
 	}
 
-	oAddrs, err := contracts.GetOfferAddrs(userAddr, proAddr)
+	m := contracts.NewCM(userAddr, "")
+	oAddrs, err := m.GetOfferAddrs(proAddr)
 	if err != nil {
 		utils.MLogger.Info("get ", proID, " 's offer address err: ", err)
 		return item, err
@@ -418,71 +306,6 @@ func GetLatestOffer(localID, proID string) (OfferItem, error) {
 	return item, nil
 }
 
-// DeployQuery is
-func DeployQuery(userID, sk string, storeDays, storeSize int64, storePrice *big.Int, ks, ps int, rdo bool) (queryID string, err error) {
-	utils.MLogger.Info("Begin to deploy query contract...")
-	uaddr, err := address.GetAddressFromID(userID)
-	if err != nil {
-		return queryID, err
-	}
-
-	// getbalance
-	balance, err := contracts.QueryBalance(uaddr.String())
-	if err != nil {
-		return queryID, err
-	}
-
-	utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
-
-	//balance >? query + upKeeping + channel cost
-	weiPrice := new(big.Float).SetInt(storePrice)
-	weiPrice.Quo(weiPrice, GetMemoPrice())
-	newPrice := big.NewInt(0)
-	weiPrice.Int(newPrice)
-
-	moneyAccount := big.NewInt(24)
-	moneyAccount.Mul(moneyAccount, newPrice)
-	moneyAccount.Mul(moneyAccount, big.NewInt(storeSize))
-	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
-	// upKeeping cost
-	moneyAccount.Add(moneyAccount, big.NewInt(int64(600000000)))
-	moneyAccount.Add(moneyAccount, big.NewInt(1128277))
-
-	// channel cost; read 1 times
-	readPrice := big.NewInt(utils.READPRICE)
-	weiRPrice := new(big.Float).SetInt64(utils.READPRICE)
-	weiRPrice.Quo(weiRPrice, GetMemoPrice())
-	weiRPrice.Int(readPrice)
-	moneyToChannel := new(big.Int).Mul(readPrice, big.NewInt(storeSize))
-
-	moneyAccount.Add(moneyAccount, moneyToChannel)
-	moneyAccount.Add(moneyAccount, big.NewInt(int64(700000*ps)))
-
-	if moneyAccount.Cmp(balance) > 0 { //余额不足
-		utils.MLogger.Infof("user %s has balance %d, but need more balance %d to start: ", uaddr.String(), balance, moneyAccount)
-		return queryID, ErrNotEnoughBalance
-	}
-
-	// deploy query
-	duration := storeDays * 24 * 60 * 60
-	queryAddr, err := contracts.DeployQuery(uaddr, sk, storeSize, duration, storePrice, ks, ps, rdo)
-	if err != nil {
-		utils.MLogger.Error("fail to deploy query contract: ", err)
-		return queryID, err
-	}
-
-	utils.MLogger.Info(uaddr.String(), " has new query: ", queryAddr.String())
-
-	queryID, err = address.GetIDFromAddress(queryAddr.String())
-	if err != nil {
-		return queryID, err
-	}
-
-	utils.MLogger.Info("Finish deploy query contract: ", queryID)
-
-	return queryID, nil
-}
-
 // GetLatestQuery gets
 func GetLatestQuery(userID string) (QueryItem, error) {
 	var item QueryItem
@@ -491,7 +314,8 @@ func GetLatestQuery(userID string) (QueryItem, error) {
 		return item, err
 	}
 
-	qAddrs, err := contracts.GetQueryAddrs(userAddr, userAddr)
+	m := contracts.NewCM(userAddr, "")
+	qAddrs, err := m.GetQueryAddrs(userAddr)
 	if err != nil {
 		utils.MLogger.Info("get ", userID, " 's query address err: ", err)
 		return item, err
@@ -515,14 +339,15 @@ func GetLatestQuery(userID string) (QueryItem, error) {
 	return item, nil
 }
 
-// GetAllQuerys gets
+// GetAllQuerys gets all query IDs
 func GetAllQuerys(userID string) ([]string, error) {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	qAddrs, err := contracts.GetQueryAddrs(userAddr, userAddr)
+	m := contracts.NewCM(userAddr, "")
+	qAddrs, err := m.GetQueryAddrs(userAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -566,7 +391,7 @@ func GetQueryInfo(localID, queryID string) (QueryItem, error) {
 			if retryCount > 10 {
 				return item, err
 			}
-			time.Sleep(60 * time.Second)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 		item = QueryItem{
@@ -612,7 +437,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	}
 
 	weiPrice := new(big.Float).SetInt(storePrice)
-	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
 	newPrice := big.NewInt(0)
 	weiPrice.Int(newPrice)
 
@@ -637,13 +462,15 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	utils.MLogger.Info("Begin to deploy upkeeping contract...")
 
 	duration := storeDays * 24 * 60 * 60
-	ukAddr, err := contracts.DeployUpkeeping(hexSk, localAddress, queryAddress, keepers, providers, duration, storeSize, storePrice, stPayCycle, moneyAccount, redo)
+	u := contracts.NewCU(localAddress, hexSk)
+	ukAddr, err := u.DeployUpkeeping(queryAddress, keepers, providers, duration, storeSize, storePrice, stPayCycle, moneyAccount, redo)
 	if err != nil {
 		utils.MLogger.Error("Deploy upkeeping contract failed: ", err)
 		return ukID, err
 	}
 
-	err = contracts.SetQueryCompleted(hexSk, queryAddress)
+	m := contracts.NewCM(localAddress, hexSk)
+	err = m.SetQueryCompleted(queryAddress)
 	if err != nil {
 		return ukID, err
 	}
@@ -658,7 +485,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	return ukID, nil
 }
 
-// GetUpkeepingInfo get Upkeeping-contract's params
+// GetUpkeepingInfo get Upkeeping-contract's params by ukID
 func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 	var item UpKeepingItem
 	localAddr, err := address.GetAddressFromID(localID)
@@ -681,47 +508,38 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 		return item, err
 	}
 
-	retryCount := 0
-	for {
-		retryCount++
-		queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := ukInstance.GetOrder(&bind.CallOpts{
-			From: localAddr,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		qid, err := address.GetIDFromAddress(queryAddr.String())
-		if err != nil {
-			return item, err
-		}
-
-		item = UpKeepingItem{
-			QueryID:     qid,
-			UpKeepingID: ukID,
-			Keepers:     keepers,
-			KeeperSLA:   int32(len(keepers)),
-			Providers:   providers,
-			ProviderSLA: int32(len(providers)),
-			Duration:    duration.Int64(),
-			Capacity:    capacity.Int64(),
-			Price:       price,
-			StartTime:   startTime.Int64(),
-			EndTime:     endDate.Int64(),
-			Cycle:       cycle.Int64(),
-			NeedPay:     needPay,
-			Proofs:      proofs,
-			Money:       ukMoney,
-		}
-		return item, nil
+	u := contracts.NewCU(localAddr, "")
+	queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := u.GetOrder(ukInstance)
+	if err != nil {
+		return item, err
 	}
+
+	qid, err := address.GetIDFromAddress(queryAddr.String())
+	if err != nil {
+		return item, err
+	}
+
+	item = UpKeepingItem{
+		QueryID:     qid,
+		UpKeepingID: ukID,
+		Keepers:     keepers,
+		KeeperSLA:   int32(len(keepers)),
+		Providers:   providers,
+		ProviderSLA: int32(len(providers)),
+		Duration:    duration.Int64(),
+		Capacity:    capacity.Int64(),
+		Price:       price,
+		StartTime:   startTime.Int64(),
+		EndTime:     endDate.Int64(),
+		Cycle:       cycle.Int64(),
+		NeedPay:     needPay,
+		Proofs:      proofs,
+		Money:       ukMoney,
+	}
+	return item, nil
 }
 
-// GetUpKeeping gets
+// GetUpKeeping get Upkeeping-contract's params by queryID
 func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 	var item UpKeepingItem
 	userAddr, err := address.GetAddressFromID(userID)
@@ -738,55 +556,47 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 	if err != nil {
 		return item, err
 	}
-	retryCount := 0
-	for {
-		retryCount++
-		queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := ukInstance.GetOrder(&bind.CallOpts{
-			From: userAddr,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
 
-		qid, err := address.GetIDFromAddress(queryAddr.String())
-		if err != nil {
-			return item, err
-		}
-
-		ukID, err := address.GetIDFromAddress(ukAddr.String())
-		if err != nil {
-			return item, err
-		}
-
-		ukMoney, err := contracts.QueryBalance(ukAddr.String())
-		if err != nil {
-			return item, err
-		}
-
-		item = UpKeepingItem{
-			UserID:      userID,
-			QueryID:     qid,
-			UpKeepingID: ukID,
-			Keepers:     keepers,
-			KeeperSLA:   int32(len(keepers)),
-			Providers:   providers,
-			ProviderSLA: int32(len(providers)),
-			Duration:    duration.Int64(),
-			Capacity:    capacity.Int64(),
-			Price:       price,
-			StartTime:   startTime.Int64(),
-			EndTime:     endDate.Int64(),
-			Cycle:       cycle.Int64(),
-			NeedPay:     needPay,
-			Proofs:      proofs,
-			Money:       ukMoney,
-		}
-		return item, nil
+	qid, err := address.GetIDFromAddress(queryAddr.String())
+	if err != nil {
+		return item, err
 	}
+
+	ukID, err := address.GetIDFromAddress(ukAddr.String())
+	if err != nil {
+		return item, err
+	}
+
+	ukMoney, err := contracts.QueryBalance(ukAddr.String())
+	if err != nil {
+		return item, err
+	}
+
+	u := contracts.NewCU(userAddr, "")
+	queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := u.GetOrder(ukInstance)
+	if err != nil {
+		return item, err
+	}
+
+	item = UpKeepingItem{
+		UserID:      userID,
+		QueryID:     qid,
+		UpKeepingID: ukID,
+		Keepers:     keepers,
+		KeeperSLA:   int32(len(keepers)),
+		Providers:   providers,
+		ProviderSLA: int32(len(providers)),
+		Duration:    duration.Int64(),
+		Capacity:    capacity.Int64(),
+		Price:       price,
+		StartTime:   startTime.Int64(),
+		EndTime:     endDate.Int64(),
+		Cycle:       cycle.Int64(),
+		NeedPay:     needPay,
+		Proofs:      proofs,
+		Money:       ukMoney,
+	}
+	return item, nil
 }
 
 // DeployRoot is
@@ -811,7 +621,8 @@ func DeployRoot(sk, userID, queryID string, rdo bool) (rootID string, err error)
 	utils.MLogger.Infof("%s (%s) has balance: %s", userID, uaddr.String(), balance)
 
 	// deploy root
-	rootAddr, err := contracts.DeployRoot(sk, uaddr, queryAddr, rdo)
+	r := contracts.NewCRoot(uaddr, sk)
+	rootAddr, err := r.DeployRoot(queryAddr, rdo)
 	if err != nil {
 		utils.MLogger.Error("fail to deploy root contract: ", err)
 		return queryID, err
@@ -829,7 +640,7 @@ func DeployRoot(sk, userID, queryID string, rdo bool) (rootID string, err error)
 	return rootID, nil
 }
 
-// GetRoot gets
+// GetRoot gets rootID
 func GetRoot(userID, queryID string) (string, error) {
 	userAddr, err := address.GetAddressFromID(userID)
 	if err != nil {
@@ -854,20 +665,6 @@ func GetRoot(userID, queryID string) (string, error) {
 	return rootID, nil
 }
 
-func SetMerkleRoot(sk, rootID string, key int64, val [32]byte) error {
-	rootAddr, err := address.GetAddressFromID(rootID)
-	if err != nil {
-		return err
-	}
-
-	err = contracts.SetMerkleRoot(sk, rootAddr, key, val)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func GetLatestMerkleRoot(rootID string) (int64, [32]byte, error) {
 	var val [32]byte
 	rootAddr, err := address.GetAddressFromID(rootID)
@@ -875,7 +672,8 @@ func GetLatestMerkleRoot(rootID string) (int64, [32]byte, error) {
 		return 0, val, err
 	}
 
-	return contracts.GetLatestMerkleRoot(rootAddr, rootAddr)
+	r := contracts.NewCRoot(rootAddr, "")
+	return r.GetLatestMerkleRoot(rootAddr)
 }
 
 // DeployChannel is
@@ -899,7 +697,7 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	moneyToChannel.Mul(moneyToChannel, big.NewInt(3))
 
 	weiPrice := new(big.Float).SetInt(moneyToChannel)
-	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
 	weiPrice.Int(moneyToChannel)
 
 	balance, err := contracts.QueryBalance(localAddress.Hex())
@@ -918,7 +716,8 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 		return chanAddr, err
 	}
 
-	cAddr, err := contracts.DeployChannelContract(hexSk, localAddress, queryAddress, proAddress, timeOut, moneyToChannel, redo)
+	ch := contracts.NewCH(localAddress, hexSk)
+	cAddr, err := ch.DeployChannelContract(queryAddress, proAddress, timeOut, moneyToChannel, redo)
 	if err != nil {
 		utils.MLogger.Error("Deploy channel contract failed: ", err)
 		return chanAddr, err
@@ -947,50 +746,38 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 		return item, err
 	}
 
-	channelInstance, err := channel.NewChannel(chanAddress, contracts.GetClient(contracts.EndPoint))
+	ch := contracts.NewCH(localAddress, "")
+	startDate, timeOut, sender, receiver, err := ch.GetChannelInfo(chanAddress)
 	if err != nil {
 		return item, err
 	}
-	retryCount := 0
-	for {
-		retryCount++
-		startDate, timeOut, sender, receiver, err := channelInstance.GetInfo(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(60 * time.Second)
-			continue
-		}
 
-		uid, err := address.GetIDFromAddress(sender.String())
-		if err != nil {
-			return item, err
-		}
-
-		pid, err := address.GetIDFromAddress(receiver.String())
-		if err != nil {
-			return item, err
-		}
-
-		ba, err := contracts.QueryBalance(chanAddress.String())
-		if err != nil {
-			return item, err
-		}
-
-		item = ChannelItem{
-			StartTime: startDate.Int64(),
-			Duration:  timeOut.Int64(),
-			ChannelID: channelID,
-			UserID:    uid,
-			ProID:     pid,
-			Value:     big.NewInt(0),
-			Money:     ba,
-		}
-		return item, nil
+	uid, err := address.GetIDFromAddress(sender.String())
+	if err != nil {
+		return item, err
 	}
+
+	pid, err := address.GetIDFromAddress(receiver.String())
+	if err != nil {
+		return item, err
+	}
+
+	ba, err := contracts.QueryBalance(chanAddress.String())
+	if err != nil {
+		return item, err
+	}
+
+	item = ChannelItem{
+		StartTime: startDate,
+		Duration:  timeOut,
+		ChannelID: channelID,
+		UserID:    uid,
+		ProID:     pid,
+		Value:     big.NewInt(0),
+		Money:     ba,
+	}
+	return item, nil
+
 }
 
 // GetBalance gets balance from
@@ -1000,20 +787,12 @@ func GetBalance(pid string) *big.Int {
 		return big.NewInt(0)
 	}
 
-	retryCount := 0
-	for {
-		retryCount++
-		balance, err := contracts.QueryBalance(paddr.String())
-		if err != nil {
-			if retryCount > 10 {
-				return big.NewInt(0)
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		return balance
+	balance, err := contracts.QueryBalance(paddr.String())
+	if err != nil {
+		return big.NewInt(0)
 	}
+
+	return balance
 }
 
 // GetLatestChannel gets
@@ -1035,7 +814,8 @@ func GetLatestChannel(userID, queryID, proID string) (ChannelItem, error) {
 		return item, err
 	}
 
-	channelAddr, _, err := contracts.GetLatestChannel(userAddr, userAddr, proAddr, queryAddr)
+	cChannel := contracts.NewCH(userAddr, "")
+	channelAddr, _, err := cChannel.GetLatestChannel(userAddr, proAddr, queryAddr)
 	if err != nil {
 		return item, err
 	}
@@ -1077,7 +857,8 @@ func GetAllChannels(userID, queryID, proID string) ([]string, error) {
 		return nil, err
 	}
 
-	channelAddrs, err := contracts.GetChannelAddrs(userAddr, userAddr, proAddr, queryAddr)
+	ch := contracts.NewCH(userAddr, "")
+	channelAddrs, err := ch.GetChannelAddrs(userAddr, proAddr, queryAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -1160,7 +941,8 @@ func CloseChannel(channelID, sk string, sign []byte, value *big.Int) error {
 		return err
 	}
 
-	return contracts.CloseChannel(chanAddress, sk, sign, value)
+	ch := contracts.NewCH(chanAddress, sk)
+	return ch.CloseChannel(chanAddress, sign, value)
 }
 
 // KillChannel closes chnannel by users
@@ -1170,7 +952,8 @@ func KillChannel(channelID, sk string) error {
 		return err
 	}
 
-	return contracts.ChannelTimeout(chanAddress, sk)
+	ch := contracts.NewCH(chanAddress, sk)
+	return ch.ChannelTimeout(chanAddress)
 }
 
 // GetKeepersOfPro get keepers of some provider
@@ -1184,17 +967,14 @@ func GetKeepersOfPro(peerID string) ([]string, bool) {
 
 // SaveKpMap saves kpmap
 func SaveKpMap(peerID string) error {
-	localAddr, err := address.GetAddressFromID(peerID)
-	if err != nil {
-		return err
-	}
-	kps, err := contracts.GetAllKeeperInKPMap(localAddr)
+	r := contracts.NewCR(peerID, "")
+	kps, err := r.GetAllKeeperInKPMap()
 	if err != nil {
 		return err
 	}
 
 	for _, kpaddr := range kps {
-		pids, err := contracts.GetProviderInKPMap(localAddr, kpaddr)
+		pids, err := r.GetProviderInKPMap(kpaddr)
 		if err != nil {
 			continue
 		}

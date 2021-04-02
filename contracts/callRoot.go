@@ -13,17 +13,34 @@ import (
 	"github.com/memoio/go-mefs/contracts/root"
 )
 
+//RootNodeInfo  The basic information of node used for root contract
+type RootNodeInfo struct {
+	addr  common.Address //local address
+	hexSk string         //local privateKey
+}
+
+//NewCR new a instance of contractRoot
+func NewCRoot(addr common.Address, hexSk string) ContractRoot {
+	RInfo := &RootNodeInfo{
+		addr:  addr,
+		hexSk: hexSk,
+	}
+
+	return RInfo
+}
+
 //DeployRoot deploy Root contracts fot users
-func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bool) (common.Address, error) {
+func (r *RootNodeInfo) DeployRoot(queryAddress common.Address, redo bool) (common.Address, error) {
 	var rtAddr, rtAddress common.Address
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, rootKey, hexKey, true)
+	ma := NewCManage(r.addr, r.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(r.addr, rootKey, true)
 	if err != nil {
 		return rtAddr, err
 	}
 
 	if !redo {
-		rtAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
+		rtAddr, err = ma.GetLatestFromMapper(mapperInstance)
 		if err == nil {
 			return rtAddr, nil
 		}
@@ -35,7 +52,7 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return rtAddr, errMA
 		}
@@ -47,7 +64,7 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 		}
 
 		rtAddress, tx, _, err = root.DeployRoot(auth, client, queryAddress)
-		if rtAddress.String() != InvalidAddr{
+		if rtAddress.String() != InvalidAddr {
 			rtAddr = rtAddress
 		}
 		if err != nil {
@@ -60,7 +77,7 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 			if retryCount > sendTransactionRetryCount {
 				return rtAddr, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -78,7 +95,7 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 	log.Println("root-contract", rtAddr.String(), "have been successfully deployed!")
 
 	//uk放进mapper
-	err = AddToMapper(rtAddr, hexKey, mapperInstance)
+	err = ma.AddToMapper(rtAddr, mapperInstance)
 	if err != nil {
 		log.Println("add root contract addr Err:", err)
 		return rtAddr, err
@@ -87,25 +104,27 @@ func DeployRoot(hexKey string, userAddress, queryAddress common.Address, redo bo
 }
 
 //GetRootAddrs get all upKeeping address
-func GetRootAddrs(localAddress, userAddress common.Address) ([]common.Address, error) {
+func (r *RootNodeInfo) GetRootAddrs(userAddress common.Address) ([]common.Address, error) {
+	ma := NewCManage(r.addr, "")
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, rootKey, "", false)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, rootKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetAddrsFromMapper(localAddress, mapperInstance)
+	return ma.GetAddressFromMapper(mapperInstance)
 }
 
 //GetRoot get root-contract from the mapper, and get the mapper from user's indexer
 func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr common.Address, rt *root.Root, err error) {
+	ma := NewCManage(localAddress, "")
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, rootKey, "", false)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, rootKey, false)
 	if err != nil {
 		return rtaddr, nil, err
 	}
 
-	rts, err := GetAddrsFromMapper(localAddress, mapperInstance)
+	rts, err := ma.GetAddressFromMapper(mapperInstance)
 	if err != nil {
 		return rtaddr, rt, err
 	}
@@ -140,7 +159,7 @@ func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr commo
 				From: localAddress,
 			})
 			if err != nil {
-				time.Sleep(60 * time.Second)
+				time.Sleep(retryGetInfoSleepTime)
 				continue
 			}
 
@@ -155,7 +174,7 @@ func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr commo
 }
 
 // SetMerkleRoot sets Merkle root
-func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]byte) error {
+func (r *RootNodeInfo) SetMerkleRoot(rootAddr common.Address, key int64, value [32]byte) error {
 	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
@@ -167,7 +186,7 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -189,7 +208,7 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -210,7 +229,7 @@ func SetMerkleRoot(hexKey string, rootAddr common.Address, key int64, value [32]
 }
 
 // GetMerkleRoot gets Merkle root
-func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, error) {
+func (r *RootNodeInfo) GetMerkleRoot(rootAddr common.Address, key int64) ([32]byte, error) {
 	var value [32]byte
 	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
@@ -222,14 +241,14 @@ func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, 
 	for {
 		retryCount++
 		res, err := rt.GetRoot(&bind.CallOpts{
-			From: localAddress,
+			From: r.addr,
 		}, key)
 		if err != nil {
 			if retryCount > 5 {
 				log.Println("get merkel root Err:", err)
 				return value, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 
@@ -242,7 +261,7 @@ func GetMerkleRoot(localAddress, rootAddr common.Address, key int64) ([32]byte, 
 }
 
 // GetMerkleKeys gets Merkle keys
-func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
+func (r *RootNodeInfo) GetMerkleKeys(rootAddr common.Address) ([]int64, error) {
 	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
@@ -253,14 +272,14 @@ func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
 	for {
 		retryCount++
 		res, err := rt.GetAllKey(&bind.CallOpts{
-			From: localAddress,
+			From: r.addr,
 		})
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("get merkel keys err:", err)
 				return nil, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 
@@ -273,7 +292,7 @@ func GetMerkleKeys(localAddress, rootAddr common.Address) ([]int64, error) {
 }
 
 // GetLatestMerkleRoot gets Merkle latest root
-func GetLatestMerkleRoot(localAddress, rootAddr common.Address) (int64, [32]byte, error) {
+func (r *RootNodeInfo) GetLatestMerkleRoot(rootAddr common.Address) (int64, [32]byte, error) {
 	var val [32]byte
 	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
 	if err != nil {
@@ -285,14 +304,14 @@ func GetLatestMerkleRoot(localAddress, rootAddr common.Address) (int64, [32]byte
 	for {
 		retryCount++
 		resKey, resVal, err := rt.GetLatest(&bind.CallOpts{
-			From: localAddress,
+			From: r.addr,
 		})
 		if err != nil {
 			if retryCount > sendTransactionRetryCount {
 				log.Println("get merkel key Err:", err)
 				return 0, val, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 

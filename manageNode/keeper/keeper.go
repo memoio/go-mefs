@@ -14,6 +14,7 @@ import (
 	metrics "github.com/ipfs/go-metrics-interface"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/memoio/go-mefs/contracts"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
@@ -38,7 +39,7 @@ type Info struct {
 	raftNodeID    uint64
 	repch         chan string
 	ds            data.Service
-	pledgeStorage *big.Int
+	pledgeStorage *big.Int //全网Provider质押的总空间
 	keepers       sync.Map // keepers except self; value: *kInfo
 	providers     sync.Map // value: *pInfo
 	users         sync.Map // value: *uInfo
@@ -754,9 +755,9 @@ func (k *Info) getPosPrice() *big.Int {
 
 		// to weiDollar
 		mmWei := new(big.Float).SetInt(mm)
-		mmWei.Mul(mmWei, role.GetMemoPrice())
+		mmWei.Mul(mmWei, contracts.GetMemoPrice())
 		mmWei.Int(mm)
-		return mm
+		return mm //返回mmWei的整数部分
 	}
 
 	return pos.GetPosPrice()

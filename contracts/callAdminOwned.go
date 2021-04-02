@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -65,13 +66,28 @@ func AlterOwner(hexKey string, adminOwnedAddress, newAdminOwner common.Address) 
 		return err
 	}
 
-	_, err = adminOwnedContract.AlterAdminOwner(auth, newAdminOwner)
-	if err != nil {
-		log.Println("AlterAdminOwnerErr:", err)
-		return err
-	}
+	for retryTimes := 0; retryTimes < sendTransactionRetryCount; retryTimes++ {
+		_, err = adminOwnedContract.AlterAdminOwner(auth, newAdminOwner)
+		if err != nil {
+			log.Println("AlterAdminOwnerErr:", err)
+			return err
+		}
 
-	return nil
+		//check if the tx has been completed by inquiring contract state variables
+		for checkTimes := 0; checkTimes < checkTxRetryCount; checkTimes++ {
+			adminOwner, err := GetAdminOwner(adminOwnedAddress, newAdminOwner)
+			if err != nil || adminOwner.Hex() != newAdminOwner.Hex() {
+				time.Sleep(retryGetInfoSleepTime)
+				continue
+			}
+			return nil
+		}
+
+		time.Sleep(retryTxSleepTime)
+	}
+	log.Println("AlterAdminOwnerErr: ", ErrNotRight)
+
+	return ErrNotRight
 }
 
 //SetBannedVersion set bannedVersion represented by key
@@ -131,8 +147,8 @@ func SetBannedVersion(hexKey, key string, adminOwnedAddress common.Address, vers
 	}
 
 	event := struct {
-		Key   string
-		From  common.Address
+		Key     string
+		From    common.Address
 		Version uint16
 	}{}
 
@@ -143,6 +159,9 @@ func SetBannedVersion(hexKey, key string, adminOwnedAddress common.Address, vers
 	}
 	fmt.Println("Log.key:", event.Key, "Log.from:", event.From.String(), "Log.version:", event.Version)
 
+	if event.Version != version {
+		fmt.Println("tx failed, the version is not right")
+	}
 	return nil
 }
 

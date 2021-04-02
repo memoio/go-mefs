@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -12,19 +13,36 @@ import (
 	"github.com/memoio/go-mefs/contracts/channel"
 )
 
+//ChannelInfo  The basic information of node used for channel contract
+type ChannelNodeInfo struct {
+	addr  common.Address //local address
+	hexSk string         //local privateKey
+}
+
+//NewCH new a instance of contractChannel
+func NewCH(addr common.Address, hexSk string) ContractChannel {
+	ChInfo := &ChannelNodeInfo{
+		addr:  addr,
+		hexSk: hexSk,
+	}
+
+	return ChInfo
+}
+
 //DeployChannelContract deploy channel-contract, timeOut's unit is second
-func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int, redo bool) (common.Address, error) {
+func (ch *ChannelNodeInfo) DeployChannelContract(queryAddress, providerAddress common.Address, timeOut *big.Int, moneyToChannel *big.Int, redo bool) (common.Address, error) {
 	var channelAddr common.Address
 
 	key := queryAddress.String() + channelKey + providerAddress.String()
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, key, hexKey, true)
+	ma := NewCManage(ch.addr, ch.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(ch.addr, key, true)
 	if err != nil {
 		return channelAddr, err
 	}
 
 	if !redo {
-		channelAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
+		channelAddr, err = ma.GetLatestFromMapper(mapperInstance)
 		if err == nil {
 			return channelAddr, nil
 		}
@@ -39,7 +57,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	checkRetryCount := 0
 	var cAddr common.Address
 	for {
-		auth, errMA := MakeAuth(hexKey, moneyToChannel, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(ch.hexSk, moneyToChannel, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return channelAddr, errMA
 		}
@@ -51,7 +69,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 		}
 
 		cAddr, tx, _, err = channel.DeployChannel(auth, client, providerAddress, timeOut)
-		if cAddr.String() != InvalidAddr{
+		if cAddr.String() != InvalidAddr {
 			channelAddr = cAddr
 		}
 		if err != nil {
@@ -64,7 +82,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 			if retryCount > sendTransactionRetryCount {
 				return channelAddr, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -83,7 +101,7 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	log.Println("channel contract", channelAddr.String(), "with", providerAddress.String(), "have been successfuly deployed!")
 
 	//将channel合约地址channelAddr放进上述的mapper中
-	err = AddToMapper(channelAddr, hexKey, mapperInstance)
+	err = ma.AddToMapper(channelAddr, mapperInstance)
 	if err != nil {
 		return channelAddr, err
 	}
@@ -91,27 +109,54 @@ func DeployChannelContract(hexKey string, userAddress, queryAddress, providerAdd
 	return channelAddr, nil
 }
 
+func (ch *ChannelNodeInfo) GetChannelInfo(chanAddress common.Address) (int64, int64, common.Address, common.Address, error) {
+	var sender, receiver common.Address
+	var startDate, timeOut *big.Int
+	channelInstance, err := channel.NewChannel(chanAddress, GetClient(EndPoint))
+	if err != nil {
+		return 0, 0, sender, receiver, err
+	}
+	retryCount := 0
+	for {
+		retryCount++
+		startDate, timeOut, sender, receiver, err = channelInstance.GetInfo(&bind.CallOpts{
+			From: ch.addr,
+		})
+		if err != nil {
+			if retryCount > sendTransactionRetryCount {
+				return 0, 0, sender, receiver, err
+			}
+			time.Sleep(retryGetInfoSleepTime)
+			continue
+		}
+
+		return startDate.Int64(), timeOut.Int64(), sender, receiver, nil
+	}
+}
+
 //GetChannelAddrs get the channel contract's address
-func GetChannelAddrs(localAddress, userAddress, providerAddress, queryAddress common.Address) ([]common.Address, error) {
+func (ch *ChannelNodeInfo) GetChannelAddrs(userAddress, providerAddress, queryAddress common.Address) ([]common.Address, error) {
 	key := queryAddress.String() + channelKey + providerAddress.String()
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, key, "", false)
+	ma := NewCManage(ch.addr, ch.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, key, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetAddrsFromMapper(localAddress, mapperInstance)
+	return ma.GetAddressFromMapper(mapperInstance)
 }
 
 //GetLatestChannel get the channel contract's address
-func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress common.Address) (common.Address, *channel.Channel, error) {
+func (ch *ChannelNodeInfo) GetLatestChannel(userAddress, providerAddress, queryAddress common.Address) (common.Address, *channel.Channel, error) {
 	var channelAddr common.Address
 	key := queryAddress.String() + channelKey + providerAddress.String()
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, key, "", false)
+	ma := NewCManage(ch.addr, ch.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, key, false)
 	if err != nil {
 		return channelAddr, nil, err
 	}
 
-	channelAddr, err = GetLatestFromMapper(localAddress, mapperInstance)
+	channelAddr, err = ma.GetLatestFromMapper(mapperInstance)
 	if err != nil {
 		return channelAddr, nil, err
 	}
@@ -125,7 +170,7 @@ func GetLatestChannel(localAddress, userAddress, providerAddress, queryAddress c
 }
 
 //ChannelTimeout called by user to discontinue the channel-contract
-func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
+func (ch *ChannelNodeInfo) ChannelTimeout(channelAddress common.Address) (err error) {
 	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
 	if err != nil {
 		return err
@@ -136,7 +181,7 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -158,7 +203,7 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -179,7 +224,7 @@ func ChannelTimeout(channelAddress common.Address, hexKey string) (err error) {
 }
 
 //CloseChannel called by provider to stop the channel-contract,the ownerAddress implements the mapper
-func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, value *big.Int) (err error) {
+func (ch *ChannelNodeInfo) CloseChannel(channelAddress common.Address, sig []byte, value *big.Int) (err error) {
 	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
 	if err != nil {
 		return err
@@ -196,7 +241,7 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -218,7 +263,7 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -239,7 +284,7 @@ func CloseChannel(channelAddress common.Address, hexKey string, sig []byte, valu
 }
 
 //ExtendChannelTime called by user to extend the time in channel contract
-func ExtendChannelTime(channelAddress common.Address, hexKey string, addTime *big.Int) error {
+func (ch *ChannelNodeInfo) ExtendChannelTime(channelAddress common.Address, addTime *big.Int) error {
 	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
 	if err != nil {
 		return err
@@ -250,7 +295,7 @@ func ExtendChannelTime(channelAddress common.Address, hexKey string, addTime *bi
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -272,7 +317,7 @@ func ExtendChannelTime(channelAddress common.Address, hexKey string, addTime *bi
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 

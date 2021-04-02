@@ -103,7 +103,12 @@ func (k *Info) loadContract(mode bool) error {
 			return err
 		}
 
-		price, err := role.GetKeeperPrice(k.localID)
+		r := contracts.NewCR(k.localID, "")
+		if err != nil {
+			return err
+		}
+
+		price, err := r.GetKeeperPrice()
 		if err != nil {
 			return err
 		}
@@ -111,7 +116,8 @@ func (k *Info) loadContract(mode bool) error {
 		if kItem.PledgeMoney.Cmp(price) < 0 {
 			price.Sub(price, kItem.PledgeMoney)
 			utils.MLogger.Infof("pledge keeper %s amount %d", k.localID, price)
-			err := role.PledgeKeeper(k.localID, k.sk, price)
+			r := contracts.NewCR(k.localID, k.sk)
+			err := r.PledgeKeeper(price)
 			if err != nil {
 				return err
 			}
@@ -194,7 +200,8 @@ func (k *Info) ukAddProvider(uid, gid, pid string) error {
 			sigs[i] = res
 		}
 
-		err = contracts.AddProvider(k.sk, localAddr, ukAddr, []common.Address{providerAddr}, sigs)
+		cu := contracts.NewCU(localAddr, k.sk)
+		err = cu.AddProvider(ukAddr, []common.Address{providerAddr}, sigs)
 		if err != nil {
 			utils.MLogger.Error("ukAddProvider AddProvider error", err)
 			return err

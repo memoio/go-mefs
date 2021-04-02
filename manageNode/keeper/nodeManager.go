@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/memoio/go-mefs/contracts"
+
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/role"
 	datastore "github.com/memoio/go-mefs/source/go-datastore"
@@ -113,7 +115,8 @@ func (k *Info) getKInfo(pid string, managed bool) (*kInfo, error) {
 
 	thisInfoI, ok := k.keepers.Load(pid)
 	if !ok {
-		has, err := role.IsKeeper(pid)
+		r := contracts.NewCR(k.localID, "")
+		has, err := r.IsKeeper(pid)
 		if err != nil {
 			return nil, err
 		}
@@ -150,8 +153,9 @@ func (k *Info) getKInfo(pid string, managed bool) (*kInfo, error) {
 
 func (k *Info) getPInfo(pid string, managed bool) (*pInfo, error) {
 	thisInfoI, ok := k.providers.Load(pid)
+	r := contracts.NewCR(k.localID, "")
 	if !ok {
-		has, err := role.IsProvider(pid)
+		has, err := r.IsProvider(pid)
 		if err != nil {
 			return nil, err
 		}

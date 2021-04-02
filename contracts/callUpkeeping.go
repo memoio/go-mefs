@@ -12,17 +12,33 @@ import (
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 )
 
+//UpkeepingInfo The basic information of node used for upkeeping contract
+type UpkeepingInfo struct {
+	addr  common.Address //local address
+	hexSk string         //local privateKey
+}
+
+//NewCU new a instance of ContractUpkeeping
+func NewCU(addr common.Address, sk string) ContractUpkeeping {
+	uInfo := &UpkeepingInfo{
+		addr:  addr,
+		hexSk: sk,
+	}
+	return uInfo
+}
+
 //DeployUpkeeping deploy UpKeeping contracts between user, keepers and providers, and save contractAddress
-func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, keeperAddress, providerAddress []common.Address, duration, size int64, price *big.Int, cycle int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
+func (u *UpkeepingInfo) DeployUpkeeping(queryAddress common.Address, keeperAddress, providerAddress []common.Address, duration, size int64, price *big.Int, cycle int64, moneyAccount *big.Int, redo bool) (common.Address, error) {
 	var ukAddr, ukAddress common.Address
 
-	_, mapperInstance, err := GetMapperFromAdmin(userAddress, userAddress, ukey, hexKey, true)
+	ma := NewCManage(u.addr, u.hexSk)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(u.addr, ukey, true)
 	if err != nil {
 		return ukAddr, err
 	}
 
 	if !redo {
-		ukAddr, err = GetLatestFromMapper(userAddress, mapperInstance)
+		ukAddr, err = ma.GetLatestFromMapper(mapperInstance)
 		if err == nil {
 			return ukAddr, nil
 		}
@@ -34,7 +50,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, moneyAccount, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := MakeAuth(u.hexSk, moneyAccount, nil, big.NewInt(defaultGasPrice), 0)
 		if errMA != nil {
 			return ukAddr, errMA
 		}
@@ -60,7 +76,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 			if retryCount > sendTransactionRetryCount {
 				return ukAddr, err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -78,7 +94,7 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 	log.Println("upKeeping-contract", ukAddr.String(), "have been successfully deployed!")
 
 	//uk放进mapper
-	err = AddToMapper(ukAddr, hexKey, mapperInstance)
+	err = ma.AddToMapper(ukAddr, mapperInstance)
 	if err != nil {
 		log.Println("add uk Err:", err)
 		return ukAddr, err
@@ -88,13 +104,14 @@ func DeployUpkeeping(hexKey string, userAddress, queryAddress common.Address, ke
 
 //GetUpkeepingAddrs get all upKeeping address
 func GetUpkeepingAddrs(localAddress, userAddress common.Address) ([]common.Address, error) {
+	ma := NewCManage(localAddress, "")
 	//获得userIndexer, key is userAddr
-	_, mapperInstance, err := GetMapperFromAdmin(localAddress, userAddress, ukey, "", false)
+	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, ukey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetAddrsFromMapper(localAddress, mapperInstance)
+	return ma.GetAddressFromMapper(mapperInstance)
 }
 
 //GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
@@ -135,7 +152,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 				From: localAddress,
 			})
 			if err != nil {
-				time.Sleep(60 * time.Second)
+				time.Sleep(retryGetInfoSleepTime)
 				continue
 			}
 
@@ -150,7 +167,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 }
 
 // SpaceTimePay pay providers for storing data and keepers for service, hexKey is keeper's privateKey
-func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int64, sign [][]byte) error {
+func (u *UpkeepingInfo) SpaceTimePay(ukAddr, providerAddr common.Address, stStart, stLength, stValue *big.Int, merkleRoot [32]byte, share []int64, sign [][]byte) error {
 	shareNew := []*big.Int{}
 	for _, b := range share {
 		shareNew = append(shareNew, big.NewInt(b))
@@ -167,7 +184,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(spaceTimePayGasPrice), spaceTimePayGasLimit)
+		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), spaceTimePayGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -190,7 +207,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -201,7 +218,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 			if checkRetryCount > checkTxRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 		break
@@ -211,7 +228,7 @@ func SpaceTimePay(ukAddr, providerAddr common.Address, hexKey string, stStart, s
 }
 
 //AddProvider add a provider to upKeeping
-func AddProvider(hexKey string, localAddress, ukAddr common.Address, providerAddress []common.Address, sign [][]byte) error {
+func (u *UpkeepingInfo) AddProvider(ukAddr common.Address, providerAddress []common.Address, sign [][]byte) error {
 	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
 	if err != nil {
 		log.Println("newUkErr:", err)
@@ -223,7 +240,7 @@ func AddProvider(hexKey string, localAddress, ukAddr common.Address, providerAdd
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -246,7 +263,7 @@ func AddProvider(hexKey string, localAddress, ukAddr common.Address, providerAdd
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -267,27 +284,24 @@ func AddProvider(hexKey string, localAddress, ukAddr common.Address, providerAdd
 }
 
 //GetOrder get queryAddr、keepers、providers、time、size、price、createDate、proofs、stEnd
-func GetOrder(hexKey string, localAddress, userAddress common.Address, key string) (common.Address, []upKeeping.UpKeepingKPInfo, []upKeeping.UpKeepingKPInfo, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, []upKeeping.UpKeepingProof, error) {
+func (u *UpkeepingInfo) GetOrder(uk *upKeeping.UpKeeping) (common.Address, []upKeeping.UpKeepingKPInfo, []upKeeping.UpKeepingKPInfo, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, []upKeeping.UpKeepingProof, error) {
 	var queryAddr common.Address
 	var keepers, providers []upKeeping.UpKeepingKPInfo
 	var t, size, price, createDate, endDate, cycle, needPay *big.Int
 	var proofs []upKeeping.UpKeepingProof
-	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
-	if err != nil {
-		return queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err
-	}
+	var err error
 
 	retryCount := 0
 	for {
 		retryCount++
 		queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err = uk.GetOrder(&bind.CallOpts{
-			From: localAddress,
+			From: u.addr,
 		})
 		if err != nil {
-			if retryCount > 5 {
+			if retryCount > sendTransactionRetryCount {
 				return queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
 		break
@@ -296,8 +310,8 @@ func GetOrder(hexKey string, localAddress, userAddress common.Address, key strin
 }
 
 //ExtendTime user extend storage-time in upKeeping-contract
-func ExtendTime(hexKey string, localAddress, userAddress common.Address, key string, addTime int64) error {
-	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
+func (u *UpkeepingInfo) ExtendTime(userAddress common.Address, key string, addTime int64) error {
+	_, uk, err := GetUpkeeping(u.addr, userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -307,7 +321,7 @@ func ExtendTime(hexKey string, localAddress, userAddress common.Address, key str
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -330,7 +344,7 @@ func ExtendTime(hexKey string, localAddress, userAddress common.Address, key str
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -351,8 +365,8 @@ func ExtendTime(hexKey string, localAddress, userAddress common.Address, key str
 }
 
 //DestructUpKeeping destruct the upKeeping contract and transfer the balance of contract to user, anyone can call
-func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, key string) error {
-	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
+func (u *UpkeepingInfo) DestructUpKeeping(userAddress common.Address, key string) error {
+	_, uk, err := GetUpkeeping(u.addr, userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -362,7 +376,7 @@ func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, 
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -384,7 +398,7 @@ func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, 
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -405,8 +419,8 @@ func DestructUpKeeping(hexKey string, localAddress, userAddress common.Address, 
 }
 
 //SetKeeperStop keeper call to set keeperAddr stop
-func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.Address, key string, sign [][]byte) error {
-	_, uk, err := GetUpkeeping(localAddress, userAddress, key)
+func (u *UpkeepingInfo) SetKeeperStop(userAddress, keeperAddr common.Address, key string, sign [][]byte) error {
+	_, uk, err := GetUpkeeping(u.addr, userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -416,7 +430,7 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -438,7 +452,7 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 
@@ -459,11 +473,11 @@ func SetKeeperStop(hexKey string, localAddress, userAddress, keeperAddr common.A
 }
 
 //SetProviderStop keeper call to set providerAddr stop
-func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr, ukAddr common.Address, key string, sign [][]byte) error {
+func (u *UpkeepingInfo) SetProviderStop(userAddress, providerAddr, ukAddr common.Address, key string, sign [][]byte) error {
 	var uk *upKeeping.UpKeeping
 	var err error
 	if ukAddr.String() == InvalidAddr {
-		_, uk, err = GetUpkeeping(localAddress, userAddress, key)
+		_, uk, err = GetUpkeeping(u.addr, userAddress, key)
 		if err != nil {
 			return err
 		}
@@ -480,7 +494,7 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr, ukA
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(hexKey, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
+		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -502,7 +516,7 @@ func SetProviderStop(hexKey string, localAddress, userAddress, providerAddr, ukA
 			if retryCount > sendTransactionRetryCount {
 				return err
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(retryTxSleepTime)
 			continue
 		}
 

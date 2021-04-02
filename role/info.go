@@ -12,12 +12,9 @@ import (
 // GetAllKeepers gets all keepers from keeper-contract
 func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 	totalMoney := new(big.Int)
-	localAddress, err := address.GetAddressFromID(localID)
-	if err != nil {
-		return nil, totalMoney, err
-	}
 
-	kaddrs, err := contracts.GetAllKeepersAddr(localAddress)
+	u := contracts.NewCR(localID, "")
+	kaddrs, err := u.GetAllKeepersAddr()
 	if err != nil {
 		return nil, totalMoney, err
 	}
@@ -42,23 +39,20 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 // GetAllProviders gets all providers from provider-contract and total storage
 func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 	totalMoney := new(big.Int)
-	localAddress, err := address.GetAddressFromID(localID)
+
+	u := contracts.NewCR(localID, "")
+	paddrs, err := u.GetAllProvidersAddr()
 	if err != nil {
 		return nil, totalMoney, err
 	}
 
-	paddrs, err := contracts.GetAllProvidersAddr(localAddress)
-	if err != nil {
-		return nil, totalMoney, err
-	}
-
-	price, err := contracts.GetProviderPrice(localAddress)
+	price, err := u.GetProviderPrice()
 	if err != nil {
 		return nil, totalMoney, err
 	}
 
 	weiPrice := new(big.Float).SetInt(price)
-	weiPrice.Quo(weiPrice, GetMemoPrice())
+	weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
 	weiPrice.Int(price)
 	if price.Sign() <= 0 {
 		return nil, nil, ErrInvalidInput
@@ -83,11 +77,6 @@ func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 		return pItems, totalMoney, nil
 	}
 	return pItems, totalMoney, ErrEmptyData
-}
-
-// GetMemoPrice gets memo price
-func GetMemoPrice() *big.Float {
-	return big.NewFloat(utils.Memo2Dollar)
 }
 
 // GetDiskSpaceInfo gets local storage info

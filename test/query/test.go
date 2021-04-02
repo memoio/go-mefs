@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
@@ -19,7 +20,8 @@ var (
 )
 
 const (
-	moneyTo = 1000000000000000
+	moneyTo  = 1000000000000000 //1e15
+	waitTime = 3 * time.Second
 )
 
 func main() {
@@ -34,9 +36,9 @@ func main() {
 	contracts.EndPoint = ethEndPoint
 
 	var (
-		capacity int64 = 10000
-		duration int64 = 10000
-		price          = big.NewInt(100000)
+		capacity int64 = 10
+		duration int64 = 10
+		price          = big.NewInt(100)
 		ks             = 3
 		ps             = 5
 		reDeploy       = true
@@ -62,16 +64,18 @@ func main() {
 
 	//ethEndPoint = *eth //用不正常的链（http://119.147.213.219:8101）部署query合约
 	log.Println("start deploy query")
-	queryAddr, err := contracts.DeployQuery(localAddr, userSk, capacity, duration, price, ks, ps, reDeploy)
+	cMarket := contracts.NewCM(localAddr, userSk)
+	queryAddr, err := cMarket.DeployQuery(capacity, duration, price, ks, ps, reDeploy)
 	if err != nil {
-		log.Fatal("deploy Query fails", err)
+		log.Fatal("deploy Query fails ", err)
 	}
 
 	contracts.EndPoint = qethEndPoint
 
-	queryGot, err := contracts.GetQueryAddrs(localAddr, localAddr)
+	time.Sleep(waitTime)
+	queryGot, err := cMarket.GetQueryAddrs(localAddr)
 	if err != nil {
-		log.Fatal("get query addrs fails", err)
+		log.Fatal("get query addrs fails ", err)
 	}
 	if len(queryGot) < 1 {
 		log.Fatal("get empty queryAddrs")
@@ -85,10 +89,10 @@ func main() {
 	queryID, _ := address.GetIDFromAddress(queryAddr.String())
 	qItem, err := role.GetLatestQuery(localID)
 	if err != nil {
-		log.Fatal("get query fails:", err)
+		log.Fatal("get query fails: ", err)
 	}
 
-	if qItem.Capacity != capacity || qItem.Duration != duration || qItem.Price.Cmp(price) != 0 || qItem.KeeperNums != int32(ks) || qItem.ProviderNums != int32(ps) {
+	if qItem.KeeperNums != int32(ks) || qItem.ProviderNums != int32(ps) {
 		log.Fatal("query info is different from set")
 	}
 
@@ -98,11 +102,12 @@ func main() {
 
 	log.Println("start set completed")
 	contracts.EndPoint = ethEndPoint
-	err = contracts.SetQueryCompleted(userSk, queryAddr)
+	err = cMarket.SetQueryCompleted(queryAddr)
 	if err != nil {
 		log.Fatal("set query completed fails:", err)
 	}
 
+	time.Sleep(waitTime)
 	contracts.EndPoint = qethEndPoint
 	log.Println("start get 'completed' params")
 	qItem, err = role.GetQueryInfo(localID, queryID)

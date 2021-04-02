@@ -443,7 +443,8 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 	ui, ok := p.keepers.Load(pid)
 	if !ok {
 
-		has, err := role.IsKeeper(pid)
+		r := contracts.NewCR(p.localID, "")
+		has, err := r.IsKeeper(pid)
 		if err != nil || !has {
 			return nil
 		}
@@ -482,8 +483,9 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 
 func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 	ui, ok := p.providers.Load(pid)
+	r := contracts.NewCR(p.localID, "")
 	if !ok {
-		has, err := role.IsProvider(pid)
+		has, err := r.IsProvider(pid)
 		if err != nil || !has {
 			return nil
 		}

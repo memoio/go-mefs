@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
@@ -20,7 +21,8 @@ var (
 )
 
 const (
-	moneyTo = 1000000000000000
+	moneyTo  = 1000000000000000
+	waitTime = 3 * time.Second
 )
 
 func main() {
@@ -62,14 +64,16 @@ func main() {
 
 	//ethEndPoint = *eth //用不正常的链（http://119.147.213.219:8101）部署query合约
 	log.Println("start deploy offer")
-	offerAddr, err := contracts.DeployOffer(localAddr, userSk, capacity, duration, price, false)
+	cMarket := contracts.NewCM(localAddr, userSk)
+	offerAddr, err := cMarket.DeployOffer(capacity, duration, price, false)
 	if err != nil {
 		log.Fatal("deploy offer fails", err)
 	}
 
 	log.Println("start get offerInfo from remote")
+	time.Sleep(waitTime)
 	contracts.EndPoint = qethEndPoint
-	offerGot, err := contracts.GetOfferAddrs(localAddr, localAddr)
+	offerGot, err := cMarket.GetOfferAddrs(localAddr)
 	if err != nil {
 		log.Fatal("get offer from remote fails: ", err)
 	}
@@ -90,14 +94,15 @@ func main() {
 	}
 
 	log.Println("start deploy offer again")
-	offerAddr, err = contracts.DeployOffer(localAddr, userSk, capacity, duration, price, true)
+	offerAddr, err = cMarket.DeployOffer(capacity, duration, price, true)
 	if err != nil {
 		log.Fatal("redo deploy offer fails", err)
 	}
 
+	time.Sleep(waitTime)
 	log.Println("start get offerInfo from remote")
 	contracts.EndPoint = qethEndPoint
-	offerGot, err = contracts.GetOfferAddrs(localAddr, localAddr)
+	offerGot, err = cMarket.GetOfferAddrs(localAddr)
 	if err != nil {
 		log.Fatal("get offer from remote fails")
 	}

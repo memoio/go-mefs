@@ -615,7 +615,8 @@ func (k *Info) handleProQuit(km *metainfo.Key, value []byte, from string) ([]byt
 			sigs[i] = sig
 		}
 
-		err = contracts.SetProviderStop(k.sk, localAddr, userAddr, proAddr, ukAddr, "", sigs)
+		cu := contracts.NewCU(localAddr, k.sk)
+		err = cu.SetProviderStop(userAddr, proAddr, ukAddr, "", sigs)
 		if err != nil {
 			utils.MLogger.Debug("setProviderStop fails, provider: ", proAddr.String(), "ukAddr: ", ukAddr.String(), "err: ", err)
 			return nil, err

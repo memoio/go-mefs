@@ -26,7 +26,8 @@ func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.I
 		if proItem.Capacity < depositSize {
 			utils.MLogger.Infof("your old pledge capacity is %d MB, now will change to %d MB", proItem.Capacity, depositSize)
 			dsize := new(big.Int).SetInt64(depositSize - proItem.Capacity)
-			err := role.PledgeProvider(proID, p.sk, dsize)
+			cRole := contracts.NewCR(proID, p.sk)
+			err := cRole.PledgeProvider(dsize)
 			if err != nil {
 				return err
 			}
@@ -50,12 +51,14 @@ func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.I
 		capacity = p.proContract.Capacity
 	}
 
-	_, err = role.DeployOffer(p.localID, p.sk, capacity, duration, price, reDeployOffer)
+	m := contracts.NewCM(proAddr, p.sk)
+	_, err = m.DeployOffer(capacity, duration, price, reDeployOffer)
 	if err != nil {
 		return err
 	}
 
-	offers, err := contracts.GetOfferAddrs(proAddr, proAddr)
+	cMarket := contracts.NewCM(proAddr, p.sk)
+	offers, err := cMarket.GetOfferAddrs(proAddr)
 	if err != nil {
 		return err
 	}
