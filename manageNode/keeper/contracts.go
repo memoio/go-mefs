@@ -103,7 +103,8 @@ func (k *Info) loadContract(mode bool) error {
 			return err
 		}
 
-		r := contracts.NewCR(k.localID, "")
+		localAddr, _ := address.GetAddressFromID(k.localID)
+		r := contracts.NewCR(localAddr, "")
 		if err != nil {
 			return err
 		}
@@ -116,7 +117,7 @@ func (k *Info) loadContract(mode bool) error {
 		if kItem.PledgeMoney.Cmp(price) < 0 {
 			price.Sub(price, kItem.PledgeMoney)
 			utils.MLogger.Infof("pledge keeper %s amount %d", k.localID, price)
-			r := contracts.NewCR(k.localID, k.sk)
+			r := contracts.NewCR(localAddr, k.sk)
 			err := r.PledgeKeeper(price)
 			if err != nil {
 				return err
@@ -276,7 +277,8 @@ func (k *Info) getFromChainRegular(ctx context.Context) {
 
 //getIncome get keeper's income from user
 func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) {
-	b, err := contracts.GetLatestBlock()
+	a := contracts.NewCA(localAddr, "")
+	b, err := a.GetLatestBlock()
 	if err != nil {
 		return 0, err
 	}
@@ -295,7 +297,7 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 				endBlock = startBlock + 1024
 			}
 
-			mIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, startBlock, endBlock)
+			mIncome, _, err := a.GetStorageIncome(ukaddrs, localAddr, startBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get ukpay log err:", err)
 				break
@@ -325,7 +327,7 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 				endBlock = posStartBlock + 1024
 			}
 
-			posMIncome, _, err := contracts.GetStorageIncome(posAddrs, localAddr, posStartBlock, endBlock)
+			posMIncome, _, err := a.GetStorageIncome(posAddrs, localAddr, posStartBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get pos ukpay log err:", err)
 				break

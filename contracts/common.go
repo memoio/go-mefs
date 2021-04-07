@@ -99,7 +99,7 @@ func init() {
 }
 
 //GetClient get rpc-client based the endPoint
-func GetClient(endPoint string) *ethclient.Client {
+func getClient(endPoint string) *ethclient.Client {
 	client, err := rpc.Dial(endPoint)
 	if err != nil {
 		log.Println(err)
@@ -108,7 +108,7 @@ func GetClient(endPoint string) *ethclient.Client {
 }
 
 //MakeAuth make the transactOpts to call contract
-func MakeAuth(hexSk string, moneyToContract, nonce, gasPrice *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
+func makeAuth(hexSk string, moneyToContract, nonce, gasPrice *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
 	auth := &bind.TransactOpts{}
 	sk, err := crypto.HexToECDSA(hexSk)
 	if err != nil {
@@ -125,7 +125,7 @@ func MakeAuth(hexSk string, moneyToContract, nonce, gasPrice *big.Int, gasLimit 
 }
 
 //QueryBalance query the balance of account
-func QueryBalance(account string) (*big.Int, error) {
+func (a *AdminOwnedInfo) QueryBalance(account string) (*big.Int, error) {
 	var result string
 
 	client, err := rpc.Dial(EndPoint)
@@ -153,7 +153,7 @@ func QueryBalance(account string) (*big.Int, error) {
 }
 
 //GetLatestBlock get latest block from chain
-func GetLatestBlock() (*types.Block, error) {
+func (a *AdminOwnedInfo) GetLatestBlock() (*types.Block, error) {
 	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
 		log.Println("rpc.Dial err", err)
@@ -175,12 +175,12 @@ func GetMemoPrice() *big.Float {
 }
 
 //CheckTx 通过交易详情检查交易是否成功
-func CheckTx(tx *types.Transaction) error {
+func checkTx(tx *types.Transaction) error {
 	log.Println("Check Tx hash:", tx.Hash().Hex(), "nonce:", tx.Nonce(), "gasPrice:", tx.GasPrice())
 
 	var receipt *types.Receipt
 	for i := 0; i < 10; i++ {
-		receipt = GetTransactionReceipt(tx.Hash())
+		receipt = getTransactionReceipt(tx.Hash())
 		if receipt != nil {
 			break
 		}
@@ -208,7 +208,7 @@ func CheckTx(tx *types.Transaction) error {
 }
 
 //GetTransactionReceipt 通过交易hash获得交易详情
-func GetTransactionReceipt(hash common.Hash) *types.Receipt {
+func getTransactionReceipt(hash common.Hash) *types.Receipt {
 	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
 		log.Fatal("rpc.Dial err", err)
@@ -218,7 +218,7 @@ func GetTransactionReceipt(hash common.Hash) *types.Receipt {
 }
 
 //GetLogs filter logs according to
-func GetLogs(restrictAddress []common.Address, fromBlock, toBlock *big.Int) ([]types.Log, error) {
+func getLogs(restrictAddress []common.Address, fromBlock, toBlock *big.Int) ([]types.Log, error) {
 	log.Println("begin to filter logs in chain...")
 
 	client, err := ethclient.Dial(EndPoint)
@@ -243,12 +243,12 @@ func GetLogs(restrictAddress []common.Address, fromBlock, toBlock *big.Int) ([]t
 }
 
 //GetStorageIncome filter upkeeping-contract Pay-logs to calculate provider's income
-func GetStorageIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
+func (a *AdminOwnedInfo) GetStorageIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
 	log.Println("begin to filter upkeeping Pay logs in chain...")
 
 	totalIncome := big.NewInt(0)
 
-	logs, err := GetLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
+	logs, err := getLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
 	if err != nil {
 		return totalIncome, nil, err
 	}
@@ -281,12 +281,12 @@ func GetStorageIncome(restrictAddress []common.Address, providerAddr common.Addr
 }
 
 //GetReadIncome filter channel-contract CloseChannel-logs to calculate provider's income
-func GetReadIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
+func (a *AdminOwnedInfo) GetReadIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
 	log.Println("begin to filter channel closeChannel logs in chain...")
 
 	totalIncome := big.NewInt(0)
 
-	logs, err := GetLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
+	logs, err := getLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
 	if err != nil {
 		return totalIncome, nil, err
 	}
@@ -318,8 +318,8 @@ func GetReadIncome(restrictAddress []common.Address, providerAddr common.Address
 	return totalIncome, resLogs, nil
 }
 
-//GetBlockTime get block's timeStamp
-func GetBlockTime(blockHash common.Hash) (uint64, error) {
+//getBlockTime get block's timeStamp
+func getBlockTime(blockHash common.Hash) (uint64, error) {
 	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
 		return 0, err

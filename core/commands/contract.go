@@ -152,7 +152,8 @@ var deployKeeperCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexPk := adminSk
-		cRole := contracts.NewCR("", hexPk)
+		var tmpAddr common.Address
+		cRole := contracts.NewCR(tmpAddr, hexPk)
 		err := cRole.DeployKeeperAdmin()
 		if err != nil {
 			fmt.Println("keeper合约部署错误:", err)
@@ -206,7 +207,7 @@ var setKeeperCmd = &cmds.Command{
 		isKeeper, _ := req.Options["isKeeper"].(bool)
 
 		localAddr := common.HexToAddress(req.Arguments[0][2:])
-		cRole := contracts.NewCR("", hexSk)
+		cRole := contracts.NewCR(localAddr, hexSk)
 		err := cRole.SetKeeper(localAddr, isKeeper)
 		if err != nil {
 			fmt.Println("setKeeper err:", err)
@@ -246,9 +247,8 @@ var isKeeperCmd = &cmds.Command{
 
 		contracts.EndPoint = eth
 
-		localID, _ := address.GetIDFromAddress(req.Arguments[0])
-		cRole := contracts.NewCR(localID, "")
-		isKeeper, err := cRole.IsKeeper(localID)
+		cRole := contracts.NewCR(common.HexToAddress(req.Arguments[0]), "")
+		isKeeper, err := cRole.IsKeeper(common.HexToAddress(req.Arguments[0]))
 		if err != nil {
 			fmt.Println("isKeeper err:", err)
 			return err
@@ -286,9 +286,8 @@ var isProviderCmd = &cmds.Command{
 
 		contracts.EndPoint = eth
 
-		localID, _ := address.GetIDFromAddress(req.Arguments[0])
-		cRole := contracts.NewCR(localID, "")
-		isProvider, err := cRole.IsProvider(localID)
+		cRole := contracts.NewCR(common.HexToAddress(req.Arguments[0]), "")
+		isProvider, err := cRole.IsProvider(common.HexToAddress(req.Arguments[0]))
 		if err != nil {
 			fmt.Println("isProvider err:", err)
 			return err
@@ -331,8 +330,7 @@ var setKeeperPriceCmd = &cmds.Command{
 			price = utils.KeeperDeposit
 		}
 
-		localID, _ := address.GetIDFromAddress(adminAddr)
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(common.HexToAddress(adminAddr), hexSk)
 		oldPrice, err := cRole.GetKeeperPrice()
 		if err != nil {
 			fmt.Println("get Keeper price err:", err)
@@ -377,7 +375,7 @@ var deployProviderCmd = &cmds.Command{
 
 		hexSk := adminSk
 
-		cRole := contracts.NewCR("", hexSk)
+		cRole := contracts.NewCR(common.HexToAddress(adminAddr), hexSk)
 		err := cRole.DeployProviderAdmin()
 		if err != nil {
 			fmt.Println("provider合约部署错误:", err)
@@ -427,11 +425,10 @@ var setProviderCmd = &cmds.Command{
 
 		hexSk := adminSk
 		localAddr := common.HexToAddress(req.Arguments[0])
-		localID, _ := address.GetIDFromAddress(req.Arguments[0])
 
 		isProvider, _ := req.Options["isProvider"].(bool)
 
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(common.HexToAddress(req.Arguments[0]), hexSk)
 		err := cRole.SetProvider(localAddr, isProvider)
 		if err != nil {
 			fmt.Println("setProvider err:", err)
@@ -476,8 +473,7 @@ var setProviderPriceCmd = &cmds.Command{
 			dprice = utils.ProviderDeposit
 		}
 
-		localID, _ := address.GetIDFromAddress(adminAddr)
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(common.HexToAddress(adminAddr), hexSk)
 		oldPrice, err := cRole.GetProviderPrice()
 		if err != nil {
 			fmt.Println("get Provider price err:", err)
@@ -521,7 +517,8 @@ var deployKeeperProviderMapCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexSk := adminSk
-		cRole := contracts.NewCR("", hexSk)
+		var tmpAddr common.Address
+		cRole := contracts.NewCR(tmpAddr, hexSk)
 		err := cRole.DeployKPMap()
 		if err != nil {
 			fmt.Println("deployKeeperProviderMapErr:", err)
@@ -580,8 +577,7 @@ var addKeeperProviderToKPMapCmd = &cmds.Command{
 		keeperAddr := common.HexToAddress(kaddr[2:])
 		providerAddr := common.HexToAddress(paddr[2:])
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(localAddr, hexSk)
 		err = cRole.AddKeeperProvidersToKPMap(keeperAddr, []common.Address{providerAddr})
 		if err != nil {
 			fmt.Println("addKeeperProviderToKPMapErr:", err)
@@ -634,8 +630,7 @@ var addMasterKeeperCmd = &cmds.Command{
 
 		keeperAddr := common.HexToAddress(kaddr[2:])
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(localAddr, hexSk)
 		err = cRole.AddKeeperProvidersToKPMap(keeperAddr, []common.Address{localAddr})
 		if err != nil {
 			fmt.Println("addKeeperProviderToKPMapErr:", err)
@@ -688,8 +683,7 @@ var addMyProviderCmd = &cmds.Command{
 
 		providerAddr := common.HexToAddress(paddr[2:])
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(localAddr, hexSk)
 		err = cRole.AddKeeperProvidersToKPMap(localAddr, []common.Address{providerAddr})
 		if err != nil {
 			fmt.Println("addKeeperProviderToKPMapErr:", err)
@@ -750,8 +744,7 @@ var deleteProviderInKPMapCmd = &cmds.Command{
 		keeperAddr := common.HexToAddress(kaddr[2:])
 		providerAddr := common.HexToAddress(paddr[2:])
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(localAddr, hexSk)
 		//删除KeeperProviderMap合约中指定keeper下的一个provider
 		err = cRole.DeleteProviderFromKPMap(keeperAddr, providerAddr)
 		if err != nil {
@@ -807,8 +800,7 @@ var deleteKeeperInKPMapCmd = &cmds.Command{
 
 		keeperAddr := common.HexToAddress(kaddr[2:])
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, hexSk)
+		cRole := contracts.NewCR(localAddr, hexSk)
 		//删除KeeperProviderMap合约中指定的keeper以及与keeper关联的所有provider
 		err = cRole.DeleteKeeperFromKPMap(keeperAddr)
 		if err != nil {
@@ -864,8 +856,7 @@ var getProviderInKPMapCmd = &cmds.Command{
 
 		keeperAddr := common.HexToAddress(kaddr[2:])
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, "")
+		cRole := contracts.NewCR(localAddr, "")
 		//获得KeeperProviderMap合约中与指定的keeper关联的所有provider
 		providerAddrsGetted, err := cRole.GetProviderInKPMap(keeperAddr)
 		if err != nil {
@@ -924,8 +915,7 @@ var getAllKeeperInKPMapCmd = &cmds.Command{
 			return err
 		}
 
-		localID, _ := address.GetIDFromAddress(localAddr.Hex())
-		cRole := contracts.NewCR(localID, "")
+		cRole := contracts.NewCR(localAddr, "")
 		//获得KeeperProviderMap合约中与指定的keeper关联的所有provider
 		keeperAddrsGetted, err := cRole.GetAllKeeperInKPMap()
 		if err != nil {
@@ -977,8 +967,9 @@ var deployAdminOwnedCmd = &cmds.Command{
 
 		contracts.EndPoint = eth
 
-		hexPk := adminSk
-		adminOwnedAddr, err := contracts.DeployAdminOwned(hexPk)
+		hexSk := adminSk
+		a := contracts.NewCA(common.HexToAddress(adminAddr), hexSk)
+		adminOwnedAddr, err := a.DeployAdminOwned()
 		if err != nil {
 			fmt.Println("AdminOwned合约部署错误:", err)
 			return err
@@ -1030,7 +1021,8 @@ var getAdminOwnerCmd = &cmds.Command{
 		peerID := n.Identity.Pretty()
 		localAddress, _ := address.GetAddressFromID(peerID)
 
-		adminOwner, err := contracts.GetAdminOwner(common.HexToAddress(adminOwnedContractAddr), localAddress)
+		a := contracts.NewCA(localAddress, "")
+		adminOwner, err := a.GetAdminOwner(common.HexToAddress(adminOwnedContractAddr))
 		if err != nil {
 			return err
 		}
@@ -1077,9 +1069,10 @@ var alterAdminOwnerCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		newOwner := req.Arguments[0]
-		hexPk := adminSk
+		hexSk := adminSk
 
-		err := contracts.AlterOwner(hexPk, common.HexToAddress(adminOwnedContractAddr), common.HexToAddress(newOwner))
+		a := contracts.NewCA(common.HexToAddress(newOwner), hexSk)
+		err := a.AlterOwner(common.HexToAddress(adminOwnedContractAddr), common.HexToAddress(newOwner))
 		if err != nil {
 			return err
 		}
@@ -1124,7 +1117,7 @@ var setBannedCmd = &cmds.Command{
 
 		contracts.EndPoint = eth
 
-		hexPk := adminSk
+		hexSk := adminSk
 		bannedVersion, ok := req.Options["BannedVersion"].(uint)
 		if !ok {
 			fmt.Println("ParamBanned is wrong")
@@ -1136,7 +1129,8 @@ var setBannedCmd = &cmds.Command{
 			return nil
 		}
 
-		err := contracts.SetBannedVersion(hexPk, key, common.HexToAddress(adminOwnedContractAddr), uint16(bannedVersion))
+		a := contracts.NewCA(common.HexToAddress(adminAddr), hexSk)
+		err := a.SetBannedVersion(key, common.HexToAddress(adminOwnedContractAddr), uint16(bannedVersion))
 		if err != nil {
 			return err
 		}
@@ -1192,7 +1186,8 @@ var getBannedCmd = &cmds.Command{
 			return nil
 		}
 
-		bannedVersion, err := contracts.GetBannedVersion(key, common.HexToAddress(adminOwnedContractAddr), localAddress)
+		a := contracts.NewCA(localAddress, "")
+		bannedVersion, err := a.GetBannedVersion(key, common.HexToAddress(adminOwnedContractAddr))
 		if err != nil {
 			return err
 		}
@@ -1236,7 +1231,8 @@ var deployRecoverCmd = &cmds.Command{
 		contracts.EndPoint = eth
 
 		hexSk := adminSk
-		recoverAddr, err := contracts.DeployRecover(hexSk)
+		a := contracts.NewCA(common.HexToAddress(adminAddr), hexSk)
+		recoverAddr, err := a.DeployRecover()
 		if err != nil {
 			fmt.Println("recover合约部署错误:", err)
 			return err

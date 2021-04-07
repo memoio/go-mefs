@@ -106,7 +106,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 }
 
 func (k *Info) Start(ctx context.Context, opts interface{}) error {
-	balance := role.GetBalance(k.localID)
+	balance, _ := role.QueryBalance(k.localID)
 	ba, _ := new(big.Float).SetInt(balance).Float64()
 	k.ms.balance.Set(ba)
 

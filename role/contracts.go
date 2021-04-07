@@ -5,12 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/memoio/go-mefs/contracts"
-	"github.com/memoio/go-mefs/contracts/market"
 	"github.com/memoio/go-mefs/contracts/upKeeping"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	mpb "github.com/memoio/go-mefs/pb"
@@ -112,7 +110,8 @@ func QueryBalance(localID string) (*big.Int, error) {
 	}
 
 	//获得用户的账户余额
-	return contracts.QueryBalance(localAddress.Hex())
+	a := contracts.NewCA(localAddress, "")
+	return a.QueryBalance(localAddress.Hex())
 }
 
 // GetKeeperInfo returns keeper info
@@ -128,36 +127,19 @@ func GetKeeperInfo(localID, keeperID string) (KeeperItem, error) {
 		return item, err
 	}
 
-	_, keeperInstance, err := contracts.GetKeeperContractFromIndexer(localAddress)
+	r := contracts.NewCR(localAddress, "")
+	isKeeper, isBanned, money, ptime, err := r.GetKeeperInfo(keeperAddress)
 	if err != nil {
-		return item, nil
+		return item, err
 	}
 
-	retryCount := 0
-	for {
-		retryCount++
-		isKeeper, isBanned, money, ptime, err := keeperInstance.Info(&bind.CallOpts{From: localAddress}, keeperAddress)
-		if err != nil {
-			if retryCount > 10 {
-				return item, nil
-			}
-			time.Sleep(retryGetInfoSleepTime)
-			continue
+	if isKeeper && !isBanned {
+		item = KeeperItem{
+			KeeperID:    keeperID,
+			PledgeMoney: money,
+			StartTime:   ptime,
 		}
-		if isKeeper && !isBanned {
-			keeperID, err := address.GetIDFromAddress(keeperAddress.String())
-			if err != nil {
-				return item, err
-			}
-
-			item = KeeperItem{
-				KeeperID:    keeperID,
-				PledgeMoney: money,
-				StartTime:   ptime.Int64(),
-			}
-			return item, nil
-		}
-		break
+		return item, nil
 	}
 
 	return item, ErrNotKeeper
@@ -176,47 +158,33 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 		return item, err
 	}
 
-	_, proInstance, err := contracts.GetProviderContractFromIndexer(localAddress)
+	r := contracts.NewCR(localAddress, "")
+	isProvider, isBanned, money, stime, err := r.GetProviderInfo(proAddress)
 	if err != nil {
-		return item, nil
+		return item, err
 	}
 
-	retryCount := 0
-	r := contracts.NewCR(localID, "")
-	for {
-		retryCount++
-		isProvider, isBanned, money, stime, err := proInstance.Info(&bind.CallOpts{From: localAddress}, proAddress)
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(retryGetInfoSleepTime)
-			continue
-		}
+	price, err := r.GetProviderPrice()
+	if err != nil {
+		return item, err
+	}
 
-		price, err := r.GetProviderPrice()
-		if err != nil {
-			return item, err
-		}
+	cap := int64(0)
+	weiPrice := new(big.Float).SetInt(price)
+	weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
+	weiPrice.Int(price)
+	if price.Sign() > 0 {
+		cap = money.Quo(money, price).Int64()
+	}
 
-		cap := int64(0)
-		weiPrice := new(big.Float).SetInt(price)
-		weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
-		weiPrice.Int(price)
-		if price.Sign() > 0 {
-			cap = money.Quo(money, price).Int64()
+	if isProvider && !isBanned {
+		item = ProviderItem{
+			ProviderID:  proID,
+			PledgeMoney: money,
+			StartTime:   stime,
+			Capacity:    cap,
 		}
-
-		if isProvider && !isBanned {
-			item = ProviderItem{
-				ProviderID:  proID,
-				PledgeMoney: money,
-				StartTime:   stime.Int64(),
-				Capacity:    cap,
-			}
-			return item, nil
-		}
-		break
+		return item, nil
 	}
 
 	return item, ErrNotProvider
@@ -228,41 +196,26 @@ func GetOfferInfo(localID, offerID string) (OfferItem, error) {
 
 	localAddress, err := address.GetAddressFromID(localID)
 	if err != nil {
-		return item, nil
+		return item, err
 	}
 
 	offerAddress, err := address.GetAddressFromID(offerID)
 	if err != nil {
-		return item, nil
+		return item, err
 	}
 
-	offerInstance, err := market.NewOffer(offerAddress, contracts.GetClient(contracts.EndPoint))
+	m := contracts.NewCM(localAddress, "")
+	capacity, duration, price, createDate, err := m.GetOfferInfo(offerAddress)
 	if err != nil {
 		return item, err
 	}
 
-	retryCount := 0
-	for {
-		retryCount++
-		capacity, duration, price, createDate, err := offerInstance.Get(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(retryGetInfoSleepTime)
-			continue
-		}
-
-		item = OfferItem{
-			Capacity:   capacity.Int64(),
-			Duration:   duration.Int64(),
-			Price:      price,
-			OfferID:    offerID,
-			CreateDate: createDate.Int64(),
-		}
-		break
+	item = OfferItem{
+		Capacity:   capacity,
+		Duration:   duration,
+		Price:      price,
+		OfferID:    offerID,
+		CreateDate: createDate,
 	}
 
 	return item, nil
@@ -377,34 +330,22 @@ func GetQueryInfo(localID, queryID string) (QueryItem, error) {
 		return item, err
 	}
 
-	queryInstance, err := market.NewQuery(queryAddr, contracts.GetClient(contracts.EndPoint))
+	m := contracts.NewCM(localAddr, "")
+	capacity, duration, price, ks, ps, completed, err := m.GetQueryInfo(queryAddr)
 	if err != nil {
 		return item, err
 	}
-	retryCount := 0
-	for {
-		retryCount++
-		capacity, duration, price, ks, ps, completed, err := queryInstance.Get(&bind.CallOpts{
-			From: localAddr,
-		})
-		if err != nil {
-			if retryCount > 10 {
-				return item, err
-			}
-			time.Sleep(retryGetInfoSleepTime)
-			continue
-		}
-		item = QueryItem{
-			Capacity:     capacity.Int64(),
-			Duration:     duration.Int64(),
-			Price:        price,
-			KeeperNums:   int32(ks.Int64()),
-			ProviderNums: int32(ps.Int64()),
-			Completed:    completed,
-			QueryID:      queryID,
-		}
-		return item, nil
+
+	item = QueryItem{
+		Capacity:     capacity,
+		Duration:     duration,
+		Price:        price,
+		KeeperNums:   int32(ks),
+		ProviderNums: int32(ps),
+		Completed:    completed,
+		QueryID:      queryID,
 	}
+	return item, nil
 }
 
 // DeployUpKeeping is
@@ -447,7 +388,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	moneyAccount.Mul(moneyAccount, big.NewInt(storeDays))
 
 	// getbalance
-	balance, err := contracts.QueryBalance(localAddress.String())
+	balance, err := QueryBalance(userID)
 	if err != nil {
 		return ukID, err
 	}
@@ -498,18 +439,13 @@ func GetUpkeepingInfo(localID, ukID string) (UpKeepingItem, error) {
 		return item, err
 	}
 
-	ukInstance, err := upKeeping.NewUpKeeping(ukAddr, contracts.GetClient(contracts.EndPoint))
-	if err != nil {
-		return item, nil
-	}
-
-	ukMoney, err := contracts.QueryBalance(ukAddr.String())
+	ukMoney, err := QueryBalance(ukID)
 	if err != nil {
 		return item, err
 	}
 
 	u := contracts.NewCU(localAddr, "")
-	queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := u.GetOrder(ukInstance)
+	queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := u.GetOrder(ukAddr)
 	if err != nil {
 		return item, err
 	}
@@ -552,7 +488,9 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 		return item, err
 	}
 
-	ukAddr, ukInstance, err := contracts.GetUpkeeping(userAddr, userAddr, queryAddr.String())
+	u := contracts.NewCU(userAddr, "")
+
+	ukAddr, _, err := u.GetUpkeeping(userAddr, queryAddr.String())
 	if err != nil {
 		return item, err
 	}
@@ -567,13 +505,12 @@ func GetUpKeeping(userID, queryID string) (UpKeepingItem, error) {
 		return item, err
 	}
 
-	ukMoney, err := contracts.QueryBalance(ukAddr.String())
+	ukMoney, err := QueryBalance(ukID)
 	if err != nil {
 		return item, err
 	}
 
-	u := contracts.NewCU(userAddr, "")
-	queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := u.GetOrder(ukInstance)
+	queryAddr, keepers, providers, duration, capacity, price, startTime, endDate, cycle, needPay, proofs, err := u.GetOrder(ukAddr)
 	if err != nil {
 		return item, err
 	}
@@ -613,7 +550,7 @@ func DeployRoot(sk, userID, queryID string, rdo bool) (rootID string, err error)
 	}
 
 	// getbalance
-	balance, err := contracts.QueryBalance(uaddr.String())
+	balance, err := QueryBalance(userID)
 	if err != nil {
 		return rootID, err
 	}
@@ -652,7 +589,8 @@ func GetRoot(userID, queryID string) (string, error) {
 		return "", err
 	}
 
-	rootAddr, _, err := contracts.GetRoot(userAddr, userAddr, queryAddr.String())
+	r := contracts.NewCRoot(userAddr, "")
+	rootAddr, _, err := r.GetRoot(userAddr, queryAddr.String())
 	if err != nil {
 		return "", err
 	}
@@ -700,7 +638,7 @@ func DeployChannel(userID, queryID, proID, hexSk string, storeDays, storeSize in
 	weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
 	weiPrice.Int(moneyToChannel)
 
-	balance, err := contracts.QueryBalance(localAddress.Hex())
+	balance, err := QueryBalance(userID)
 	if err != nil {
 		return chanAddr, err
 	}
@@ -762,7 +700,7 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 		return item, err
 	}
 
-	ba, err := contracts.QueryBalance(chanAddress.String())
+	ba, err := QueryBalance(channelID)
 	if err != nil {
 		return item, err
 	}
@@ -778,21 +716,6 @@ func GetChannelInfo(localID, channelID string) (ChannelItem, error) {
 	}
 	return item, nil
 
-}
-
-// GetBalance gets balance from
-func GetBalance(pid string) *big.Int {
-	paddr, err := address.GetAddressFromID(pid)
-	if err != nil {
-		return big.NewInt(0)
-	}
-
-	balance, err := contracts.QueryBalance(paddr.String())
-	if err != nil {
-		return big.NewInt(0)
-	}
-
-	return balance
 }
 
 // GetLatestChannel gets
@@ -967,7 +890,12 @@ func GetKeepersOfPro(peerID string) ([]string, bool) {
 
 // SaveKpMap saves kpmap
 func SaveKpMap(peerID string) error {
-	r := contracts.NewCR(peerID, "")
+	peerAddr, err := address.GetAddressFromID(peerID)
+	if err != nil {
+		return err
+	}
+
+	r := contracts.NewCR(peerAddr, "")
 	kps, err := r.GetAllKeeperInKPMap()
 	if err != nil {
 		return err

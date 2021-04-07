@@ -39,12 +39,12 @@ func (m *ContractManageInfo) DeployIndexer() (common.Address, *indexer.Indexer, 
 	var err error
 
 	log.Println("begin deploy indexer contract...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return indexerAddr, nil, errMA
 		}
@@ -74,7 +74,7 @@ func (m *ContractManageInfo) DeployIndexer() (common.Address, *indexer.Indexer, 
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy user indexer transaction fails:", err)
@@ -131,7 +131,7 @@ func (m *ContractManageInfo) AddToIndexer(addAddr common.Address, key string, ad
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -159,7 +159,7 @@ func (m *ContractManageInfo) AddToIndexer(addAddr common.Address, key string, ad
 		}
 
 		//check tx receipt to judge if the tx is success
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("add address to indexer transaction fails: ", err)
@@ -202,7 +202,7 @@ func (m *ContractManageInfo) AlterAddrInIndexer(addAddr common.Address, key stri
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -228,7 +228,7 @@ func (m *ContractManageInfo) AlterAddrInIndexer(addAddr common.Address, key stri
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("alter addr in indexer transaction fails: ", err)
@@ -247,7 +247,7 @@ func (m *ContractManageInfo) AlterAddrInIndexer(addAddr common.Address, key stri
 func (m *ContractManageInfo) GetResolverAddr(key string) (common.Address, common.Address, error) {
 	var resAddr common.Address
 
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	adminIndexerAddr := common.HexToAddress(indexerHex)
 	adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
 	if err != nil {
@@ -263,7 +263,7 @@ func (m *ContractManageInfo) GetResolverAddr(key string) (common.Address, common
 	return resAddr, ownAddr, nil
 }
 
-// GetAddrFromIndexer gets addr
+// GetAddrFromIndexer used also in test
 func GetAddrFromIndexer(localAddress common.Address, key string, indexerInstance *indexer.Indexer) (common.Address, common.Address, error) {
 	retryCount := 0
 	for {
@@ -298,12 +298,12 @@ func (m *ContractManageInfo) DeployResolver() (common.Address, *resolver.Resolve
 	var err error
 
 	log.Println("begin deploy resolver...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return resolverAddr, resolverInstance, errMA
 		}
@@ -333,7 +333,7 @@ func (m *ContractManageInfo) DeployResolver() (common.Address, *resolver.Resolve
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy resolver transaction fails: ", err)
@@ -359,7 +359,7 @@ func (m *ContractManageInfo) AddToResolver(addAddr common.Address, resolverInsta
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -385,7 +385,7 @@ func (m *ContractManageInfo) AddToResolver(addAddr common.Address, resolverInsta
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("add addr to resolver transaction fails: ", err)
@@ -453,12 +453,12 @@ func (m *ContractManageInfo) DeployMapper() (common.Address, *mapper.Mapper, err
 	var err error
 
 	log.Println("begin deploy mapper...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return mapperAddr, mapperInstance, errMA
 		}
@@ -488,7 +488,7 @@ func (m *ContractManageInfo) DeployMapper() (common.Address, *mapper.Mapper, err
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy mapper transaction fails: ", err)
@@ -511,7 +511,7 @@ func (m *ContractManageInfo) AddToMapper(addr common.Address, mapperInstance *ma
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -537,7 +537,7 @@ func (m *ContractManageInfo) AddToMapper(addr common.Address, mapperInstance *ma
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("add addr to mapperContract transaction fails: ", err)
@@ -615,7 +615,7 @@ func (m *ContractManageInfo) GetResolverFromIndexer(key string) (common.Address,
 		return resAddr, nil, err
 	}
 
-	resInstance, err := resolver.NewResolver(resAddr, GetClient(EndPoint))
+	resInstance, err := resolver.NewResolver(resAddr, getClient(EndPoint))
 	if err != nil {
 		return resAddr, nil, err
 	}
@@ -632,7 +632,7 @@ func (m *ContractManageInfo) GetMapperFromIndexer(key string) (common.Address, *
 		return mapperAddr, nil, err
 	}
 
-	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
+	mapperInstance, err := mapper.NewMapper(mapperAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newMapperErr:", err)
 		return mapperAddr, nil, err
@@ -648,7 +648,7 @@ func (m *ContractManageInfo) GetMapperFromResolver(ownerAddress common.Address, 
 		return mapperAddr, nil, err
 	}
 
-	mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
+	mapperInstance, err := mapper.NewMapper(mapperAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newMapperErr:", err)
 		return mapperAddr, nil, err
@@ -711,7 +711,7 @@ func (m *ContractManageInfo) GetResolverFromAdmin(key string, flag bool) (common
 		if !flag {
 			return resolverAddr, nil, err
 		}
-		client := GetClient(EndPoint)
+		client := getClient(EndPoint)
 		adminIndexerAddr := common.HexToAddress(indexerHex)
 		adminIndexer, err := indexer.NewIndexer(adminIndexerAddr, client)
 		if err != nil {

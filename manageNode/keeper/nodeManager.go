@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"github.com/memoio/go-mefs/utils/address"
 	"context"
 	"strings"
 	"sync"
@@ -115,8 +116,11 @@ func (k *Info) getKInfo(pid string, managed bool) (*kInfo, error) {
 
 	thisInfoI, ok := k.keepers.Load(pid)
 	if !ok {
-		r := contracts.NewCR(k.localID, "")
-		has, err := r.IsKeeper(pid)
+		localAddr, _ := address.GetAddressFromID(k.localID)
+		pAddr, _ := address.GetAddressFromID(pid)
+
+		r := contracts.NewCR(localAddr, "")
+		has, err := r.IsKeeper(pAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -153,9 +157,11 @@ func (k *Info) getKInfo(pid string, managed bool) (*kInfo, error) {
 
 func (k *Info) getPInfo(pid string, managed bool) (*pInfo, error) {
 	thisInfoI, ok := k.providers.Load(pid)
-	r := contracts.NewCR(k.localID, "")
+	localAddr, _ := address.GetAddressFromID(k.localID)
+	r := contracts.NewCR(localAddr, "")
 	if !ok {
-		has, err := r.IsProvider(pid)
+		pAddr, _ := address.GetAddressFromID(pid)
+		has, err := r.IsProvider(pAddr)
 		if err != nil {
 			return nil, err
 		}

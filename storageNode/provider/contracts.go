@@ -15,6 +15,7 @@ import (
 
 func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.Int, reDeployOffer bool) error {
 	proID := p.localID
+	proAddr, _ := address.GetAddressFromID(proID)
 
 	if p.proContract == nil {
 		proItem, err := role.GetProviderInfo(proID, proID)
@@ -26,7 +27,7 @@ func (p *Info) loadContracts(capacity, duration, depositSize int64, price *big.I
 		if proItem.Capacity < depositSize {
 			utils.MLogger.Infof("your old pledge capacity is %d MB, now will change to %d MB", proItem.Capacity, depositSize)
 			dsize := new(big.Int).SetInt64(depositSize - proItem.Capacity)
-			cRole := contracts.NewCR(proID, p.sk)
+			cRole := contracts.NewCR(proAddr, p.sk)
 			err := cRole.PledgeProvider(dsize)
 			if err != nil {
 				return err
@@ -133,7 +134,7 @@ func (p *Info) saveChannelValue(userID, groupID, proID string) error {
 					continue
 				}
 
-				cItem.Money = role.GetBalance(cItem.ChannelID)
+				cItem.Money, err = role.QueryBalance(cItem.ChannelID)
 			}
 		}
 	}
@@ -234,7 +235,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 				cItem.Sig = valueByte
 			}
 
-			cItem.Money = role.GetBalance(cItem.ChannelID)
+			cItem.Money, _ = role.QueryBalance(cItem.ChannelID)
 
 			// close before timeout
 			if time.Now().Unix()-cItem.StartTime > cItem.Duration-int64(60*60) && cItem.Money.Sign() > 0 {
@@ -255,7 +256,7 @@ func (p *Info) loadChannelValue(userID, groupID string) error {
 					continue
 				}
 
-				cItem.Money = role.GetBalance(cItem.ChannelID)
+				cItem.Money, _ = role.QueryBalance(cItem.ChannelID)
 			}
 		}
 	}

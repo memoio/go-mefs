@@ -154,15 +154,16 @@ func testCloseChannel() (err error) {
 	log.Println("test close channel")
 	contracts.EndPoint = ethEndPoint
 
-	oldblk, err := contracts.GetLatestBlock()
-	if err != nil {
-		panic(err)
-	}
-
 	userAddr, userSk, err := test.CreateAddr()
 	if err != nil {
 		log.Println(err)
 		return err
+	}
+
+	a := contracts.NewCA(common.HexToAddress(userAddr), "")
+	oldblk, err := a.GetLatestBlock()
+	if err != nil {
+		panic(err)
 	}
 
 	err = test.TransferTo(big.NewInt(moneyTo), userAddr, ethEndPoint, qethEndPoint)
@@ -298,13 +299,13 @@ func testCloseChannel() (err error) {
 	}
 
 	log.Println("test get download income from chain")
-	newblk, err := contracts.GetLatestBlock()
+	newblk, err := a.GetLatestBlock()
 	if err != nil {
 		panic(err)
 	}
 
 	chAddrs := []common.Address{channelAddr}
-	total, _, err := contracts.GetReadIncome(chAddrs, providerAddr, oldblk.Number().Int64(), newblk.Number().Int64())
+	total, _, err := a.GetReadIncome(chAddrs, providerAddr, oldblk.Number().Int64(), newblk.Number().Int64())
 	if err != nil {
 		log.Fatal(err)
 	}

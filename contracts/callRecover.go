@@ -9,10 +9,10 @@ import (
 )
 
 //DeployRecover deploy a recover contract
-func DeployRecover(hexKey string) (common.Address, error) {
+func (a *AdminOwnedInfo) DeployRecover() (common.Address, error) {
 	var recoverAddr common.Address
-	client := GetClient(EndPoint)
-	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	client := getClient(EndPoint)
+	auth, err := makeAuth(a.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return recoverAddr, err
 	}

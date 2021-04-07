@@ -45,12 +45,12 @@ func (u *UpkeepingInfo) DeployUpkeeping(queryAddress common.Address, keeperAddre
 	}
 
 	log.Println("begin deploy upKeeping...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, moneyAccount, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := makeAuth(u.hexSk, moneyAccount, nil, big.NewInt(defaultGasPrice), 0)
 		if errMA != nil {
 			return ukAddr, errMA
 		}
@@ -80,7 +80,7 @@ func (u *UpkeepingInfo) DeployUpkeeping(queryAddress common.Address, keeperAddre
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy UpKeeping transaction fails", err)
@@ -103,7 +103,7 @@ func (u *UpkeepingInfo) DeployUpkeeping(queryAddress common.Address, keeperAddre
 }
 
 //GetUpkeepingAddrs get all upKeeping address
-func GetUpkeepingAddrs(localAddress, userAddress common.Address) ([]common.Address, error) {
+func getUpkeepingAddrs(localAddress, userAddress common.Address) ([]common.Address, error) {
 	ma := NewCManage(localAddress, "")
 	//获得userIndexer, key is userAddr
 	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, ukey, false)
@@ -115,14 +115,14 @@ func GetUpkeepingAddrs(localAddress, userAddress common.Address) ([]common.Addre
 }
 
 //GetUpkeeping get upKeeping-contract from the mapper, and get the mapper from user's indexer
-func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
+func (u *UpkeepingInfo) GetUpkeeping(userAddress common.Address, key string) (ukaddr common.Address, uk *upKeeping.UpKeeping, err error) {
 	//获得userIndexer, key is userAddr
-	uks, err := GetUpkeepingAddrs(localAddress, userAddress)
+	uks, err := getUpkeepingAddrs(u.addr, userAddress)
 	if err != nil {
 		return ukaddr, uk, err
 	}
 
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 
 	if key == "latest" {
 		ukaddr = uks[len(uks)-1]
@@ -149,7 +149,7 @@ func GetUpkeeping(localAddress, userAddress common.Address, key string) (ukaddr 
 				continue
 			}
 			queryAddr, _, _, _, _, _, _, _, _, _, _, err := uk.GetOrder(&bind.CallOpts{
-				From: localAddress,
+				From: u.addr,
 			})
 			if err != nil {
 				time.Sleep(retryGetInfoSleepTime)
@@ -173,7 +173,7 @@ func (u *UpkeepingInfo) SpaceTimePay(ukAddr, providerAddr common.Address, stStar
 		shareNew = append(shareNew, big.NewInt(b))
 	}
 
-	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
+	uk, err := upKeeping.NewUpKeeping(ukAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newUkErr:", err)
 		return err
@@ -184,7 +184,7 @@ func (u *UpkeepingInfo) SpaceTimePay(ukAddr, providerAddr common.Address, stStar
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), spaceTimePayGasLimit)
+		auth, errMA := makeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), spaceTimePayGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -211,7 +211,7 @@ func (u *UpkeepingInfo) SpaceTimePay(ukAddr, providerAddr common.Address, stStar
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("spaceTimePay transaction fails", err)
@@ -229,7 +229,7 @@ func (u *UpkeepingInfo) SpaceTimePay(ukAddr, providerAddr common.Address, stStar
 
 //AddProvider add a provider to upKeeping
 func (u *UpkeepingInfo) AddProvider(ukAddr common.Address, providerAddress []common.Address, sign [][]byte) error {
-	uk, err := upKeeping.NewUpKeeping(ukAddr, GetClient(EndPoint))
+	uk, err := upKeeping.NewUpKeeping(ukAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newUkErr:", err)
 		return err
@@ -240,7 +240,7 @@ func (u *UpkeepingInfo) AddProvider(ukAddr common.Address, providerAddress []com
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -267,7 +267,7 @@ func (u *UpkeepingInfo) AddProvider(ukAddr common.Address, providerAddress []com
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("addProvider transaction fails", err)
@@ -284,17 +284,23 @@ func (u *UpkeepingInfo) AddProvider(ukAddr common.Address, providerAddress []com
 }
 
 //GetOrder get queryAddr、keepers、providers、time、size、price、createDate、proofs、stEnd
-func (u *UpkeepingInfo) GetOrder(uk *upKeeping.UpKeeping) (common.Address, []upKeeping.UpKeepingKPInfo, []upKeeping.UpKeepingKPInfo, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, []upKeeping.UpKeepingProof, error) {
+func (u *UpkeepingInfo) GetOrder(ukAddress common.Address) (common.Address, []upKeeping.UpKeepingKPInfo, []upKeeping.UpKeepingKPInfo, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int, []upKeeping.UpKeepingProof, error) {
 	var queryAddr common.Address
 	var keepers, providers []upKeeping.UpKeepingKPInfo
 	var t, size, price, createDate, endDate, cycle, needPay *big.Int
 	var proofs []upKeeping.UpKeepingProof
 	var err error
 
+	ukInstance, err := upKeeping.NewUpKeeping(ukAddress, getClient(EndPoint))
+	if err != nil {
+		log.Println("newUkErr:", err)
+		return queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err
+	}
+
 	retryCount := 0
 	for {
 		retryCount++
-		queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err = uk.GetOrder(&bind.CallOpts{
+		queryAddr, keepers, providers, t, size, price, createDate, endDate, cycle, needPay, proofs, err = ukInstance.GetOrder(&bind.CallOpts{
 			From: u.addr,
 		})
 		if err != nil {
@@ -311,7 +317,7 @@ func (u *UpkeepingInfo) GetOrder(uk *upKeeping.UpKeeping) (common.Address, []upK
 
 //ExtendTime user extend storage-time in upKeeping-contract
 func (u *UpkeepingInfo) ExtendTime(userAddress common.Address, key string, addTime int64) error {
-	_, uk, err := GetUpkeeping(u.addr, userAddress, key)
+	_, uk, err := u.GetUpkeeping(userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -321,7 +327,7 @@ func (u *UpkeepingInfo) ExtendTime(userAddress common.Address, key string, addTi
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -348,7 +354,7 @@ func (u *UpkeepingInfo) ExtendTime(userAddress common.Address, key string, addTi
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("extendUKTime transaction fails", err)
@@ -366,7 +372,7 @@ func (u *UpkeepingInfo) ExtendTime(userAddress common.Address, key string, addTi
 
 //DestructUpKeeping destruct the upKeeping contract and transfer the balance of contract to user, anyone can call
 func (u *UpkeepingInfo) DestructUpKeeping(userAddress common.Address, key string) error {
-	_, uk, err := GetUpkeeping(u.addr, userAddress, key)
+	_, uk, err := u.GetUpkeeping(userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -376,7 +382,7 @@ func (u *UpkeepingInfo) DestructUpKeeping(userAddress common.Address, key string
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(u.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -402,7 +408,7 @@ func (u *UpkeepingInfo) DestructUpKeeping(userAddress common.Address, key string
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("destruct UK transaction fails", err, "maybe you cannot destruct UK now")
@@ -420,7 +426,7 @@ func (u *UpkeepingInfo) DestructUpKeeping(userAddress common.Address, key string
 
 //SetKeeperStop keeper call to set keeperAddr stop
 func (u *UpkeepingInfo) SetKeeperStop(userAddress, keeperAddr common.Address, key string, sign [][]byte) error {
-	_, uk, err := GetUpkeeping(u.addr, userAddress, key)
+	_, uk, err := u.GetUpkeeping(userAddress, key)
 	if err != nil {
 		return err
 	}
@@ -430,7 +436,7 @@ func (u *UpkeepingInfo) SetKeeperStop(userAddress, keeperAddr common.Address, ke
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -456,7 +462,7 @@ func (u *UpkeepingInfo) SetKeeperStop(userAddress, keeperAddr common.Address, ke
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set keeper stop transaction fails", err)
@@ -477,12 +483,12 @@ func (u *UpkeepingInfo) SetProviderStop(userAddress, providerAddr, ukAddr common
 	var uk *upKeeping.UpKeeping
 	var err error
 	if ukAddr.String() == InvalidAddr {
-		_, uk, err = GetUpkeeping(u.addr, userAddress, key)
+		_, uk, err = u.GetUpkeeping(userAddress, key)
 		if err != nil {
 			return err
 		}
 	} else {
-		client := GetClient(EndPoint)
+		client := getClient(EndPoint)
 		uk, err = upKeeping.NewUpKeeping(ukAddr, client)
 		if err != nil {
 			return err
@@ -494,7 +500,7 @@ func (u *UpkeepingInfo) SetProviderStop(userAddress, providerAddr, ukAddr common
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(u.hexSk, nil, nil, big.NewInt(spaceTimePayGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -520,7 +526,7 @@ func (u *UpkeepingInfo) SetProviderStop(userAddress, providerAddr, ukAddr common
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set provider stop transaction fails", err)

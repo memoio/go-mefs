@@ -68,7 +68,7 @@ func main() {
 	log.Println("start get root contract")
 
 	time.Sleep(waitTime)
-	gotAddr, _, err := contracts.GetRoot(localAddr, localAddr, localAddr.String())
+	gotAddr, _, err := cRoot.GetRoot(localAddr, localAddr.String())
 	if err != nil {
 		log.Fatal("get root contract fails: ", err)
 	}

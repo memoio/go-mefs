@@ -10,6 +10,9 @@ import (
 	"io"
 	"math/big"
 
+	"github.com/memoio/go-mefs/role"
+
+	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
@@ -56,7 +59,8 @@ var transferCmd = &cmds.Command{
 		toAddr, _ := req.Options["address"].(string)
 		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.219:8101", "http://119.147.213.219:8101")
 
-		balances, err := contracts.QueryBalance(toAddr)
+		a := contracts.NewCA(common.HexToAddress(toAddr), "")
+		balances, err := a.QueryBalance(toAddr)
 		if err != nil {
 			return err
 		}
@@ -144,21 +148,16 @@ var showBalanceCmd = &cmds.Command{
 			return err
 		}
 		var userid string
-		addressid, found := req.Options["address"].(string)
-		if addressid == "" || !found {
+		peerAddress, found := req.Options["address"].(string)
+		if peerAddress == "" || !found {
 			userid = node.Identity.Pretty()
-			address, err := address.GetAddressFromID(userid)
-			addressid = address.String()
-			if err != nil {
-				return err
-			}
 		} else {
-			userid, err = address.GetIDFromAddress(addressid)
+			userid, err = address.GetIDFromAddress(peerAddress)
 			if err != nil {
 				return err
 			}
 		}
-		balances, err := contracts.QueryBalance(addressid)
+		balances, err := role.QueryBalance(userid)
 		if err != nil {
 			return err
 		}

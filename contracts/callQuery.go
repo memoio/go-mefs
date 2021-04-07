@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -19,7 +20,8 @@ func (m *MarketInfo) DeployQuery(capacity, storeDays int64, price *big.Int, ks i
 	var queryAddr, qAddr common.Address
 
 	// getbalance
-	balance, err := QueryBalance(m.addr.String())
+	a := NewCA(m.addr, m.hexSk)
+	balance, err := a.QueryBalance(m.addr.String())
 	if err != nil {
 		return queryAddr, err
 	}
@@ -72,12 +74,12 @@ func (m *MarketInfo) DeployQuery(capacity, storeDays int64, price *big.Int, ks i
 	}
 
 	log.Println("begin to deploy query-contract...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return queryAddr, errMA
 		}
@@ -106,7 +108,7 @@ func (m *MarketInfo) DeployQuery(capacity, storeDays int64, price *big.Int, ks i
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy Query transaction fails", err)
@@ -143,7 +145,7 @@ func (m *MarketInfo) GetQueryAddrs(userAddress common.Address) (queryAddr []comm
 
 //SetQueryCompleted when user has found providers and keepers needed, user call this function
 func (m *MarketInfo) SetQueryCompleted(queryAddress common.Address) error {
-	query, err := market.NewQuery(queryAddress, GetClient(EndPoint))
+	query, err := market.NewQuery(queryAddress, getClient(EndPoint))
 	if err != nil {
 		log.Println("newQueryErr:", err)
 		return err
@@ -154,7 +156,7 @@ func (m *MarketInfo) SetQueryCompleted(queryAddress common.Address) error {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(m.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -180,7 +182,7 @@ func (m *MarketInfo) SetQueryCompleted(queryAddress common.Address) error {
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set query completed transaction fails", err)
@@ -194,4 +196,29 @@ func (m *MarketInfo) SetQueryCompleted(queryAddress common.Address) error {
 
 	log.Println("you have called setQueryCompleted successfully!")
 	return nil
+}
+
+//GetQueryInfo get information about query
+func (m *MarketInfo) GetQueryInfo(queryAddress common.Address) (int64, int64, *big.Int, int64, int64, bool, error) {
+	queryInstance, err := market.NewQuery(queryAddress, getClient(EndPoint))
+	if err != nil {
+		log.Println("newQueryErr:", err)
+		return 0, 0, big.NewInt(0), 0, 0, false, err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		capacity, duration, price, ks, ps, completed, err := queryInstance.Get(&bind.CallOpts{
+			From: m.addr,
+		})
+		if err != nil {
+			if retryCount > 10 {
+				return 0, 0, big.NewInt(0), 0, 0, false, err
+			}
+			time.Sleep(retryGetInfoSleepTime)
+			continue
+		}
+		return capacity.Int64(), duration.Int64(), price, ks.Int64(), ps.Int64(), completed, nil
+	}
 }
