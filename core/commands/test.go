@@ -13,7 +13,7 @@ import (
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
 )
@@ -75,7 +75,7 @@ var mclCmd = &cmds.Command{
 	Options:   []cmds.Option{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 
-		err := mcl.Init(mcl.BLS12_381)
+		err := pdp.Init(pdp.BLS12_381)
 		if err != nil {
 			panic(err)
 		}

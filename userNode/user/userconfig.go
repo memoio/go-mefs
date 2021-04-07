@@ -12,7 +12,7 @@ import (
 
 func initBLS12Config(seed []byte) (pdp.KeySet, error) {
 	utils.MLogger.Info("Generating BLS12 Sk and Pk")
-	kset, err := pdp.GenKeySetV0WithSeed(seed, pdp.TagAtomNumV1, pdp.PDPCountV1)
+	kset, err := pdp.GenKeySetV1WithSeed(seed, pdp.SCount)
 	if err != nil {
 		utils.MLogger.Error("Init BlS12 keyset error: ", err)
 		return nil, err
@@ -26,7 +26,7 @@ func (l *LfsInfo) putUserConfig(ctx context.Context) {
 		return
 	}
 
-	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet.(*pdp.KeySetV0), []byte(l.privateKey))
+	userBLS12Config, err := role.BLS12KeysetToByte(l.keySet.(*pdp.KeySetV1), []byte(l.privateKey))
 	if err != nil {
 		return
 	}

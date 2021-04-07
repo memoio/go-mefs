@@ -71,6 +71,12 @@ message Record {
 	bytes signature = 3; // A signature for the key+value depends on its keytype
 }
 
+message BLSKey {
+  int32 version = 1;
+  bytes pubKey = 2;
+  bytes secretKey = 3;
+}
+
 // bls12 config information 
 message UserBLS12Config{
     int32 version = 1;
@@ -236,7 +242,7 @@ message ChalInfo{
     int64 TotalLength = 8;
     repeated string Blocks = 9;
     repeated string FaultBlocks = 10;
-    string BlsProof = 11;
+    bytes BlsProof = 11;
     bool Res = 12;
     bytes keeperSign = 13;
     bytes proSign = 14;

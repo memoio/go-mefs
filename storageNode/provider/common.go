@@ -35,11 +35,11 @@ type GInfoOutput struct {
 func (p *Info) getNewUserConfig(userID, groupID string) (pdp.KeySet, error) {
 	value, ok := p.userConfigs.Get(groupID)
 	if ok {
-		return value.(*pdp.KeySetV0), nil
+		return value.(*pdp.KeySetV1), nil
 	}
 
 	if userID == pos.GetPosId() {
-		mkey, err := pdp.GenKeySetV0WithSeed(pos.GetPosSeed(), pdp.TagAtomNumV1, pdp.PDPCountV1)
+		mkey, err := pdp.GenKeySetV1WithSeed(pos.GetPosSeed(), pdp.SCount)
 		if err != nil {
 			utils.MLogger.Info("Init bls config for pos user fail: ", err)
 			return nil, err

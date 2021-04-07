@@ -22,7 +22,7 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/storageNode/commands"
@@ -379,7 +379,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	fmt.Printf("Network daemon is ready\n")
 
-	err = mcl.Init(mcl.BLS12_381)
+	err = pdp.Init(pdp.BLS12_381)
 	if err != nil {
 		utils.MLogger.Error("Init BLS12_381 curve failed: ", err)
 		<-req.Context.Done()
@@ -400,7 +400,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				return errWrongInput
 			}
 
-			deUnit := cap[len(cap)-2 : len(cap)]
+			deUnit := cap[len(cap)-2:]
 			switch deUnit {
 			case "MB":
 				capacity = res
@@ -428,7 +428,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				return errWrongInput
 			}
 
-			deUnit := decap[len(decap)-2 : len(decap)]
+			deUnit := decap[len(decap)-2:]
 			switch deUnit {
 			case "MB":
 				decapacity = res
@@ -483,12 +483,17 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		pos, _ := req.Options[posKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
-		ins, err := provider.New(req.Context, node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc, exAddr)
+		ins, err := provider.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc, exAddr)
 		if err != nil {
 			fmt.Println("Start provider Service failed:", err)
 			return err
 		}
 
+		err = ins.Start(node.Context(), nil)
+		if err != nil {
+			fmt.Println("Start provider Service failed:", err)
+			return err
+		}
 		node.Inst = ins
 
 		fmt.Println("Provider service is ready")

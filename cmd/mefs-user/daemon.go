@@ -20,7 +20,7 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/userNode/commands"
@@ -358,7 +358,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	fmt.Printf("Network daemon is ready\n")
 
-	err = mcl.Init(mcl.BLS12_381)
+	err = pdp.Init(pdp.BLS12_381)
 	if err != nil {
 		utils.MLogger.Error("Init BLS12_381 curve failed: ", err)
 		<-req.Context.Done()
@@ -370,6 +370,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case metainfo.RoleUser:
 		fmt.Println("Starting as a user")
 		ins, err := user.New(node.Context(), node.Identity.Pretty(), node.Data, node.Routing)
+		if err != nil {
+			fmt.Println("Start user daemon fails:", err)
+			return err
+		}
+		err = ins.Start(node.Context(), nil)
 		if err != nil {
 			fmt.Println("Start user daemon fails:", err)
 			return err

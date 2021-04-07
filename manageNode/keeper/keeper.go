@@ -97,66 +97,70 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		groupedProviders: make(map[string][]string),
 	}
 
-	balance := role.GetBalance(m.localID)
+	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func (k *Info) Start(ctx context.Context, opts interface{}) error {
+	balance := role.GetBalance(k.localID)
 	ba, _ := new(big.Float).SetInt(balance).Float64()
-	m.ms.balance.Set(ba)
+	k.ms.balance.Set(ba)
 
-	usedCapacity, err := datastore.DiskUsage(m.ds.DataStore())
+	usedCapacity, err := datastore.DiskUsage(k.ds.DataStore())
 	if err == nil {
-		m.ms.storageUsed.Set(float64(usedCapacity))
+		k.ms.storageUsed.Set(float64(usedCapacity))
 	}
 
-	m.ms.keeperNum.Inc() // add self
+	k.ms.keeperNum.Inc() // add self
 
-	pubKey, err := id.GetCompressPubByte(m.sk)
+	pubKey, err := id.GetCompressPubByte(k.sk)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	kmp, err := metainfo.NewKey(m.localID, mpb.KeyType_PublicKey)
+	kmp, err := metainfo.NewKey(k.localID, mpb.KeyType_PublicKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	m.ds.PutKey(ctx, kmp.ToString(), pubKey, nil, "local")
+	k.ds.PutKey(ctx, kmp.ToString(), pubKey, nil, "local")
 
-	err = m.loadContract(true)
+	err = k.loadContract(true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// cache userconfigs, key is queryID
 	ucache, err := lru.NewARC(1024)
 	if err != nil {
 		utils.MLogger.Error("new lru err:", err)
-		return nil, err
+		return err
 	}
-	m.userConfigs = ucache
+	k.userConfigs = ucache
 
-	err = m.load(ctx) //连接节点
+	err = k.load(ctx) //连接节点
 	if err != nil {
 		utils.MLogger.Error("load err:", err)
-		return nil, err
+		return err
 	}
 
-	go m.persistRegular(ctx)
-	go m.challengeRegular(ctx)
-	go m.cleanTestUsersRegular(ctx)
-	go m.checkLedgerRafi(ctx)
-	go m.repairRegular(ctx)
-	go m.stPrePayRegular(ctx)
-	go m.stPayRegular(ctx)
-	go m.checkPeers(ctx) //check if connect
-	go m.getFromChainRegular(ctx)
+	go k.persistRegular(ctx)
+	go k.challengeRegular(ctx)
+	go k.cleanTestUsersRegular(ctx)
+	go k.checkLedgerRafi(ctx)
+	go k.repairRegular(ctx)
+	go k.stPrePayRegular(ctx)
+	go k.stPayRegular(ctx)
+	go k.checkPeers(ctx) //check if connect
+	go k.getFromChainRegular(ctx)
 
-	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
-	if err != nil {
-		return nil, err
-	}
-
-	m.state = true
+	k.state = true
 	utils.MLogger.Info("Keeper Service is ready")
-	return m, nil
+	return nil
 }
 
 // Online is

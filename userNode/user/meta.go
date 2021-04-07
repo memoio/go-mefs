@@ -753,8 +753,8 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([][
 	return nil, role.ErrEmptyData
 }
 
-func writeToMeta(data []byte, fsID, buc string) error {
-	metapath, err := checkMetaPath(fsID)
+func writeToMeta(data []byte, fsPrefix, buc string) error {
+	metapath, err := checkMetaPath(fsPrefix)
 	if err != nil {
 		return err
 	}
@@ -770,8 +770,8 @@ func writeToMeta(data []byte, fsID, buc string) error {
 	return nil
 }
 
-func readFromMeta(fsID, buc string) ([]byte, error) {
-	metapath, err := checkMetaPath(fsID)
+func readFromMeta(fsPrefix, buc string) ([]byte, error) {
+	metapath, err := checkMetaPath(fsPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -785,16 +785,16 @@ func readFromMeta(fsID, buc string) ([]byte, error) {
 	return ioutil.ReadAll(sbMetaFile)
 }
 
-func getMetaPath(fsID string) string {
+func getMetaPath(fsPrefix string) string {
 	rootpath, _ := fsrepo.BestKnownPath()
 	metapath, _ := config.Path(rootpath, meta)
-	fsmetapath := path.Join(metapath, fsID)
+	fsmetapath := path.Join(metapath, fsPrefix)
 	return fsmetapath
 }
 
 //检查path是否存在，不存在则新建一个
-func checkMetaPath(fsID string) (string, error) {
-	metapath := getMetaPath(fsID)
+func checkMetaPath(fsPrefix string) (string, error) {
+	metapath := getMetaPath(fsPrefix)
 	stat, err := os.Stat(metapath)
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(metapath, 0777)

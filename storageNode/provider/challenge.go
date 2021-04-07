@@ -63,7 +63,8 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		return nil
 	}
 
-	var proof pdp.Proof
+	var proof pdp.ProofWithVersion
+	proof.Ver = 1
 	var faultValue string
 	switch cr.GetPolicy() {
 	case "smart", "meta":
@@ -71,7 +72,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		if err != nil {
 			return err
 		}
-		proof = pr
+		proof.Proof = pr
 		if len(cr.GetFailMap()) > 0 {
 			faultValue = metainfo.DELIMITER + b58.Encode(cr.GetFailMap())
 		}
@@ -80,7 +81,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 		if err != nil {
 			return err
 		}
-		proof = pr
+		proof.Proof = pr
 		if len(cr.GetFaultBlocks()) > 0 {
 			faultValue = metainfo.DELIMITER + b58.Encode([]byte(strings.Join(cr.GetFaultBlocks(), metainfo.DELIMITER)))
 		}
@@ -89,12 +90,12 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 
 	utils.MLogger.Info("handle challenge: ", km.ToString(), " gen right proof")
 
-	pf := proof.(*pdp.ProofV0)
-	mustr := b58.Encode(pf.Mu)
-	nustr := b58.Encode(pf.Nu)
-	deltastr := b58.Encode(pf.Delta)
-
-	retValue := mustr + metainfo.DELIMITER + nustr + metainfo.DELIMITER + deltastr + faultValue
+	pf, err := proof.Serialize()
+	if err != nil {
+		utils.MLogger.Warnf("proof serialize failed : %s, %s", fsID, err)
+		return err
+	}
+	retValue := b58.Encode(pf) + faultValue
 
 	// provider发回挑战结果,其中proof结构体序列化，作为字符串用Proof返回
 	_, err = p.ds.SendMetaRequest(p.context, int32(mpb.OpType_Put), km.ToString(), []byte(retValue), nil, from)
@@ -108,8 +109,8 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 	var data, tag [][]byte
 	failchunk := false
 
-	var chal pdp.ChallengeV0
-	chal.Seed = pdp.GenChallengeV0(cr)
+	var chal pdp.ChallengeV1
+	chal.R = pdp.GenChallengeV1(cr)
 
 	bset := bitset.New(0)
 	err := bset.UnmarshalBinary(cr.GetChunkMap())
@@ -120,7 +121,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 	chalNum := bset.Count()
 	meta := false
 
-	startPos := uint(chal.Seed) % bset.Len()
+	startPos := uint(chal.R) % bset.Len()
 
 	switch cr.GetPolicy() {
 	case "100":
@@ -183,7 +184,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 		blockID := buf.String()
 
 		segNum := int(cr.Buckets[bucketID].GetSegCount())
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+		electedOffset = int((chal.R + int64(i)) % int64(segNum))
 
 		cbuf.Reset()
 		cbuf.WriteString(blockID)
@@ -261,7 +262,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 		blockID := buf.String()
 
 		segNum := int(cr.Buckets[bucketID].GetSegCount())
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+		electedOffset = int((chal.R + int64(i)) % int64(segNum))
 
 		cbuf.Reset()
 		cbuf.WriteString(blockID)
@@ -310,7 +311,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 	}
 
 	// 在发送之前检查生成的proof
-	boo, err := blskey.PublicKey().VerifyProof(&chal, proof, true)
+	boo, err := blskey.VerifyKey().VerifyProof(&chal, proof)
 	if err != nil {
 		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
 		return nil, err
@@ -327,13 +328,13 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 		}
 		cr.FailMap = failMap
 	}
-	pf := proof.(*pdp.ProofV0)
-	return pf, nil
+
+	return proof, nil
 }
 
 func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, error) {
-	var chal pdp.ChallengeV0
-	chal.Seed = pdp.GenChallengeV0(cr)
+	var chal pdp.ChallengeV1
+	chal.R = pdp.GenChallengeV1(cr)
 
 	// 聚合
 	var data, tag [][]byte
@@ -354,7 +355,7 @@ func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.P
 			faultBlocks = append(faultBlocks, index)
 			continue
 		} else if off > 0 {
-			electedOffset = int(chal.Seed) % off
+			electedOffset = int(chal.R) % off
 		} else {
 			electedOffset = 0
 		}
@@ -405,7 +406,7 @@ func (p *Info) handleChallengeRandom(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.P
 		return nil, err
 	}
 
-	boo, err := blskey.PublicKey().VerifyProof(&chal, proof, true)
+	boo, err := blskey.VerifyKey().VerifyProof(&chal, proof)
 	if err != nil {
 		utils.MLogger.Errorf("gen proof for blocks: %s failed: %s", chal.Indices, err)
 		return nil, err

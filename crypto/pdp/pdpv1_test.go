@@ -111,7 +111,7 @@ func BenchmarkMultiGenTagV1(b *testing.B) {
 		panic(err)
 	}
 	SegSize = 4 * 1024
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 4; i++ {
 		b.Run("SegSize:"+strconv.Itoa(SegSize/1024)+"Kb", benchmarkGenOneTagV1(keySet))
 		SegSize = SegSize * 2
 	}
@@ -140,6 +140,8 @@ func BenchmarkGenChallengeV1(b *testing.B) {
 		blocks[i] = strconv.Itoa(i)
 	}
 
+	pk := keySet.PublicKey()
+
 	// ------------- the data owner --------------- //
 	tags := make([][]byte, SegNum)
 	for j, segment := range segments {
@@ -149,7 +151,7 @@ func BenchmarkGenChallengeV1(b *testing.B) {
 			panic("Error")
 		}
 
-		boo := keySet.Pk.VerifyTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, tags[j])
+		boo := pk.VerifyTag([]byte(strconv.Itoa(j)+"_"+"0"), segment, tags[j])
 		if boo == false {
 			panic("VerifyTag false")
 		}
@@ -231,6 +233,7 @@ func BenchmarkVerifyProofV1(b *testing.B) {
 		panic(err)
 	}
 
+	vk := keySet.VerifyKey()
 	segments := make([][]byte, SegNum)
 	blocks := make([]string, SegNum)
 	for i := 0; i < SegNum; i++ {
@@ -271,7 +274,7 @@ func BenchmarkVerifyProofV1(b *testing.B) {
 	b.ResetTimer()
 	b.SetBytes(int64(FileSize))
 	for i := 0; i < b.N; i++ {
-		result, err := keySet.Pk.VerifyProof(&chal, proof, false)
+		result, err := vk.VerifyProof(&chal, proof)
 		if err != nil {
 			panic("Error")
 		}
@@ -297,6 +300,8 @@ func TestVerifyProofV1(t *testing.T) {
 		panic(err)
 	}
 
+	pk := keySet.PublicKey()
+	vk := keySet.VerifyKey()
 	segments := make([][]byte, SegNum)
 	blocks := make([]string, SegNum)
 	for i := 0; i < SegNum; i++ {
@@ -313,7 +318,7 @@ func TestVerifyProofV1(t *testing.T) {
 			panic("gentag Error")
 		}
 
-		res := keySet.Pk.VerifyTag([]byte(blocks[i]), segment, tag)
+		res := pk.VerifyTag([]byte(blocks[i]), segment, tag)
 		if !res {
 			panic("VerifyTag failed")
 		}
@@ -337,7 +342,7 @@ func TestVerifyProofV1(t *testing.T) {
 
 	// -------------- TPA --------------- //
 	// Verify the proof
-	result, err := keySet.Pk.VerifyProof(&chal, proof, false)
+	result, err := vk.VerifyProof(&chal, proof)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,6 +367,8 @@ func TestProofAggregatorV1(t *testing.T) {
 		panic(err)
 	}
 
+	pk := keySet.PublicKey()
+	vk := keySet.VerifyKey()
 	segments := make([][]byte, SegNum)
 	blocks := make([]string, SegNum)
 	for i := 0; i < SegNum; i++ {
@@ -378,7 +385,7 @@ func TestProofAggregatorV1(t *testing.T) {
 			panic("gentag Error")
 		}
 
-		res := keySet.Pk.VerifyTag([]byte(blocks[i]), segment, tag)
+		res := pk.VerifyTag([]byte(blocks[i]), segment, tag)
 		if !res {
 			panic("VerifyTag failed")
 		}
@@ -405,7 +412,7 @@ func TestProofAggregatorV1(t *testing.T) {
 	}
 	// -------------- TPA --------------- //
 	// Verify the proof
-	result, err := keySet.Pk.VerifyProof(&chal, proof, false)
+	result, err := vk.VerifyProof(&chal, proof)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,6 +437,7 @@ func TestDataVerifierV1(t *testing.T) {
 		panic(err)
 	}
 
+	pk := keySet.PublicKey()
 	segments := make([][]byte, SegNum)
 	blocks := make([][]byte, SegNum)
 	for i := 0; i < SegNum; i++ {
@@ -446,7 +454,7 @@ func TestDataVerifierV1(t *testing.T) {
 			panic("gentag Error")
 		}
 
-		res := keySet.Pk.VerifyTag([]byte(blocks[i]), segment, tag)
+		res := pk.VerifyTag([]byte(blocks[i]), segment, tag)
 		if !res {
 			panic("VerifyTag failed")
 		}

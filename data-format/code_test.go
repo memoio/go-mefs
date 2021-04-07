@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/memoio/go-mefs/crypto/aes"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
 	"github.com/memoio/go-mefs/crypto/pdp"
 )
 
@@ -27,11 +26,11 @@ var userID = "8MGxCuiT75bje883b7uFb6eMrJt5cP"
 var FileSize = 8 * 1024 * 1024
 
 func BenchmarkEncode(b *testing.B) {
-	err := mcl.Init(mcl.BLS12_381)
+	err := pdp.Init(pdp.BLS12_381)
 	if err != nil {
 		log.Fatal(err)
 	}
-	keyset, err := pdp.GenKeySetV0()
+	keyset, err := pdp.GenKeySetV1()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,7 +61,7 @@ func BenchmarkEncode(b *testing.B) {
 }
 
 func CodeAndRepair(policy, dc, pc, size int) {
-	keyset, err := pdp.GenKeySetV0()
+	keyset, err := pdp.GenKeySetV1()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -201,7 +200,7 @@ func CodeAndRepair(policy, dc, pc, size int) {
 }
 
 func TestCode(t *testing.T) {
-	err := mcl.Init(mcl.BLS12_381)
+	err := pdp.Init(pdp.BLS12_381)
 	if err != nil {
 		log.Fatal(err)
 	}
