@@ -7,8 +7,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/memoio/go-mefs/utils/address"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/memoio/go-mefs/contracts"
@@ -55,7 +53,8 @@ func main() {
 
 func testDeploy() error {
 	contracts.EndPoint = ethEndPoint
-	cRole := contracts.NewCR("", adminSk)
+	var tmpAddr common.Address
+	cRole := contracts.NewCR(tmpAddr, adminSk)
 	err := cRole.DeployKPMap()
 	if err != nil {
 		log.Println("DeployKeeperProviderMap err:", err)
@@ -87,8 +86,8 @@ func testKeeper() (err error) {
 	keeperAddr := common.HexToAddress(userAddr[2:])
 
 	contracts.EndPoint = ethEndPoint
-	keeperID, _ := address.GetIDFromAddress(userAddr)
-	cRole := contracts.NewCR(keeperID, adminSk)
+
+	cRole := contracts.NewCR(common.HexToAddress(userAddr), adminSk)
 	err = cRole.SetKeeper(keeperAddr, true)
 	if err != nil {
 		log.Println("setKeeper err:", err)
@@ -102,7 +101,7 @@ func testKeeper() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsKeeper(keeperID)
+		res, err := cRole.IsKeeper(common.HexToAddress(userAddr))
 		if err != nil || res == false {
 			if retryCount > 20 {
 				log.Fatal("set keeper fails")
@@ -123,7 +122,7 @@ func testKeeper() (err error) {
 	contracts.EndPoint = ethEndPoint
 	log.Println("2. test pledge keeper")
 	amount := new(big.Int).SetInt64(utils.KeeperDeposit)
-	cRole = contracts.NewCR(keeperID, userSk)
+	cRole = contracts.NewCR(common.HexToAddress(userAddr), userSk)
 	err = cRole.PledgeKeeper(amount)
 	if err != nil {
 		return err
@@ -149,7 +148,7 @@ func testKeeper() (err error) {
 	}
 
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(keeperID, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(userAddr), adminSk)
 	err = cRole.SetKeeper(keeperAddr, false)
 	if err != nil {
 		log.Println("setKeeper false err:", err)
@@ -177,10 +176,9 @@ func testProvider() (err error) {
 	log.Println("1. test set provider")
 
 	proAddr := common.HexToAddress(userAddr[2:])
-	proID, _ := address.GetIDFromAddress(userAddr)
 
 	contracts.EndPoint = ethEndPoint
-	cRole := contracts.NewCR(proID, adminSk)
+	cRole := contracts.NewCR(common.HexToAddress(userAddr), adminSk)
 	err = cRole.SetProvider(proAddr, true)
 	if err != nil {
 		log.Println("setProvider err:", err)
@@ -193,7 +191,7 @@ func testProvider() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsProvider(proID)
+		res, err := cRole.IsProvider(common.HexToAddress(userAddr))
 		if err != nil || res == false {
 			if retryCount > 20 {
 				log.Fatal("set provider fails")
@@ -215,7 +213,7 @@ func testProvider() (err error) {
 	log.Println("2. test pledge provider")
 	size := new(big.Int).SetInt64(utils.DepositCapacity / 1024)
 
-	cRole = contracts.NewCR(proID, userSk)
+	cRole = contracts.NewCR(common.HexToAddress(userAddr), userSk)
 	err = cRole.PledgeProvider(size)
 	if err != nil {
 		return err
@@ -236,12 +234,12 @@ func testProvider() (err error) {
 
 	log.Println("get provider info: ", active, banned, money, time)
 
-	if money.Cmp(size) != 0 {
+	if money.Cmp(big.NewInt(307199999999998976)) != 0 {
 		return errors.New("wrong parameters")
 	}
 
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(proID, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(userAddr), adminSk)
 	err = cRole.SetProvider(proAddr, false)
 	if err != nil {
 		log.Println("setProvider false err:", err)
@@ -257,10 +255,9 @@ func testRole() (err error) {
 	log.Println("test set keeper")
 
 	keeperAddr := common.HexToAddress(kpAddr[2:])
-	keeperID, _ := address.GetIDFromAddress(kpAddr)
 
 	contracts.EndPoint = ethEndPoint
-	cRole := contracts.NewCR(keeperID, adminSk)
+	cRole := contracts.NewCR(common.HexToAddress(kpAddr), adminSk)
 	err = cRole.SetKeeper(keeperAddr, true)
 	if err != nil {
 		log.Println("setKeeper err:", err)
@@ -272,7 +269,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsKeeper(keeperID)
+		res, err := cRole.IsKeeper(common.HexToAddress(kpAddr))
 		if err != nil || res == false {
 			if retryCount > 20 {
 				log.Fatal("set keeper fails")
@@ -299,7 +296,6 @@ func testRole() (err error) {
 	test.TransferTo(big.NewInt(moneyTo), proAddr, ethEndPoint, qethEndPoint)
 
 	providerAddr := common.HexToAddress(proAddr[2:])
-	providerID, _ := address.GetIDFromAddress(proAddr)
 
 	err = cRole.SetProvider(providerAddr, true)
 	if err != nil {
@@ -313,7 +309,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsProvider(providerID)
+		res, err := cRole.IsProvider(common.HexToAddress(proAddr))
 		if err != nil || res == false {
 			if retryCount > 20 {
 				log.Fatal("set provider fails")
@@ -330,10 +326,9 @@ func testRole() (err error) {
 		return err
 	}
 
-	return nil
 	log.Println("test set add kp")
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(keeperID, kpSk)
+	cRole = contracts.NewCR(common.HexToAddress(kpAddr), kpSk)
 	err = cRole.AddKeeperProvidersToKPMap(keeperAddr, []common.Address{providerAddr})
 	if err != nil {
 		log.Println("Add Keeper Providers To KPMap err:", err)
@@ -417,9 +412,8 @@ func testRole() (err error) {
 	test.TransferTo(big.NewInt(moneyTo), proAddr2, ethEndPoint, qethEndPoint)
 
 	providerAddr2 := common.HexToAddress(proAddr2[2:])
-	providerID2, _ := address.GetIDFromAddress(proAddr2)
 
-	cRole = contracts.NewCR(keeperID, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(kpAddr), adminSk)
 	err = cRole.SetProvider(providerAddr2, true)
 	if err != nil {
 		log.Println("setProvider2 err:", err)
@@ -431,7 +425,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsProvider(providerID2)
+		res, err := cRole.IsProvider(common.HexToAddress(proAddr2))
 		if err != nil || res == false {
 			if retryCount > 20 {
 				log.Fatal("set provider2 fails")
@@ -444,7 +438,7 @@ func testRole() (err error) {
 
 	log.Println("test set add kp second")
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(keeperID, kpSk)
+	cRole = contracts.NewCR(common.HexToAddress(kpAddr), kpSk)
 	err = cRole.AddKeeperProvidersToKPMap(keeperAddr, []common.Address{providerAddr2})
 	if err != nil {
 		log.Println("Add Keeper Providers To KPMap err:", err)
@@ -458,7 +452,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		cRole = contracts.NewCR(providerID2, kpSk)
+		cRole = contracts.NewCR(common.HexToAddress(proAddr2), kpSk)
 		pids, err := cRole.GetProviderInKPMap(keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -490,7 +484,7 @@ func testRole() (err error) {
 
 	log.Println("test delete provider from kpmap")
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(keeperID, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(kpAddr), adminSk)
 	err = cRole.DeleteProviderFromKPMap(keeperAddr, providerAddr)
 	if err != nil {
 		log.Fatal("delete provider from kpmap err:", err)
@@ -502,7 +496,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		cRole = contracts.NewCR(providerID, kpSk)
+		cRole = contracts.NewCR(common.HexToAddress(proAddr), kpSk)
 		pids, err := cRole.GetProviderInKPMap(keeperAddr)
 		if err != nil {
 			if retryCount > 20 {
@@ -533,7 +527,7 @@ func testRole() (err error) {
 	log.Println("test delete keeper from kpmap")
 
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(keeperID, kpSk)
+	cRole = contracts.NewCR(common.HexToAddress(kpAddr), kpSk)
 	err = cRole.DeleteKeeperFromKPMap(keeperAddr)
 	if err != nil {
 		log.Fatal("delete keeper from kpmap err:", err)
@@ -574,7 +568,7 @@ func testRole() (err error) {
 
 	log.Println("test set keeper false")
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(keeperID, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(kpAddr), adminSk)
 	err = cRole.SetKeeper(keeperAddr, false)
 	if err != nil {
 		log.Println("setKeeper err:", err)
@@ -586,7 +580,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsKeeper(keeperID)
+		res, err := cRole.IsKeeper(common.HexToAddress(kpAddr))
 		if err != nil || res == true {
 			if retryCount > 20 {
 				log.Fatal("set keeper false fails")
@@ -599,7 +593,7 @@ func testRole() (err error) {
 
 	log.Println("test set provider false")
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(providerID, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(proAddr), adminSk)
 	err = cRole.SetProvider(providerAddr, false)
 	if err != nil {
 		log.Println("setProvider err:", err)
@@ -611,7 +605,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsProvider(providerID)
+		res, err := cRole.IsProvider(common.HexToAddress(proAddr))
 		if err != nil || res == true {
 			if retryCount > 20 {
 				log.Fatal("set provider false fails")
@@ -624,7 +618,7 @@ func testRole() (err error) {
 
 	log.Println("test set provider false second")
 	contracts.EndPoint = ethEndPoint
-	cRole = contracts.NewCR(providerID2, adminSk)
+	cRole = contracts.NewCR(common.HexToAddress(proAddr2), adminSk)
 	err = cRole.SetProvider(providerAddr2, false)
 	if err != nil {
 		log.Println("setProvider err:", err)
@@ -636,7 +630,7 @@ func testRole() (err error) {
 	for {
 		retryCount++
 		time.Sleep(test.RetryGetInfoSleepTime * time.Duration(retryCount))
-		res, err := cRole.IsProvider(providerID2)
+		res, err := cRole.IsProvider(common.HexToAddress(proAddr2))
 		if err != nil || res == true {
 			if retryCount > 20 {
 				log.Fatal("set provider2 false fails")

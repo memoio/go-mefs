@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/memoio/go-mefs/utils/address"
 	"errors"
 	_ "expvar"
 	"fmt"
@@ -278,11 +279,12 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	printSwarmAddrs(node)
 
 	nid := node.Identity.Pretty()
+	addr, _ := address.GetAddressFromID(nid)
 
-	r := contracts.NewCR(nid, "")
+	r := contracts.NewCR(addr, "")
 	if !cfg.Test {
 		//从合约中获取账户角色
-		isKeeper, err := r.IsKeeper(nid)
+		isKeeper, err := r.IsKeeper(addr)
 		if err != nil {
 			utils.MLogger.Error("Got Keeper err: ", err)
 			return err
@@ -295,7 +297,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 				cfg.Eth = "http://119.147.213.219:8101"
 			}
 		} else {
-			isProvider, err := r.IsProvider(nid)
+			isProvider, err := r.IsProvider(addr)
 			if err != nil {
 				utils.MLogger.Error("Got Provider role: ", err)
 				return err

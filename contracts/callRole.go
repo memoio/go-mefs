@@ -13,20 +13,19 @@ import (
 	"github.com/memoio/go-mefs/contracts/role"
 	id "github.com/memoio/go-mefs/crypto/identity"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 //RoleInfo  The basic information of node used for 'role' contract
 type RoleInfo struct {
-	localID string //local ID
-	hexSk   string //local privateKey
+	localAddr common.Address //local address
+	hexSk     string         //local privateKey
 }
 
 //NewCR new a instance of contractRole
-func NewCR(localID, hexSk string) ContractRole {
+func NewCR(localAddr common.Address, hexSk string) ContractRole {
 	RInfo := &RoleInfo{
-		localID: localID,
-		hexSk:   hexSk,
+		localAddr: localAddr,
+		hexSk:     hexSk,
 	}
 
 	return RInfo
@@ -34,8 +33,8 @@ func NewCR(localID, hexSk string) ContractRole {
 
 // DeployKeeperAdmin deploy a keeper contract
 func (r *RoleInfo) DeployKeeperAdmin() (err error) {
-	client := GetClient(EndPoint)
-	auth, err := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
+	client := getClient(EndPoint)
+	auth, err := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return err
 	}
@@ -49,7 +48,7 @@ func (r *RoleInfo) DeployKeeperAdmin() (err error) {
 	log.Println("keeperContractAddr:", keeperContractAddr.String())
 
 	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newIndexerErr:", err)
 		return err
@@ -64,6 +63,7 @@ func (r *RoleInfo) DeployKeeperAdmin() (err error) {
 	return ma.AddToIndexer(keeperContractAddr, keeperKey, indexer)
 }
 
+//GetKeeperContractFromIndexer alse used in test
 func GetKeeperContractFromIndexer(localAddress common.Address) (common.Address, *role.Keeper, error) {
 	var res common.Address
 	ma := NewCManage(localAddress, "")
@@ -73,7 +73,7 @@ func GetKeeperContractFromIndexer(localAddress common.Address) (common.Address, 
 		return res, nil, err
 	}
 
-	keeperContract, err := role.NewKeeper(keeperContractAddr, GetClient(EndPoint))
+	keeperContract, err := role.NewKeeper(keeperContractAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newKeeperErr:", err)
 		return res, nil, err
@@ -94,7 +94,7 @@ func (r *RoleInfo) SetKeeper(accountAddress common.Address, isKeeper bool) (err 
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -116,7 +116,7 @@ func (r *RoleInfo) SetKeeper(accountAddress common.Address, isKeeper bool) (err 
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set keeper transaction fails", err)
@@ -132,12 +132,7 @@ func (r *RoleInfo) SetKeeper(accountAddress common.Address, isKeeper bool) (err 
 }
 
 //IsKeeper judge if localAddress is keeper
-func (r *RoleInfo) IsKeeper(accountID string) (bool, error) {
-	accountAddress, err := address.GetAddressFromID(accountID)
-	if err != nil {
-		return false, err
-	}
-
+func (r *RoleInfo) IsKeeper(accountAddress common.Address) (bool, error) {
 	_, keeperContract, err := GetKeeperContractFromIndexer(accountAddress)
 	if err != nil {
 		log.Println("get keeperContract err:", err)
@@ -173,7 +168,7 @@ func (r *RoleInfo) SetKeeperBanned(accountAddress common.Address, isBanned bool)
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -195,7 +190,7 @@ func (r *RoleInfo) SetKeeperBanned(accountAddress common.Address, isBanned bool)
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("ban keeper transaction fails", err)
@@ -210,12 +205,7 @@ func (r *RoleInfo) SetKeeperBanned(accountAddress common.Address, isBanned bool)
 }
 
 func (r *RoleInfo) SetKeeperPrice(price *big.Int) (err error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
-
-	_, keeperInstance, err := GetKeeperContractFromIndexer(localAddr)
+	_, keeperInstance, err := GetKeeperContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
 		return err
@@ -225,7 +215,7 @@ func (r *RoleInfo) SetKeeperPrice(price *big.Int) (err error) {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -247,7 +237,7 @@ func (r *RoleInfo) SetKeeperPrice(price *big.Int) (err error) {
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set keeper price transaction fails", err)
@@ -262,18 +252,13 @@ func (r *RoleInfo) SetKeeperPrice(price *big.Int) (err error) {
 }
 
 func (r *RoleInfo) GetKeeperPrice() (*big.Int, error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return big.NewInt(0), err
-	}
-
-	_, keeperContract, err := GetKeeperContractFromIndexer(localAddr)
+	_, keeperContract, err := GetKeeperContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
 		return big.NewInt(0), err
 	}
 	price, err := keeperContract.GetPrice(&bind.CallOpts{
-		From: localAddr,
+		From: r.localAddr,
 	})
 	if err != nil {
 		log.Println("getKeeperPrice err:", err)
@@ -283,12 +268,7 @@ func (r *RoleInfo) GetKeeperPrice() (*big.Int, error) {
 }
 
 func (r *RoleInfo) PledgeKeeper(amount *big.Int) (err error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
-
-	_, kInstance, err := GetKeeperContractFromIndexer(localAddr)
+	_, kInstance, err := GetKeeperContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("getkeeperContracterr:", err)
 		return err
@@ -298,7 +278,7 @@ func (r *RoleInfo) PledgeKeeper(amount *big.Int) (err error) {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, amount, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, amount, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -324,7 +304,7 @@ func (r *RoleInfo) PledgeKeeper(amount *big.Int) (err error) {
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("keeper pledge transaction fails", err)
@@ -342,19 +322,14 @@ func (r *RoleInfo) PledgeKeeper(amount *big.Int) (err error) {
 
 // GetAllKeepersAddr gets all keepers from chain
 func (r *RoleInfo) GetAllKeepersAddr() ([]common.Address, error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return nil, err
-	}
-
-	_, keeperContract, err := GetKeeperContractFromIndexer(localAddr)
+	_, keeperContract, err := GetKeeperContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("keeperContracterr:", err)
 		return nil, err
 	}
 
 	res, err := keeperContract.GetAllAddress(&bind.CallOpts{
-		From: localAddr,
+		From: r.localAddr,
 	})
 	if err != nil {
 		return nil, err
@@ -363,12 +338,35 @@ func (r *RoleInfo) GetAllKeepersAddr() ([]common.Address, error) {
 	return res, nil
 }
 
+//GetKeeperInfo get keeper's information
+func (r *RoleInfo) GetKeeperInfo(keeperAddress common.Address) (bool, bool, *big.Int, int64, error) {
+	_, keeperInstance, err := GetKeeperContractFromIndexer(r.localAddr)
+	if err != nil {
+		return false, false, big.NewInt(0), 0, err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		isKeeper, isBanned, money, ptime, err := keeperInstance.Info(&bind.CallOpts{From: r.localAddr}, keeperAddress)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				return false, false, big.NewInt(0), 0, err
+			}
+			time.Sleep(retryGetInfoSleepTime)
+			continue
+		}
+
+		return isKeeper, isBanned, money, ptime.Int64(), nil
+	}
+}
+
 //---------provider----------//
 
 //DeployProviderAdmin deploy a keeper contract
 func (r *RoleInfo) DeployProviderAdmin() (err error) {
-	client := GetClient(EndPoint)
-	auth, err := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
+	client := getClient(EndPoint)
+	auth, err := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return err
 	}
@@ -383,7 +381,7 @@ func (r *RoleInfo) DeployProviderAdmin() (err error) {
 	log.Println("providerContractAddr:", providerContractAddr.String())
 
 	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newIndexerErr:", err)
 		return err
@@ -398,6 +396,7 @@ func (r *RoleInfo) DeployProviderAdmin() (err error) {
 	return ma.AddToIndexer(providerContractAddr, providerKey, indexer)
 }
 
+//GetProviderContractFromIndexer also used in test
 func GetProviderContractFromIndexer(localAddress common.Address) (common.Address, *role.Provider, error) {
 	var res common.Address
 	ma := NewCManage(localAddress, "")
@@ -407,7 +406,7 @@ func GetProviderContractFromIndexer(localAddress common.Address) (common.Address
 		return res, nil, err
 	}
 
-	providerContract, err := role.NewProvider(providerContractAddr, GetClient(EndPoint))
+	providerContract, err := role.NewProvider(providerContractAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println(err)
 		return res, nil, err
@@ -427,7 +426,7 @@ func (r *RoleInfo) SetProvider(accountAddress common.Address, isProvider bool) (
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -449,7 +448,7 @@ func (r *RoleInfo) SetProvider(accountAddress common.Address, isProvider bool) (
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set provider transaction fails", err)
@@ -465,13 +464,8 @@ func (r *RoleInfo) SetProvider(accountAddress common.Address, isProvider bool) (
 }
 
 //IsProvider judge if an account is provider
-func (r *RoleInfo) IsProvider(accountID string) (bool, error) {
-	accountAddress, err := address.GetAddressFromID(accountID)
-	if err != nil {
-		return false, err
-	}
-
-	_, providerContract, err := GetProviderContractFromIndexer(accountAddress)
+func (r *RoleInfo) IsProvider(accountAddr common.Address) (bool, error) {
+	_, providerContract, err := GetProviderContractFromIndexer(accountAddr)
 	if err != nil {
 		log.Println("providerContracterr:", err)
 		return false, err
@@ -481,8 +475,8 @@ func (r *RoleInfo) IsProvider(accountID string) (bool, error) {
 
 	for i := 0; i < 3; i++ {
 		isProvider, _, _, _, err = providerContract.Info(&bind.CallOpts{
-			From: accountAddress,
-		}, accountAddress)
+			From: accountAddr,
+		}, accountAddr)
 		if err != nil {
 			time.Sleep(retryGetInfoSleepTime)
 		}
@@ -506,7 +500,7 @@ func (r *RoleInfo) SetProviderBanned(accountAddress common.Address, isBanned boo
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -528,7 +522,7 @@ func (r *RoleInfo) SetProviderBanned(accountAddress common.Address, isBanned boo
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("ban provider transaction fails", err)
@@ -543,18 +537,13 @@ func (r *RoleInfo) SetProviderBanned(accountAddress common.Address, isBanned boo
 }
 
 func (r *RoleInfo) GetProviderPrice() (*big.Int, error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return big.NewInt(0), err
-	}
-
-	_, providerContract, err := GetProviderContractFromIndexer(localAddr)
+	_, providerContract, err := GetProviderContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("providerContracterr:", err)
 		return big.NewInt(0), err
 	}
 	price, err := providerContract.GetPrice(&bind.CallOpts{
-		From: localAddr,
+		From: r.localAddr,
 	})
 	if err != nil {
 		log.Println("getProviderPrice err:", err)
@@ -564,12 +553,7 @@ func (r *RoleInfo) GetProviderPrice() (*big.Int, error) {
 }
 
 func (r *RoleInfo) SetProviderPrice(price *big.Int) (err error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
-
-	_, providerInstance, err := GetProviderContractFromIndexer(localAddr)
+	_, providerInstance, err := GetProviderContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("providerContracterr:", err)
 		return err
@@ -579,7 +563,7 @@ func (r *RoleInfo) SetProviderPrice(price *big.Int) (err error) {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -601,7 +585,7 @@ func (r *RoleInfo) SetProviderPrice(price *big.Int) (err error) {
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set provider price transaction fails", err)
@@ -627,12 +611,7 @@ func (r *RoleInfo) PledgeProvider(size *big.Int) (err error) {
 	weiPrice.Int(price)
 	price.Mul(price, size)
 
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
-
-	_, providerInstance, err := GetProviderContractFromIndexer(localAddr)
+	_, providerInstance, err := GetProviderContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("providerContracterr:", err)
 		return err
@@ -642,7 +621,7 @@ func (r *RoleInfo) PledgeProvider(size *big.Int) (err error) {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, price, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, price, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -668,7 +647,7 @@ func (r *RoleInfo) PledgeProvider(size *big.Int) (err error) {
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("provider pledge transaction fails", err)
@@ -686,25 +665,42 @@ func (r *RoleInfo) PledgeProvider(size *big.Int) (err error) {
 
 // GetAllProvidersAddr gets all provider addresses from chain
 func (r *RoleInfo) GetAllProvidersAddr() ([]common.Address, error) {
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return nil, err
-	}
-
-	_, proContract, err := GetProviderContractFromIndexer(localAddr)
+	_, proContract, err := GetProviderContractFromIndexer(r.localAddr)
 	if err != nil {
 		log.Println("providerContracterr:", err)
 		return nil, err
 	}
 
 	res, err := proContract.GetAllAddress(&bind.CallOpts{
-		From: localAddr,
+		From: r.localAddr,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return res, nil
+}
+
+func (r *RoleInfo) GetProviderInfo(providerAddr common.Address) (bool, bool, *big.Int, int64, error) {
+	_, proInstance, err := GetProviderContractFromIndexer(r.localAddr)
+	if err != nil {
+		return false, false, big.NewInt(0), 0, err
+	}
+
+	retryCount := 0
+	for {
+		retryCount++
+		isProvider, isBanned, money, stime, err := proInstance.Info(&bind.CallOpts{From: r.localAddr}, providerAddr)
+		if err != nil {
+			if retryCount > checkTxRetryCount {
+				return false, false, big.NewInt(0), 0, err
+			}
+			time.Sleep(retryGetInfoSleepTime)
+			continue
+		}
+
+		return isProvider, isBanned, money, stime.Int64(), nil
+	}
 }
 
 //----------------------kpmap---------------------------//
@@ -714,8 +710,8 @@ func (r *RoleInfo) DeployKPMap() error {
 	log.Println("begin deploy keeperProviderMap...")
 
 	//之前没有部署过，部署keeperProviderMap合约
-	client := GetClient(EndPoint)
-	auth, err := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
+	client := getClient(EndPoint)
+	auth, err := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return err
 	}
@@ -727,7 +723,7 @@ func (r *RoleInfo) DeployKPMap() error {
 	}
 
 	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, GetClient(EndPoint))
+	indexer, err := indexer.NewIndexer(indexerAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("newIndexerErr:", err)
 		return err
@@ -747,7 +743,7 @@ func getKPMap(localAddress common.Address) (common.Address, *role.KeeperProvider
 		return res, nil, err
 	}
 
-	keeperProviderInstance, err := role.NewKeeperProviderMap(res, GetClient(EndPoint))
+	keeperProviderInstance, err := role.NewKeeperProviderMap(res, getClient(EndPoint))
 	if err != nil {
 		log.Println("newKeeperProviderMapContractErr:", err)
 		return res, keeperProviderInstance, err
@@ -758,31 +754,22 @@ func getKPMap(localAddress common.Address) (common.Address, *role.KeeperProvider
 // AddKeeperProvidersToKPMap adds provider/keeper to kpmap
 func (r *RoleInfo) AddKeeperProvidersToKPMap(keeperAddress common.Address, providerAddresses []common.Address) error {
 	log.Println("begin add keeperProviders to kpMap...")
-	keeperID, err := address.GetIDFromAddress(keeperAddress.Hex())
-	if err != nil {
-		return err
-	}
-	res, err := r.IsKeeper(keeperID)
+
+	res, err := r.IsKeeper(keeperAddress)
 	if err != nil || res == false {
 		log.Println(keeperAddress.String(), "is not a keeper")
 		return ErrNotKeeper
 	}
 
 	for _, proAddresses := range providerAddresses {
-		proID, _ := address.GetIDFromAddress(proAddresses.Hex())
-		res, err = r.IsProvider(proID)
+		res, err = r.IsProvider(proAddresses)
 		if err != nil || res == false {
 			log.Println(proAddresses.String(), "is not a provider")
 			return ErrNotProvider
 		}
 	}
 
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
-
-	_, kpMapInstance, err := getKPMap(localAddr)
+	_, kpMapInstance, err := getKPMap(r.localAddr)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
@@ -792,7 +779,7 @@ func (r *RoleInfo) AddKeeperProvidersToKPMap(keeperAddress common.Address, provi
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 		if errMA != nil {
 			return errMA
 		}
@@ -818,7 +805,7 @@ func (r *RoleInfo) AddKeeperProvidersToKPMap(keeperAddress common.Address, provi
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("add kpMap transaction fails", err)
@@ -837,12 +824,7 @@ func (r *RoleInfo) AddKeeperProvidersToKPMap(keeperAddress common.Address, provi
 // DeleteKeeperFromKPMap deletes keeper from kpmap
 func (r *RoleInfo) DeleteKeeperFromKPMap(keeperAddress common.Address) error {
 	log.Println("begin delete keeper from kpMap...")
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
-
-	_, kpMapInstance, err := getKPMap(localAddr)
+	_, kpMapInstance, err := getKPMap(r.localAddr)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
@@ -852,7 +834,7 @@ func (r *RoleInfo) DeleteKeeperFromKPMap(keeperAddress common.Address) error {
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 		if errMA != nil {
 			return errMA
 		}
@@ -878,7 +860,7 @@ func (r *RoleInfo) DeleteKeeperFromKPMap(keeperAddress common.Address) error {
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("delete keeper from kpMap transaction fails", err)
@@ -897,12 +879,8 @@ func (r *RoleInfo) DeleteKeeperFromKPMap(keeperAddress common.Address) error {
 // DeleteProviderFromKPMap deletes provider from kpmap
 func (r *RoleInfo) DeleteProviderFromKPMap(keeperAddress common.Address, providerAddress common.Address) error {
 	log.Println("begin delete provider from kpMap...")
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return err
-	}
 
-	_, kpMapInstance, err := getKPMap(localAddr)
+	_, kpMapInstance, err := getKPMap(r.localAddr)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return err
@@ -912,7 +890,7 @@ func (r *RoleInfo) DeleteProviderFromKPMap(keeperAddress common.Address, provide
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 		if errMA != nil {
 			return errMA
 		}
@@ -938,7 +916,7 @@ func (r *RoleInfo) DeleteProviderFromKPMap(keeperAddress common.Address, provide
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("delete provider from kpMap transaction fails", err)
@@ -958,18 +936,14 @@ func (r *RoleInfo) DeleteProviderFromKPMap(keeperAddress common.Address, provide
 func (r *RoleInfo) GetAllKeeperInKPMap() ([]common.Address, error) {
 	var keeperAddresses []common.Address
 
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return nil, err
-	}
-	_, kpMapInstance, err := getKPMap(localAddr)
+	_, kpMapInstance, err := getKPMap(r.localAddr)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return nil, err
 	}
 
 	keeperAddresses, err = kpMapInstance.GetAllKeeper(&bind.CallOpts{
-		From: localAddr,
+		From: r.localAddr,
 	})
 	if err != nil {
 		log.Println("getKeeperInkpMapErr:", err)
@@ -982,19 +956,14 @@ func (r *RoleInfo) GetAllKeeperInKPMap() ([]common.Address, error) {
 func (r *RoleInfo) GetProviderInKPMap(keeperAddress common.Address) ([]common.Address, error) {
 	var providerAddresses []common.Address
 
-	localAddr, err := address.GetAddressFromID(r.localID)
-	if err != nil {
-		return nil, err
-	}
-
-	_, kpMapInstance, err := getKPMap(localAddr)
+	_, kpMapInstance, err := getKPMap(r.localAddr)
 	if err != nil {
 		log.Println("getKeeperProviderMapInstanceErr:", err)
 		return nil, err
 	}
 
 	providerAddresses, err = kpMapInstance.GetProvider(&bind.CallOpts{
-		From: localAddr,
+		From: r.localAddr,
 	}, keeperAddress)
 	if err != nil {
 		log.Println("getProviderInkpMapErr:", err)

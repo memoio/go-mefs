@@ -15,11 +15,27 @@ import (
 	"github.com/memoio/go-mefs/contracts/adminOwned"
 )
 
+//AdminOwnedInfo  The basic information of node used for 'adminOwned' contract
+type AdminOwnedInfo struct {
+	addr  common.Address //local address
+	hexSk string         //local privateKey
+}
+
+//NewCA new a instance of contractAdminOwned
+func NewCA(addr common.Address, hexSk string) ContractAdminOwned {
+	AInfo := &AdminOwnedInfo{
+		addr:  addr,
+		hexSk: hexSk,
+	}
+
+	return AInfo
+}
+
 //DeployAdminOwned deploy an AdminOwned contract
-func DeployAdminOwned(hexKey string) (common.Address, error) {
+func (a *AdminOwnedInfo) DeployAdminOwned() (common.Address, error) {
 	var adminOwnedAddr common.Address
-	client := GetClient(EndPoint)
-	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	client := getClient(EndPoint)
+	auth, err := makeAuth(a.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return adminOwnedAddr, err
 	}
@@ -34,16 +50,16 @@ func DeployAdminOwned(hexKey string) (common.Address, error) {
 }
 
 //GetAdminOwner get owner of the adminOwned-contract
-func GetAdminOwner(adminOwnedAddress, localAddress common.Address) (common.Address, error) {
-	client := GetClient(EndPoint)
+func (a *AdminOwnedInfo) GetAdminOwner(adminOwnedAddress common.Address) (common.Address, error) {
+	client := getClient(EndPoint)
 	adminOwnedContract, err := adminOwned.NewAdminOwned(adminOwnedAddress, client)
 	if err != nil {
 		log.Println("getAdminOwnedErr:", err)
-		return localAddress, err
+		return adminOwnedAddress, err
 	}
 
 	adminOwner, err := adminOwnedContract.GetAdminOwner(&bind.CallOpts{
-		From: localAddress,
+		From: a.addr,
 	})
 	if err != nil {
 		return adminOwner, err
@@ -53,15 +69,15 @@ func GetAdminOwner(adminOwnedAddress, localAddress common.Address) (common.Addre
 }
 
 //AlterOwner alter the owner of AdminOwned-contract
-func AlterOwner(hexKey string, adminOwnedAddress, newAdminOwner common.Address) error {
-	client := GetClient(EndPoint)
+func (a *AdminOwnedInfo) AlterOwner(adminOwnedAddress, newAdminOwner common.Address) error {
+	client := getClient(EndPoint)
 	adminOwnedContract, err := adminOwned.NewAdminOwned(adminOwnedAddress, client)
 	if err != nil {
 		log.Println("getAdminOwnedErr:", err)
 		return err
 	}
 
-	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	auth, err := makeAuth(a.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return err
 	}
@@ -75,7 +91,7 @@ func AlterOwner(hexKey string, adminOwnedAddress, newAdminOwner common.Address) 
 
 		//check if the tx has been completed by inquiring contract state variables
 		for checkTimes := 0; checkTimes < checkTxRetryCount; checkTimes++ {
-			adminOwner, err := GetAdminOwner(adminOwnedAddress, newAdminOwner)
+			adminOwner, err := a.GetAdminOwner(adminOwnedAddress)
 			if err != nil || adminOwner.Hex() != newAdminOwner.Hex() {
 				time.Sleep(retryGetInfoSleepTime)
 				continue
@@ -91,15 +107,15 @@ func AlterOwner(hexKey string, adminOwnedAddress, newAdminOwner common.Address) 
 }
 
 //SetBannedVersion set bannedVersion represented by key
-func SetBannedVersion(hexKey, key string, adminOwnedAddress common.Address, version uint16) error {
-	client := GetClient(EndPoint)
+func (a *AdminOwnedInfo) SetBannedVersion(key string, adminOwnedAddress common.Address, version uint16) error {
+	client := getClient(EndPoint)
 	adminOwnedContract, err := adminOwned.NewAdminOwned(adminOwnedAddress, client)
 	if err != nil {
 		log.Println("getAdminOwnedErr:", err)
 		return err
 	}
 
-	auth, err := MakeAuth(hexKey, nil, nil, big.NewInt(defaultGasPrice), 0)
+	auth, err := makeAuth(a.hexSk, nil, nil, big.NewInt(defaultGasPrice), 0)
 	if err != nil {
 		return err
 	}
@@ -135,10 +151,10 @@ func SetBannedVersion(hexKey, key string, adminOwnedAddress common.Address, vers
 		return err
 	}
 
-	err = CheckTx(tx)
+	err = checkTx(tx)
 
 	//解析日志
-	receipt := GetTransactionReceipt(tx.Hash())
+	receipt := getTransactionReceipt(tx.Hash())
 
 	contractABI, err := abi.JSON(strings.NewReader(string(adminOwned.AdminOwnedABI)))
 	if err != nil {
@@ -166,8 +182,8 @@ func SetBannedVersion(hexKey, key string, adminOwnedAddress common.Address, vers
 }
 
 //GetBannedVersion get bannedVersion represented by key
-func GetBannedVersion(key string, adminOwnedAddress, localAddress common.Address) (uint16, error) {
-	client := GetClient(EndPoint)
+func (a *AdminOwnedInfo) GetBannedVersion(key string, adminOwnedAddress common.Address) (uint16, error) {
+	client := getClient(EndPoint)
 	adminOwnedContract, err := adminOwned.NewAdminOwned(adminOwnedAddress, client)
 	if err != nil {
 		log.Println("getAdminOwnedErr:", err)
@@ -179,39 +195,39 @@ func GetBannedVersion(key string, adminOwnedAddress, localAddress common.Address
 	switch key {
 	case "channel":
 		bannedVersion, err = adminOwnedContract.GetChannelBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "mapper":
 		bannedVersion, err = adminOwnedContract.GetMapperBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "query":
 		bannedVersion, err = adminOwnedContract.GetQueryBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "offer":
 		bannedVersion, err = adminOwnedContract.GetOfferBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "upkeeping":
 		bannedVersion, err = adminOwnedContract.GetUpkeepingBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "root":
 		bannedVersion, err = adminOwnedContract.GetRootBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "keeper":
 		bannedVersion, err = adminOwnedContract.GetKeeperBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "provider":
 		bannedVersion, err = adminOwnedContract.GetProviderBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	case "kpMap":
 		bannedVersion, err = adminOwnedContract.GetKPMapBannedVersion(&bind.CallOpts{
-			From: localAddress,
+			From: a.addr,
 		})
 	default:
 		log.Println("unsupported key")

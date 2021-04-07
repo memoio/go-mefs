@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/contracts/indexer"
 	"github.com/memoio/go-mefs/test"
@@ -56,7 +58,7 @@ func main() {
 	// fmt.Println("indexer-contract address is ", indexerAddress.Hex())
 
 	//build indexer instance by indexerAddress
-	indexerInstance, err := indexer.NewIndexer(common.HexToAddress(indexerAddress), contracts.GetClient(ethEndPoint))
+	indexerInstance, err := indexer.NewIndexer(common.HexToAddress(indexerAddress), getClient(ethEndPoint))
 	if err != nil {
 		log.Fatal("new indexerInstance fails: ", err)
 	}
@@ -101,4 +103,13 @@ func main() {
 	}
 
 	log.Println("*****test pass*****")
+}
+
+//GetClient get rpc-client based the endPoint
+func getClient(endPoint string) *ethclient.Client {
+	client, err := rpc.Dial(endPoint)
+	if err != nil {
+		log.Println(err)
+	}
+	return ethclient.NewClient(client)
 }

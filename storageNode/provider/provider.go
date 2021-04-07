@@ -221,7 +221,7 @@ func (p *Info) Start(ctx context.Context, opts interface{}) error {
 	}
 	p.userConfigs = ucache
 
-	balance := role.GetBalance(p.localID)
+	balance, _ := role.QueryBalance(p.localID)
 	ba, _ := new(big.Float).SetInt(balance).Float64()
 	p.ms.balance.Set(ba)
 
@@ -457,10 +457,12 @@ func (p *Info) getUserInfo(pid string) *uInfo {
 
 func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 	ui, ok := p.keepers.Load(pid)
+	localAddr, _ := address.GetAddressFromID(p.localID)
+	pAddr, _ := address.GetAddressFromID(pid)
 	if !ok {
 
-		r := contracts.NewCR(p.localID, "")
-		has, err := r.IsKeeper(pid)
+		r := contracts.NewCR(localAddr, "")
+		has, err := r.IsKeeper(pAddr)
 		if err != nil || !has {
 			return nil
 		}
@@ -499,9 +501,11 @@ func (p *Info) getKInfo(pid string, managed bool) *kInfo {
 
 func (p *Info) getPInfo(pid string, managed bool) *pInfo {
 	ui, ok := p.providers.Load(pid)
-	r := contracts.NewCR(p.localID, "")
+	localAddr, _ := address.GetAddressFromID(p.localID)
+	pAddr, _ := address.GetAddressFromID(pid)
+	r := contracts.NewCR(localAddr, "")
 	if !ok {
-		has, err := r.IsProvider(pid)
+		has, err := r.IsProvider(pAddr)
 		if err != nil || !has {
 			return nil
 		}
@@ -819,7 +823,8 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 }
 
 func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) {
-	b, err := contracts.GetLatestBlock()
+	a := contracts.NewCA(localAddr, "")
+	b, err := a.GetLatestBlock()
 	if err != nil {
 		return 0, err
 	}
@@ -838,7 +843,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 				endBlock = storageBlock + 1024
 			}
 
-			sIncome, _, err := contracts.GetStorageIncome(ukaddrs, localAddr, storageBlock, endBlock)
+			sIncome, _, err := a.GetStorageIncome(ukaddrs, localAddr, storageBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get ukpay log err:", err)
 				break
@@ -870,7 +875,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 				endBlock = posBlock + 1024
 			}
 
-			sIncome, _, err := contracts.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
+			sIncome, _, err := a.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get pos ukpay log err:", err)
 				break
@@ -901,7 +906,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 				endBlock = readBlock + 1024
 			}
 
-			sIncome, _, err := contracts.GetReadIncome(chanAddrs, localAddr, readBlock, endBlock)
+			sIncome, _, err := a.GetReadIncome(chanAddrs, localAddr, readBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get readpay log err:", err)
 				break
@@ -1090,7 +1095,7 @@ func (p *Info) extAddrSync(ctx context.Context) error {
 }
 
 func (p *Info) storageSync(ctx context.Context) error {
-	balance := role.GetBalance(p.localID)
+	balance, _ := role.QueryBalance(p.localID)
 	ba, _ := new(big.Float).SetInt(balance).Float64()
 	p.ms.balance.Set(ba)
 

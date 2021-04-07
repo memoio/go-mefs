@@ -47,12 +47,12 @@ func (r *RootNodeInfo) DeployRoot(queryAddress common.Address, redo bool) (commo
 	}
 
 	log.Println("begin deploy root contract...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return rtAddr, errMA
 		}
@@ -81,7 +81,7 @@ func (r *RootNodeInfo) DeployRoot(queryAddress common.Address, redo bool) (commo
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy Root transaction fails", err)
@@ -116,8 +116,8 @@ func (r *RootNodeInfo) GetRootAddrs(userAddress common.Address) ([]common.Addres
 }
 
 //GetRoot get root-contract from the mapper, and get the mapper from user's indexer
-func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr common.Address, rt *root.Root, err error) {
-	ma := NewCManage(localAddress, "")
+func (r *RootNodeInfo) GetRoot(userAddress common.Address, key string) (rtaddr common.Address, rt *root.Root, err error) {
+	ma := NewCManage(r.addr, "")
 	//获得userIndexer, key is userAddr
 	_, mapperInstance, err := ma.GetMapperFromAdmin(userAddress, rootKey, false)
 	if err != nil {
@@ -129,7 +129,7 @@ func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr commo
 		return rtaddr, rt, err
 	}
 
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 
 	if key == "latest" {
 		rtaddr = rts[len(rts)-1]
@@ -156,7 +156,7 @@ func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr commo
 				continue
 			}
 			queryAddr, err := rt.QueryAddr(&bind.CallOpts{
-				From: localAddress,
+				From: r.addr,
 			})
 			if err != nil {
 				time.Sleep(retryGetInfoSleepTime)
@@ -175,7 +175,7 @@ func GetRoot(localAddress, userAddress common.Address, key string) (rtaddr commo
 
 // SetMerkleRoot sets Merkle root
 func (r *RootNodeInfo) SetMerkleRoot(rootAddr common.Address, key int64, value [32]byte) error {
-	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return err
@@ -186,7 +186,7 @@ func (r *RootNodeInfo) SetMerkleRoot(rootAddr common.Address, key int64, value [
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(r.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -212,7 +212,7 @@ func (r *RootNodeInfo) SetMerkleRoot(rootAddr common.Address, key int64, value [
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("set MerkleRoot transaction fails", err)
@@ -231,7 +231,7 @@ func (r *RootNodeInfo) SetMerkleRoot(rootAddr common.Address, key int64, value [
 // GetMerkleRoot gets Merkle root
 func (r *RootNodeInfo) GetMerkleRoot(rootAddr common.Address, key int64) ([32]byte, error) {
 	var value [32]byte
-	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return value, err
@@ -262,7 +262,7 @@ func (r *RootNodeInfo) GetMerkleRoot(rootAddr common.Address, key int64) ([32]by
 
 // GetMerkleKeys gets Merkle keys
 func (r *RootNodeInfo) GetMerkleKeys(rootAddr common.Address) ([]int64, error) {
-	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return nil, err
@@ -294,7 +294,7 @@ func (r *RootNodeInfo) GetMerkleKeys(rootAddr common.Address) ([]int64, error) {
 // GetLatestMerkleRoot gets Merkle latest root
 func (r *RootNodeInfo) GetLatestMerkleRoot(rootAddr common.Address) (int64, [32]byte, error) {
 	var val [32]byte
-	rt, err := root.NewRoot(rootAddr, GetClient(EndPoint))
+	rt, err := root.NewRoot(rootAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("new root Err:", err)
 		return 0, val, err

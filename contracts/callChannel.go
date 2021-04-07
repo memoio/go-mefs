@@ -49,7 +49,7 @@ func (ch *ChannelNodeInfo) DeployChannelContract(queryAddress, providerAddress c
 	}
 
 	log.Println("begin deploy channel contract...")
-	client := GetClient(EndPoint)
+	client := getClient(EndPoint)
 
 	//本user与指定的provider部署channel合约
 	tx := &types.Transaction{}
@@ -57,7 +57,7 @@ func (ch *ChannelNodeInfo) DeployChannelContract(queryAddress, providerAddress c
 	checkRetryCount := 0
 	var cAddr common.Address
 	for {
-		auth, errMA := MakeAuth(ch.hexSk, moneyToChannel, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(ch.hexSk, moneyToChannel, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return channelAddr, errMA
 		}
@@ -86,7 +86,7 @@ func (ch *ChannelNodeInfo) DeployChannelContract(queryAddress, providerAddress c
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("deploy channel transaction fails", err)
@@ -112,7 +112,7 @@ func (ch *ChannelNodeInfo) DeployChannelContract(queryAddress, providerAddress c
 func (ch *ChannelNodeInfo) GetChannelInfo(chanAddress common.Address) (int64, int64, common.Address, common.Address, error) {
 	var sender, receiver common.Address
 	var startDate, timeOut *big.Int
-	channelInstance, err := channel.NewChannel(chanAddress, GetClient(EndPoint))
+	channelInstance, err := channel.NewChannel(chanAddress, getClient(EndPoint))
 	if err != nil {
 		return 0, 0, sender, receiver, err
 	}
@@ -161,7 +161,7 @@ func (ch *ChannelNodeInfo) GetLatestChannel(userAddress, providerAddress, queryA
 		return channelAddr, nil, err
 	}
 
-	channelInstance, err := channel.NewChannel(channelAddr, GetClient(EndPoint))
+	channelInstance, err := channel.NewChannel(channelAddr, getClient(EndPoint))
 	if err != nil {
 		log.Println("getChannelsErr:", err)
 		return channelAddr, nil, err
@@ -171,7 +171,7 @@ func (ch *ChannelNodeInfo) GetLatestChannel(userAddress, providerAddress, queryA
 
 //ChannelTimeout called by user to discontinue the channel-contract
 func (ch *ChannelNodeInfo) ChannelTimeout(channelAddress common.Address) (err error) {
-	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
+	channelInstance, err := channel.NewChannel(channelAddress, getClient(EndPoint))
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (ch *ChannelNodeInfo) ChannelTimeout(channelAddress common.Address) (err er
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -207,7 +207,7 @@ func (ch *ChannelNodeInfo) ChannelTimeout(channelAddress common.Address) (err er
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("channelTimeout transaction fails", err)
@@ -225,7 +225,7 @@ func (ch *ChannelNodeInfo) ChannelTimeout(channelAddress common.Address) (err er
 
 //CloseChannel called by provider to stop the channel-contract,the ownerAddress implements the mapper
 func (ch *ChannelNodeInfo) CloseChannel(channelAddress common.Address, sig []byte, value *big.Int) (err error) {
-	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
+	channelInstance, err := channel.NewChannel(channelAddress, getClient(EndPoint))
 	if err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func (ch *ChannelNodeInfo) CloseChannel(channelAddress common.Address, sig []byt
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -267,7 +267,7 @@ func (ch *ChannelNodeInfo) CloseChannel(channelAddress common.Address, sig []byt
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("closeChannel transaction fails", err)
@@ -285,7 +285,7 @@ func (ch *ChannelNodeInfo) CloseChannel(channelAddress common.Address, sig []byt
 
 //ExtendChannelTime called by user to extend the time in channel contract
 func (ch *ChannelNodeInfo) ExtendChannelTime(channelAddress common.Address, addTime *big.Int) error {
-	channelInstance, err := channel.NewChannel(channelAddress, GetClient(EndPoint))
+	channelInstance, err := channel.NewChannel(channelAddress, getClient(EndPoint))
 	if err != nil {
 		return err
 	}
@@ -295,7 +295,7 @@ func (ch *ChannelNodeInfo) ExtendChannelTime(channelAddress common.Address, addT
 	retryCount := 0
 	checkRetryCount := 0
 	for {
-		auth, errMA := MakeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
+		auth, errMA := makeAuth(ch.hexSk, nil, nil, big.NewInt(defaultGasPrice), defaultGasLimit)
 		if errMA != nil {
 			return errMA
 		}
@@ -321,7 +321,7 @@ func (ch *ChannelNodeInfo) ExtendChannelTime(channelAddress common.Address, addT
 			continue
 		}
 
-		err = CheckTx(tx)
+		err = checkTx(tx)
 		if err != nil {
 			checkRetryCount++
 			log.Println("extendChannelTime transaction fails", err)

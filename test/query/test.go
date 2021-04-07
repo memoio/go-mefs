@@ -21,7 +21,7 @@ var (
 
 const (
 	moneyTo  = 1000000000000000 //1e15
-	waitTime = 3 * time.Second
+	waitTime = 10 * time.Second
 )
 
 func main() {

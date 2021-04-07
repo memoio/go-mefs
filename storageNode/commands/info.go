@@ -10,7 +10,6 @@ import (
 	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
-	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/role"
@@ -95,7 +94,7 @@ var SelfCmd = &cmds.Command{
 		}
 
 		var depositCapacity, usedCapacity, posCapacity uint64
-		balance, err := contracts.QueryBalance(localAddr.String())
+		balance, err := role.QueryBalance(localID)
 		if err != nil {
 			return err
 		}

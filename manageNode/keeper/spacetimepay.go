@@ -103,7 +103,7 @@ func (k *Info) stPayAll(ctx context.Context) {
 		}
 	}
 
-	balance := role.GetBalance(k.localID)
+	balance, _ := role.QueryBalance(k.localID)
 	ba, _ := new(big.Float).SetInt(balance).Float64()
 	k.ms.balance.Set(ba)
 }

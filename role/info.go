@@ -12,8 +12,12 @@ import (
 // GetAllKeepers gets all keepers from keeper-contract
 func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 	totalMoney := new(big.Int)
+	localAddr, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return nil, totalMoney, err
+	}
 
-	u := contracts.NewCR(localID, "")
+	u := contracts.NewCR(localAddr, "")
 	kaddrs, err := u.GetAllKeepersAddr()
 	if err != nil {
 		return nil, totalMoney, err
@@ -40,7 +44,12 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 func GetAllProviders(localID string) ([]*ProviderItem, *big.Int, error) {
 	totalMoney := new(big.Int)
 
-	u := contracts.NewCR(localID, "")
+	localAddr, err := address.GetAddressFromID(localID)
+	if err != nil {
+		return nil, totalMoney, err
+	}
+
+	u := contracts.NewCR(localAddr, "")
 	paddrs, err := u.GetAllProvidersAddr()
 	if err != nil {
 		return nil, totalMoney, err

@@ -101,7 +101,8 @@ var keeperCmd = &cmds.Command{
 
 		var ons, offs []keeperInfo
 
-		cRole := contracts.NewCR(n.Identity.Pretty(), "")
+		localAddr, _ := address.GetAddressFromID(n.Identity.Pretty())
+		cRole := contracts.NewCR(localAddr, "")
 
 		price, err := cRole.GetKeeperPrice()
 		if err != nil {
