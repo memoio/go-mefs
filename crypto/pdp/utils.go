@@ -27,7 +27,7 @@ var (
 )
 
 var SegSize = 32 * 1024
-var FileSize = 48 * 1024 * 1024
+var FileSize = 8 * 1024 * 1024
 var SegNum = FileSize / SegSize
 
 // -------------------- proof related routines ------------------- //
