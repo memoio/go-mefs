@@ -8,11 +8,10 @@ import (
 	mpb "github.com/memoio/go-mefs/pb"
 	"github.com/memoio/go-mefs/utils/bitset"
 	"github.com/memoio/go-mefs/utils/metainfo"
-	b58 "github.com/mr-tron/base58/base58"
 )
 
 // VerifyChallenge verifies ChalInfo
-func VerifyChallenge(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []string, []string, error) {
+func VerifyChallenge(cr *mpb.ChalInfo, blsKey pdp.VerifyKey, strict bool) (bool, []string, []string, error) {
 	switch cr.GetPolicy() {
 	case "smart", "meta":
 		return VerifyChallengeData(cr, blsKey, strict)
@@ -23,7 +22,7 @@ func VerifyChallenge(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []
 	}
 }
 
-func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []string, []string, error) {
+func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.VerifyKey, strict bool) (bool, []string, []string, error) {
 	var sucCid, faultCid []string
 	var slength, chalLength int64 //success length
 	var electedOffset int
@@ -45,11 +44,11 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool
 		return false, sucCid, faultCid, err
 	}
 
-	var chal pdp.ChallengeV0
-	chal.Seed = pdp.GenChallengeV0(cr)
+	var chal pdp.ChallengeV1
+	chal.R = pdp.GenChallengeV1(cr)
 
 	chalNum := bset.Count()
-	startPos := uint(chal.Seed) % bset.Len()
+	startPos := uint(chal.R) % bset.Len()
 	meta := false
 
 	switch cr.GetPolicy() {
@@ -120,7 +119,7 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool
 		sucCid = append(sucCid, blockID)
 
 		slength += chunkSize
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+		electedOffset = int((chal.R + int64(i)) % int64(segNum))
 
 		buf.Reset()
 		buf.WriteString(qid)
@@ -185,7 +184,7 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool
 		sucCid = append(sucCid, blockID)
 
 		slength += chunkSize
-		electedOffset = int((chal.Seed + int64(i)) % int64(segNum))
+		electedOffset = int((chal.R + int64(i)) % int64(segNum))
 
 		buf.Reset()
 		buf.WriteString(qid)
@@ -236,30 +235,12 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool
 		return false, sucCid, faultCid, ErrInvalidInput
 	}
 
-	spliteProof := strings.Split(cr.GetBlsProof(), metainfo.DELIMITER)
-	if len(spliteProof) != 3 {
-		return false, sucCid, faultCid, ErrInvalidInput
-	}
-	muByte, err := b58.Decode(spliteProof[0])
+	pf := new(pdp.ProofWithVersion)
+	err = pf.Deserialize(cr.GetBlsProof())
 	if err != nil {
 		return false, sucCid, faultCid, err
 	}
-	nuByte, err := b58.Decode(spliteProof[1])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-	deltaByte, err := b58.Decode(spliteProof[2])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-
-	pf := &pdp.ProofV0{
-		Mu:    muByte,
-		Nu:    nuByte,
-		Delta: deltaByte,
-	}
-
-	res, err := blsKey.PublicKey().VerifyProof(&chal, pf, true)
+	res, err := blsKey.VerifyProof(&chal, pf.Proof)
 	if err != nil {
 		return false, sucCid, faultCid, err
 	}
@@ -278,15 +259,15 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool
 	return false, sucCid, faultCid, nil
 }
 
-func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bool, []string, []string, error) {
+func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey pdp.VerifyKey, strict bool) (bool, []string, []string, error) {
 	var slength int64 //success length
 	var electedOffset int
 	var buf strings.Builder
 
 	var sucCid, faultCid []string
 
-	var chal pdp.ChallengeV0
-	chal.Seed = pdp.GenChallengeV0(cr)
+	var chal pdp.ChallengeV1
+	chal.R = pdp.GenChallengeV1(cr)
 
 	// key: bucketid_stripeid_blockid_offset
 	set := make(map[string]struct{}, len(cr.GetFaultBlocks()))
@@ -319,7 +300,7 @@ func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bo
 		sucCid = append(sucCid, chcid)
 
 		if off > 0 {
-			electedOffset = int(chal.Seed) % off
+			electedOffset = int(chal.R) % off
 		} else if off == 0 {
 			electedOffset = 0
 		} else {
@@ -345,30 +326,13 @@ func VerifyChallengeRandom(cr *mpb.ChalInfo, blsKey pdp.KeySet, strict bool) (bo
 		return false, sucCid, faultCid, ErrInvalidInput
 	}
 
-	spliteProof := strings.Split(cr.GetBlsProof(), metainfo.DELIMITER)
-	if len(spliteProof) != 3 {
-		return false, sucCid, faultCid, ErrInvalidInput
-	}
-	muByte, err := b58.Decode(spliteProof[0])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-	nuByte, err := b58.Decode(spliteProof[1])
-	if err != nil {
-		return false, sucCid, faultCid, err
-	}
-	deltaByte, err := b58.Decode(spliteProof[2])
+	pf := new(pdp.ProofWithVersion)
+	err := pf.Deserialize(cr.GetBlsProof())
 	if err != nil {
 		return false, sucCid, faultCid, err
 	}
 
-	pf := &pdp.ProofV0{
-		Mu:    muByte,
-		Nu:    nuByte,
-		Delta: deltaByte,
-	}
-
-	res, err := blsKey.PublicKey().VerifyProof(&chal, pf, true)
+	res, err := blsKey.VerifyProof(&chal, pf.Proof)
 	if err != nil {
 		return false, sucCid, faultCid, err
 	}

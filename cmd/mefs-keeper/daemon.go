@@ -20,7 +20,7 @@ import (
 	oldcmds "github.com/memoio/go-mefs/commands"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core"
-	mcl "github.com/memoio/go-mefs/crypto/bls12"
+	"github.com/memoio/go-mefs/crypto/pdp"
 	"github.com/memoio/go-mefs/manageNode/commands"
 	"github.com/memoio/go-mefs/manageNode/corehttp"
 	"github.com/memoio/go-mefs/manageNode/keeper"
@@ -369,7 +369,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	fmt.Printf("Network daemon is ready\n")
 
-	err = mcl.Init(mcl.BLS12_381)
+	err = pdp.Init(pdp.BLS12_381)
 	if err != nil {
 		utils.MLogger.Error("Init BLS12_381 curve failed: ", err)
 		<-req.Context.Done()
@@ -381,6 +381,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case metainfo.RoleKeeper:
 		fmt.Println("Starting as a keeper")
 		ins, err := keeper.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing)
+		if err != nil {
+			fmt.Println("Start keeper service fails: ", err, "; please restart")
+			return err
+		}
+		err = ins.Start(node.Context(), nil)
 		if err != nil {
 			fmt.Println("Start keeper service fails: ", err, "; please restart")
 			return err

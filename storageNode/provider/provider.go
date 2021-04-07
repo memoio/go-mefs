@@ -37,6 +37,7 @@ type Info struct {
 	localID           string
 	sk                string
 	state             bool
+	enablePos         bool
 	ds                data.Service
 	StorageTotal      uint64
 	StorageUsed       uint64
@@ -60,6 +61,17 @@ type Info struct {
 	serverAddr        string
 	serverTime        time.Time
 	StartTime         time.Time
+}
+
+type ProviderStartOption struct {
+	Capacity      int64
+	Duration      int64
+	DepositSize   int64
+	Price         *big.Int
+	ReDeployOffer bool
+	EnablePos     bool
+	Gc            bool
+	ExtAddr       string
 }
 
 type measure struct {
@@ -148,6 +160,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		ds:            ds,
 		context:       ctx,
 		ms:            mea,
+		enablePos:     enablePos,
 		TotalIncome:   big.NewInt(0),
 		ReadIncome:    big.NewInt(0),
 		StorageIncome: big.NewInt(0),
@@ -156,33 +169,10 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		StartTime:     time.Now(),
 	}
 
-	// cache userconfigs, key is queryID
-	ucache, err := lru.NewARC(1024)
-	if err != nil {
-		utils.MLogger.Error("new lru err:", err)
-		return nil, err
-	}
-	m.userConfigs = ucache
-
-	balance := role.GetBalance(m.localID)
-	ba, _ := new(big.Float).SetInt(balance).Float64()
-	m.ms.balance.Set(ba)
-
-	usedCapacity, err := m.getDiskUsage()
-	if err == nil {
-		m.ms.storageUsed.Set(float64(usedCapacity))
-	}
-
-	m.StorageUsed = usedCapacity
-
-	lsinfo, err := role.GetDiskSpaceInfo()
+	err := rt.(*dht.KadDHT).AssignmetahandlerV2(m)
 	if err != nil {
 		return nil, err
 	}
-
-	m.LocalStorageTotal = lsinfo.Total
-	m.LocalStorageFree = lsinfo.Free
-	m.ms.storageFree.Set(float64(m.LocalStorageFree))
 
 	err = m.loadContracts(capacity, duration, depositSize, price, reDeployOffer)
 	if err != nil {
@@ -190,36 +180,13 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		return nil, err
 	}
 
-	m.StorageTotal = m.getDiskTotal()
-
-	if m.LocalStorageTotal < m.StorageTotal {
-		utils.MLogger.Errorf("%s has pledge space %d, but local storage has %d", m.localID, m.StorageTotal, m.LocalStorageTotal)
-	}
-
-	utils.MLogger.Info("Get ", m.localID, "'s contract info success")
-
-	m.ms.providerNum.Inc()
-
-	err = rt.(*dht.KadDHT).AssignmetahandlerV2(m)
-	if err != nil {
-		return nil, err
-	}
-
-	utils.MLogger.Info("Take charge of network handler")
-
-	if enablePos {
+	if m.enablePos {
 		go func() {
 			err := m.PosService(ctx, gc)
 			if err != nil {
 				utils.MLogger.Errorf("start pos err: %s ", err)
 			}
 		}()
-	}
-
-	err = m.load(ctx)
-	if err != nil {
-		utils.MLogger.Error("provider load local info failed: ", err)
-		return nil, err
 	}
 
 	if extAddr != "" {
@@ -242,17 +209,66 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		}
 	}
 
-	go m.getFromChainRegular(ctx)
-	go m.sendStorageRegular(ctx)
-	go m.saveRegular(ctx)
+	return m, nil
+}
 
-	m.extAddrSync(ctx)
-	m.GetPublicAddress()
+func (p *Info) Start(ctx context.Context, opts interface{}) error {
+	// cache userconfigs, key is queryID
+	ucache, err := lru.NewARC(1024)
+	if err != nil {
+		utils.MLogger.Error("new lru err:", err)
+		return err
+	}
+	p.userConfigs = ucache
 
-	m.state = true
+	balance := role.GetBalance(p.localID)
+	ba, _ := new(big.Float).SetInt(balance).Float64()
+	p.ms.balance.Set(ba)
+
+	usedCapacity, err := p.getDiskUsage()
+	if err == nil {
+		p.ms.storageUsed.Set(float64(usedCapacity))
+	}
+
+	p.StorageUsed = usedCapacity
+
+	lsinfo, err := role.GetDiskSpaceInfo()
+	if err != nil {
+		return err
+	}
+
+	p.LocalStorageTotal = lsinfo.Total
+	p.LocalStorageFree = lsinfo.Free
+	p.ms.storageFree.Set(float64(p.LocalStorageFree))
+
+	p.StorageTotal = p.getDiskTotal()
+
+	if p.LocalStorageTotal < p.StorageTotal {
+		utils.MLogger.Errorf("%s has pledge space %d, but local storage has %d", p.localID, p.StorageTotal, p.LocalStorageTotal)
+	}
+
+	utils.MLogger.Info("Get ", p.localID, "'s contract info success")
+
+	p.ms.providerNum.Inc()
+	utils.MLogger.Info("Take charge of network handler")
+
+	err = p.load(ctx)
+	if err != nil {
+		utils.MLogger.Error("provider load local info failed: ", err)
+		return err
+	}
+
+	go p.getFromChainRegular(ctx)
+	go p.sendStorageRegular(ctx)
+	go p.saveRegular(ctx)
+
+	p.extAddrSync(ctx)
+	p.GetPublicAddress()
+
+	p.state = true
 
 	utils.MLogger.Info("Provider Service is ready")
-	return m, nil
+	return nil
 }
 
 func (p *Info) Online() bool {

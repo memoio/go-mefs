@@ -70,6 +70,10 @@ func New(ctx context.Context, nid string, d data.Service, rt routing.Routing) (i
 	return us, nil
 }
 
+func (u *Info) Start(ctx context.Context, opts interface{}) error {
+	return nil
+}
+
 // NewFS add a new user
 func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int64, price *big.Int, ks, ps int, rdo, force bool) (FileSyetem, error) {
 	utils.MLogger.Infof("create lfs service: %s for user %s", queryID, userID)

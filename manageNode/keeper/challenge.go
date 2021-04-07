@@ -551,24 +551,28 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 	chalResult := thischalresult.(*mpb.ChalInfo)
 
 	spliteProof := strings.Split(string(value), metainfo.DELIMITER)
-	if len(spliteProof) < 3 {
+	if len(spliteProof) < 1 {
 		utils.MLogger.Warnf("handleProof: %s fails: proof is too short", km.ToString())
 		return
 	}
 
-	chalResult.BlsProof = strings.Join(spliteProof[:3], metainfo.DELIMITER)
-
+	var err error
+	chalResult.BlsProof, err = b58.Decode(spliteProof[0])
+	if err != nil {
+		utils.MLogger.Warnf("handleProof: %s fails: proof b58 decode failed", km.ToString())
+		return
+	}
 	switch chalResult.GetPolicy() {
 	case "smart", "meta":
-		if len(spliteProof) == 4 {
-			fmap, err := b58.Decode(spliteProof[3])
+		if len(spliteProof) == 2 {
+			fmap, err := b58.Decode(spliteProof[1])
 			if err == nil {
 				chalResult.FailMap = fmap
 			}
 		}
 	case "random100":
-		if len(spliteProof) == 4 {
-			indices, err := b58.Decode(spliteProof[3])
+		if len(spliteProof) == 2 {
+			indices, err := b58.Decode(spliteProof[1])
 			if err == nil {
 				chalResult.FaultBlocks = strings.Split(string(indices), metainfo.DELIMITER)
 			}
