@@ -188,7 +188,7 @@ func checkTx(tx *types.Transaction) error {
 		time.Sleep(time.Duration(t) * time.Second)
 	}
 
-	if receipt == nil { //5分钟获取不到交易信息，判定交易失败
+	if receipt == nil { //245s获取不到交易信息，判定交易失败
 		return ErrTxFail
 	}
 

@@ -90,11 +90,12 @@ var rootSubcommands = map[string]*cmds.Command{
 	"commands":  CommandsDaemonCmd,
 	"lfs":       LfsCmd,
 	"gateway":   GatewayCmd,
-	"block":     newcmd.BlockCmd,  //not use
+	"block":     newcmd.BlockCmd, //not use
 	"bootstrap": newcmd.BootstrapCmd,
 	"config":    newcmd.ConfigCmd,
 	"dht":       newcmd.DhtCmd,
 	"id":        newcmd.IDCmd,
+	"sk":        newcmd.SkCmd,
 	"swarm":     newcmd.SwarmCmd,
 	"version":   newcmd.VersionCmd,
 	"shutdown":  newcmd.DaemonShutdownCmd,

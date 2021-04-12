@@ -121,7 +121,7 @@ func GetPrivateKey(peerID, password, path string) (privateKey string, err error)
 	}
 	// Make sure we're really operating on the requested key (no swap attacks)
 	if peerID != "" && key.PeerID != peerID {
-		return "", fmt.Errorf("key content mismatch: have peer %x, want %x", key.PeerID, peerID)
+		return "", fmt.Errorf("key content mismatch: have peer %s, want %s", key.PeerID, peerID)
 	}
 
 	return ECDSAByteToString(key.PrivateKey), nil
