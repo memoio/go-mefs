@@ -116,10 +116,10 @@ func testKeeper() (err error) {
 	if err != nil {
 		return err
 	}
-
 	log.Println("set keeper need price is: ", price)
 	log.Println("set keeper price is: ", utils.KeeperDeposit)
 	contracts.EndPoint = ethEndPoint
+
 	log.Println("2. test pledge keeper")
 	amount := new(big.Int).SetInt64(utils.KeeperDeposit)
 	cRole = contracts.NewCR(common.HexToAddress(userAddr), userSk)
@@ -147,6 +147,7 @@ func testKeeper() (err error) {
 		return errors.New("wrong parameters")
 	}
 
+	log.Println("3. test set to non-keeper")
 	contracts.EndPoint = ethEndPoint
 	cRole = contracts.NewCR(common.HexToAddress(userAddr), adminSk)
 	err = cRole.SetKeeper(keeperAddr, false)
