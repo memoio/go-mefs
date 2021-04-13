@@ -41,7 +41,7 @@ func BenchmarkGenTagV1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for j, segment := range segments {
 			// generate the data tag
-			_, err = keySet.GenTag([]byte("123456"+strconv.Itoa(j)), segment, 0, 32, true)
+			_, err = keySet.GenTag([]byte("123456"+strconv.Itoa(j)), segment, 0, 30, true)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -71,7 +71,7 @@ func BenchmarkGenOneTagV1(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// generate the data tag
-		_, err := keySet.GenTag([]byte("123456"+strconv.Itoa(i)), data, 0, 32, true)
+		_, err := keySet.GenTag([]byte("123456"+strconv.Itoa(i)), data, 0, 30, true)
 		if err != nil {
 			b.Error(err)
 		}
@@ -228,7 +228,7 @@ func BenchmarkVerifyProofV1(b *testing.B) {
 	fillRandom(data)
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySetV1WithSeed(data[:32], 1024)
+	keySet, err := GenKeySetV1WithSeed(data[:32], SCount)
 	if err != nil {
 		panic(err)
 	}
@@ -295,7 +295,7 @@ func TestVerifyProofV1(t *testing.T) {
 	fillRandom(data)
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySetV1WithSeed(data[:32], 1024)
+	keySet, err := GenKeySetV1WithSeed(data[:32], SCount)
 	if err != nil {
 		panic(err)
 	}
@@ -362,7 +362,7 @@ func TestProofAggregatorV1(t *testing.T) {
 	fillRandom(data)
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySetV1WithSeed(data[:32], 1024)
+	keySet, err := GenKeySetV1WithSeed(data[:32], SCount)
 	if err != nil {
 		panic(err)
 	}
@@ -432,7 +432,7 @@ func TestDataVerifierV1(t *testing.T) {
 	fillRandom(data)
 
 	// generate the key set for proof of data possession
-	keySet, err := GenKeySetV1WithSeed(data[:32], 1024)
+	keySet, err := GenKeySetV1WithSeed(data[:32], SCount)
 	if err != nil {
 		panic(err)
 	}
@@ -481,4 +481,39 @@ func TestDataVerifierV1(t *testing.T) {
 	if !result {
 		t.Errorf("Verificaition failed!")
 	}
+}
+
+func TestKeyDeserialize(t *testing.T) {
+	err := Init(BLS12_381)
+	if err != nil {
+		panic(err)
+	}
+
+	data := make([]byte, FileSize)
+	rand.Seed(time.Now().UnixNano())
+	fillRandom(data)
+
+	// generate the key set for proof of data possession
+	keySet, err := GenKeySetV1WithSeed(data[:32], SCount)
+	if err != nil {
+		panic(err)
+	}
+	skBytes := keySet.SecreteKey().Serialize()
+	skDes := new(SecretKeyV1)
+	err = skDes.Deserialize(skBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pk := keySet.Pk
+	pkBytes := pk.Serialize()
+	pkDes := new(PublicKeyV1)
+	err = pkDes.Deserialize(pkBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pkDes.BlsPk.IsEqual(&pk.BlsPk) {
+		t.Fatal("not equal")
+	}
+
 }

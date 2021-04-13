@@ -17,6 +17,7 @@ var (
 
 	ErrInvalidSettings       = errors.New("setting is invalid")
 	ErrNumOutOfRange         = errors.New("numOfAtoms is out of range")
+	ErrDeserializeFailed     = errors.New("deserialize failed")
 	ErrChalOutOfRange        = errors.New("numOfAtoms is out of chal range")
 	ErrSegmentSize           = errors.New("the size of the segment is wrong")
 	ErrGenTag                = errors.New("GenTag failed")
