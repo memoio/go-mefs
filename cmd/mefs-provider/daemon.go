@@ -348,8 +348,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		utils.MLogger.Error("Put role key falied: ", err)
 	}
 
-	contracts.EndPoint = cfg.Eth
-
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children
 		// that it will wait for before closing, such as the API server.
