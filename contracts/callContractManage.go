@@ -581,7 +581,7 @@ func (m *ContractManageInfo) GetAddressFromMapper(mapperInstance *mapper.Mapper)
 			From: m.addr,
 		})
 		if err != nil {
-			if retryCount > 20 {
+			if retryCount > checkTxRetryCount {
 				log.Println("get addr from mapper err:", err)
 				return nil, err
 			}

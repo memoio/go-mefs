@@ -243,17 +243,13 @@ func (r *RootNodeInfo) GetMerkleRoot(rootAddr common.Address, key int64) ([32]by
 		res, err := rt.GetRoot(&bind.CallOpts{
 			From: r.addr,
 		}, key)
-		if err != nil {
+		if err != nil || hex.EncodeToString(res[:]) == "0000000000000000000000000000000000000000000000000000000000000000" {
 			if retryCount > 5 {
 				log.Println("get merkel root Err:", err)
-				return value, err
+				return res, err
 			}
 			time.Sleep(retryGetInfoSleepTime)
 			continue
-		}
-
-		if hex.EncodeToString(res[:]) == "0000000000000000000000000000000000000000000000000000000000000000" {
-			return res, ErrEmpty
 		}
 
 		return res, nil

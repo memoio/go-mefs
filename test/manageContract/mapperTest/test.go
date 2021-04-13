@@ -26,8 +26,8 @@ const ( //indexerHex indexerAddress, it is well known
 func main() {
 	utils.StartLogger()
 	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")   //dev网，用于user连接
-	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;") //dev网，用于keeper、provider连接
+	eth := flag.String("eth", "http://119.147.213.220:8193", "eth api address;")   //dev网，用于user连接
+	qeth := flag.String("qeth", "http://119.147.213.220:8196", "eth api address;") //dev网，用于keeper、provider连接
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth

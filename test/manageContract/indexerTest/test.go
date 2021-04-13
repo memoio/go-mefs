@@ -34,7 +34,7 @@ const (
 
 func main() {
 	utils.StartLogger()
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")
+	eth := flag.String("eth", "http://119.147.213.220:8193", "eth api address;")
 	flag.Parse()
 	ethEndPoint = *eth
 	contracts.EndPoint = ethEndPoint

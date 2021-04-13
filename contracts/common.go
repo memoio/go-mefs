@@ -95,7 +95,7 @@ type LogCloseChannel struct {
 }
 
 func init() {
-	EndPoint = "http://119.147.213.219:8101"
+	EndPoint = "http://119.147.213.220:8191"
 }
 
 //GetClient get rpc-client based the endPoint

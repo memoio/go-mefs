@@ -22,7 +22,7 @@ const (
 func main() {
 	utils.StartLogger()
 	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")             //dev网
+	eth := flag.String("eth", "http://119.147.213.220:8193", "eth api address;")             //dev网
 	addr := flag.String("addr", "0x1a249DB4cc739BD53b05E2082D3724b7e033F74F", "transfer to") //dev网，用于keeper、provider连接
 	money := flag.Int64("money", 6, "transfer money")
 

@@ -24,9 +24,9 @@ const (
 
 func main() {
 	utils.StartLogger()
-	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")   //dev网
-	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;") //dev网，用于keeper、provider连接
+	//--eth=http://119.147.213.220:8193 --qeth=http://119.147.213.220:8196      testnet网
+	eth := flag.String("eth", "http://119.147.213.220:8193", "eth api address;")   //dev网
+	qeth := flag.String("qeth", "http://119.147.213.220:8196", "eth api address;") //dev网，用于keeper、provider连接
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
@@ -35,7 +35,7 @@ func main() {
 	num := test.QueryBalance("0x1a249DB4cc739BD53b05E2082D3724b7e033F74F", ethEndPoint)
 	log.Println("用于转账的账号余额:", num)
 
-	//ethEndPoint = *qeth //用正常的链（http://119.147.213.219:8101）给新建账户转账
+	//ethEndPoint = *qeth //用正常的链（http://119.147.213.220:8192）给新建账户转账
 	userAddr, userSk, err := test.CreateAddr()
 	if err != nil {
 		log.Fatal("create user fails", err)
@@ -50,7 +50,7 @@ func main() {
 	log.Println("===============start test================")
 	defer log.Println("==============finish test===============")
 
-	//ethEndPoint = *eth //用不正常的链（http://119.147.213.219:8101）部署query合约
+	//ethEndPoint = *eth
 	log.Println("=====start set mapper addr=====")
 	contracts.EndPoint = ethEndPoint
 	cManage := contracts.NewCManage(localAddr, userSk)
