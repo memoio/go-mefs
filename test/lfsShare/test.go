@@ -25,8 +25,8 @@ var ethEndPoint, qethEndPoint string
 
 func main() {
 	utils.StartLogger()
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address for set;")
-	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address for query;")
+	eth := flag.String("eth", "http://119.147.213.220:8193", "eth api address for set;")
+	qeth := flag.String("qeth", "http://119.147.213.220:8196", "eth api address for query;")
 
 	flag.Parse()
 	ethEndPoint = *eth

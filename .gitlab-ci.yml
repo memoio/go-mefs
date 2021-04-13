@@ -9,8 +9,8 @@ stages:
 variables:
   UPCOUNT: "50"
   NETKEY: "dev"
-  ETHENDPOINT: "http://119.147.213.219:8101"
-  QETHENDPOINT: "http://119.147.213.219:8101"
+  ETHENDPOINT: "http://119.147.213.220:8191"
+  QETHENDPOINT: "http://119.147.213.220:8194"
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio

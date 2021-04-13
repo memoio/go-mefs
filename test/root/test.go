@@ -27,8 +27,8 @@ const (
 func main() {
 	utils.StartLogger()
 	//--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101      testnet网
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")   //dev网
-	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;") //dev网，用于keeper、provider连接
+	eth := flag.String("eth", "http://119.147.213.220:8191", "eth api address;")   //dev网
+	qeth := flag.String("qeth", "http://119.147.213.220:8194", "eth api address;") //dev网，用于keeper、provider连接
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth
@@ -38,7 +38,7 @@ func main() {
 		reDeploy = true
 	)
 
-	//ethEndPoint = *qeth //用正常的链（http://119.147.213.219:8101）给新建账户转账
+	//ethEndPoint = *qeth
 	userAddr, userSk, err := test.CreateAddr()
 	if err != nil {
 		log.Fatal("create user fails", err)
@@ -56,7 +56,7 @@ func main() {
 	log.Println("===============start test deployRoot================")
 	defer log.Println("==============finish test deployRoot===============")
 
-	//ethEndPoint = *eth //用不正常的链（http://119.147.213.219:8101）部署query合约
+	//ethEndPoint = *eth
 	log.Println("start deploy root")
 	cRoot := contracts.NewCRoot(localAddr, userSk)
 	rootAddr, err := cRoot.DeployRoot(localAddr, reDeploy)

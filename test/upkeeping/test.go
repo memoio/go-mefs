@@ -54,8 +54,8 @@ var success bool
 func main() {
 	utils.StartLogger()
 	flag.String("testnet", "--eth=http://119.147.213.219:8101 --qeth=http://119.147.213.219:8101", "testnet commands")
-	eth := flag.String("eth", "http://119.147.213.219:8101", "eth api address;")
-	qeth := flag.String("qeth", "http://119.147.213.219:8101", "eth api address;")
+	eth := flag.String("eth", "http://119.147.213.220:8191", "eth api address;")
+	qeth := flag.String("qeth", "http://119.147.213.220:8194", "eth api address;")
 	flag.Parse()
 	ethEndPoint = *eth
 	qethEndPoint = *qeth

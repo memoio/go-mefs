@@ -58,7 +58,7 @@ var transferCmd = &cmds.Command{
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		toAddr, _ := req.Options["address"].(string)
-		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.219:8101", "http://119.147.213.219:8101")
+		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.220:8192", "http://119.147.213.220:8192")
 
 		cn, _ := req.Options["CodeName"].(string)
 		if cn != codeName {
