@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/memoio/go-mefs/utils/address"
 	"errors"
 	_ "expvar"
 	"fmt"
@@ -12,6 +11,8 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+
+	"github.com/memoio/go-mefs/utils/address"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	mprome "github.com/ipfs/go-metrics-prometheus"
@@ -324,8 +325,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if err != nil {
 		utils.MLogger.Error("Put role key falied: ", err)
 	}
-
-	contracts.EndPoint = cfg.Eth
 
 	defer func() { //关闭daemon时进行的操作
 		// We wait for the node to close first, as the node has children

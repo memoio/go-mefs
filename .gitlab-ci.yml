@@ -107,7 +107,6 @@ unit_test:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off make test
   tags:
     - "119.147.213.219"
@@ -118,7 +117,6 @@ role_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/roleContract/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "119.147.213.219"
@@ -131,7 +129,6 @@ query_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/query/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "119.147.213.219"
@@ -144,7 +141,6 @@ offer_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/offer/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "119.147.213.219"
@@ -157,7 +153,6 @@ upkeeping_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/upkeeping/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "119.147.213.219"
@@ -170,7 +165,6 @@ channel_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/channel/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "119.147.213.219"
@@ -183,7 +177,6 @@ root_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - sh ./bin/checkbin.sh
     - GO111MODULE=off go run test/root/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
     - "119.147.213.219"
