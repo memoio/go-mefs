@@ -2,7 +2,11 @@ package pdp
 
 import (
 	"encoding/binary"
+
+	bls "github.com/herumi/bls-eth-go-binary/bls"
 )
+
+const MaxPkNumCount = 2048
 
 // the data structures for the Proof of data possession
 
@@ -21,7 +25,7 @@ func (sk *SecretKeyV1) Serialize() []byte {
 	buf := make([]byte, 2*FrSize)
 	copy(buf[0:FrSize], sk.BlsSk.Serialize())
 	copy(buf[FrSize:2*FrSize], sk.Alpha.Serialize())
-	return nil
+	return buf
 }
 
 func (sk *SecretKeyV1) Deserialize(data []byte) error {
@@ -73,7 +77,7 @@ func (pk *PublicKeyV1) Serialize() []byte {
 	for i := 0; i < int(pk.Count); i++ {
 		copy(buf[8+2*G2Size+i*G1Size:8+2*G2Size+(i+1)*G1Size], pk.ElemAlphas[i].Serialize())
 	}
-	return nil
+	return buf
 }
 
 func (pk *PublicKeyV1) Deserialize(data []byte) error {
@@ -81,13 +85,19 @@ func (pk *PublicKeyV1) Deserialize(data []byte) error {
 		return ErrKeyIsNil
 	}
 	if len(data) <= 8+2*G2Size {
-		return ErrNumOutOfRange
+		return ErrDeserializeFailed
 	}
 	pk.Count = int64(binary.BigEndian.Uint64(data[:8]))
+	if pk.Count > MaxPkNumCount {
+		return ErrDeserializeFailed
+	}
 	pk.BlsPk.Deserialize(data[8 : 8+G2Size])
 	pk.Zeta.Deserialize(data[8+G2Size : 8+2*G2Size])
 	if (len(data)-(8+2*G2Size))/G1Size != int(pk.Count) {
 		return ErrNumOutOfRange
+	}
+	if int64(len(pk.ElemAlphas)) != pk.Count {
+		pk.ElemAlphas = make([]bls.G1, pk.Count)
 	}
 	for i := 0; i < int(pk.Count); i++ {
 		pk.ElemAlphas[i].Deserialize(data[8+2*G2Size+i*G1Size : 8+2*G2Size+(i+1)*G1Size])
@@ -111,7 +121,7 @@ func (vk *VerifyKeyV1) Serialize() []byte {
 	buf := make([]byte, 8+2*G2Size)
 	copy(buf[0:G2Size], vk.BlsPk.Serialize())
 	copy(buf[G2Size:2*G2Size], vk.Zeta.Serialize())
-	return nil
+	return buf
 }
 
 func (vk *VerifyKeyV1) Deserialize(data []byte) error {

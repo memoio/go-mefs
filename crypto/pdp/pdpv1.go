@@ -118,7 +118,6 @@ func (k *KeySetV1) Calculate() {
 		bls.G1Mul(&k.Pk.ElemAlphas[i], &k.Pk.ElemAlphas[0], &k.Sk.ElemAlpha[i])
 	}
 
-	return
 }
 
 func (sk *SecretKeyV1) Calculate(count int64) {
