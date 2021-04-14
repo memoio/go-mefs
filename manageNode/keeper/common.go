@@ -32,7 +32,10 @@ var MarketingMoney int64 = 1
 func (k *Info) getUserBLS12Config(userID, groupID string) (pdp.VerifyKey, error) {
 	value, ok := k.userConfigs.Get(groupID)
 	if ok {
-		return value.(*pdp.VerifyKeyV1), nil
+		if v, ok := value.(*pdp.VerifyKeyV1); ok {
+			return v, nil
+		}
+		return nil, metainfo.ErrIllegalKey
 	}
 
 	if userID == pos.GetPosId() {
@@ -41,8 +44,10 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (pdp.VerifyKey, error)
 			return nil, err
 		}
 
-		k.userConfigs.Add(groupID, mkey)
-		return mkey.VerifyKey(), nil
+		vk := mkey.VerifyKey()
+
+		k.userConfigs.Add(groupID, vk)
+		return vk, nil
 	}
 
 	userconfigbyte, err := k.getUserBLS12ConfigByte(userID, groupID)
@@ -55,8 +60,10 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (pdp.VerifyKey, error)
 		return nil, err
 	}
 
-	k.userConfigs.Add(groupID, mkey)
-	return mkey.VerifyKey(), nil
+	vk := mkey.VerifyKey()
+
+	k.userConfigs.Add(groupID, vk)
+	return vk, nil
 }
 
 func (k *Info) getUserBLS12ConfigByte(uid, qid string) ([]byte, error) {

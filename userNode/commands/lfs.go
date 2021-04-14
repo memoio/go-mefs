@@ -412,7 +412,10 @@ var lfsStartUserCmd = &cmds.Command{
 		}
 
 		list := &StringList{
-			ChildLists: []string{"User is started, the address is : " + addr},
+			ChildLists: []string{
+				"User is started, the address is : " + addr,
+				"queryID is : " + qid,
+			},
 		}
 		return cmds.EmitOnce(res, list)
 	},
