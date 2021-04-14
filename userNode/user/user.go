@@ -23,10 +23,10 @@ const defaultWeighted = int64(100)
 //Info implements user service
 type Info struct {
 	localID string
+	context context.Context
 	ds      data.Service
 	fsMap   sync.Map // now key is queryID, value is *lfsInfo
 	qMap    sync.Map // key is userID, value is *userInfo
-	context context.Context
 }
 
 type queryInfo struct {

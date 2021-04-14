@@ -632,6 +632,7 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 		}
 	} else {
 		utils.MLogger.Info("handle proof of ", qid, "from provider: ", proID, " verify fail.")
+		utils.MLogger.Info("User's verifykey is ", blsKey.Serialize(), "proof is ", chalResult.BlsProof)
 	}
 
 	//update thischalinfo.chalMap
@@ -642,5 +643,4 @@ func (k *Info) handleProof(km *metainfo.Key, value []byte) {
 
 	k.putKey(k.context, km.ToString(), hByte, nil, "local", thisGroup.clusterID, thisGroup.bft)
 
-	return
 }

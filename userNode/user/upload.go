@@ -58,12 +58,59 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	defer l.Sm.Release(10)
 	utils.MLogger.Infof("Upload object: %s to bucket: %s begin", objectName, bucketName)
 
-	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, true)
+	bucket, err := l.getBucketInfo(bucketName)
 	if err != nil {
 		return nil, err
 	}
 
-	return l.addObjectData(ctx, bucket, object, reader)
+	objectElement := bucket.Objects.Find(MetaName(objectName))
+	if objectElement != nil {
+		return nil, ErrObjectAlreadyExist
+	}
+
+	bucket.Lock()
+	defer bucket.Unlock()
+
+	//add Object
+	ct := time.Now().Unix()
+	oInfo := &mpb.Object{
+		Name:     objectName,
+		BucketID: bucket.BucketID,
+		CTime:    ct,
+		ObjectID: bucket.NextObjectID,
+		Dir:      false,
+	}
+
+	object := &ObjectInfo{
+		ObjectInfo: mpb.ObjectInfo{
+			Info:      oInfo,
+			PartCount: 0,
+			Parts:     make([]*mpb.ObjectPart, 0, 1),
+			Deletion:  false,
+			CTime:     ct,
+			MTime:     ct,
+		},
+	}
+
+	object.Lock()
+	defer object.Unlock()
+
+	obj, opart, err := l.addObjectData(ctx, bucket, object, reader)
+	if err != nil {
+		return &obj.ObjectInfo, err
+	}
+
+	err = l.insertObject(bucket, obj)
+	if err != nil {
+		return &obj.ObjectInfo, err
+	}
+
+	err = l.appendPart(bucket, obj, opart)
+	if err != nil {
+		return &obj.ObjectInfo, err
+	}
+
+	return &obj.ObjectInfo, nil
 }
 
 // AppendObject constructs upload process
@@ -75,15 +122,113 @@ func (l *LfsInfo) AppendObject(ctx context.Context, bucketName, objectName strin
 	}
 	defer l.Sm.Release(10)
 	utils.MLogger.Infof("Upload append object: %s to bucket: %s begin", objectName, bucketName)
-	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName, false)
+	bucket, object, err := l.getBucketAndObjectInfo(bucketName, objectName)
 	if err != nil {
 		return nil, err
 	}
 
-	return l.addObjectData(ctx, bucket, object, reader)
+	obj, opart, err := l.addObjectData(ctx, bucket, object, reader)
+	if err != nil {
+		return &obj.ObjectInfo, err
+	}
+
+	err = l.appendPart(bucket, obj, opart)
+	if err != nil {
+		return &obj.ObjectInfo, err
+	}
+
+	return &obj.ObjectInfo, nil
 }
 
-func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation bool) (*superBucket, *ObjectInfo, error) {
+func (l *LfsInfo) insertObject(bucket *superBucket, object *ObjectInfo) error {
+	bucket.Objects.Insert(MetaName(object.GetInfo().GetName()), object)
+	bucket.NextObjectID++
+
+	payload, err := proto.Marshal(&object.ObjectInfo)
+	if err != nil {
+		return err
+	}
+	op := &mpb.OpRecord{
+		OpType:  mpb.LfsOp_OpAdd,
+		OpID:    bucket.GetNextOpID(),
+		Payload: payload,
+	}
+
+	l.flushObjectMeta(bucket, false, op)
+	bucket.applyOpID = op.GetOpID()
+	bucket.NextOpID++
+
+	//gen_root
+	tag, err := proto.Marshal(op)
+	if err != nil {
+		return err
+	}
+	bucket.mtree.Push(tag)
+	bucket.Root = bucket.mtree.Root()
+	bucket.dirty = true
+	bucket.MTime = time.Now().Unix()
+
+	l.meta.dirty = true
+	utils.MLogger.Infof("Upload create object: %s in bucket: %s", object.GetInfo().GetName(), bucket.GetName())
+	return nil
+}
+
+func (l *LfsInfo) appendPart(bucket *superBucket, object *ObjectInfo, opart *mpb.ObjectPart) error {
+	object.Parts = append(object.Parts, opart)
+	object.PartCount++
+	object.Length += int64(opart.GetLength())
+	object.ETag = calculateETagForNewPart(object.ETag, opart.ETag)
+	object.MTime = opart.CTime
+
+	// bucket
+	bucket.MTime = opart.CTime
+	payload, err := proto.Marshal(opart)
+	if err != nil {
+		return err
+	}
+	op := &mpb.OpRecord{
+		OpType:  mpb.LfsOp_OpAppend,
+		OpID:    bucket.GetNextOpID(),
+		Payload: payload,
+	}
+
+	l.flushObjectMeta(bucket, false, op)
+	bucket.applyOpID = op.GetOpID()
+	bucket.NextOpID++
+
+	// leaf is OpID + PayLoad
+	tag, err := proto.Marshal(op)
+	if err != nil {
+		return err
+	}
+	bucket.mtree.Push(tag)
+	bucket.Root = bucket.mtree.Root()
+	l.meta.dirty = true
+
+	bucket.dirty = true
+	utils.MLogger.Infof("Add data to object: %s in bucket: %s end, length is: %d", object.GetInfo().GetName(), bucket.GetName(), opart.Length)
+	return nil
+
+}
+
+func (l *LfsInfo) getBucketInfo(bucketName string) (*superBucket, error) {
+	if !l.Online() || l.meta.buckets == nil {
+		return nil, ErrLfsServiceNotReady
+	}
+
+	if !l.writable {
+		return nil, ErrLfsReadOnly
+	}
+
+	bucket, ok := l.meta.buckets[bucketName]
+	if !ok || bucket == nil || bucket.Deletion {
+		return nil, ErrBucketNotExist
+	}
+
+	return bucket, nil
+}
+
+func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string) (*superBucket, *ObjectInfo, error) {
 	if !l.Online() || l.meta.buckets == nil {
 		return nil, nil, ErrLfsServiceNotReady
 	}
@@ -104,81 +249,16 @@ func (l *LfsInfo) getBucketAndObjectInfo(bucketName, objectName string, creation
 
 	objectElement := bucket.Objects.Find(MetaName(objectName))
 	if objectElement != nil {
-		if creation {
-			return nil, nil, ErrObjectAlreadyExist
-		}
 		return bucket, objectElement.(*ObjectInfo), nil
 	}
 
-	bucket.Lock()
-	defer bucket.Unlock()
-
-	if creation {
-		//add Object
-		ct := time.Now().Unix()
-		oInfo := &mpb.Object{
-			Name:     objectName,
-			BucketID: bucket.BucketID,
-			CTime:    ct,
-			ObjectID: bucket.NextObjectID,
-			Dir:      false,
-		}
-
-		object := &ObjectInfo{
-			ObjectInfo: mpb.ObjectInfo{
-				Info:      oInfo,
-				PartCount: 0,
-				Parts:     make([]*mpb.ObjectPart, 0, 1),
-				Deletion:  false,
-				CTime:     ct,
-				MTime:     ct,
-			},
-		}
-
-		bucket.Objects.Insert(MetaName(objectName), object)
-		bucket.NextObjectID++
-
-		payload, err := proto.Marshal(oInfo)
-		if err != nil {
-			return nil, nil, err
-		}
-		op := &mpb.OpRecord{
-			OpType:  mpb.LfsOp_OpAdd,
-			OpID:    bucket.GetNextOpID(),
-			Payload: payload,
-		}
-
-		l.flushObjectMeta(bucket, false, op)
-		bucket.applyOpID = op.GetOpID()
-		bucket.NextOpID++
-
-		//gen_root
-		tag, err := proto.Marshal(op)
-		if err != nil {
-			return nil, nil, err
-		}
-		bucket.mtree.Push(tag)
-		bucket.Root = bucket.mtree.Root()
-		bucket.dirty = true
-		bucket.MTime = time.Now().Unix()
-
-		l.meta.dirty = true
-		utils.MLogger.Infof("Upload create object: %s in bucket: %s", objectName, bucketName)
-		return bucket, object, nil
-	}
 	return nil, nil, ErrObjectNotExist
 }
 
 // make sure bucket and object is ont empty
-func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object *ObjectInfo, reader io.Reader) (*mpb.ObjectInfo, error) {
-	bucket.Lock()
-	defer bucket.Unlock()
-
-	object.Lock()
-	defer object.Unlock()
-
+func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object *ObjectInfo, reader io.Reader) (*ObjectInfo, *mpb.ObjectPart, error) {
 	if object.Info.Dir {
-		return &object.ObjectInfo, ErrObjectIsDir
+		return object, nil, ErrObjectIsDir
 	}
 
 	bopt := &mpb.BlockOptions{
@@ -190,7 +270,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 
 	encoder, err := dataformat.NewDataCoderWithPrefix(l.keySet, bopt)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	//append Object
@@ -220,7 +300,7 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 	err = ul.Start(ctx)
 	if err != nil {
 		utils.MLogger.Infof("Add data to object: %s in bucket: %s fails %s", object.GetInfo().GetName(), bucket.GetName(), err)
-		return &object.ObjectInfo, err
+		return object, opart, err
 	}
 
 	// upload success length is less than expected,
@@ -234,49 +314,17 @@ func (l *LfsInfo) addObjectData(ctx context.Context, bucket *superBucket, object
 
 	if ul.length+padding != ul.sucLen {
 		utils.MLogger.Infof("upload %d, but success %d", ul.length, ul.sucLen)
-		return &object.ObjectInfo, ErrUpload
+		return object, opart, ErrUpload
 	}
 
 	// opart
 	opart.ETag = ul.etag
 	opart.Length = int64(ul.length)
 
-	// object
-	object.Parts = append(object.Parts, opart)
-	object.PartCount++
-	object.Length += int64(ul.length)
-	object.ETag = calculateETagForNewPart(object.ETag, opart.ETag)
-	object.MTime = opart.CTime
-
 	// bucket
 	bucket.Length += int64(ul.rawLen)
-	bucket.MTime = opart.CTime
-	payload, err := proto.Marshal(opart)
-	if err != nil {
-		return nil, err
-	}
-	op := &mpb.OpRecord{
-		OpType:  mpb.LfsOp_OpAppend,
-		OpID:    bucket.GetNextOpID(),
-		Payload: payload,
-	}
 
-	l.flushObjectMeta(bucket, false, op)
-	bucket.applyOpID = op.GetOpID()
-	bucket.NextOpID++
-
-	// leaf is OpID + PayLoad
-	tag, err := proto.Marshal(op)
-	if err != nil {
-		return nil, err
-	}
-	bucket.mtree.Push(tag)
-	bucket.Root = bucket.mtree.Root()
-	l.meta.dirty = true
-
-	bucket.dirty = true
-	utils.MLogger.Infof("Add data to object: %s in bucket: %s end, length is: %d", object.GetInfo().GetName(), bucket.GetName(), opart.Length)
-	return &object.ObjectInfo, nil
+	return object, opart, nil
 }
 
 // Stop is
@@ -291,7 +339,6 @@ func (u *uploadTask) Cancel(context.Context) error {
 
 // Done is
 func (u *uploadTask) Done() {
-	return
 }
 
 // Info gets
