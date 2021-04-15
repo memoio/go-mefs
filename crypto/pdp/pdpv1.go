@@ -124,12 +124,10 @@ func (sk *SecretKeyV1) Calculate(count int64) {
 	if sk == nil {
 		return
 	}
-	var oneFr bls.Fr
-	oneFr.SetInt64(1)
-	sk.ElemAlpha[0] = oneFr
 	if int64(len(sk.ElemAlpha)) != count {
 		sk.ElemAlpha = make([]bls.Fr, count)
 	}
+	sk.ElemAlpha[0] = OneFr
 
 	var i int64
 	// alpha_i = alpha ^ i

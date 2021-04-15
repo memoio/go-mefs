@@ -64,7 +64,7 @@ func (p *Info) handleChallengeBls12(km *metainfo.Key, metaValue []byte, from str
 	}
 
 	var proof pdp.ProofWithVersion
-	proof.Ver = 1
+	proof.Ver = pdp.PDPV1
 	var faultValue string
 	switch cr.GetPolicy() {
 	case "smart", "meta":

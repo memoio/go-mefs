@@ -300,7 +300,7 @@ func TestVerifyProofV1(t *testing.T) {
 		panic(err)
 	}
 
-	pk := keySet.PublicKey()
+	pk := keySet.Pk
 	vk := keySet.VerifyKey()
 	segments := make([][]byte, SegNum)
 	blocks := make([]string, SegNum)
@@ -325,6 +325,16 @@ func TestVerifyProofV1(t *testing.T) {
 		tags[i] = tag
 	}
 
+	pkBytes := pk.Serialize()
+	pkDes := new(PublicKeyV1)
+	err = pkDes.Deserialize(pkBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pkDes.BlsPk.IsEqual(&pk.BlsPk) {
+		t.Fatal("not equal")
+	}
+
 	// -------------- TPA --------------- //
 	// generate the challenge for data possession validation
 	chal := ChallengeV1{
@@ -333,16 +343,23 @@ func TestVerifyProofV1(t *testing.T) {
 	}
 
 	// generate the proof
-	proof, err := keySet.Pk.GenProof(&chal, segments, tags, 32)
+	proof, err := pkDes.GenProof(&chal, segments, tags, 32)
 	if err != nil {
 		panic(err)
 	}
 
 	t.Log(proof)
 
+	vkBytes := vk.Serialize()
+	vkDes := new(VerifyKeyV1)
+	err = vkDes.Deserialize(vkBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// -------------- TPA --------------- //
 	// Verify the proof
-	result, err := vk.VerifyProof(&chal, proof)
+	result, err := vkDes.VerifyProof(&chal, proof)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,11 +515,16 @@ func TestKeyDeserialize(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	skBytes := keySet.SecreteKey().Serialize()
+	sk := keySet.Sk
+	skBytes := sk.Serialize()
 	skDes := new(SecretKeyV1)
 	err = skDes.Deserialize(skBytes)
+	skDes.Calculate(keySet.Pk.Count)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !skDes.Alpha.IsEqual(&sk.Alpha) || !skDes.BlsSk.IsEqual(&sk.BlsSk) {
+		t.Fatal("not equal")
 	}
 
 	pk := keySet.Pk
