@@ -741,6 +741,12 @@ var lfsGetObjectCmd = &cmds.Command{
 			return errLfsServiceNotReady
 		}
 
+		obj, err := lfs.HeadObject(req.Context, req.Arguments[0], req.Arguments[1])
+		if err != nil {
+			return err
+		}
+		res.SetLength(uint64(obj.Length))
+
 		piper, pipew := io.Pipe()
 		bufw := bufio.NewWriterSize(pipew, user.DefaultBufSize)
 		checkErrAndClosePipe := func(err error) error {
@@ -769,6 +775,7 @@ var lfsGetObjectCmd = &cmds.Command{
 			if !ok {
 				return e.New(e.TypeErr(outReader, v))
 			}
+
 			outPath := getOutPath(req)
 			rootExists := true
 			rootIsDir := false
@@ -799,7 +806,12 @@ var lfsGetObjectCmd = &cmds.Command{
 			}
 			//close这里不会报错么？
 			defer file.Close()
-			n, err := io.Copy(file, outReader)
+
+			bar, barR := progressBarForReader(os.Stderr, outReader, int64(res.Length()))
+			bar.Start()
+			defer bar.Finish()
+
+			n, err := io.Copy(file, barR)
 			if err != nil {
 				fmt.Println("Download failed - ", err)
 				return err
