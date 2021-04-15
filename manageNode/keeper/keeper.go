@@ -1230,17 +1230,14 @@ func (k *Info) deleteIDByIP(pid, eAddr string, isKeeper bool) {
 		delete(k.groupedProviders, ip)
 	}
 
-	for i, id := range k.groupedProviders[ip] {
-		if id == pid {
-			if i == 0 {
-				k.groupedProviders[ip] = k.groupedProviders[ip][1:]
-			} else if i == len(k.groupedProviders[ip])-1 {
-				k.groupedProviders[ip] = k.groupedProviders[ip][:i]
-			} else {
-				k.groupedProviders[ip] = append(k.groupedProviders[ip][:i], k.groupedProviders[ip][i+1:]...)
-			}
+	i := 0
+	for _, id := range k.groupedProviders[ip] {
+		if id != pid {
+			k.groupedProviders[ip][i] = id
+			i++
 		}
 	}
+	k.groupedProviders[ip] = k.groupedProviders[ip][:i]
 	utils.MLogger.Debug("deleteIDByIP groupedPs:", k.groupedProviders)
 	return
 }
