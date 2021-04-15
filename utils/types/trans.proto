@@ -1,0 +1,57 @@
+syntax = "proto3";
+package mefs.pb;
+
+
+// 用于表示ChunkID相同一整段Block域
+//blockID is prefix_buckekID_stripeID_chunkID
+message BlockRange {
+    string Prifix = 1; 
+    int64 BucketID = 2;
+    int64 StripeStart = 3;
+    int64 StripeEnd = 4;
+    int64 SegEnd = 5; //最后一个stripe的最后一个segment的index，从0开始计数
+    int64 ChunkID = 6;
+}
+
+//表示每个Provider存储了某个range域
+message RangePacket {
+    repeated BlockRange Ranges = 1;
+    repeated string Providers = 2;
+}
+
+//表示每个Provider存储了某个range域，考虑下用数组还是Map
+message RangeMap {
+    map<string, BlockRange> Ranges = 10;  
+}
+
+
+//挑战种子，包含一个bucket的某一段Stripe
+message ChalSeed {
+	string Prifix     = 1; 
+    int64 BucketID    = 2;
+	int64 StripeStart = 3;
+	int64 StripeEnd   = 4;
+	int64 SegEnd      = 5;
+    int64 Seed        = 6;   
+}
+
+//ChunkID存储格式 23_5表示一个块，23_223_5表示23_5到223_5的段
+message ChalSpecefic {
+	string Prifix            = 1; 
+    int64 BucketID           = 2;
+    int64 Seed               = 3;  
+    string Provider          = 4; 
+    repeated string ChunkIDs = 5;  
+}
+
+//指示一个Role的信息，一个peer可能有多个addr
+message RoleNetInfo {
+    string Address       = 1;
+    repeated bytes Addrs = 2; //net addrs
+}
+
+//返回给User的注册信息
+message InitRes {
+    repeated RoleNetInfo Keepers = 1;
+    repeated RoleNetInfo Providers = 2;
+}

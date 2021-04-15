@@ -118,7 +118,7 @@ func (vk *VerifyKeyV1) Serialize() []byte {
 	if vk == nil {
 		return nil
 	}
-	buf := make([]byte, 8+2*G2Size)
+	buf := make([]byte, 2*G2Size)
 	copy(buf[0:G2Size], vk.BlsPk.Serialize())
 	copy(buf[G2Size:2*G2Size], vk.Zeta.Serialize())
 	return buf

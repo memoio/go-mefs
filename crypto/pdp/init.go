@@ -31,4 +31,5 @@ func init() {
 	G1Size = bls.GetG1ByteSize()
 	G2Size = bls.GetG2ByteSize()
 	FrSize = bls.GetFrByteSize()
+	OneFr.SetInt64(1)
 }

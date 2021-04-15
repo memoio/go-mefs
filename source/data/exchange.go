@@ -49,14 +49,15 @@ var (
 )
 
 type impl struct {
-	netID   string // network address
-	bstore  bs.Blockstore
-	dstore  ds.Datastore
-	aCache  *Cache
-	rt      routing.Routing
-	ph      p2phost.Host
-	pubKeys *lru.ARCCache
-	ms      *measure
+	netID    string                   // network address
+	peerAddr map[string]peer.AddrInfo //用来做地址向网络地址的映射
+	bstore   bs.Blockstore
+	dstore   ds.Datastore
+	aCache   *Cache
+	rt       routing.Routing
+	ph       p2phost.Host
+	pubKeys  *lru.ARCCache
+	ms       *measure
 }
 
 type measure struct {
@@ -162,7 +163,7 @@ func New(id string, b bs.Blockstore, d ds.Datastore, host p2phost.Host, r routin
 	}
 }
 
-func (n *impl) GetNetAddr() string {
+func (n *impl) GetNetID() string {
 	return n.netID
 }
 
@@ -181,7 +182,7 @@ func (n *impl) SendMetaMessage(ctx context.Context, typ int32, key string, data,
 
 	utils.MLogger.Debug("SendMetaMessage: ", key, " to: ", to)
 
-	p, err := peer.IDB58Decode(to)
+	p, err := peer.Decode(to)
 	if err != nil {
 		return err
 	}
@@ -203,7 +204,7 @@ func (n *impl) SendMetaRequest(ctx context.Context, typ int32, key string, data,
 
 	utils.MLogger.Debug("SendMetaRequest: ", key, " to: ", to)
 
-	p, err := peer.IDB58Decode(to)
+	p, err := peer.Decode(to)
 	if err != nil {
 		return nil, err
 	}
@@ -717,7 +718,7 @@ func (n *impl) FastConnect(ctx context.Context, to string) bool {
 		return false
 	}
 
-	id, err := peer.IDB58Decode(to)
+	id, err := peer.Decode(to)
 	if err != nil {
 		return false
 	}
@@ -751,7 +752,7 @@ func (n *impl) Connect(ctx context.Context, to string) (string, bool) {
 		return "", false
 	}
 
-	id, err := peer.IDB58Decode(to)
+	id, err := peer.Decode(to)
 	if err != nil {
 		return "", false
 	}
@@ -806,7 +807,7 @@ func (n *impl) GetAddrAndConnect(ctx context.Context, to string) (string, bool) 
 		return "", false
 	}
 
-	toID, err := peer.IDB58Decode(to)
+	toID, err := peer.Decode(to)
 	if err != nil {
 		return "", false
 	}
@@ -947,7 +948,7 @@ func (n *impl) GetExternalAddr(p string) (ma.Multiaddr, error) {
 
 	utils.MLogger.Debug("GetExternalAddr: ", p)
 
-	pid, err := peer.IDB58Decode(p)
+	pid, err := peer.Decode(p)
 	if err != nil {
 		return nil, err
 	}

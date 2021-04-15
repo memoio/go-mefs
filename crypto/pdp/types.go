@@ -33,6 +33,7 @@ var GenG2 G2
 
 var ZeroG1 G1
 var ZeroG2 G2
+var OneFr Fr
 
 var G1Size int
 var G2Size int
