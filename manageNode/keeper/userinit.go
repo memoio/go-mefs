@@ -115,7 +115,10 @@ func (k *Info) initUser(uid, gid string, kc, pc int, price *big.Int) (string, er
 			if ok {
 				thisP := thisinfo.(*pInfo)
 				if thisP.online && thisP.offerItem != nil {
-					if thisP.offerItem.Price.Cmp(price) <= 0 && thisP.credit > 0 {
+					if thisP.offerItem.Price.Cmp(price) <= 0 {
+						if thisP.credit <= 0 {
+							utils.MLogger.Debugf("provider %s need price %d, but %d; has credit: %d", proID, thisP.offerItem.Price, price, thisP.credit)
+						}
 						newResponse.WriteString(proID)
 						pcount--
 					} else {
