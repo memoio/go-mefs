@@ -231,8 +231,10 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 			if err == nil {
 				has := false
 				for _, lr := range lm.sb.GetLRoot() {
-					if lr.CTime == gotTime && bytes.Compare(lr.Root, gotRoot[:]) == 0 {
+					if lr.CTime == gotTime && bytes.Equal(lr.Root, gotRoot[:]) {
 						has = true
+					} else {
+						utils.MLogger.Infof("unmatched root, gotroot:%s, lr.root:%s", gotRoot, lr.Root)
 					}
 				}
 				if has {
@@ -451,12 +453,12 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 
 			opNum++
 
-			if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) == 0 {
+			if bytes.Equal(broot.GetRoot(), bucket.mtree.Root()) {
 				utils.MLogger.Infof("bucket %s at ops %d store op %d expect root %s", bucket.Name, opNum, broot.GetOpCount(), hex.EncodeToString(broot.GetRoot()))
 			}
 
 			if broot.GetBucketID() != 0 && opNum == broot.GetOpCount() {
-				if bytes.Compare(broot.GetRoot(), bucket.mtree.Root()) != 0 {
+				if bytes.Equal(broot.GetRoot(), bucket.mtree.Root()) {
 					utils.MLogger.Errorf("bucket %s at ops %d expect root %s, but got %s", bucket.Name, opNum, hex.EncodeToString(broot.GetRoot()), hex.EncodeToString(bucket.mtree.Root()))
 				}
 			}
@@ -514,7 +516,7 @@ func applyOp(bucket *superBucket, op *mpb.OpRecord) error {
 		}
 		ob, ok := bucket.Objects.Find(MetaName(part.GetName())).(*ObjectInfo)
 		if !ok || ob == nil {
-			utils.MLogger.Error("Add Object Part: ", part.GetPartID(), "to an inexistent object: ", part.GetName())
+			utils.MLogger.Error("Add Object Part: ", part.GetPartID(), " to an inexistent object: ", part.GetName())
 			return ErrObjectNotExist
 		}
 

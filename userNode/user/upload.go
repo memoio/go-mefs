@@ -144,7 +144,7 @@ func (l *LfsInfo) insertObject(bucket *superBucket, object *ObjectInfo) error {
 	bucket.Objects.Insert(MetaName(object.GetInfo().GetName()), object)
 	bucket.NextObjectID++
 
-	payload, err := proto.Marshal(&object.ObjectInfo)
+	payload, err := proto.Marshal(object.ObjectInfo.Info)
 	if err != nil {
 		return err
 	}
