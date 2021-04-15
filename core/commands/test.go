@@ -57,14 +57,14 @@ var transferCmd = &cmds.Command{
 		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		toAddr, _ := req.Options["address"].(string)
-		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.220:8192", "http://119.147.213.220:8192")
-
 		cn, _ := req.Options["CodeName"].(string)
 		if cn != codeName {
-			fmt.Println("CodeName is wrong")
+			fmt.Println("CodeName is wrong, we will not transfer money")
 			return nil
 		}
+
+		toAddr, _ := req.Options["address"].(string)
+		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.220:8192", "http://119.147.213.220:8192")
 
 		a := contracts.NewCA(common.HexToAddress(toAddr), "")
 		balances, err := a.QueryBalance(toAddr)
