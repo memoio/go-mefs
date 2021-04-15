@@ -57,7 +57,7 @@ func main() {
 	defer log.Println("==============finish test deployRoot===============")
 
 	//ethEndPoint = *eth
-	log.Println("start deploy root")
+	log.Println("========start deploy root=========")
 	cRoot := contracts.NewCRoot(localAddr, userSk)
 	rootAddr, err := cRoot.DeployRoot(localAddr, reDeploy)
 	if err != nil {
@@ -65,7 +65,7 @@ func main() {
 	}
 
 	contracts.EndPoint = qethEndPoint
-	log.Println("start get root contract")
+	log.Println("=======start get root contract=======")
 
 	time.Sleep(waitTime)
 	gotAddr, _, err := cRoot.GetRoot(localAddr, localAddr.String())
@@ -77,6 +77,7 @@ func main() {
 		log.Fatal("get wrong root contract")
 	}
 
+	log.Println("=======start get merkleRoot in root-contract=========")
 	keyTime := time.Now().Unix()
 	res, err := cRoot.GetMerkleRoot(gotAddr, keyTime)
 	if err == nil {
@@ -85,12 +86,14 @@ func main() {
 
 	val := sha256.Sum256([]byte{'1'})
 
+	log.Println("=========start set merkleRoot========")
 	err = cRoot.SetMerkleRoot(gotAddr, keyTime, val)
 	if err != nil {
 		log.Fatal("set merkle root fails:", err)
 	}
 
 	time.Sleep(waitTime)
+	log.Println("=========start get merkleRoot========")
 	res, err = cRoot.GetMerkleRoot(gotAddr, keyTime)
 	if err != nil {
 		log.Fatal("get empty merkle root:", err)
