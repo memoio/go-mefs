@@ -11,7 +11,7 @@ import (
 var log = logging.Logger("core/commands")
 
 var ErrNotOnline = errors.New("this command must be run in online mode. Try running 'mefs-user daemon' first")
-var ErrNotReady = errors.New("this instance is not ready, please check")
+var ErrNotReady = errors.New("this instance is not ready, please wait daemon ready")
 
 const (
 	ConfigOption = "config"
@@ -33,8 +33,8 @@ ADVANCED COMMANDS
   lfs           Manage User Log FileSystem
   repo          Manipulate the MEFS repository
   contract      Some contract functions
-  gateway 		Start gateWay
-  create		Create a new account
+  gateway       Start gateWay
+  create        Create a new account
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
@@ -46,10 +46,10 @@ TOOL COMMANDS
   config        Manage configuration
   version       Show MEfs version information
   commands      List all available commands
-  shutdown		Kill mefs-user daemon
-  test			Some test functions
-  list			List keepers and providers
-  sys			Print system diagnostic information
+  shutdown      Kill mefs-user daemon
+  test          Some test functions
+  list          List keepers and providers
+  sys           Print system diagnostic information
 
 Use 'mefs-user <command> --help' to learn more about each command.
 

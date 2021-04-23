@@ -115,7 +115,7 @@ environment variable:
 
 		hexsk, ok := req.Options[secretKeyKwd].(string)
 		if !ok || hexsk == "" {
-			fmt.Printf("input your private key manully: ")
+			fmt.Printf("input your private key manully(if you have and want to use it. Or press 'Enter' to skip this step): ")
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			go func() {
 				defer cancel()

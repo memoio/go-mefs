@@ -667,7 +667,7 @@ func (r *RoleInfo) PledgeProvider(size *big.Int) (err error) {
 func (r *RoleInfo) GetAllProvidersAddr() ([]common.Address, error) {
 	_, proContract, err := GetProviderContractFromIndexer(r.localAddr)
 	if err != nil {
-		log.Println("providerContracterr:", err)
+		log.Println("getProviderContracterr:", err)
 		return nil, err
 	}
 

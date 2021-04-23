@@ -30,10 +30,10 @@ BASIC COMMANDS
 ADVANCED COMMANDS
   daemon        Start a long-running daemon process
   repo          Manipulate the MEFS repository
-  info			Show informations about Provider
-  create		Create a new account
+  info          Show informations about Provider
+  create        Create a new account
   contract      Some contract functions
-  quit			Provider quit group
+  quit          Provider quit group
 
 NETWORK COMMANDS
   id            Show info about MEFS peers
@@ -44,10 +44,10 @@ NETWORK COMMANDS
 TOOL COMMANDS
   config        Manage configuration
   version       Show MEfs version information
-  shutdown		Shutdown mefs-provider daemon
-  test			Some test functions
-  list			List keepers and providers
-  sys			Print system diagnostic information
+  shutdown      Shutdown mefs-provider daemon
+  test          Some test functions
+  list          List keepers and providers
+  sys           Print system diagnostic information
   commands      List all available commands
 
 Use 'mefs-provider <command> --help' to learn more about each command.

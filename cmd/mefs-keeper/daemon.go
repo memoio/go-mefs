@@ -299,34 +299,36 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		//从合约中获取账户角色
 		isKeeper, err := r.IsKeeper(localAddr)
 		if err != nil {
-			utils.MLogger.Error("Got Keeper err: ", err)
+			utils.MLogger.Error("judge whether you are Keeper from chain err: ", err)
 			return err
 		}
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 			if nKey == "testnet" {
-				cfg.Eth = "http://119.147.213.220:8192"
+				contracts.EndPoint = "http://119.147.213.220:8192"
 			} else {
-				cfg.Eth = "http://119.147.213.220:8192"
+				contracts.EndPoint = "http://119.147.213.220:8192"
 			}
 		} else {
 			isProvider, err := r.IsProvider(localAddr)
 			if err != nil {
-				utils.MLogger.Error("Got Provider role: ", err)
+				utils.MLogger.Error("judge whether you are Provider from chain err: ", err)
 				return err
 			}
 			if isProvider {
 				cfg.Role = metainfo.RoleProvider
 				if nKey == "testnet" {
-					cfg.Eth = "http://119.147.213.220:8193"
+					contracts.EndPoint = "http://119.147.213.220:8193"
 				} else {
-					cfg.Eth = "http://119.147.213.220:8193"
+					contracts.EndPoint = "http://119.147.213.220:8193"
 				}
 			} else {
 				cfg.Role = metainfo.RoleUser
 			}
 		}
 	}
+
+	fmt.Println("use blockchain's endPoint: ", contracts.EndPoint)
 
 	kmRole, err := metainfo.NewKey(nid, mpb.KeyType_Role)
 	if err != nil {
@@ -335,7 +337,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), nil, "local")
 	if err != nil {
-		utils.MLogger.Error("Put role key falied: ", err)
+		utils.MLogger.Error("Put role key to local falied: ", err)
 	}
 
 	defer func() { //关闭daemon时进行的操作

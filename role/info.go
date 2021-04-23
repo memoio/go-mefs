@@ -30,6 +30,9 @@ func GetAllKeepers(localID string) ([]*KeeperItem, *big.Int, error) {
 			return nil, totalMoney, err
 		}
 		item, err := GetKeeperInfo(localID, keeperID)
+		if err != nil {
+			return nil, totalMoney, err
+		}
 		kItems = append(kItems, &item)
 		totalMoney.Add(totalMoney, item.PledgeMoney)
 	}

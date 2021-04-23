@@ -29,7 +29,7 @@ const (
 	collecting               // broadcast UserInit
 	collectDone              // notify keeper
 	deploying                // deploy contracts
-	depoyDone                // connect
+	deployDone               // connect
 	groupStarted             // done
 )
 
@@ -139,7 +139,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		g.storePrice = uItem.Price
 		g.storeSize = uItem.Capacity
 		g.stPayCycle = uItem.Cycle
-		g.state = depoyDone
+		g.state = deployDone
 		err := g.connect(ctx)
 		if err != nil {
 			return true, err
@@ -200,7 +200,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 
 				utils.MLogger.Info("Start test user: ", g.userID, " and its lfs:", g.groupID)
 
-				g.state = depoyDone
+				g.state = deployDone
 				err = g.connect(ctx)
 				if err != nil {
 					return true, err
@@ -220,7 +220,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 }
 
 func (g *groupInfo) connect(ctx context.Context) error {
-	if g.state != depoyDone {
+	if g.state != deployDone {
 		return role.ErrWrongState
 	}
 
@@ -385,7 +385,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		kinfo.sessionID = newID
 		resp, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kms, val, sig, kinfo.keeperID)
 		if err != nil {
-			utils.MLogger.Warn("Send keeper: ", kinfo.keeperID, " err: ", err)
+			utils.MLogger.Warn("Send to keeper: ", kinfo.keeperID, " err: ", err)
 			continue
 		}
 
@@ -403,7 +403,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 		pinfo.sessionID = newID
 		resp, err := g.ds.SendMetaRequest(ctx, int32(mpb.OpType_Put), kms, val, sig, pinfo.providerID)
 		if err != nil {
-			utils.MLogger.Warn("Send provider: ", pinfo.providerID, "  err: ", err)
+			utils.MLogger.Warn("Send to provider: ", pinfo.providerID, "  err: ", err)
 		}
 
 		uuidtmp, err := uuid.ParseBytes(resp)
@@ -430,6 +430,7 @@ func (g *groupInfo) connect(ctx context.Context) error {
 func (g *groupInfo) initGroup(ctx context.Context) error {
 	//构造init信息并发送 此时，初始化阶段为collecting
 	if g.providerSLA <= 0 || g.keeperSLA <= 0 {
+		utils.MLogger.Error("groupInfo.providerSLA: ", g.providerSLA, "groupInfo.keeperSLA: ", g.keeperSLA)
 		return ErrWrongParameters
 	}
 
@@ -463,7 +464,7 @@ func (g *groupInfo) initGroup(ctx context.Context) error {
 				g.notify(ctx)
 			case deploying:
 				g.deployContract(ctx)
-			case depoyDone:
+			case deployDone:
 				return g.connect(ctx)
 			default:
 				return nil
@@ -761,7 +762,7 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 
 		g.ds.PutKey(ctx, kmUser.ToString(), []byte(res.String()), nil, "local")
 	}
-	g.state = depoyDone
+	g.state = deployDone
 
 	return nil
 }
@@ -817,7 +818,7 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	g.RLock()
 	defer g.RUnlock()
 
-	utils.MLogger.Info("Send heartbeat for user: ", g.userID)
+	utils.MLogger.Info("Send heartbeat to kps for user: ", g.userID)
 
 	// key: queryID/"UserStart"/userID/kc/pc/id
 	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_HeartBeat, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())

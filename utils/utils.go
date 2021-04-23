@@ -351,7 +351,7 @@ func GetPassWord() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	go func() {
 		defer cancel()
-		fmt.Printf("Please input your password (at least 8): ")
+		fmt.Printf("Please input your password (at least 8, or press 'Enter' to use default password): ")
 		input := bufio.NewScanner(os.Stdin)
 		ok := input.Scan()
 		if ok {

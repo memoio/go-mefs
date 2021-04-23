@@ -11,6 +11,8 @@ import (
 	"math/big"
 	"strconv"
 
+	"github.com/memoio/go-mefs/role"
+
 	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
@@ -70,8 +72,70 @@ var ContractCmd = &cmds.Command{
 		"alterAdminOwner":          alterAdminOwnerCmd,
 		"setBannedVersion":         setBannedCmd,
 		"getBannedVersion":         getBannedCmd,
-		"deployRecover":            deployRecoverCmd, //部署recover合约
+		"deployRecover":            deployRecoverCmd,     //部署recover合约
+		"getPledgeSpace":           getAllPledgeSpaceCmd, //获得全网质押的存储空间
 	},
+}
+
+var getAllPledgeSpaceCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "get storage space pledged by the entire network",
+	},
+	Arguments: []cmds.Argument{ //参数列表
+		cmds.StringArg("peerID", true, false, "The local peerID with prefix '8M'"),
+	},
+	Options: []cmds.Option{ //选项列表
+		cmds.StringOption("ChainNet", "net", "The chain net, testnet or dev").WithDefault("dev"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		pID := req.Arguments[0]
+
+		net := req.Options["ChainNet"].(string)
+		if net != "dev" && net != "testnet" {
+			fmt.Println("net is wrong")
+			return nil
+		}
+
+		if net == "dev" {
+			contracts.EndPoint = "http://119.147.213.220:8194"
+		} else {
+			contracts.EndPoint = "http://119.147.213.220:8194"
+		}
+
+		_, space, err := role.GetAllProviders(pID) //单位：MB
+		if err != nil {
+			return err
+		}
+
+		str := []string{"all pledged storage space is: ", formatStorageSize(space.Int64())}
+		list := &StringList{
+			ChildLists: str,
+		}
+
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
+	},
+}
+
+//convert the storageSize in MB unit to a string with unit
+func formatStorageSize(storageSize int64) (size string) {
+	if storageSize < 1024 {
+		return fmt.Sprintf("%.3fMB", float64(storageSize)/float64(1))
+	} else if storageSize < (1024 * 1024) {
+		return fmt.Sprintf("%.3fGB", float64(storageSize)/float64(1024))
+	} else if storageSize < (1024 * 1024 * 1024) {
+		return fmt.Sprintf("%.3fTB", float64(storageSize)/float64(1024*1024))
+	} else if storageSize < (1024 * 1024 * 1024 * 1024) {
+		return fmt.Sprintf("%.3fPB", float64(storageSize)/float64(1024*1024*1024))
+	} else {
+		return fmt.Sprintf("%.3fEB", float64(storageSize)/float64(1024*1024*1024*1024))
+	}
 }
 
 var deployResolverCmd = &cmds.Command{
