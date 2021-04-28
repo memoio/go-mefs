@@ -25,7 +25,7 @@ const (
 	payInternval = int64(2 * 60 * 60)
 )
 
-// MarketingMoney is used to
+// MarketingMoney is used to pos price
 var MarketingMoney int64 = 1
 
 //---config----

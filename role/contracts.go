@@ -169,12 +169,12 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 		return item, err
 	}
 
-	cap := int64(0)
+	cap := new(big.Int)
 	weiPrice := new(big.Float).SetInt(price)
 	weiPrice.Quo(weiPrice, contracts.GetMemoPrice())
 	weiPrice.Int(price)
 	if price.Sign() > 0 {
-		cap = money.Quo(money, price).Int64()
+		cap.Quo(money, price)
 	}
 
 	if isProvider && !isBanned {
@@ -182,7 +182,7 @@ func GetProviderInfo(localID, proID string) (ProviderItem, error) {
 			ProviderID:  proID,
 			PledgeMoney: money,
 			StartTime:   stime,
-			Capacity:    cap,
+			Capacity:    cap.Int64(),
 		}
 		return item, nil
 	}

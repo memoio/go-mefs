@@ -42,7 +42,7 @@ var (
 )
 
 var (
-	errNoRouting    = errors.New("routing is not running")
+	errNoRouting    = errors.New("routing is not running, please check whether the daemon is running normally")
 	errNoConnection = errors.New("connection is offline")
 	ErrRetry        = errors.New("ReTry Later")
 	errKey          = errors.New("Key and value are mismatched")

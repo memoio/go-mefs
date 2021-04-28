@@ -50,9 +50,9 @@ type Objects struct {
 var (
 	errLfsServiceNotReady       = errors.New("lfs service not ready")
 	errGroupServiceNotReady     = errors.New("group service not ready")
-	errNoFileToUpload           = errors.New("No file to upload")
+	errNoFileToUpload           = errors.New("No file to upload, the file path is wrong, please check")
 	errSumCountsBeyondProviders = errors.New("The sum counts(datacount+paritycount) has beyond the providers counts")
-	errWrongInput               = errors.New("The input option is wrong.")
+	errWrongInput               = errors.New("The input format is wrong")
 )
 
 func (ob ObjectStat) String() string {
@@ -224,7 +224,7 @@ var lfsStartUserCmd = &cmds.Command{
 	Options: []cmds.Option{
 		cmds.StringOption(SecreteKey, "sk", "The practice user's private key that you want to exec").WithDefault(""),
 		cmds.StringOption(PassWord, "pwd", "The practice user's password that you want to exec").WithDefault(""),
-		cmds.StringOption("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB").WithDefault(""),
+		cmds.StringOption("capacity", "cap", "Size user wants to store data in deploying contracts, unit is MB, eg: 10GB、1TB、100MB").WithDefault(""),
 		cmds.Int64Option("duration", "dur", "Time user wants to store data in deploying contracts, unit is day").WithDefault(utils.DefaultDuration),
 		cmds.StringOption("storedPrice", "price", "Price user wants to store data in deploying contracts, unit is wei").WithDefault(""),
 		cmds.IntOption("keeperSla", "ks", "implement user needs how many keepers").WithDefault(utils.KeeperSLA),
@@ -313,7 +313,7 @@ var lfsStartUserCmd = &cmds.Command{
 				case "TB":
 					capacity = res * (1024 * 1024)
 				default:
-					fmt.Println("input wrong capacity uint.")
+					fmt.Println("input wrong capacity uint, you can input uint: MB、GB、TB")
 					return errWrongInput
 				}
 			}
@@ -321,7 +321,7 @@ var lfsStartUserCmd = &cmds.Command{
 
 		duration, ok := req.Options["duration"].(int64) //user签署合约时指定的需求存储时长
 		if !ok || duration <= 0 {
-			fmt.Println("input wrong duration.")
+			fmt.Println("input wrong duration, duration should be positive integer")
 			return errWrongInput
 		}
 		price := big.NewInt(0)
@@ -333,19 +333,19 @@ var lfsStartUserCmd = &cmds.Command{
 		if len(priceStr) > 0 {
 			price.SetString(priceStr, 10)
 			if price.Cmp(big.NewInt(0)) <= 0 {
-				fmt.Println("input wrong price: ", priceStr)
+				fmt.Println("input wrong price: ", priceStr, ", price should be positive integer")
 				return errWrongInput
 			}
 		}
 
 		ks, ok := req.Options["keeperSla"].(int) //user签署合约时指定的需求keeper数量
 		if !ok || ks <= 0 {
-			fmt.Println("input wrong keeper nums.")
+			fmt.Println("input wrong keeper nums, keeper nums should be positive integer")
 			return errWrongInput
 		}
 		ps, ok := req.Options["providerSla"].(int) //user签署合约时指定的需求provider数量
 		if !ok || ps <= 1 {
-			fmt.Println("input wrong provider nums.")
+			fmt.Println("input wrong provider nums, provider nums should be positive integer")
 			return errWrongInput
 		}
 
@@ -653,7 +653,7 @@ var lfsPutObjectCmd = &cmds.Command{
 		var fileNext files.File
 		switch fileType := file.(type) {
 		case files.Directory:
-			return errors.New("unsupported now")
+			return errors.New("unsupported upload dir now")
 		case files.File:
 			fileNext = fileType
 		}
@@ -1109,9 +1109,9 @@ var lfsCreateBucketCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
-		cmds.IntOption(Policy, "pl", "Storage policy").WithDefault(dataformat.RsPolicy),
-		cmds.BoolOption(Encryption, "encryp", "Encrytion or not").WithDefault(true),
-		cmds.IntOption(DataCount, "dc", "data count").WithDefault(3),
+		cmds.IntOption(Policy, "pl", "Storage policy, '1' represent erasure code, '2' represent multiple backups, '1' is default").WithDefault(dataformat.RsPolicy),
+		cmds.BoolOption(Encryption, "encryp", "Encrypt the uploaded data or not").WithDefault(true),
+		cmds.IntOption(DataCount, "dc", "data count, dc + pc should not be larger than providers count").WithDefault(3),
 		cmds.IntOption(ParityCount, "pc", "parity count, we suggest parity_count >= 2").WithDefault(2),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -1138,22 +1138,22 @@ var lfsCreateBucketCmd = &cmds.Command{
 		}
 		policy, ok := req.Options[Policy].(int)
 		if !ok || (policy != dataformat.MulPolicy && policy != dataformat.RsPolicy) {
-			fmt.Println("input wrong policy.")
+			fmt.Println("input wrong policy, policy should be 1 or 2")
 			return errWrongInput
 		}
 		dataCount, ok := req.Options[DataCount].(int)
 		if !ok || dataCount <= 0 {
-			fmt.Println("input wrong dataCount.")
+			fmt.Println("input wrong dataCount, dataCount should be positive integer")
 			return errWrongInput
 		}
 		parityCount, ok := req.Options[ParityCount].(int)
 		if !ok || parityCount <= 0 {
-			fmt.Println("input wrong parityCount.")
+			fmt.Println("input wrong parityCount, parityCount should be positive integer")
 			return errWrongInput
 		}
-		encrytion, ok := req.Options[Encryption].(bool)
+		encryption, ok := req.Options[Encryption].(bool)
 		if !ok {
-			fmt.Println("input wrong encrytion.")
+			fmt.Println("input wrong encryption, encryption should be bool")
 			return errWrongInput
 		}
 
@@ -1166,7 +1166,7 @@ var lfsCreateBucketCmd = &cmds.Command{
 		bucketOptions.Policy = int32(policy)
 		bucketOptions.DataCount = int32(dataCount)
 		bucketOptions.ParityCount = int32(parityCount)
-		if encrytion {
+		if encryption {
 			bucketOptions.Encryption = 1
 		} else {
 			bucketOptions.Encryption = 0
@@ -1363,7 +1363,7 @@ var lfsListKeepersCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "List keepers in lfs.",
 		ShortDescription: `
-'mefs lfs list_keepers' is a plumbing command for printing buckets in lfs.
+'mefs-user lfs list_keepers' is a plumbing command for printing buckets in lfs.
 `,
 	},
 
@@ -1584,7 +1584,7 @@ var lfsFsyncCmd = &cmds.Command{
 
 		IsForce, ok := req.Options[ForceFlush].(bool)
 		if !ok {
-			fmt.Println("input wrong isForce.")
+			fmt.Println("input wrong 'ForceFlush' option.")
 			return errWrongInput
 		}
 		err = lfs.Fsync(IsForce)

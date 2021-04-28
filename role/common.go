@@ -26,7 +26,7 @@ var (
 	ErrWrongContarctContent = errors.New("Contract content is wrong")
 	ErrWrongKey             = errors.New("Wrong key")
 	ErrWrongValue           = errors.New("Wrong value")
-	ErrWrongState           = errors.New("Wrong state")
+	ErrWrongState           = errors.New("Wrong state, please wait or restart lfs")
 
 	ErrNoContract      = errors.New("No contract")
 	ErrNoBlock         = errors.New("No such block")

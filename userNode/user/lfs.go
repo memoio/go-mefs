@@ -63,6 +63,7 @@ func (l *LfsInfo) Start(ctx context.Context) error {
 	for _, kinof := range l.gInfo.keepers {
 		if kinof.sessionID != l.gInfo.sessionID {
 			utils.MLogger.Infof("%s starts in readonly mode, has session %s, want session: %s ", l.userID, l.gInfo.sessionID.String(), kinof.sessionID.String())
+			utils.MLogger.Info("If you want to start in write mode, please set the force option to true when starting lfs")
 			l.writable = false
 			break
 		}
@@ -252,7 +253,7 @@ func (l *LfsInfo) GetGroup() *groupInfo {
 }
 
 func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
-	utils.MLogger.Infof("Send Heartbeat %s is ready for: %s", l.fsID, l.userID)
+	utils.MLogger.Infof("Send %s Heartbeat is ready for user: %s", l.fsID, l.userID)
 	tick := time.NewTicker(1 * time.Minute)
 	defer tick.Stop()
 	for {
@@ -267,7 +268,7 @@ func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 					l.genRoot()
 					// change to readonly, because of other force
 					l.writable = false
-					utils.MLogger.Infof("Lfs %s is changed to readonly mode", l.fsID)
+					utils.MLogger.Info("Lfs ", l.fsID, " is changed to readonly mode, because sendHeartBeat err: ", err)
 				}
 				if ok {
 					l.Sm.Release(1)
@@ -281,7 +282,7 @@ func (l *LfsInfo) sendHeartBeat(ctx context.Context) error {
 
 //每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
 func (l *LfsInfo) persistRoot(ctx context.Context) error {
-	utils.MLogger.Infof("Persist Lfs root %s is ready for: %s", l.fsID, l.userID)
+	utils.MLogger.Infof("Persist Lfs %s root is ready for user: %s", l.fsID, l.userID)
 	l.genRoot()
 	tick := time.NewTicker(30 * time.Minute)
 	defer tick.Stop()
@@ -404,9 +405,9 @@ func (l *LfsInfo) genRoot() {
 	}
 }
 
-//每隔一段时间，会检查元数据快是否为脏，决定要不要持久化
+//每隔一段时间，会检查元数据块是否为脏，决定要不要持久化
 func (l *LfsInfo) persistMetaBlock(ctx context.Context) error {
-	utils.MLogger.Infof("Persist Lfs %s is ready for: %s", l.fsID, l.userID)
+	utils.MLogger.Infof("Persist Lfs %s metaBlock is ready for user: %s", l.fsID, l.userID)
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
 	for {

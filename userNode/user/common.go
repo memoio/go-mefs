@@ -21,21 +21,21 @@ var transNum = defaultTransNum
 
 var (
 	ErrPolicy               = errors.New("policy is error")
-	ErrLfsServiceNotReady   = errors.New("lfs service is not ready")
+	ErrLfsServiceNotReady   = errors.New("lfs service is not ready, please restart lfs")
 	ErrLfsReadOnly          = errors.New("lfs service is read only")
 	ErrLfsStarting          = errors.New("Another lfs instance is starting")
 	ErrCannotGetEnoughBlock = errors.New("cannot get enough block")
 	ErrCannotLoadMetaBlock  = errors.New("cannot load metaBlock")
 	ErrCannotLoadSuperBlock = errors.New("cannot load superblock")
 	ErrUpload               = errors.New("upload fails")
-	ErrResourceUnavailable  = errors.New("resource unavailable")
+	ErrResourceUnavailable  = errors.New("resource unavailable, wait other option about lfs completed")
 	ErrWrongParameters      = errors.New("Wrong parameters")
 	ErrTaskCanceled         = errors.New("task canceled")
 
-	ErrNoProviders      = errors.New("there is no providers")
+	ErrNoProviders      = errors.New("there is no providers has the designated block")
 	ErrNoKeepers        = errors.New("there is no keepers")
-	ErrNoEnoughProvider = errors.New("no enough providers")
-	ErrNoEnoughKeeper   = errors.New("no enough keepers")
+	ErrNoEnoughProvider = errors.New("no enough providers can be connected")
+	ErrNoEnoughKeeper   = errors.New("no enough keepers can be connected")
 
 	ErrBucketNotExist     = errors.New("bucket not exist")
 	ErrBucketAlreadyExist = errors.New("bucket already exists")

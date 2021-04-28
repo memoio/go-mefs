@@ -188,7 +188,7 @@ func (l *LfsInfo) loadSuperBlock(update bool) error {
 	if !update {
 		l.meta = lm
 		// read from local at start
-		ldata, _ := readFromMeta(l.fsID, "0")
+		ldata, _ := readFromMeta(l.fsID, "0") //read from 'meta' dir
 		if len(ldata) > 0 {
 			localHas = true
 			sdReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
@@ -274,7 +274,7 @@ func (l *LfsInfo) loadSingleBucketInfo(bucketID int64, update bool) error {
 
 	tsb := &superBucket{}
 	if !update {
-		ldata, _ := readFromMeta(l.fsID, idName)
+		ldata, _ := readFromMeta(l.fsID, idName) // read from 'meta' dir
 		if len(ldata) > 0 {
 			bdReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
 			err := bdReader.ReadMsg(&localbucket)
@@ -361,7 +361,7 @@ func (l *LfsInfo) loadObjectsInfo(bucket *superBucket, update bool) error {
 	var data []byte
 	op := mpb.OpRecord{}
 	if !update {
-		ldata, _ := readFromMeta(l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object")
+		ldata, _ := readFromMeta(l.fsID, strconv.FormatInt(bucket.BucketID, 10)+".object") //read from 'meta' dir
 		if len(ldata) > 0 {
 			data = ldata
 			odReader := ggio.NewDelimitedReader(bytes.NewBuffer(ldata), len(ldata))
@@ -708,6 +708,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([][
 		ncid := bm.ToString()
 		provider, _, err := l.gInfo.getBlockProviders(ctx, ncid) //获取数据块的保存位置
 		if err != nil || provider == "" {
+			utils.MLogger.Debug("get providers that has block ", ncid, " fails, err: ", err)
 			continue
 		}
 
@@ -728,6 +729,7 @@ func (l *LfsInfo) getDataFromBlock(metaBackupCount int, buc, stripe string) ([][
 				}
 			}
 		}
+		utils.MLogger.Debug("get block ", ncid, " from provider ", provider, " fails, err: ", err)
 	}
 
 	bm.SetCid(strconv.Itoa(0))

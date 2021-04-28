@@ -54,6 +54,7 @@ const (
 	capacityKwd               = "storageCapacity"
 	durationKwd               = "storageDuration"
 	priceKwd                  = "storagePrice"
+	depositKwd                = "depositCapacity"
 	ksKwd                     = "keeperSla"
 	psKwd                     = "providerSla"
 	passwordKwd               = "password"
@@ -145,11 +146,11 @@ environment variable:
 		cmds.StringOption(passwordKwd, "pwd", "the password is used to decrypt the PrivateKey").WithDefault(""),
 		cmds.StringOption(secretKeyKwd, "sk", "the stored PrivateKey").WithDefault(""),
 		cmds.BoolOption(reDeploy, "rdo", "used for reDeploying contract").WithDefault(false),
-		cmds.StringOption(capacityKwd, "cap", "provider offers how many capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
+		cmds.StringOption(capacityKwd, "cap", "provider offers how many capacity of storage, such as 900MB, 10GB or 2TB, should not larger than deCap").WithDefault(""),
 		cmds.Int64Option(durationKwd, "dur", "provider offers how much time of storage, uint is day").WithDefault(utils.DefaultOfferDuration),
-		cmds.StringOption(priceKwd, "price", "implement user needs or provider offers how much price of storage").WithDefault(""),
-		cmds.StringOption("depositCapacity", "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
-		cmds.BoolOption(posKwd, "Pos feature for provider").WithDefault(false),
+		cmds.StringOption(priceKwd, "price", "implement user needs or provider offers how much price of storage, price is wei").WithDefault(""),
+		cmds.StringOption(depositKwd, "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
+		cmds.BoolOption(posKwd, "Pos feature for provider to flushing data").WithDefault(false),
 		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
 		cmds.StringOption("extAddress", "extAddr", "provider external address when using ddns or port mapping, tcp protocol only, such as: 239v39e500.zicp.vip:50272 or 123.123.123.123:50272").WithDefault(""),
 	},
@@ -309,34 +310,36 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		//从合约中获取账户角色
 		isKeeper, err := r.IsKeeper(localAddr)
 		if err != nil {
-			utils.MLogger.Error("Got Keeper err: ", err)
+			utils.MLogger.Error("judge whether you are Keeper from chain err: ", err)
 			return err
 		}
 		if isKeeper {
 			cfg.Role = metainfo.RoleKeeper
 			if nKey == "testnet" {
-				cfg.Eth = "http://119.147.213.220:8192"
+				contracts.EndPoint = "http://119.147.213.220:8192"
 			} else {
-				cfg.Eth = "http://119.147.213.220:8192"
+				contracts.EndPoint = "http://119.147.213.220:8192"
 			}
 		} else {
 			isProvider, err := r.IsProvider(localAddr)
 			if err != nil {
-				utils.MLogger.Error("Got Provider role: ", err)
+				utils.MLogger.Error("judge whether you are Provider from chain err: ", err)
 				return err
 			}
 			if isProvider {
 				cfg.Role = metainfo.RoleProvider
 				if nKey == "testnet" {
-					cfg.Eth = "http://119.147.213.220:8193"
+					contracts.EndPoint = "http://119.147.213.220:8193"
 				} else {
-					cfg.Eth = "http://119.147.213.220:8193"
+					contracts.EndPoint = "http://119.147.213.220:8193"
 				}
 			} else {
 				cfg.Role = metainfo.RoleUser
 			}
 		}
 	}
+
+	fmt.Println("use blockchain's endPoint: ", contracts.EndPoint)
 
 	kmRole, err := metainfo.NewKey(nid, mpb.KeyType_Role)
 	if err != nil {
@@ -345,7 +348,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	err = node.Data.PutKey(node.Context(), kmRole.ToString(), []byte(cfg.Role), nil, "local")
 	if err != nil {
-		utils.MLogger.Error("Put role key falied: ", err)
+		utils.MLogger.Error("Put role key to local falied: ", err)
 	}
 
 	defer func() { //关闭daemon时进行的操作
@@ -449,7 +452,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	duration, ok := req.Options[durationKwd].(int64)
 	if !ok || duration <= 0 {
-		fmt.Println("input wrong duration.")
+		fmt.Println("input wrong duration, duration should be positive integer")
 		return errWrongInput
 	}
 
@@ -462,7 +465,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if len(priceStr) > 0 {
 		price.SetString(priceStr, 10)
 		if price.Cmp(big.NewInt(0)) <= 0 {
-			fmt.Println("input wrong price: ", priceStr)
+			fmt.Println("input wrong price: ", priceStr, " price should be positive integer")
 			return errWrongInput
 		}
 	}
