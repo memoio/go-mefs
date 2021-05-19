@@ -1,11 +1,15 @@
 package keeper
 
 import (
+	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	mpb "github.com/memoio/go-mefs/pb"
+	"github.com/memoio/go-mefs/role"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 	"github.com/memoio/go-mefs/utils/metainfo"
 	"github.com/memoio/go-mefs/utils/pos"
 )
@@ -107,4 +111,41 @@ func (k *Info) handlePosDelete(km *metainfo.Key, metaValue []byte, from string) 
 		}
 		k.deleteBlockMeta(bm.GetQid(), blockID, false)
 	}
+}
+
+func getPosPreIncome(ukAddrs []common.Address, localAddr common.Address) *big.Int {
+	posPreIncome := big.NewInt(0)
+	localID, err := address.GetIDFromAddress(localAddr.Hex())
+	if err != nil {
+		utils.MLogger.Debug("getIDFromAddress err: ", err, "address: ", localAddr.Hex())
+		return posPreIncome
+	}
+
+	for _, ukAddr := range ukAddrs {
+		ukID, err := address.GetIDFromAddress(ukAddr.Hex())
+		if err != nil {
+			utils.MLogger.Debug("getIDFromAddress err: ", err, "address: ", ukAddr.Hex())
+			continue
+		}
+		ukItem, err := role.GetUpkeepingInfo(localID, ukID)
+		if err != nil {
+			utils.MLogger.Debug("GetUpkeepingInfo err: ", err, "localID: ", localID, "ukID: ", ukID)
+			continue
+		}
+		for _, kInfo := range ukItem.Keepers {
+			if kInfo.Addr.Hex() == localAddr.Hex() {
+				posPreIncome.Add(posPreIncome, calculatePreIncome(kInfo.Money, int(kInfo.PayIndex.Int64())))
+				break
+			}
+		}
+	}
+	return posPreIncome
+}
+
+func calculatePreIncome(money []*big.Int, payIndex int) *big.Int {
+	count := big.NewInt(0)
+	for ; payIndex < len(money); payIndex++ {
+		count.Add(count, money[payIndex])
+	}
+	return count
 }

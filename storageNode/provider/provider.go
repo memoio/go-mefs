@@ -48,6 +48,7 @@ type Info struct {
 	ReadIncome        *big.Int
 	StorageIncome     *big.Int
 	PosIncome         *big.Int
+	PosPreIncome      *big.Int
 	context           context.Context
 	fsGroup           sync.Map // key: queryID, value: *groupInfo
 	users             sync.Map // key: userID, value: *uInfo
@@ -165,6 +166,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		ReadIncome:    big.NewInt(0),
 		StorageIncome: big.NewInt(0),
 		PosIncome:     big.NewInt(0),
+		PosPreIncome:  big.NewInt(0),
 		offers:        make([]*role.OfferItem, 0, 1),
 		StartTime:     time.Now(),
 	}
@@ -745,7 +747,7 @@ func (p *Info) save(ctx context.Context) error {
 //GetIncomeAddress get upkeepingAddress and channelAddress of this provider to filter logs in chain
 func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.Address) {
 	ukAddr := []common.Address{}
-	posAddr := []common.Address{}
+	posAddr := []common.Address{}     //pos中的upkeeping合约地址
 	channelAddr := []common.Address{} // missing some
 	pus := p.getGroups()
 	for _, pu := range pus {
@@ -895,6 +897,8 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
+	p.PosPreIncome = getPosPreIncome(posAddrs, localAddr)
+
 	readBlock := pBlock
 
 	if len(chanAddrs) > 0 && latestBlock > readBlock {
@@ -938,6 +942,8 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		res.WriteString(p.ReadIncome.String())
 		res.WriteString(metainfo.DELIMITER)
 		res.WriteString(p.PosIncome.String())
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(p.PosPreIncome.String())
 
 		p.ds.PutKey(p.context, km.ToString(), []byte(res.String()), nil, "local")
 	}
@@ -986,7 +992,7 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 		if err == nil && len(res) > 0 {
 			utils.MLogger.Infof("Load %s income info: %s", km.ToString(), string(res))
 			ins := strings.Split(string(res), metainfo.DELIMITER)
-			if len(ins) == 5 {
+			if len(ins) == 6 {
 				lb, err := strconv.ParseInt(ins[0], 10, 0)
 				if err == nil {
 					lastBlock = lb
@@ -1010,6 +1016,11 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 				pi, ok := new(big.Int).SetString(ins[4], 10)
 				if ok {
 					p.PosIncome = pi
+				}
+
+				prei, ok := new(big.Int).SetString(ins[5], 10)
+				if ok {
+					p.PosPreIncome = prei
 				}
 			}
 		}

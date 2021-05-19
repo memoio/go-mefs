@@ -39,6 +39,7 @@ type pInfoOutput struct {
 	StorageIncome   string
 	DownloadIncome  string
 	PosIncome       string
+	PosPreIncome    string
 }
 
 type StringList struct {
@@ -108,6 +109,7 @@ var SelfCmd = &cmds.Command{
 		di := new(big.Int)
 		si := new(big.Int)
 		pi := new(big.Int)
+		prei := new(big.Int)
 
 		var eAddr string
 		ready := false
@@ -142,6 +144,7 @@ var SelfCmd = &cmds.Command{
 			si = providerIns.StorageIncome
 			di = providerIns.ReadIncome
 			pi = providerIns.PosIncome
+			prei = providerIns.PosPreIncome
 			eAddr, _ = providerIns.GetPublicAddress()
 			ea := strings.Split(eAddr, "/")
 			if len(ea) >= 5 {
@@ -184,6 +187,7 @@ var SelfCmd = &cmds.Command{
 			DownloadIncome:  utils.FormatWei(di),
 			StorageIncome:   utils.FormatWei(si),
 			PosIncome:       utils.FormatWei(pi),
+			PosPreIncome:    utils.FormatWei(prei),
 		}
 		return cmds.EmitOnce(res, output)
 	},

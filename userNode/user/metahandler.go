@@ -21,7 +21,7 @@ func (u *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 		switch opType {
 		case mpb.OpType_Put:
 			fs, ok := u.fsMap.Load(km.GetMainID())
-			if !ok {
+			if !ok || fs == nil {
 				utils.MLogger.Warn("no lfs for: ", km.GetMainID())
 			}
 			go fs.(*LfsInfo).gInfo.handleUserInit(u.context, km, metaValue, from)
