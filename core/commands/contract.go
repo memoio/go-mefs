@@ -54,9 +54,11 @@ var ContractCmd = &cmds.Command{
 		"deployKeeper":             deployKeeperCmd,   //deploy keeper contract
 		"setKeeper":                setKeeperCmd,      //将传入的账户设为keeper
 		"setKeeperPrice":           setKeeperPriceCmd,
+		"getKeeperPrice":           getKeeperPriceCmd, //get Keeper pledge price
 		"deployProvider":           deployProviderCmd, //deploy keeper contract
 		"setProvider":              setProviderCmd,    //将传入的账户设为provider
 		"setProviderPrice":         setProviderPriceCmd,
+		"getProviderPrice":         getProviderPriceCmd,        //get Provider pledge price
 		"deployKeeperProviderMap":  deployKeeperProviderMapCmd, //部署 KeeperProviderMap 合约
 		"addMasterKeeper":          addMasterKeeperCmd,
 		"addMyProvider":            addMyProviderCmd,
@@ -74,6 +76,7 @@ var ContractCmd = &cmds.Command{
 		"getBannedVersion":         getBannedCmd,
 		"deployRecover":            deployRecoverCmd,     //部署recover合约
 		"getPledgeSpace":           getAllPledgeSpaceCmd, //获得全网质押的存储空间
+		"deployQuery":              deployQueryCmd,
 	},
 }
 
@@ -188,6 +191,42 @@ var deployResolverCmd = &cmds.Command{
 			_, err := fmt.Fprintf(w, "%s", fl)
 			return err
 		}),
+	},
+}
+
+var deployQueryCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "the entrance to deploy Query",
+		ShortDescription: "deploy Query contract, you should supply your address and private key",
+	},
+	Arguments: []cmds.Argument{
+		cmds.StringArg("address", true, false, "your address, with prefix ox."),
+		cmds.StringArg("sk", true, false, "your private key, without prefix ox."),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("EndPoint", "eth", "The EndPoint this net used").WithDefault("http://119.147.213.220:8192"),
+		cmds.BoolOption("redeploy query", "redo", "if redeploy query contract").WithDefault(false),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		addr := req.Arguments[0]
+		sk := req.Arguments[1]
+		eth := req.Options["EndPoint"].(string)
+		redo := req.Options["redeploy query"].(bool)
+
+		contracts.EndPoint = eth
+
+		utils.StartLogger()
+
+		cMarket := contracts.NewCM(common.HexToAddress(addr), sk)
+		queryAddr, err := cMarket.DeployQuery(utils.DefaultCapacity, utils.DefaultDuration, big.NewInt(utils.STOREPRICE), utils.KeeperSLA, utils.ProviderSLA, redo)
+		if err != nil {
+			fmt.Println("query合约部署失败:", err)
+			return err
+		}
+		list := &StringList{
+			ChildLists: []string{"query合约部署成功", "queryAddress: ", queryAddr.Hex()},
+		}
+		return cmds.EmitOnce(res, list)
 	},
 }
 
@@ -413,6 +452,37 @@ var setKeeperPriceCmd = &cmds.Command{
 	},
 }
 
+var getKeeperPriceCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "get Keeper pledge price",
+		ShortDescription: "get the keeper pledge price",
+	},
+
+	Options: []cmds.Option{ //选项列表
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.220:8192"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		cRole := contracts.NewCR(common.HexToAddress(adminAddr), "")
+		price, err := cRole.GetKeeperPrice()
+		if err != nil {
+			fmt.Println("get Keeper price err:", err)
+			return err
+		}
+
+		fmt.Println("deposit price is:", price)
+
+		return nil
+	},
+}
+
 var deployProviderCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline:          "test deployProvider",
@@ -552,6 +622,36 @@ var setProviderPriceCmd = &cmds.Command{
 			return err
 		}
 		fmt.Println("set Provider price success")
+		return nil
+	},
+}
+
+var getProviderPriceCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline:          "get Provider pledge price",
+		ShortDescription: "get the Provider pledge price",
+	},
+
+	Options: []cmds.Option{ //选项列表
+		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.220:8192"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		eth, ok := req.Options["EndPoint"].(string)
+		if !ok {
+			fmt.Println("Endpoint is wrong")
+			return nil
+		}
+
+		contracts.EndPoint = eth
+
+		cRole := contracts.NewCR(common.HexToAddress(adminAddr), "")
+		price, err := cRole.GetProviderPrice()
+		if err != nil {
+			fmt.Println("get Provider price err:", err)
+			return err
+		}
+
+		fmt.Println("provider deposit price is:", price)
 		return nil
 	},
 }

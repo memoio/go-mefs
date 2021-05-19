@@ -50,6 +50,7 @@ type Info struct {
 	ms            *measure
 	ManageIncome  *big.Int //keeper's manage-income
 	PosIncome     *big.Int //keeper's pos-manage-income
+	PosPreIncome  *big.Int //keeper's pos-manage-pre-income
 	//groupedK/P's purpose is to make the keepers and providers in one upkeeping-contract as dispersed as possible
 	groupedKeepers   map[string][]string //divide keepers into different groups according to the ip address
 	groupedProviders map[string][]string //divide providers into different groups according to the ip address
@@ -93,6 +94,7 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		pledgeStorage:    big.NewInt(0),
 		ManageIncome:     big.NewInt(0),
 		PosIncome:        big.NewInt(0),
+		PosPreIncome:     big.NewInt(0),
 		groupedKeepers:   make(map[string][]string),
 		groupedProviders: make(map[string][]string),
 	}

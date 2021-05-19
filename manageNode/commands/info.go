@@ -186,6 +186,7 @@ var KeeperListIncomeCmd = &cmds.Command{
 
 		mi := big.NewInt(0)
 		pi := big.NewInt(0)
+		prei := big.NewInt(0)
 
 		keeperIns, ok := node.Inst.(*keeper.Info)
 		if !ok {
@@ -194,8 +195,9 @@ var KeeperListIncomeCmd = &cmds.Command{
 
 		mi = keeperIns.ManageIncome
 		pi = keeperIns.PosIncome
+		prei = keeperIns.PosPreIncome
 
-		stringList := []string{"manageIncome: " + utils.FormatWei(mi), "posIncome: " + utils.FormatWei(pi)}
+		stringList := []string{"manageIncome: " + utils.FormatWei(mi), "posIncome: " + utils.FormatWei(pi), "posPreIncome: " + utils.FormatWei(prei)}
 		list := &StringList{
 			ChildLists: stringList,
 		}

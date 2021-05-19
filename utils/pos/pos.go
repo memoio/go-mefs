@@ -16,8 +16,10 @@ const (
 	Reps     = 10 // 10备份
 )
 
+//sk:3aef4a160e08ffcd27f4ca6d49ec0a0dfe39f8ae2f3f880b32a405ade9eb0eea
+//ukAddr: 0x180956aC2979c424e481689B484186B3fe184b40
 func GetPosAddr() string {
-	return "0x46EF41A6c60912173b50dAD714Ca2a6f82c32aE8"
+	return "0x2F34Aae01b7A66502d114EbcC50b16C78E645C32"
 }
 
 func GetPosId() string {

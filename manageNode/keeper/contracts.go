@@ -232,7 +232,7 @@ func (k *Info) getFromChainRegular(ctx context.Context) {
 		if err == nil && len(res) > 0 {
 			utils.MLogger.Infof("Load %s income info: %s", km.ToString(), string(res))
 			ins := strings.Split(string(res), metainfo.DELIMITER)
-			if len(ins) == 3 {
+			if len(ins) == 4 {
 				lb, err := strconv.ParseInt(ins[0], 10, 0)
 				if err == nil {
 					lastBlock = lb
@@ -246,6 +246,11 @@ func (k *Info) getFromChainRegular(ctx context.Context) {
 				pi, ok := new(big.Int).SetString(ins[2], 10)
 				if ok {
 					k.PosIncome = pi
+				}
+
+				prei, ok := new(big.Int).SetString(ins[3], 10)
+				if ok {
+					k.PosPreIncome = prei
 				}
 			}
 		}
@@ -346,6 +351,8 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
+	k.PosPreIncome = getPosPreIncome(posAddrs, localAddr)
+
 	km, err := metainfo.NewKey(k.localID, mpb.KeyType_Income)
 	if err == nil {
 		var res strings.Builder
@@ -354,6 +361,8 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		res.WriteString(k.ManageIncome.String())
 		res.WriteString(metainfo.DELIMITER)
 		res.WriteString(k.PosIncome.String())
+		res.WriteString(metainfo.DELIMITER)
+		res.WriteString(k.PosPreIncome.String())
 
 		k.ds.PutKey(k.context, km.ToString(), []byte(res.String()), nil, "local")
 	}

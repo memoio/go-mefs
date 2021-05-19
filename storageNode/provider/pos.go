@@ -2,10 +2,13 @@ package provider
 
 import (
 	"context"
+	"math/big"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/memoio/go-mefs/crypto/pdp"
 	df "github.com/memoio/go-mefs/data-format"
@@ -440,4 +443,41 @@ func fillRandom(p []byte) {
 			val >>= 8
 		}
 	}
+}
+
+func getPosPreIncome(ukAddrs []common.Address, localAddr common.Address) *big.Int {
+	posPreIncome := big.NewInt(0)
+	localID, err := address.GetIDFromAddress(localAddr.Hex())
+	if err != nil {
+		utils.MLogger.Debug("getIDFromAddress err: ", err, "address: ", localAddr.Hex())
+		return posPreIncome
+	}
+
+	for _, ukAddr := range ukAddrs {
+		ukID, err := address.GetIDFromAddress(ukAddr.Hex())
+		if err != nil {
+			utils.MLogger.Debug("getIDFromAddress err: ", err, "address: ", ukAddr.Hex())
+			continue
+		}
+		ukItem, err := role.GetUpkeepingInfo(localID, ukID)
+		if err != nil {
+			utils.MLogger.Debug("GetUpkeepingInfo err: ", err, "localID: ", localID, "ukID: ", ukID)
+			continue
+		}
+		for _, pInfo := range ukItem.Providers {
+			if pInfo.Addr.Hex() == localAddr.Hex() {
+				posPreIncome.Add(posPreIncome, calculatePreIncome(pInfo.Money, int(pInfo.PayIndex.Int64())))
+				break
+			}
+		}
+	}
+	return posPreIncome
+}
+
+func calculatePreIncome(money []*big.Int, payIndex int) *big.Int {
+	count := big.NewInt(0)
+	for ; payIndex < len(money); payIndex++ {
+		count.Add(count, money[payIndex])
+	}
+	return count
 }
