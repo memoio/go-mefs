@@ -57,7 +57,7 @@ func (k *Info) stPrePayAll(ctx context.Context) {
 		}
 
 		if uq.uid == pos.GetPosId() {
-			utils.MLogger.Info("SpaceTime Pay for pos user")
+			utils.MLogger.Info("SpaceTime Pay for post user")
 			thisGroup.upkeeping.Price = k.getPosPrice()
 		}
 
@@ -312,7 +312,7 @@ func (g *groupInfo) stPay(ctx context.Context, proID, localSk, localID string, d
 			}
 
 			if g.userID == pos.GetPosId() {
-				utils.MLogger.Infof("SpaceTimePay start pay for pos user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
+				utils.MLogger.Infof("SpaceTimePay start pay for post user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
 			} else {
 				utils.MLogger.Infof("SpaceTimePay start pay for user %s fsID %s pro %s from %s, length %s value %s success", g.userID, g.groupID, proID, st.String(), sl.String(), sv.String())
 			}

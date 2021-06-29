@@ -323,7 +323,7 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 	posStartBlock := pBlock
 	if len(posAddrs) > 0 && latestBlock > posStartBlock {
-		utils.MLogger.Infof("get pos income from chain")
+		utils.MLogger.Infof("get post income from chain")
 
 		endBlock = latestBlock
 
@@ -334,7 +334,7 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 			posMIncome, _, err := a.GetStorageIncome(posAddrs, localAddr, posStartBlock, endBlock)
 			if err != nil {
-				utils.MLogger.Info("get pos ukpay log err:", err)
+				utils.MLogger.Info("get post ukpay log err:", err)
 				break
 			}
 

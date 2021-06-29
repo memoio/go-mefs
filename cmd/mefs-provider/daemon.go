@@ -61,7 +61,7 @@ const (
 	secretKeyKwd              = "secretKey"
 	reDeploy                  = "reDeployContract"
 	netKeyKwd                 = "netKey"
-	posKwd                    = "pos"
+	postKwd                    = "post"
 	gcKwd                     = "cleanPos"
 )
 
@@ -150,8 +150,8 @@ environment variable:
 		cmds.Int64Option(durationKwd, "dur", "provider offers how much time of storage, uint is day").WithDefault(utils.DefaultOfferDuration),
 		cmds.StringOption(priceKwd, "price", "implement user needs or provider offers how much price of storage, price is wei").WithDefault(""),
 		cmds.StringOption(depositKwd, "deCap", "provider deposits how capacity of storage, such as 900MB, 10GB or 2TB").WithDefault(""),
-		cmds.BoolOption(posKwd, "Pos feature for provider to flushing data").WithDefault(false),
-		cmds.BoolOption(gcKwd, "gc", "used for provider to clean pos data").WithDefault(false),
+		cmds.BoolOption(postKwd, "Post feature for provider to flushing data").WithDefault(false),
+		cmds.BoolOption(gcKwd, "gc", "used for provider to clean post data").WithDefault(false),
 		cmds.StringOption("extAddress", "extAddr", "provider external address when using ddns or port mapping, tcp protocol only, such as: 239v39e500.zicp.vip:50272 or 123.123.123.123:50272").WithDefault(""),
 	},
 	Subcommands: map[string]*cmds.Command{},
@@ -482,7 +482,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("Starting as a provider")
 
-		pos, _ := req.Options[posKwd].(bool)
+		pos, _ := req.Options[postKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
 		ins, err := provider.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc, exAddr)

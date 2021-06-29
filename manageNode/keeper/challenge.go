@@ -63,11 +63,11 @@ func (k *Info) challengeRegular(ctx context.Context) {
 					if pu.uid == pos.GetPosId() {
 						key, value, err := thisGroup.genChallengeRandom100(k.localID, pu.uid, pu.qid, proID, mtime)
 						if err != nil {
-							utils.MLogger.Infof("Challenge data for pos user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
+							utils.MLogger.Infof("Challenge data for post user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)
 							continue
 						}
 						count++
-						utils.MLogger.Infof("Challenge pos data: %s", key)
+						utils.MLogger.Infof("Challenge post data: %s", key)
 						k.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), key, value, nil, proID)
 						continue
 					}

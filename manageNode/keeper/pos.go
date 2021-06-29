@@ -16,7 +16,7 @@ import (
 
 // handle pos add provider
 func (k *Info) handlePosGet(km *metainfo.Key, val []byte, from string) {
-	utils.MLogger.Info("handlePos Add provider: ", km.ToString())
+	utils.MLogger.Info("handlePost Add provider: ", km.ToString())
 
 	// add provider to upkeeping if it is not in upkeeping
 	ops := km.GetOptions()
@@ -42,7 +42,7 @@ func (k *Info) handlePosGet(km *metainfo.Key, val []byte, from string) {
 
 	err := k.ukAddProvider(ops[0], km.GetMainID(), pid)
 	if err != nil {
-		utils.MLogger.Info("handlePos Add provider err:", err)
+		utils.MLogger.Info("handlePost Add provider err:", err)
 	}
 }
 

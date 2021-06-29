@@ -608,6 +608,10 @@ var lfsPutObjectCmd = &cmds.Command{
 		cmds.StringOption(ObjectName, "obn", "The name of the file or Bucket that you want to put").WithDefault(""),
 		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
 	},
+	PreRun: func(req *cmds.Request, env cmds.Environment) error {
+		fmt.Println("putting object...")
+		return nil
+	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		//暂时不做成api层的接口
 		node, err := cmdenv.GetNode(env)

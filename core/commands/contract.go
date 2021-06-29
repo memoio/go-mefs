@@ -338,14 +338,12 @@ var isKeeperCmd = &cmds.Command{
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		cn := req.Options["CodeName"].(string)
 		if cn != codeName {
-			fmt.Println("CodeName is wrong")
-			return nil
+			return cmds.EmitOnce(res, "CodeName is wrong")
 		}
 
 		eth, ok := req.Options["EndPoint"].(string)
 		if !ok {
-			fmt.Println("Endpoint is wrong")
-			return nil
+			return cmds.EmitOnce(res, "Endpoint is wrong")
 		}
 
 		contracts.EndPoint = eth
@@ -353,8 +351,7 @@ var isKeeperCmd = &cmds.Command{
 		cRole := contracts.NewCR(common.HexToAddress(req.Arguments[0]), "")
 		isKeeper, err := cRole.IsKeeper(common.HexToAddress(req.Arguments[0]))
 		if err != nil {
-			fmt.Println("isKeeper err:", err)
-			return err
+			return cmds.EmitOnce(res, err)
 		}
 
 		return cmds.EmitOnce(res, isKeeper)
