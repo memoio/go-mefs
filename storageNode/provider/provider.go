@@ -186,7 +186,7 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		go func() {
 			err := m.PosService(ctx, gc)
 			if err != nil {
-				utils.MLogger.Errorf("start pos err: %s ", err)
+				utils.MLogger.Errorf("start post err: %s ", err)
 			}
 		}()
 	}
@@ -868,7 +868,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 	posBlock := pBlock
 
 	if len(posAddrs) > 0 && latestBlock > posBlock {
-		utils.MLogger.Infof("get pos income from chain")
+		utils.MLogger.Infof("get post income from chain")
 
 		endBlock = latestBlock
 
@@ -879,7 +879,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 			sIncome, _, err := a.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
 			if err != nil {
-				utils.MLogger.Info("get pos ukpay log err:", err)
+				utils.MLogger.Info("get post ukpay log err:", err)
 				break
 			}
 

@@ -95,16 +95,19 @@ func (l *LfsInfo) PutObject(ctx context.Context, bucketName, objectName string, 
 	object.Lock()
 	defer object.Unlock()
 
+	//upload data
 	obj, opart, err := l.addObjectData(ctx, bucket, object, reader)
 	if err != nil {
 		return &obj.ObjectInfo, err
 	}
 
+	//update objectInfo in bucket and metadata
 	err = l.insertObject(bucket, obj)
 	if err != nil {
 		return &obj.ObjectInfo, err
 	}
 
+	//flush object meta and update bucket root
 	err = l.appendPart(bucket, obj, opart)
 	if err != nil {
 		return &obj.ObjectInfo, err

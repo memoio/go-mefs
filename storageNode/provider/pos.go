@@ -55,7 +55,7 @@ var opt = &df.DataCoder{
 func (p *Info) PosService(ctx context.Context, gc bool) error {
 	// 获取合约地址一次，主要是获取keeper，用于发送block meta
 	// handleUserDeployedContracts()
-	utils.MLogger.Info("Start Pos Service")
+	utils.MLogger.Info("Start Post Service")
 
 	//从磁盘读取存储的Cidprefix
 	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
@@ -82,7 +82,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		}
 	}
 
-	utils.MLogger.Info("before traverse pos blocks reaches sid: ", curSid)
+	utils.MLogger.Info("before traverse post blocks reaches sid: ", curSid)
 
 	p.StoragePosUsed = uint64(pos.DLen * pos.Reps * (curSid + 1))
 
@@ -127,7 +127,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 		}
 
 		for _, keeper := range gp.keepers {
-			utils.MLogger.Info("Send Pos add to keepers:", keeper)
+			utils.MLogger.Info("Send Post add to keepers:", keeper)
 			p.ds.SendMetaRequest(ctx, int32(mpb.OpType_Get), km.ToString(), []byte(p.localID), nil, keeper)
 		}
 
@@ -138,7 +138,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 	//填充opt.KeySet
 	mkey, err := pdp.GenKeySetV1WithSeed(pos.GetPosSeed(), pdp.SCount)
 	if err != nil {
-		utils.MLogger.Info("Init bls config for pos user fail: ", err)
+		utils.MLogger.Info("Init bls config for post user fail: ", err)
 		return err
 	}
 
@@ -150,7 +150,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 
 	p.traversePath(gc)
 
-	utils.MLogger.Info("after traverse pos blocks reaches sid: ", curSid)
+	utils.MLogger.Info("after traverse post blocks reaches sid: ", curSid)
 
 	newbm, err := metainfo.NewBlockMeta(groupID, strconv.Itoa(bucketNum), strconv.Itoa(curSid), "0")
 	if err != nil {
@@ -172,7 +172,7 @@ func (p *Info) PosService(ctx context.Context, gc bool) error {
 
 // posRegular checks posBlocks and decide to add/delete
 func (p *Info) posRegular(ctx context.Context) {
-	utils.MLogger.Info("Pos start!")
+	utils.MLogger.Info("Post start!")
 
 	p.doGenerateOrDelete()
 	ticker := time.NewTicker(30 * time.Minute)
@@ -192,7 +192,7 @@ func (p *Info) posRegular(ctx context.Context) {
 
 func (p *Info) traversePath(gc bool) {
 	if gc {
-		utils.MLogger.Info("clean pos blocks first")
+		utils.MLogger.Info("clean post blocks first")
 	}
 
 	notfound := 0
@@ -212,7 +212,7 @@ func (p *Info) traversePath(gc bool) {
 			ncid := cid.NewCidV2([]byte(res.String()))
 			exist, err := p.ds.BlockStore().Has(ncid)
 			if err != nil {
-				utils.MLogger.Infof("pos has %s failed: %s", res.String(), err)
+				utils.MLogger.Infof("post has %s failed: %s", res.String(), err)
 				notfound++
 				continue
 			}
@@ -223,7 +223,7 @@ func (p *Info) traversePath(gc bool) {
 				}
 			} else {
 				notfound++
-				utils.MLogger.Infof("pos not has %s", res.String())
+				utils.MLogger.Infof("post not has %s", res.String())
 			}
 		}
 
@@ -297,7 +297,7 @@ func (p *Info) doGenerateOrDelete() {
 
 // generatePosBlocks generate block accoding to the free space
 func (p *Info) generatePosBlocks(increaseSpace uint64) {
-	utils.MLogger.Infof("generate pos blocks for space: %d", increaseSpace)
+	utils.MLogger.Infof("generate post blocks for space: %d", increaseSpace)
 
 	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
 	if err != nil {
@@ -318,7 +318,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 		bm.SetSid(strconv.Itoa(curSid))
 		data, offset, err := opt.Encode(tmpData, bm.ToString(3), 0)
 		if err != nil {
-			utils.MLogger.Info("UploadMulpolicy in generate Pos Blocks error: ", err)
+			utils.MLogger.Info("UploadMulpolicy in generate Post Blocks error: ", err)
 			continue
 		}
 
@@ -371,7 +371,7 @@ func (p *Info) generatePosBlocks(increaseSpace uint64) {
 }
 
 func (p *Info) deletePosBlocks(decreseSpace uint64) {
-	utils.MLogger.Info("data is about to exceed the space limit, delete pos blocks")
+	utils.MLogger.Info("data is about to exceed the space limit, delete post blocks")
 
 	posKM, err := metainfo.NewKey(p.localID, mpb.KeyType_PosMeta)
 	if err != nil {

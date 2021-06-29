@@ -524,6 +524,8 @@ func (g *groupInfo) handleUserInit(ctx context.Context, km *metainfo.Key, metaVa
 		}
 	}
 
+	utils.MLogger.Info("collected ", kcount, " keepers, ", pcount, " providers.")
+
 	if kcount >= g.keeperSLA && pcount >= g.providerSLA {
 		g.state = collectDone
 	}
@@ -818,7 +820,7 @@ func (g *groupInfo) heartbeat(ctx context.Context) error {
 	g.RLock()
 	defer g.RUnlock()
 
-	utils.MLogger.Info("Send heartbeat to kps for user: ", g.userID)
+	utils.MLogger.Debug("Send heartbeat to kps for user: ", g.userID)
 
 	// key: queryID/"UserStart"/userID/kc/pc/id
 	kmc, err := metainfo.NewKey(g.groupID, mpb.KeyType_HeartBeat, g.userID, strconv.Itoa(g.keeperSLA), strconv.Itoa(g.providerSLA), g.sessionID.String())

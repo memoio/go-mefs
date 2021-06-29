@@ -67,5 +67,5 @@ For example: /home/zl/.mefs/keystore/0x2F34Aae01b7A66502d114EbcC50b16C78E645C32
 			return err
 		}),
 	},
-	Type: IdOutput{},
+	Type: StringList{},
 }

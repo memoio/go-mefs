@@ -41,7 +41,7 @@ func (p *Info) getNewUserConfig(userID, groupID string) (pdp.KeySet, error) {
 	if userID == pos.GetPosId() {
 		mkey, err := pdp.GenKeySetV1WithSeed(pos.GetPosSeed(), pdp.SCount)
 		if err != nil {
-			utils.MLogger.Info("Init bls config for pos user fail: ", err)
+			utils.MLogger.Info("Init bls config for post user fail: ", err)
 			return nil, err
 		}
 

@@ -346,7 +346,7 @@ var swarmConnectCmd = &cmds.Command{
 
 The address format is an MEFS multiaddr:
 
-mefs swarm connect "/ip4/119.3.159.159/tcp/4001/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp"
+mefs swarm connect "/ip4/103.39.231.220/tcp/14069/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp"
 `,
 	},
 	Arguments: []cmds.Argument{
@@ -391,7 +391,7 @@ var swarmDisconnectCmd = &cmds.Command{
 'mefs swarm disconnect' closes a connection to a peer address. The address
 format is an MEFS multiaddr:
 
-mefs swarm disconnect "/ip4/119.3.159.159/tcp/4001/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp"
+mefs swarm disconnect "/ip4/103.39.231.220/tcp/14069/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp"
 
 The disconnect is not permanent; if mefs needs to talk to that address later,
 it will reconnect.
