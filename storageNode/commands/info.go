@@ -145,7 +145,10 @@ var SelfCmd = &cmds.Command{
 			di = providerIns.ReadIncome
 			pi = providerIns.PosIncome
 			prei = providerIns.PosPreIncome
-			eAddr, _ = providerIns.GetPublicAddress()
+			eAddr = providerIns.ExtAddr
+			if eAddr == "" {
+				eAddr, _ = providerIns.GetPublicAddress()
+			}
 			ea := strings.Split(eAddr, "/")
 			if len(ea) >= 5 {
 				ipa := ea[2] + ":" + ea[4]

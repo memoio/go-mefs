@@ -844,9 +844,11 @@ func (n *impl) GetAddrAndConnect(ctx context.Context, to string) (string, bool) 
 			continue
 		}
 
+		tp, _ := peer.SplitAddr(pai)
+
 		npi = peer.AddrInfo{
 			ID:    toID,
-			Addrs: []ma.Multiaddr{pai},
+			Addrs: []ma.Multiaddr{tp},
 		}
 
 		utils.MLogger.Debug(to, " has extern ip: ", npi.String())
@@ -861,6 +863,7 @@ func (n *impl) GetAddrAndConnect(ctx context.Context, to string) (string, bool) 
 				return pai.String(), true
 			}
 		}
+		utils.MLogger.Debug("connect ", toID, " failed by extern ip ", npi.String(), "; err: ", err)
 	}
 	return "", false
 }

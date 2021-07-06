@@ -19,7 +19,9 @@ var DefaultBootstrapPeers []multiaddr.Multiaddr
 func init() {
 	for _, s := range []string{
 		"/ip4/103.39.231.220/tcp/14069/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp",
+		"/ip4/1.182.90.4/tcp/14050/p2p/8MG5qs3p9htzsTRxNyaAjbsruZk2a5",
 		"/ip4/103.39.231.220/tcp/14061/p2p/8MGRqoRZisBforqyu8eCim2e1MiohV",
+		"/ip4/1.182.90.4/tcp/14051/p2p/8MK9U1TMNuHrZ5NW5usomiycVe19yZ",
 		"/ip4/103.39.231.220/tcp/14064/p2p/8MHsfVNmRYiCNUaofa1b34VoymnRm4",
 		"/ip4/39.98.240.7/tcp/4001/p2p/8MK6qHvAfayLQy4d2684NTLAVLpQFk",
 		"/ip4/39.100.0.162/tcp/4001/p2p/8MJ5cAWfAP86cHmAcC3dxqzK41dh4a",
