@@ -37,18 +37,18 @@ type Info struct {
 	localID           string
 	sk                string
 	state             bool
-	enablePos         bool
+	enablePost         bool
 	ds                data.Service
 	StorageTotal      uint64
 	StorageUsed       uint64
-	StoragePosUsed    uint64
+	StoragePostUsed    uint64
 	LocalStorageTotal uint64
 	LocalStorageFree  uint64
 	TotalIncome       *big.Int
 	ReadIncome        *big.Int
 	StorageIncome     *big.Int
-	PosIncome         *big.Int
-	PosPreIncome      *big.Int
+	PostIncome         *big.Int
+	PostPreIncome      *big.Int
 	context           context.Context
 	fsGroup           sync.Map // key: queryID, value: *groupInfo
 	users             sync.Map // key: userID, value: *uInfo
@@ -70,7 +70,7 @@ type ProviderStartOption struct {
 	DepositSize   int64
 	Price         *big.Int
 	ReDeployOffer bool
-	EnablePos     bool
+	EnablePost     bool
 	Gc            bool
 	ExtAddr       string
 }
@@ -144,7 +144,7 @@ type pInfo struct {
 }
 
 //New start provider service
-func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, depositSize int64, price *big.Int, reDeployOffer, enablePos, gc bool, extAddr string) (instance.Service, error) {
+func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing, capacity, duration, depositSize int64, price *big.Int, reDeployOffer, enablePost, gc bool, extAddr string) (instance.Service, error) {
 	mea := &measure{
 		balance:     metrics.New("provider.balance", "Balance of this provider").Gauge(),
 		groupNum:    metrics.New("provider.group_num", "Group number").Gauge(),
@@ -161,12 +161,12 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		ds:            ds,
 		context:       ctx,
 		ms:            mea,
-		enablePos:     enablePos,
+		enablePost:     enablePost,
 		TotalIncome:   big.NewInt(0),
 		ReadIncome:    big.NewInt(0),
 		StorageIncome: big.NewInt(0),
-		PosIncome:     big.NewInt(0),
-		PosPreIncome:  big.NewInt(0),
+		PostIncome:     big.NewInt(0),
+		PostPreIncome:  big.NewInt(0),
 		offers:        make([]*role.OfferItem, 0, 1),
 		StartTime:     time.Now(),
 	}
@@ -182,9 +182,9 @@ func New(ctx context.Context, id, sk string, ds data.Service, rt routing.Routing
 		return nil, err
 	}
 
-	if m.enablePos {
+	if m.enablePost {
 		go func() {
-			err := m.PosService(ctx, gc)
+			err := m.PostService(ctx, gc)
 			if err != nil {
 				utils.MLogger.Errorf("start post err: %s ", err)
 			}
@@ -615,8 +615,8 @@ func (p *Info) load(ctx context.Context) error {
 				continue
 			}
 
-			// pos user is init in pos service
-			if userID == pos.GetPosId() {
+			// post user is init in post service
+			if userID == pos.GetPostId() {
 				continue
 			}
 
@@ -747,7 +747,7 @@ func (p *Info) save(ctx context.Context) error {
 //GetIncomeAddress get upkeepingAddress and channelAddress of this provider to filter logs in chain
 func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.Address) {
 	ukAddr := []common.Address{}
-	posAddr := []common.Address{}     //pos中的upkeeping合约地址
+	postAddr := []common.Address{}     //post中的upkeeping合约地址
 	channelAddr := []common.Address{} // missing some
 	pus := p.getGroups()
 	for _, pu := range pus {
@@ -765,8 +765,8 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 			continue
 		}
 
-		if pu.uid == pos.GetPosId() {
-			posAddr = append(posAddr, tmp)
+		if pu.uid == pos.GetPostId() {
+			postAddr = append(postAddr, tmp)
 			continue
 		} else {
 			ukAddr = append(ukAddr, tmp)
@@ -796,32 +796,32 @@ func (p *Info) GetIncomeAddress() ([]common.Address, []common.Address, []common.
 		}
 	}
 
-	if len(posAddr) == 0 {
-		qItem, err := role.GetLatestQuery(pos.GetPosId())
+	if len(postAddr) == 0 {
+		qItem, err := role.GetLatestQuery(pos.GetPostId())
 		if err != nil {
-			return ukAddr, posAddr, channelAddr
+			return ukAddr, postAddr, channelAddr
 		}
-		uItem, err := role.GetUpKeeping(pos.GetPosId(), qItem.QueryID)
+		uItem, err := role.GetUpKeeping(pos.GetPostId(), qItem.QueryID)
 		if err != nil {
-			return ukAddr, posAddr, channelAddr
+			return ukAddr, postAddr, channelAddr
 		}
 		localAddr, err := address.GetAddressFromID(p.localID)
 		if err != nil {
-			return ukAddr, posAddr, channelAddr
+			return ukAddr, postAddr, channelAddr
 		}
 		for _, pi := range uItem.Providers {
 			if pi.Addr.String() == localAddr.String() {
 				uAddr, err := address.GetAddressFromID(uItem.UpKeepingID)
 				if err != nil {
-					return ukAddr, posAddr, channelAddr
+					return ukAddr, postAddr, channelAddr
 				}
-				posAddr = append(posAddr, uAddr)
+				postAddr = append(postAddr, uAddr)
 			}
 		}
 
 	}
 
-	return ukAddr, posAddr, channelAddr
+	return ukAddr, postAddr, channelAddr
 }
 
 func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) {
@@ -833,7 +833,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 	latestBlock := b.Number().Int64()
 	endBlock := b.Number().Int64()
-	ukaddrs, posAddrs, chanAddrs := p.GetIncomeAddress()
+	ukaddrs, postAddrs, chanAddrs := p.GetIncomeAddress()
 
 	storageBlock := pBlock
 	if len(ukaddrs) > 0 && latestBlock > storageBlock {
@@ -865,27 +865,27 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
-	posBlock := pBlock
+	postBlock := pBlock
 
-	if len(posAddrs) > 0 && latestBlock > posBlock {
+	if len(postAddrs) > 0 && latestBlock > postBlock {
 		utils.MLogger.Infof("get post income from chain")
 
 		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > posBlock+1024 {
-				endBlock = posBlock + 1024
+			if endBlock > postBlock+1024 {
+				endBlock = postBlock + 1024
 			}
 
-			sIncome, _, err := a.GetStorageIncome(posAddrs, localAddr, posBlock, endBlock)
+			sIncome, _, err := a.GetStorageIncome(postAddrs, localAddr, postBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get post ukpay log err:", err)
 				break
 			}
 
-			p.PosIncome.Add(p.PosIncome, sIncome)
+			p.PostIncome.Add(p.PostIncome, sIncome)
 			p.TotalIncome.Add(p.TotalIncome, sIncome)
-			posBlock = endBlock
+			postBlock = endBlock
 
 			if endBlock == latestBlock {
 				break
@@ -897,7 +897,7 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
-	p.PosPreIncome = getPosPreIncome(posAddrs, localAddr)
+	p.PostPreIncome = getPostPreIncome(postAddrs, localAddr)
 
 	readBlock := pBlock
 
@@ -941,9 +941,9 @@ func (p *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		res.WriteString(metainfo.DELIMITER)
 		res.WriteString(p.ReadIncome.String())
 		res.WriteString(metainfo.DELIMITER)
-		res.WriteString(p.PosIncome.String())
+		res.WriteString(p.PostIncome.String())
 		res.WriteString(metainfo.DELIMITER)
-		res.WriteString(p.PosPreIncome.String())
+		res.WriteString(p.PostPreIncome.String())
 
 		p.ds.PutKey(p.context, km.ToString(), []byte(res.String()), nil, "local")
 	}
@@ -1015,12 +1015,12 @@ func (p *Info) getFromChainRegular(ctx context.Context) {
 
 				pi, ok := new(big.Int).SetString(ins[4], 10)
 				if ok {
-					p.PosIncome = pi
+					p.PostIncome = pi
 				}
 
 				prei, ok := new(big.Int).SetString(ins[5], 10)
 				if ok {
-					p.PosPreIncome = prei
+					p.PostPreIncome = prei
 				}
 			}
 		}

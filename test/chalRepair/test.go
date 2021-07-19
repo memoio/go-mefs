@@ -193,7 +193,7 @@ func challengeTest() error {
 	}
 
 	if len(pro) != 2 || pro[0] == "" || pro[1] == "" {
-		log.Fatal("cannot get block pos: ", pro[0], " and ", pro[1])
+		log.Fatal("cannot get block post: ", pro[0], " and ", pro[1])
 	}
 
 	ret, err := getBlock(sh, cid[0], pro[0]) //获取块的MD5
@@ -304,7 +304,7 @@ func challengeTest() error {
 	}
 
 	if len(newProvider) == 0 {
-		log.Fatal("cannot get block pos")
+		log.Fatal("cannot get block post")
 	}
 
 	log.Println("new provider is: ", newProvider)

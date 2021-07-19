@@ -25,7 +25,7 @@ const (
 	payInternval = int64(2 * 60 * 60)
 )
 
-// MarketingMoney is used to pos price
+// MarketingMoney is used to post price
 var MarketingMoney int64 = 1
 
 //---config----
@@ -38,8 +38,8 @@ func (k *Info) getUserBLS12Config(userID, groupID string) (pdp.VerifyKey, error)
 		return nil, metainfo.ErrIllegalKey
 	}
 
-	if userID == pos.GetPosId() {
-		mkey, err := pdp.GenKeySetV1WithSeed(pos.GetPosSeed(), pdp.SCount)
+	if userID == pos.GetPostId() {
+		mkey, err := pdp.GenKeySetV1WithSeed(pos.GetPostSeed(), pdp.SCount)
 		if err != nil {
 			return nil, err
 		}

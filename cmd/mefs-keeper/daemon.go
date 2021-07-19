@@ -58,8 +58,8 @@ const (
 	secretKeyKwd              = "secretKey"
 	reDeploy                  = "reDeployContract"
 	netKeyKwd                 = "netKey"
-	posKwd                    = "pos"
-	gcKwd                     = "cleanPos"
+	postKwd                    = "post"
+	gcKwd                     = "cleanPost"
 )
 
 var (
@@ -327,8 +327,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			}
 		}
 	}
-
-	fmt.Println("use blockchain's endPoint: ", contracts.EndPoint)
 
 	kmRole, err := metainfo.NewKey(nid, mpb.KeyType_Role)
 	if err != nil {

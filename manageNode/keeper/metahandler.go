@@ -49,11 +49,11 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	case mpb.KeyType_BlockPos:
 		switch opType {
 		case mpb.OpType_Put:
-			go k.handleAddBlockPos(km, metaValue, sig, from)
+			go k.handleAddBlockPost(km, metaValue, sig, from)
 		case mpb.OpType_Get:
 			return k.handleGetKey(km, metaValue, sig, from)
 		case mpb.OpType_Delete:
-			go k.handleDeleteBlockPos(km, metaValue, sig, from)
+			go k.handleDeleteBlockPost(km, metaValue, sig, from)
 		}
 	case mpb.KeyType_Challenge:
 		if opType == mpb.OpType_Put {
@@ -82,11 +82,11 @@ func (k *Info) HandleMetaMessage(opType mpb.OpType, metaKey string, metaValue, s
 	case mpb.KeyType_Pos:
 		switch opType {
 		case mpb.OpType_Put:
-			go k.handlePosAdd(km, metaValue, from)
+			go k.handlePostAdd(km, metaValue, from)
 		case mpb.OpType_Delete:
-			go k.handlePosDelete(km, metaValue, from)
+			go k.handlePostDelete(km, metaValue, from)
 		case mpb.OpType_Get:
-			go k.handlePosGet(km, metaValue, from)
+			go k.handlePostGet(km, metaValue, from)
 		}
 	case mpb.KeyType_StPaySign:
 		switch opType {
@@ -315,32 +315,32 @@ func (k *Info) handleDeleteKey(km *metainfo.Key, metaValue, sig []byte, from str
 
 // key: blockID/"BlockPos"
 // value: pid/offset
-func (k *Info) handleAddBlockPos(km *metainfo.Key, metaValue, sig []byte, from string) {
-	utils.MLogger.Info("handleAddBlockPos: ", km.ToString())
+func (k *Info) handleAddBlockPost(km *metainfo.Key, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handleAddBlockPost: ", km.ToString())
 
 	blockID := km.GetMainID()
 
 	sValue := strings.Split(string(metaValue), metainfo.DELIMITER)
 	if len(sValue) != 2 {
-		utils.MLogger.Info("handleBlockPos err: ", metainfo.ErrIllegalValue)
+		utils.MLogger.Info("handleBlockPost err: ", metainfo.ErrIllegalValue)
 		return
 	}
 	offset, err := strconv.Atoi(sValue[1])
 	if err != nil {
-		utils.MLogger.Info("handleBlockPos err: ", err)
+		utils.MLogger.Info("handleBlockPost err: ", err)
 		return
 	}
 
 	bids := strings.SplitN(blockID, metainfo.BlockDelimiter, 2)
 	err = k.addBlockMeta(bids[0], bids[1], sValue[0], offset, true)
 	if err != nil {
-		utils.MLogger.Error("handleBlockPos err: ", err)
+		utils.MLogger.Error("handleBlockPost err: ", err)
 	}
 	return
 }
 
-func (k *Info) handleDeleteBlockPos(km *metainfo.Key, metaValue, sig []byte, from string) {
-	utils.MLogger.Info("handleDeleteBlockPos: ", km.ToString())
+func (k *Info) handleDeleteBlockPost(km *metainfo.Key, metaValue, sig []byte, from string) {
+	utils.MLogger.Info("handleDeleteBlockPost: ", km.ToString())
 	blockID := km.GetMainID()
 
 	// delete from local

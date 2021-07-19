@@ -194,10 +194,10 @@ var KeeperListIncomeCmd = &cmds.Command{
 		}
 
 		mi = keeperIns.ManageIncome
-		pi = keeperIns.PosIncome
-		prei = keeperIns.PosPreIncome
+		pi = keeperIns.PostIncome
+		prei = keeperIns.PostPreIncome
 
-		stringList := []string{"manageIncome: " + utils.FormatWei(mi), "posIncome: " + utils.FormatWei(pi), "posPreIncome: " + utils.FormatWei(prei)}
+		stringList := []string{"manageIncome: " + utils.FormatWei(mi), "postIncome: " + utils.FormatWei(pi), "postPreIncome: " + utils.FormatWei(prei)}
 		list := &StringList{
 			ChildLists: stringList,
 		}

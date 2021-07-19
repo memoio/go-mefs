@@ -134,7 +134,7 @@ func (k *Info) loadContract(mode bool) error {
 	return nil
 }
 
-// addProvider 将传入pid加入posuser的upkeeping合约
+// addProvider 将传入pid加入postuser的upkeeping合约
 func (k *Info) ukAddProvider(uid, gid, pid string) error {
 	gp := k.getGroupInfo(uid, gid, true)
 	if gp == nil || gp.upkeeping == nil {
@@ -245,12 +245,12 @@ func (k *Info) getFromChainRegular(ctx context.Context) {
 
 				pi, ok := new(big.Int).SetString(ins[2], 10)
 				if ok {
-					k.PosIncome = pi
+					k.PostIncome = pi
 				}
 
 				prei, ok := new(big.Int).SetString(ins[3], 10)
 				if ok {
-					k.PosPreIncome = prei
+					k.PostPreIncome = prei
 				}
 			}
 		}
@@ -290,7 +290,7 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 
 	latestBlock := b.Number().Int64()
 	endBlock := b.Number().Int64()
-	ukaddrs, posAddrs := k.GetIncomeAddress()
+	ukaddrs, postAddrs := k.GetIncomeAddress()
 
 	startBlock := pBlock
 	if len(ukaddrs) > 0 && latestBlock > startBlock {
@@ -321,25 +321,25 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
-	posStartBlock := pBlock
-	if len(posAddrs) > 0 && latestBlock > posStartBlock {
+	postStartBlock := pBlock
+	if len(postAddrs) > 0 && latestBlock > postStartBlock {
 		utils.MLogger.Infof("get post income from chain")
 
 		endBlock = latestBlock
 
 		for endBlock <= latestBlock {
-			if endBlock > posStartBlock+1024 {
-				endBlock = posStartBlock + 1024
+			if endBlock > postStartBlock+1024 {
+				endBlock = postStartBlock + 1024
 			}
 
-			posMIncome, _, err := a.GetStorageIncome(posAddrs, localAddr, posStartBlock, endBlock)
+			postMIncome, _, err := a.GetStorageIncome(postAddrs, localAddr, postStartBlock, endBlock)
 			if err != nil {
 				utils.MLogger.Info("get post ukpay log err:", err)
 				break
 			}
 
-			k.PosIncome.Add(k.PosIncome, posMIncome)
-			posStartBlock = endBlock
+			k.PostIncome.Add(k.PostIncome, postMIncome)
+			postStartBlock = endBlock
 
 			if endBlock == latestBlock {
 				break
@@ -351,7 +351,7 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		}
 	}
 
-	k.PosPreIncome = getPosPreIncome(posAddrs, localAddr)
+	k.PostPreIncome = getPostPreIncome(postAddrs, localAddr)
 
 	km, err := metainfo.NewKey(k.localID, mpb.KeyType_Income)
 	if err == nil {
@@ -360,9 +360,9 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 		res.WriteString(metainfo.DELIMITER)
 		res.WriteString(k.ManageIncome.String())
 		res.WriteString(metainfo.DELIMITER)
-		res.WriteString(k.PosIncome.String())
+		res.WriteString(k.PostIncome.String())
 		res.WriteString(metainfo.DELIMITER)
-		res.WriteString(k.PosPreIncome.String())
+		res.WriteString(k.PostPreIncome.String())
 
 		k.ds.PutKey(k.context, km.ToString(), []byte(res.String()), nil, "local")
 	}
@@ -371,10 +371,10 @@ func (k *Info) getIncome(localAddr common.Address, pBlock int64) (int64, error) 
 	return latestBlock, nil
 }
 
-//GetIncomeAddress get upkeepingAddress and posAddress of this keeper to filter logs in chain
+//GetIncomeAddress get upkeepingAddress and postAddress of this keeper to filter logs in chain
 func (k *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
 	ukAddr := []common.Address{}
-	posAddr := []common.Address{}
+	postAddr := []common.Address{}
 	pus := k.getQUKeys()
 	for _, pu := range pus {
 		if pu.uid == pu.qid { //test
@@ -391,38 +391,38 @@ func (k *Info) GetIncomeAddress() ([]common.Address, []common.Address) {
 			continue
 		}
 
-		if pu.uid == pos.GetPosId() {
-			posAddr = append(posAddr, tmp)
+		if pu.uid == pos.GetPostId() {
+			postAddr = append(postAddr, tmp)
 			continue
 		} else {
 			ukAddr = append(ukAddr, tmp)
 		}
 	}
 
-	if len(posAddr) == 0 {
-		qItem, err := role.GetLatestQuery(pos.GetPosId())
+	if len(postAddr) == 0 {
+		qItem, err := role.GetLatestQuery(pos.GetPostId())
 		if err != nil {
-			return ukAddr, posAddr
+			return ukAddr, postAddr
 		}
-		uItem, err := role.GetUpKeeping(pos.GetPosId(), qItem.QueryID)
+		uItem, err := role.GetUpKeeping(pos.GetPostId(), qItem.QueryID)
 		if err != nil {
-			return ukAddr, posAddr
+			return ukAddr, postAddr
 		}
 		localAddr, err := address.GetAddressFromID(k.localID)
 		if err != nil {
-			return ukAddr, posAddr
+			return ukAddr, postAddr
 		}
 		for _, ki := range uItem.Keepers {
 			if ki.Addr.String() == localAddr.String() {
 				uAddr, err := address.GetAddressFromID(uItem.UpKeepingID)
 				if err != nil {
-					return ukAddr, posAddr
+					return ukAddr, postAddr
 				}
-				posAddr = append(posAddr, uAddr)
+				postAddr = append(postAddr, uAddr)
 			}
 		}
 
 	}
 
-	return ukAddr, posAddr
+	return ukAddr, postAddr
 }

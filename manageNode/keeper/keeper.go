@@ -49,8 +49,8 @@ type Info struct {
 	kItem         *role.KeeperItem
 	ms            *measure
 	ManageIncome  *big.Int //keeper's manage-income
-	PosIncome     *big.Int //keeper's pos-manage-income
-	PosPreIncome  *big.Int //keeper's pos-manage-pre-income
+	PostIncome     *big.Int //keeper's post-manage-income
+	PostPreIncome  *big.Int //keeper's post-manage-pre-income
 	//groupedK/P's purpose is to make the keepers and providers in one upkeeping-contract as dispersed as possible
 	groupedKeepers   map[string][]string //divide keepers into different groups according to the ip address
 	groupedProviders map[string][]string //divide providers into different groups according to the ip address
@@ -93,8 +93,8 @@ func New(ctx context.Context, nid, sk string, d data.Service, rt routing.Routing
 		ms:               mea,
 		pledgeStorage:    big.NewInt(0),
 		ManageIncome:     big.NewInt(0),
-		PosIncome:        big.NewInt(0),
-		PosPreIncome:     big.NewInt(0),
+		PostIncome:        big.NewInt(0),
+		PostPreIncome:     big.NewInt(0),
 		groupedKeepers:   make(map[string][]string),
 		groupedProviders: make(map[string][]string),
 	}
@@ -295,7 +295,7 @@ func (k *Info) save(ctx context.Context) error {
 			k.savePay(qu.uid, qu.qid, proID)
 		}
 
-		if qu.uid == pos.GetPosId() {
+		if qu.uid == pos.GetPostId() {
 			continue
 		}
 
@@ -426,7 +426,7 @@ func (k *Info) loadUser(ctx context.Context) error {
 
 func (k *Info) loadUserBucketStripes(uid, qid string) error {
 	// load bucketinfo
-	if uid == pos.GetPosId() {
+	if uid == pos.GetPostId() {
 		return nil
 	}
 
@@ -752,7 +752,7 @@ func (k *Info) loadPeersFromChain() error {
 	return nil
 }
 
-func (k *Info) getPosPrice() *big.Int {
+func (k *Info) getPostPrice() *big.Int {
 	if k.pledgeStorage.Sign() > 0 {
 		mm := big.NewInt(MarketingMoney)
 		mm.Mul(mm, big.NewInt(utils.Token))
@@ -766,7 +766,7 @@ func (k *Info) getPosPrice() *big.Int {
 		return mm //返回mmWei的整数部分
 	}
 
-	return pos.GetPosPrice()
+	return pos.GetPostPrice()
 }
 
 /*====================Key Ops========================*/
@@ -961,13 +961,13 @@ func (k *Info) deleteGroup(ctx context.Context, qid string) {
 
 /*====================Block Meta Ops=========================*/
 
-func (k *Info) getBlockPos(qid, bid string) (string, error) {
+func (k *Info) getBlockPost(qid, bid string) (string, error) {
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp == nil {
 		return "", role.ErrNoBlock
 	}
 
-	return gp.getBlockPos(bid)
+	return gp.getBlockPost(bid)
 }
 
 func (k *Info) getBlockAvail(qid, bid string) (int64, error) {
@@ -1023,7 +1023,7 @@ func (k *Info) addBlockMeta(qid, bid, pid string, offset int, mode bool) error {
 			return err
 		}
 
-		if bucketNum <= 0 || gp.userID == pos.GetPosId() {
+		if bucketNum <= 0 || gp.userID == pos.GetPostId() {
 			return gp.addBlockMeta(bid, pid, offset)
 		}
 
@@ -1074,7 +1074,7 @@ func (k *Info) deleteBlockMeta(qid, bid string, flag bool) {
 
 	gp := k.getGroupInfo(qid, qid, false)
 	if gp != nil {
-		pid, err := gp.getBlockPos(bid)
+		pid, err := gp.getBlockPost(bid)
 		if err != nil || pid == "" {
 			return
 		}
