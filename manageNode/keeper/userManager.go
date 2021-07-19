@@ -172,7 +172,7 @@ func (g *groupInfo) getBucketInfo(bucketID string, mode bool) *bucketInfo {
 				return nil
 			}
 
-			if g.userID == pos.GetPosId() {
+			if g.userID == pos.GetPostId() {
 				bop.DataCount = 1
 				bop.ParityCount = pos.Reps - 1
 				bop.SegmentCount = pos.SegCount
@@ -338,7 +338,7 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 		binfo := bui.(*bucketInfo)
 		binfo.stripes.Delete(bids[1] + metainfo.BlockDelimiter + bids[2])
 		segSize = int(bui.(*bucketInfo).bops.GetSegmentSize())
-		if g.userID == pos.GetPosId() {
+		if g.userID == pos.GetPostId() {
 			strpeNum, err := strconv.Atoi(bids[1])
 			if err == nil {
 				binfo.curStripes = strpeNum - 1
@@ -364,7 +364,7 @@ func (g *groupInfo) deleteBlockMeta(bid, pid string) {
 }
 
 // bucketID_stripeID_chunkID
-func (g *groupInfo) getBlockPos(bid string) (string, error) {
+func (g *groupInfo) getBlockPost(bid string) (string, error) {
 	bids := strings.SplitN(bid, metainfo.BlockDelimiter, 2)
 
 	bui, ok := g.buckets.Load(bids[0])

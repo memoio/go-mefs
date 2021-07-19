@@ -60,7 +60,7 @@ func (k *Info) challengeRegular(ctx context.Context) {
 				utils.MLogger.Infof("Challenge for user %s fsID %s at rootTime %d", pu.uid, pu.qid, mtime)
 				count = 0
 				for _, proID := range thisGroup.providers {
-					if pu.uid == pos.GetPosId() {
+					if pu.uid == pos.GetPostId() {
 						key, value, err := thisGroup.genChallengeRandom100(k.localID, pu.uid, pu.qid, proID, mtime)
 						if err != nil {
 							utils.MLogger.Infof("Challenge data for post user %s fsID %s at provider %s fails: %s", pu.uid, pu.qid, proID, err)

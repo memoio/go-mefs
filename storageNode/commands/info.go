@@ -28,7 +28,7 @@ type pInfoOutput struct {
 	Balance         string
 	PledgeBytes     string
 	UsedBytes       string
-	PosBytes        string
+	PostBytes        string
 	LocalFreeBytes  string
 	OfferAddress    string
 	OfferCapacity   string
@@ -38,8 +38,8 @@ type pInfoOutput struct {
 	TotalIncome     string
 	StorageIncome   string
 	DownloadIncome  string
-	PosIncome       string
-	PosPreIncome    string
+	PostIncome       string
+	PostPreIncome    string
 }
 
 type StringList struct {
@@ -94,7 +94,7 @@ var SelfCmd = &cmds.Command{
 			return err
 		}
 
-		var depositCapacity, usedCapacity, posCapacity uint64
+		var depositCapacity, usedCapacity, postCapacity uint64
 		balance, err := role.QueryBalance(localID)
 		if err != nil {
 			return err
@@ -138,13 +138,13 @@ var SelfCmd = &cmds.Command{
 		} else {
 			depositCapacity = providerIns.StorageTotal
 			usedCapacity = providerIns.StorageUsed
-			posCapacity = providerIns.StoragePosUsed
+			postCapacity = providerIns.StoragePostUsed
 
 			ti = providerIns.TotalIncome
 			si = providerIns.StorageIncome
 			di = providerIns.ReadIncome
-			pi = providerIns.PosIncome
-			prei = providerIns.PosPreIncome
+			pi = providerIns.PostIncome
+			prei = providerIns.PostPreIncome
 			eAddr = providerIns.ExtAddr
 			if eAddr == "" {
 				eAddr, _ = providerIns.GetPublicAddress()
@@ -178,7 +178,7 @@ var SelfCmd = &cmds.Command{
 			PublicReachable: reachable,
 			PledgeBytes:     utils.FormatBytes(int64(depositCapacity)),
 			UsedBytes:       utils.FormatBytes(int64(usedCapacity)),
-			PosBytes:        utils.FormatBytes(int64(posCapacity)),
+			PostBytes:        utils.FormatBytes(int64(postCapacity)),
 			LocalFreeBytes:  utils.FormatBytes(int64(lsinfo.Free)),
 			OfferAddress:    offerAddr.String(),
 			OfferDuration:   utils.FormatSecond(oItem.Duration),
@@ -189,8 +189,8 @@ var SelfCmd = &cmds.Command{
 			TotalIncome:     utils.FormatWei(ti),
 			DownloadIncome:  utils.FormatWei(di),
 			StorageIncome:   utils.FormatWei(si),
-			PosIncome:       utils.FormatWei(pi),
-			PosPreIncome:    utils.FormatWei(prei),
+			PostIncome:       utils.FormatWei(pi),
+			PostPreIncome:    utils.FormatWei(prei),
 		}
 		return cmds.EmitOnce(res, output)
 	},

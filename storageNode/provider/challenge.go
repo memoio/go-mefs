@@ -121,7 +121,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 	chalNum := bset.Count()
 	meta := false
 
-	startPos := uint(chal.R) % bset.Len()
+	startPost := uint(chal.R) % bset.Len()
 
 	switch cr.GetPolicy() {
 	case "100":
@@ -151,7 +151,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 	electedOffset := 0
 
 	var buf, cbuf strings.Builder
-	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
+	for i, e := bset.NextSet(startPost); e; i, e = bset.NextSet(i + 1) {
 		count++
 		for j := bucketID; j < bucketNum; j++ {
 			if int64(i) >= stripeNum && int64(i) <
@@ -224,7 +224,7 @@ func (p *Info) handleChallenge(cr *mpb.ChalInfo, blskey pdp.KeySet) (pdp.Proof, 
 	bucketID = 0
 	stripeNum = 0
 
-	for i, e := bset.NextSet(0); e && i < startPos; i, e = bset.NextSet(i + 1) {
+	for i, e := bset.NextSet(0); e && i < startPost; i, e = bset.NextSet(i + 1) {
 		if count > chalNum {
 			break
 		}

@@ -48,7 +48,7 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.VerifyKey, strict bool) (b
 	chal.R = pdp.GenChallengeV1(cr)
 
 	chalNum := bset.Count()
-	startPos := uint(chal.R) % bset.Len()
+	startPost := uint(chal.R) % bset.Len()
 	meta := false
 
 	switch cr.GetPolicy() {
@@ -75,7 +75,7 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.VerifyKey, strict bool) (b
 	chunkNum := int(cr.Buckets[0].GetChunkNum())
 	count := uint(0)
 
-	for i, e := bset.NextSet(startPos); e; i, e = bset.NextSet(i + 1) {
+	for i, e := bset.NextSet(startPost); e; i, e = bset.NextSet(i + 1) {
 		count++
 		for j := bucketID; j < int(bucketNum); j++ {
 			if int64(i) >= stripeNum && int64(i) <
@@ -136,7 +136,7 @@ func VerifyChallengeData(cr *mpb.ChalInfo, blsKey pdp.VerifyKey, strict bool) (b
 
 	bucketID = 0
 	stripeNum = 0
-	for i, e := bset.NextSet(0); e && i < startPos; i, e = bset.NextSet(i + 1) {
+	for i, e := bset.NextSet(0); e && i < startPost; i, e = bset.NextSet(i + 1) {
 		if count > chalNum {
 			break
 		}

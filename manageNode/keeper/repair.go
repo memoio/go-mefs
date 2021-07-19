@@ -25,8 +25,8 @@ func (k *Info) checkLedgerRafi(ctx context.Context) {
 			utils.MLogger.Info("Rafi Repair starts!")
 			pus := k.getQUKeys()
 			for _, pu := range pus {
-				// not repair pos blocks
-				if pu.uid == pos.GetPosId() {
+				// not repair post blocks
+				if pu.uid == pos.GetPostId() {
 					continue
 				}
 
@@ -285,8 +285,8 @@ func (k *Info) checkLedgerV2(ctx context.Context) {
 			utils.MLogger.Info("Repair starts!")
 			pus := k.getQUKeys()
 			for _, pu := range pus {
-				// not repair pos blocks
-				if pu.uid == pos.GetPosId() {
+				// not repair post blocks
+				if pu.uid == pos.GetPostId() {
 					continue
 				}
 
@@ -478,8 +478,8 @@ func (k *Info) checkLedger(ctx context.Context) {
 			utils.MLogger.Info("Repair starts!")
 			pus := k.getQUKeys()
 			for _, pu := range pus {
-				// not repair pos blocks
-				if pu.uid == pos.GetPosId() {
+				// not repair post blocks
+				if pu.uid == pos.GetPostId() {
 					continue
 				}
 

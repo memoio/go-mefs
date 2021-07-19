@@ -59,8 +59,8 @@ const (
 	secretKeyKwd              = "secretKey"
 	reDeploy                  = "reDeployContract"
 	netKeyKwd                 = "netKey"
-	posKwd                    = "pos"
-	gcKwd                     = "cleanPos"
+	postKwd                    = "post"
+	gcKwd                     = "cleanPost"
 )
 
 var (

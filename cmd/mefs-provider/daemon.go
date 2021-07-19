@@ -62,7 +62,7 @@ const (
 	reDeploy                  = "reDeployContract"
 	netKeyKwd                 = "netKey"
 	postKwd                    = "post"
-	gcKwd                     = "cleanPos"
+	gcKwd                     = "cleanPost"
 )
 
 var (
@@ -482,10 +482,10 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case metainfo.RoleProvider: //provider和keeper同样
 		fmt.Println("Starting as a provider")
 
-		pos, _ := req.Options[postKwd].(bool)
+		post, _ := req.Options[postKwd].(bool)
 		gc, _ := req.Options[gcKwd].(bool)
 
-		ins, err := provider.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, pos, gc, exAddr)
+		ins, err := provider.New(node.Context(), node.Identity.Pretty(), node.PrivateKey, node.Data, node.Routing, capacity, duration*24*60*60, decapacity, price, rdo, post, gc, exAddr)
 		if err != nil {
 			fmt.Println("Start provider Service failed:", err)
 			return err
