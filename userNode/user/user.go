@@ -99,7 +99,7 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int
 		if queryID == "" || rdo {
 			userAddr, _ := address.GetAddressFromID(userID)
 			m := contracts.NewCM(userAddr, sk)
-			qAddr, err := m.DeployQuery(duration, capacity, price, ks, ps, rdo)
+			qAddr, err := m.DeployQuery(capacity, duration, price, ks, ps, rdo)
 			if err != nil {
 				return nil, err
 			}
@@ -109,7 +109,7 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int
 
 		qItem, err := role.GetQueryInfo(userID, queryID)
 		if err != nil {
-			utils.MLogger.Infof("get query %s for user %s from chain failed: %s, please restart lfs", queryID, userID, err)
+			utils.MLogger.Errorf("get query %s for user %s from chain failed: %s, please restart lfs", queryID, userID, err)
 			return nil, err
 		}
 
@@ -117,9 +117,16 @@ func (u *Info) NewFS(userID, shareTo, queryID, sk string, capacity, duration int
 		ginfo.keeperSLA = int(qItem.KeeperNums)
 		ginfo.providerSLA = int(qItem.ProviderNums)
 		ginfo.groupID = queryID
+		ginfo.storeDays = int64(qItem.Duration / 86400)
+		ginfo.storeSize = qItem.Capacity
+		ginfo.storePrice = qItem.Price
+
 		uItem, err := role.GetUpKeeping(userID, queryID)
 		if err == nil {
 			ginfo.upKeepingItem = &uItem
+		} else {
+			ginfo.upKeepingItem = nil
+			utils.MLogger.Debug("get upkeeping of uid ", userID, " qID ", queryID, " err: ", err)
 		}
 	} else {
 		ginfo.groupID = userID

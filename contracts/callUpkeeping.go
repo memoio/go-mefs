@@ -45,6 +45,7 @@ func (u *UpkeepingInfo) DeployUpkeeping(queryAddress common.Address, keeperAddre
 	}
 
 	log.Println("begin deploy upKeeping...")
+	log.Println("deploy upkeeping with queryAddress:", queryAddress.Hex(), " duration:", duration, "s size:", size, "MB price:", price, " cycle:", cycle/60/60, "h")
 	client := getClient(EndPoint)
 	tx := &types.Transaction{}
 	retryCount := 0
@@ -139,7 +140,7 @@ func (u *UpkeepingInfo) GetUpkeeping(userAddress common.Address, key string) (uk
 		retryCount := 0
 		for {
 			retryCount++
-			if retryCount > 10 {
+			if retryCount > 3 {
 				log.Println("GetUpkeepingInfo:", err)
 				break
 			}

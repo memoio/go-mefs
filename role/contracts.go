@@ -396,7 +396,7 @@ func DeployUpKeeping(userID, queryID, hexSk string, ks, ps []string, storeDays, 
 	utils.MLogger.Infof("%s (%s) has balance: %s", userID, localAddress.String(), balance)
 
 	if moneyAccount.Cmp(balance) > 0 {
-		utils.MLogger.Infof("%s (%s) has balance: %s, need %d to deploy upkeeping", userID, localAddress.String(), balance, moneyAccount)
+		utils.MLogger.Errorf("%s (%s) has balance: %s, need %d to deploy upkeeping", userID, localAddress.String(), balance, moneyAccount)
 		return ukID, ErrNotEnoughBalance
 	}
 

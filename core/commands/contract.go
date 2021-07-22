@@ -10,7 +10,9 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/memoio/go-mefs/role"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -77,6 +79,124 @@ var ContractCmd = &cmds.Command{
 		"deployRecover":            deployRecoverCmd,     //部署recover合约
 		"getPledgeSpace":           getAllPledgeSpaceCmd, //获得全网质押的存储空间
 		"deployQuery":              deployQueryCmd,
+		"getQueryContract":         getQueryCmd,     //获得User的query合约信息
+		"getUpkeeping":             getUpkeepingCmd, //获得upkeeping合约信息
+	},
+}
+
+var getUpkeepingCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "get upkeeping contract deployed by the user",
+	},
+	Arguments: []cmds.Argument{
+		cmds.StringArg("uaddress", true, false, "The User's address with prefix of '0x'"),
+		cmds.StringArg("qaddress", true, false, "'latest' or the Query-contract's address with prefix of '0x'"),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("ChainNet", "net", "The chain net, testnet or dev").WithDefault("dev"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		uaddr := req.Arguments[0]
+		qaddr := req.Arguments[1]
+
+		net := req.Options["ChainNet"].(string)
+		if net != "dev" && net != "testnet" {
+			fmt.Println("net is wrong")
+			return nil
+		}
+
+		if net == "dev" {
+			contracts.EndPoint = "http://119.147.213.220:8191"
+		} else {
+			contracts.EndPoint = "http://119.147.213.220:8194"
+		}
+
+		cu := contracts.NewCU(common.HexToAddress(uaddr), "")
+		ukaddr, uk, err := cu.GetUpkeeping(common.HexToAddress(uaddr), qaddr)
+		if err != nil {
+			fmt.Println("cannnot get upkeeping contract: ", err)
+			return err
+		}
+		fmt.Println("get upkeeping addr: ", ukaddr.Hex())
+
+		queryAddr, keepers, providers, t, size, _, createDate, endDate, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+			From: common.HexToAddress(uaddr),
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("get query: ", queryAddr.Hex())
+		ks := make([]string, 0)
+		for _, k := range keepers {
+			ks = append(ks, k.Addr.Hex())
+		}
+		fmt.Println("get ks: ", ks)
+		ps := make([]string, 0)
+		for _, p := range providers {
+			ps = append(ps, p.Addr.Hex())
+		}
+		fmt.Println("get ps: ", ps)
+		ct := time.Unix(createDate.Int64(), 0)
+		et := time.Unix(endDate.Int64(), 0)
+		fmt.Println("duration: ", t, " size: ", size, " createDate: ", ct.Format("2006-01-02 15:04:05"), " endDate: ", et.Format("2006-01-02 15:04:05"))
+		return cmds.EmitOnce(res, nil)
+	},
+}
+
+var getQueryCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "get query contract deployed by the node",
+	},
+	Arguments: []cmds.Argument{
+		cmds.StringArg("address", true, false, "The node's address with prefix of '0x'"),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("ChainNet", "net", "The chain net, testnet or dev").WithDefault("dev"),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		addr := req.Arguments[0]
+
+		net := req.Options["ChainNet"].(string)
+		if net != "dev" && net != "testnet" {
+			fmt.Println("net is wrong")
+			return nil
+		}
+
+		if net == "dev" {
+			contracts.EndPoint = "http://119.147.213.220:8191"
+		} else {
+			contracts.EndPoint = "http://119.147.213.220:8194"
+		}
+
+		cMarket := contracts.NewCM(common.HexToAddress(addr), "")
+		queryGot, err := cMarket.GetQueryAddrs(common.HexToAddress(addr))
+		if err != nil {
+			log.Fatal("get query addrs fails ", err)
+		}
+
+		mInfo := contracts.NewCM(common.HexToAddress(addr), "")
+
+		s := make([]string, 0)
+		for _, a := range queryGot {
+			s = append(s, a.String())
+			capacity, duration, price, ks, ps, completed, err := mInfo.GetQueryInfo(a)
+			if err == nil {
+				fmt.Println(a.String(), " info: ")
+				fmt.Println("capacity: ", capacity, " duration: ", duration, " price: ", price, " ks: ", ks, " ps: ", ps, " completed: ", completed)
+			}
+		}
+
+		list := &StringList{
+			ChildLists: s,
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
 	},
 }
 
@@ -100,7 +220,7 @@ var getAllPledgeSpaceCmd = &cmds.Command{
 		}
 
 		if net == "dev" {
-			contracts.EndPoint = "http://119.147.213.220:8194"
+			contracts.EndPoint = "http://119.147.213.220:8191"
 		} else {
 			contracts.EndPoint = "http://119.147.213.220:8194"
 		}
