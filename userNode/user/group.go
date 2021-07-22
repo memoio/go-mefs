@@ -210,7 +210,7 @@ func (g *groupInfo) start(ctx context.Context) (bool, error) {
 		}
 	}
 
-	utils.MLogger.Infof("Initialize user %s and its lfs %s, need keepers %d, providers %d, storesize %d, storadays %d, at price %d", g.userID, g.groupID, g.keeperSLA, g.providerSLA, g.storeSize, g.storeDays, g.storePrice)
+	utils.MLogger.Infof("Initialize user %s and its lfs %s, need keepers %d, providers %d, storesize %d, storedays %d, at price %d", g.userID, g.groupID, g.keeperSLA, g.providerSLA, g.storeSize, g.storeDays, g.storePrice)
 	err := g.initGroup(ctx)
 	if err != nil {
 		return false, err
