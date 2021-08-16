@@ -16,7 +16,7 @@ import (
 )
 
 func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error {
-	utils.MLogger.Info("handlePutBlock: ", km.ToString(), "from: ", from)
+	utils.MLogger.Info("handlePutBlock: ", km.ToString(), " from: ", from)
 	// key is blockID/"block"
 	splitedNcid := strings.Split(km.ToString(), metainfo.DELIMITER)
 	if len(splitedNcid) != 2 {
