@@ -119,7 +119,7 @@ var getUpkeepingCmd = &cmds.Command{
 		}
 		fmt.Println("get upkeeping addr: ", ukaddr.Hex())
 
-		queryAddr, keepers, providers, t, size, _, createDate, endDate, _, _, _, err := uk.GetOrder(&bind.CallOpts{
+		queryAddr, keepers, providers, t, size, price, createDate, endDate, _, _, _, err := uk.GetOrder(&bind.CallOpts{
 			From: common.HexToAddress(uaddr),
 		})
 		if err != nil {
@@ -138,7 +138,7 @@ var getUpkeepingCmd = &cmds.Command{
 		fmt.Println("get ps: ", ps)
 		ct := time.Unix(createDate.Int64(), 0)
 		et := time.Unix(endDate.Int64(), 0)
-		fmt.Println("duration: ", t, " size: ", size, " createDate: ", ct.Format("2006-01-02 15:04:05"), " endDate: ", et.Format("2006-01-02 15:04:05"))
+		fmt.Println("duration: ", t, " size: ", size, " price: ", price, " createDate: ", ct.Format("2006-01-02 15:04:05"), " endDate: ", et.Format("2006-01-02 15:04:05"))
 		return cmds.EmitOnce(res, nil)
 	},
 }
@@ -453,14 +453,8 @@ var isKeeperCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{ //选项列表
 		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.220:8192"),
-		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		cn := req.Options["CodeName"].(string)
-		if cn != codeName {
-			return cmds.EmitOnce(res, "CodeName is wrong")
-		}
-
 		eth, ok := req.Options["EndPoint"].(string)
 		if !ok {
 			return cmds.EmitOnce(res, "Endpoint is wrong")
@@ -489,15 +483,8 @@ var isProviderCmd = &cmds.Command{
 	},
 	Options: []cmds.Option{ //选项列表
 		cmds.StringOption("EndPoint", "eth", "The Endpoint this net used").WithDefault("http://119.147.213.220:8192"),
-		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		cn := req.Options["CodeName"].(string)
-		if cn != codeName {
-			fmt.Println("CodeName is wrong")
-			return nil
-		}
-
 		eth, ok := req.Options["EndPoint"].(string)
 		if !ok {
 			fmt.Println("Endpoint is wrong")
