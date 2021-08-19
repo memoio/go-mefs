@@ -26,7 +26,7 @@ func (p *Info) handlePutBlock(km *metainfo.Key, value []byte, from string) error
 	bids := strings.SplitN(splitedNcid[0], metainfo.BlockDelimiter, 2)
 	qid := bids[0]
 
-	gp := p.getGroupInfo(qid, qid, true)
+	gp := p.getGroupInfo(from, qid, true)
 	if gp == nil {
 		return role.ErrNotMyUser
 	}
