@@ -737,7 +737,9 @@ func (g *groupInfo) deployContract(ctx context.Context) error {
 			wg.Add(1)
 			go func(proID string) {
 				defer wg.Done()
-				for i := 0; i < 5; i++ {
+				//存在问题，如果5次都没有部署成功，没有错误返回出来，后面的流程会接着走下去。不过在后面connect=>loadContract流程中，
+				//会尝试获取chanItem，如果没有获取到，会尝试再重新部署一次channel合约，但是如果部署失败，后面的流程还是会正常执行下去。
+				for i := 0; i < 5; i++ { 
 					tdelay := rand.Int63n(int64(i+1) * 60000000000)
 					time.Sleep(time.Duration(tdelay))
 					_, err := role.DeployChannel(g.userID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize/int64(g.providerSLA), true)
@@ -1283,6 +1285,7 @@ func (g *groupInfo) loadContracts(ctx context.Context, pid string) error {
 			utils.MLogger.Infof("redeploy channel contract for %s", proID)
 			_, err := role.DeployChannel(g.shareToID, g.groupID, proID, g.privKey, g.storeDays, g.storeSize/int64(g.providerSLA), true)
 			if err != nil {
+				utils.MLogger.Warn("redeploy channel fails for: ", proID)
 				return
 			}
 
