@@ -179,7 +179,7 @@ func checkTx(tx *types.Transaction) error {
 	log.Println("Check Tx hash:", tx.Hash().Hex(), "nonce:", tx.Nonce(), "gasPrice:", tx.GasPrice())
 
 	var receipt *types.Receipt
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		receipt = getTransactionReceipt(tx.Hash())
 		if receipt != nil {
 			break
