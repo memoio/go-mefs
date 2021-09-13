@@ -388,13 +388,16 @@ var lfsStartUserCmd = &cmds.Command{
 				rdo = true
 				qid = ""
 			} else {
-				if fsIndex > 0 && len(querys) < fsIndex {
+				if len(querys) < fsIndex {
+					return errWrongInput
+				}
+				if fsIndex < 0 {
 					return errWrongInput
 				}
 				if fsIndex == 0 {
 					qid = querys[len(querys)-1]
 				} else {
-					qid = querys[fsIndex]
+					qid = querys[fsIndex-1]
 				}
 			}
 		}
