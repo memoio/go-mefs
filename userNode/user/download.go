@@ -186,7 +186,7 @@ func (do *downloadTask) Start(ctx context.Context) error {
 	} else {
 		transNum = defaultTransNum
 	}
-	utils.MLogger.Debugf("download rate is: ", transNum)
+	utils.MLogger.Debugf("download rate is: %d", transNum)
 
 	var length int64
 	breakFlag := false
