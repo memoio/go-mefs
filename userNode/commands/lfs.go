@@ -14,8 +14,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	files "github.com/ipfs/go-ipfs-files"
+	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
 	"github.com/memoio/go-mefs/core/commands/e"
 	id "github.com/memoio/go-mefs/crypto/identity"
@@ -31,6 +33,7 @@ import (
 const (
 	SecreteKey = "secreteKey"
 	PassWord   = "password"
+	CodeName   = "septemberwednesday"
 )
 
 type ObjectStat struct {
@@ -193,6 +196,7 @@ var LfsCmd = &cmds.Command{
 		"list_users":     lfsListUsersCmd,
 		"get_share":      lfsGetShareCmd,
 		"gen_share":      lfsGenShareCmd,
+		"add_provider":   lfsAddProviderCmd,
 	},
 }
 
@@ -2161,6 +2165,99 @@ var lfsListQuerysCmd = &cmds.Command{
 		}
 		list := &StringList{
 			ChildLists: result,
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, pl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", pl)
+			return err
+		}),
+	},
+}
+
+var lfsAddProviderCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "Add provider to fs.",
+		ShortDescription: `
+'mefs lfs add_provider' is a plumbing command for adding provider to fs for user.
+`,
+	},
+
+	Arguments: []cmds.Argument{
+		cmds.StringArg("addr", true, true, "Provider address that you want to added in fs for user."),
+	},
+	Options: []cmds.Option{
+		cmds.StringOption("CodeName", "cn", "The CodeName this command used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn := req.Options["CodeName"].(string)
+		if cn != CodeName {
+			fmt.Println("CodeName is wrong")
+			return nil
+		}
+
+		node, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+		if !node.OnlineMode() {
+			return ErrNotOnline
+		}
+		userid := node.Identity.Pretty()
+		sk := node.PrivateKey
+		userAddress, err := address.GetAddressFromID(userid)
+		if err != nil {
+			return err
+		}
+		userIns, ok := node.Inst.(*user.Info)
+		if !ok {
+			return ErrNotReady
+		}
+		lfs := userIns.GetUser(userid)
+		if lfs == nil || !lfs.Online() {
+			return errLfsServiceNotReady
+		}
+		gp := lfs.(*user.LfsInfo).GetGroup()
+		if gp == nil {
+			return errLfsServiceNotReady
+		}
+		uk := gp.GetUk()
+		if uk == nil {
+			return role.ErrEmptyData
+		}
+		ukAddress, err := address.GetAddressFromID(uk.UpKeepingID)
+		if err != nil {
+			return err
+		}
+
+		var providerAddrs []common.Address
+		for _, provider := range req.Arguments {
+			fmt.Println(provider)
+			providerAddrs = append(providerAddrs, common.HexToAddress(provider))
+		}
+
+		// begin add provider
+		var esigs [][]byte
+		cu := contracts.NewCU(userAddress, sk)
+		err = cu.AddProvider(ukAddress, providerAddrs, esigs)
+		if err != nil {
+			log.Fatal("ukAddProvider user AddProvider() error", err)
+			return err
+		}
+		// get providers in upkeeping
+		_, _, pros, _, _, _, _, _, _, _, _, err := cu.GetOrder(ukAddress)
+		if err != nil {
+			log.Fatal("getUk err:", err)
+		}
+		var ps []string
+		for _, pInfo := range pros {
+			ps = append(ps, pInfo.Addr.String())
+		}
+
+		list := &StringList{
+			ChildLists: ps,
 		}
 		return cmds.EmitOnce(res, list)
 	},
