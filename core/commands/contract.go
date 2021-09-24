@@ -171,7 +171,8 @@ var getQueryCmd = &cmds.Command{
 		cMarket := contracts.NewCM(common.HexToAddress(addr), "")
 		queryGot, err := cMarket.GetQueryAddrs(common.HexToAddress(addr))
 		if err != nil {
-			log.Fatal("get query addrs fails ", err)
+			fmt.Println("get query addrs fails ", err)
+			return err
 		}
 
 		mInfo := contracts.NewCM(common.HexToAddress(addr), "")
