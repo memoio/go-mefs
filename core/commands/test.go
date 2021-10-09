@@ -11,6 +11,7 @@ import (
 	"math/big"
 
 	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -168,6 +169,17 @@ var showBalanceCmd = &cmds.Command{
 		if err != nil {
 			return err
 		}
-		return cmds.EmitOnce(res, balances)
+		bal := utils.FormatWei(balances)
+		list := &StringList{
+			ChildLists: []string{"balance: " + bal},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
 	},
 }
