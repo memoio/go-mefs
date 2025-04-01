@@ -96,11 +96,11 @@ func (s *Shell) Request(command string, args ...string) *RequestBuilder {
 }
 
 type IdOutput struct {
-	ID              string
-	PublicKey       string
-	Addresses       []string
-	AgentVersion    string
-	ProtocolVersion string
+	NetworkAddr  string
+	AccountAddr  string
+	PublicKey    string
+	Addresses    []string
+	AgentVersion string
 }
 
 // ID gets information about a given peer.  Arguments:

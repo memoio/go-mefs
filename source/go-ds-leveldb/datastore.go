@@ -12,17 +12,16 @@ import (
 	"github.com/memoio/go-mefs/source/goleveldb/leveldb/opt"
 	"github.com/memoio/go-mefs/source/goleveldb/leveldb/storage"
 	"github.com/memoio/go-mefs/source/goleveldb/leveldb/util"
-	"github.com/jbenet/goprocess"
 )
 
-type datastore struct {
+type Datastore struct {
 	*accessor
 	DB   *leveldb.DB
 	path string
 }
 
-var _ ds.Datastore = (*datastore)(nil)
-var _ ds.TxnDatastore = (*datastore)(nil)
+var _ ds.Datastore = (*Datastore)(nil)
+var _ ds.TxnDatastore = (*Datastore)(nil)
 
 // Options is an alias of syndtr/goleveldb/opt.Options which might be extended
 // in the future.
@@ -31,7 +30,7 @@ type Options opt.Options
 // NewDatastore returns a new datastore backed by leveldb
 //
 // for path == "", an in memory bachend will be chosen
-func NewDatastore(path string, opts *Options) (*datastore, error) {
+func NewDatastore(path string, opts *Options) (*Datastore, error) {
 	var nopts opt.Options
 	if opts != nil {
 		nopts = opt.Options(*opts)
@@ -53,8 +52,8 @@ func NewDatastore(path string, opts *Options) (*datastore, error) {
 		return nil, err
 	}
 
-	return &datastore{
-		accessor: &accessor{ldb: db},
+	return &Datastore{
+		accessor: &accessor{ldb: db, syncWrites: true},
 		DB:       db,
 		path:     path,
 	}, nil
@@ -69,19 +68,23 @@ type levelDbOps interface {
 	Has(key []byte, ro *opt.ReadOptions) (ret bool, err error)
 	Delete(key []byte, wo *opt.WriteOptions) error
 	NewIterator(slice *util.Range, ro *opt.ReadOptions) iterator.Iterator
-	Append(key, value []byte, wo *opt.WriteOptions) error
 }
 
 // Datastore operations using either the DB or a transaction as the backend.
 type accessor struct {
-	ldb levelDbOps
+	ldb        levelDbOps
+	syncWrites bool
 }
 
 func (a *accessor) Put(key ds.Key, value []byte) (err error) {
-	return a.ldb.Put(key.Bytes(), value, nil)
+	return a.ldb.Put(key.Bytes(), value, &opt.WriteOptions{Sync: a.syncWrites})
 }
 
-func (a *accessor) Append(key ds.Key, value []byte, beginoffset, endoffset int) (err error) {
+func (a *accessor) Append(key ds.Key, value []byte, begin, length int) (err error) {
+	return nil
+}
+
+func (a *accessor) Sync(prefix ds.Key) error {
 	return nil
 }
 
@@ -96,10 +99,6 @@ func (a *accessor) Get(key ds.Key) (value []byte, err error) {
 	return val, nil
 }
 
-func (a *accessor) GetSegAndTag(key ds.Key, offset uint64) (segment []byte, tag []byte, err error) {
-	return nil, nil, nil
-}
-
 func (a *accessor) Has(key ds.Key) (exists bool, err error) {
 	return a.ldb.Has(key.Bytes(), nil)
 }
@@ -109,43 +108,41 @@ func (d *accessor) GetSize(key ds.Key) (size int, err error) {
 }
 
 func (a *accessor) Delete(key ds.Key) (err error) {
-	// leveldb Delete will not return an error if the key doesn't
-	// exist (see https://github.com/syndtr/goleveldb/issues/109),
-	// so check that the key exists first and if not return an
-	// error
-	exists, err := a.ldb.Has(key.Bytes(), nil)
-	if !exists {
-		return ds.ErrNotFound
-	} else if err != nil {
-		return err
-	}
-	return a.ldb.Delete(key.Bytes(), nil)
+	return a.ldb.Delete(key.Bytes(), &opt.WriteOptions{Sync: a.syncWrites})
 }
 
 func (a *accessor) Query(q dsq.Query) (dsq.Results, error) {
-	return a.queryNew(q)
-}
-
-func (a *accessor) queryNew(q dsq.Query) (dsq.Results, error) {
-	if len(q.Filters) > 0 ||
-		len(q.Orders) > 0 ||
-		q.Limit > 0 ||
-		q.Offset > 0 {
-		return a.queryOrig(q)
-	}
 	var rnge *util.Range
+
+	// make a copy of the query for the fallback naive query implementation.
+	// don't modify the original so res.Query() returns the correct results.
+	qNaive := q
 	if q.Prefix != "" {
-		rnge = util.BytesPrefix([]byte(q.Prefix)) //产生前缀匹配的查询范围
+		rnge = util.BytesPrefix([]byte(q.Prefix))
+		qNaive.Prefix = ""
 	}
-	i := a.ldb.NewIterator(rnge, nil) //进行查询
-	return dsq.ResultsFromIterator(q, dsq.Iterator{
+	i := a.ldb.NewIterator(rnge, nil)
+	next := i.Next
+	if len(q.Orders) > 0 {
+		switch q.Orders[0].(type) {
+		case dsq.OrderByKey, *dsq.OrderByKey:
+			qNaive.Orders = nil
+		case dsq.OrderByKeyDescending, *dsq.OrderByKeyDescending:
+			next = func() bool {
+				next = i.Prev
+				return i.Last()
+			}
+			qNaive.Orders = nil
+		default:
+		}
+	}
+	r := dsq.ResultsFromIterator(q, dsq.Iterator{
 		Next: func() (dsq.Result, bool) {
-			ok := i.Next()
-			if !ok {
+			if !next() {
 				return dsq.Result{}, false
 			}
 			k := string(i.Key())
-			e := dsq.Entry{Key: k}
+			e := dsq.Entry{Key: k, Size: len(i.Value())}
 
 			if !q.KeysOnly {
 				buf := make([]byte, len(i.Value()))
@@ -158,86 +155,13 @@ func (a *accessor) queryNew(q dsq.Query) (dsq.Results, error) {
 			i.Release()
 			return nil
 		},
-	}), nil
-}
-
-func (a *accessor) queryOrig(q dsq.Query) (dsq.Results, error) {
-	// we can use multiple iterators concurrently. see:
-	// https://godoc.org/github.com/syndtr/goleveldb/leveldb#DB.NewIterator
-	// advance the iterator only if the reader reads
-	//
-	// run query in own sub-process tied to Results.Process(), so that
-	// it waits for us to finish AND so that clients can signal to us
-	// that resources should be reclaimed.
-	qrb := dsq.NewResultBuilder(q)
-	qrb.Process.Go(func(worker goprocess.Process) {
-		a.runQuery(worker, qrb)
 	})
-
-	// go wait on the worker (without signaling close)
-	go qrb.Process.CloseAfterChildren()
-
-	// Now, apply remaining things (filters, order)
-	qr := qrb.Results()
-	for _, f := range q.Filters {
-		qr = dsq.NaiveFilter(qr, f)
-	}
-	for _, o := range q.Orders {
-		qr = dsq.NaiveOrder(qr, o)
-	}
-	return qr, nil
-}
-
-func (a *accessor) runQuery(worker goprocess.Process, qrb *dsq.ResultBuilder) {
-	var rnge *util.Range
-	if qrb.Query.Prefix != "" {
-		rnge = util.BytesPrefix([]byte(qrb.Query.Prefix))
-	}
-	i := a.ldb.NewIterator(rnge, nil)
-	defer i.Release()
-
-	// advance iterator for offset
-	if qrb.Query.Offset > 0 {
-		for j := 0; j < qrb.Query.Offset; j++ {
-			i.Next()
-		}
-	}
-
-	// iterate, and handle limit, too
-	for sent := 0; i.Next(); sent++ {
-		// end early if we hit the limit
-		if qrb.Query.Limit > 0 && sent >= qrb.Query.Limit {
-			break
-		}
-
-		k := string(i.Key())
-		e := dsq.Entry{Key: k}
-
-		if !qrb.Query.KeysOnly {
-			buf := make([]byte, len(i.Value()))
-			copy(buf, i.Value())
-			e.Value = buf
-		}
-
-		select {
-		case qrb.Output <- dsq.Result{Entry: e}: // we sent it out
-		case <-worker.Closing(): // client told us to end early.
-			break
-		}
-	}
-
-	if err := i.Error(); err != nil {
-		select {
-		case qrb.Output <- dsq.Result{Error: err}: // client read our error
-		case <-worker.Closing(): // client told us to end.
-			return
-		}
-	}
+	return dsq.NaiveQueryApply(qNaive, r), nil
 }
 
 // DiskUsage returns the current disk size used by this levelDB.
 // For in-mem datastores, it will return 0.
-func (d *datastore) DiskUsage() (uint64, error) {
+func (d *Datastore) DiskUsage() (uint64, error) {
 	if d.path == "" { // in-mem
 		return 0, nil
 	}
@@ -260,21 +184,21 @@ func (d *datastore) DiskUsage() (uint64, error) {
 }
 
 // LevelDB needs to be closed.
-func (d *datastore) Close() (err error) {
+func (d *Datastore) Close() (err error) {
 	return d.DB.Close()
 }
 
-func (d *datastore) IsThreadSafe() {}
-
 type leveldbBatch struct {
-	b  *leveldb.Batch
-	db *leveldb.DB
+	b          *leveldb.Batch
+	db         *leveldb.DB
+	syncWrites bool
 }
 
-func (d *datastore) Batch() (ds.Batch, error) {
+func (d *Datastore) Batch() (ds.Batch, error) {
 	return &leveldbBatch{
-		b:  new(leveldb.Batch),
-		db: d.DB,
+		b:          new(leveldb.Batch),
+		db:         d.DB,
+		syncWrites: d.syncWrites,
 	}, nil
 }
 
@@ -283,12 +207,12 @@ func (b *leveldbBatch) Put(key ds.Key, value []byte) error {
 	return nil
 }
 
-func (b *leveldbBatch) Append(key ds.Key, value []byte, beginoffset, endoffset int) error {
+func (b *leveldbBatch) Append(key ds.Key, value []byte, begin, length int) error {
 	return nil
 }
 
 func (b *leveldbBatch) Commit() error {
-	return b.db.Write(b.b, nil)
+	return b.db.Write(b.b, &opt.WriteOptions{Sync: b.syncWrites})
 }
 
 func (b *leveldbBatch) Delete(key ds.Key) error {
@@ -310,11 +234,11 @@ func (t *transaction) Discard() {
 	t.tx.Discard()
 }
 
-func (d *datastore) NewTransaction(readOnly bool) (ds.Txn, error) {
+func (d *Datastore) NewTransaction(readOnly bool) (ds.Txn, error) {
 	tx, err := d.DB.OpenTransaction()
 	if err != nil {
 		return nil, err
 	}
-	accessor := &accessor{tx}
+	accessor := &accessor{ldb: tx, syncWrites: false}
 	return &transaction{accessor, tx}, nil
 }

@@ -13,8 +13,8 @@ import (
 )
 
 type ObjectStat struct {
-	ObjectName     string
-	ObjectSize     int32
+	Name           string
+	Size           int64
 	MD5            string
 	Ctime          string
 	Dir            bool
@@ -32,7 +32,7 @@ var (
 )
 
 func (ob ObjectStat) String() string {
-	FloatStorage := float64(ob.ObjectSize)
+	FloatStorage := float64(ob.Size)
 	var OutStorage string
 	if FloatStorage < 1024 && FloatStorage > 0 {
 		OutStorage = fmt.Sprintf("%.2f", FloatStorage) + "B"
@@ -45,7 +45,7 @@ func (ob ObjectStat) String() string {
 	}
 	return fmt.Sprintf(
 		"ObjectName: %s\n--ObjectSize: %s\n--MD5: %s\n--Ctime: %s\n--Dir: %t\n--LatestChalTime: %s\n",
-		ob.ObjectName,
+		ob.Name,
 		OutStorage,
 		ob.MD5,
 		ob.Ctime,
@@ -79,6 +79,30 @@ func (s *Shell) HeadObject(ObjectName, BucketName string, options ...LfsOpts) (*
 func (s *Shell) GetObject(ObjectName, BucketName string, options ...LfsOpts) (io.ReadCloser, error) {
 	var err error
 	rb := s.Request("lfs/get_object", BucketName, ObjectName)
+	for _, option := range options {
+		option(rb)
+	}
+	resp, err := rb.Send(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return resp.Output, err
+}
+
+func (s *Shell) GenShare(ObjectName, BucketName string, options ...LfsOpts) (string, error) {
+	var slink string
+	rb := s.Request("lfs/gen_share", BucketName, ObjectName)
+	for _, option := range options {
+		option(rb)
+	}
+	if err := rb.Exec(context.Background(), &slink); err != nil {
+		return "", err
+	}
+	return slink, nil
+}
+
+func (s *Shell) GetShare(shareLink, outputName string, options ...LfsOpts) (io.ReadCloser, error) {
+	rb := s.Request("lfs/get_share", shareLink, outputName)
 	for _, option := range options {
 		option(rb)
 	}
@@ -154,7 +178,7 @@ func (s *Shell) PutObject(r io.Reader, ObjectName, BucketName string, options ..
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
 	fileReader := files.NewMultiFileReader(slf, true)
 	var objs Objects
-	rb := s.Request("lfs/put_object", BucketName, ObjectName)
+	rb := s.Request("lfs/put_object", BucketName)
 	for _, option := range options {
 		option(rb)
 	}

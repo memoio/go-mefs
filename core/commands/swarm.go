@@ -13,10 +13,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	commands "github.com/memoio/go-mefs/commands"
+	config "github.com/memoio/go-mefs/config"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
 	repo "github.com/memoio/go-mefs/repo"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
-	config "github.com/memoio/go-mefs/config"
 	ma "github.com/multiformats/go-multiaddr"
 	mafilter "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -293,7 +293,7 @@ var swarmAddrsLocalCmd = &cmds.Command{
 		for _, addr := range maddrs {
 			saddr := addr.String()
 			if showid {
-				saddr = path.Join(saddr, "ipfs", node.Identity.Pretty())
+				saddr = path.Join(saddr, "p2p", node.Identity.Pretty())
 			}
 			addrs = append(addrs, saddr)
 		}
@@ -346,7 +346,7 @@ var swarmConnectCmd = &cmds.Command{
 
 The address format is an MEFS multiaddr:
 
-mefs swarm connect /ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ
+mefs swarm connect "/ip4/103.39.231.220/tcp/14069/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp"
 `,
 	},
 	Arguments: []cmds.Argument{
@@ -391,7 +391,7 @@ var swarmDisconnectCmd = &cmds.Command{
 'mefs swarm disconnect' closes a connection to a peer address. The address
 format is an MEFS multiaddr:
 
-mefs swarm disconnect /ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ
+mefs swarm disconnect "/ip4/103.39.231.220/tcp/14069/p2p/8MHSTe6UWXsBYLgFKdEU3VnrnVPRUp"
 
 The disconnect is not permanent; if mefs needs to talk to that address later,
 it will reconnect.

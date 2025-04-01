@@ -3,10 +3,10 @@
 package retrystore
 
 import (
-	"fmt"
 	"time"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
+	xerrors "golang.org/x/xerrors"
 )
 
 // Datastore wraps a Batching datastore with a
@@ -23,7 +23,7 @@ type Datastore struct {
 	ds.Batching
 }
 
-var errFmtString = "ran out of retries trying to get past temporary error: %s"
+var errFmtString = "ran out of retries trying to get past temporary error: %w"
 
 func (d *Datastore) runOp(op func() error) error {
 	err := op()
@@ -40,7 +40,7 @@ func (d *Datastore) runOp(op func() error) error {
 		}
 	}
 
-	return fmt.Errorf(errFmtString, err)
+	return xerrors.Errorf(errFmtString, err)
 }
 
 // DiskUsage implements the PersistentDatastore interface.
@@ -66,18 +66,6 @@ func (d *Datastore) Get(k ds.Key) ([]byte, error) {
 	return val, err
 }
 
-// Get retrieves a value given a key.
-func (d *Datastore) GetSegAndTag(k ds.Key, offset uint64) ([]byte, []byte, error) {
-	var segment, tag []byte
-	err := d.runOp(func() error {
-		var err error
-		segment, tag, err = d.Batching.GetSegAndTag(k, offset)
-		return err
-	})
-
-	return segment, tag, err
-}
-
 // Put stores a key/value.
 func (d *Datastore) Put(k ds.Key, val []byte) error {
 	return d.runOp(func() error {
@@ -86,9 +74,16 @@ func (d *Datastore) Put(k ds.Key, val []byte) error {
 }
 
 // Append append a block
-func (d *Datastore) Append(k ds.Key, val []byte, beginoffset, endoffset int) error {
+func (d *Datastore) Append(k ds.Key, val []byte, begin, length int) error {
 	return d.runOp(func() error {
-		return d.Batching.Append(k, val, beginoffset, endoffset)
+		return d.Batching.Append(k, val, begin, length)
+	})
+}
+
+// Sync implements Datastore.Sync
+func (d *Datastore) Sync(prefix ds.Key) error {
+	return d.runOp(func() error {
+		return d.Batching.Sync(prefix)
 	})
 }
 

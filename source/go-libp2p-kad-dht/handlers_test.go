@@ -5,16 +5,14 @@ import (
 	"testing"
 
 	proto "github.com/gogo/protobuf/proto"
-	recpb "github.com/libp2p/go-libp2p-record/pb"
+	recpb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
 )
 
 func TestCleanRecordSigned(t *testing.T) {
 	actual := new(recpb.Record)
-	actual.TimeReceived = "time"
 	actual.Value = []byte("value")
 	actual.Key = []byte("key")
 
-	cleanRecord(actual)
 	actualBytes, err := proto.Marshal(actual)
 	if err != nil {
 		t.Fatal(err)
@@ -35,11 +33,9 @@ func TestCleanRecordSigned(t *testing.T) {
 
 func TestCleanRecord(t *testing.T) {
 	actual := new(recpb.Record)
-	actual.TimeReceived = "time"
 	actual.Key = []byte("key")
 	actual.Value = []byte("value")
 
-	cleanRecord(actual)
 	actualBytes, err := proto.Marshal(actual)
 	if err != nil {
 		t.Fatal(err)

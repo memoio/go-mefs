@@ -1,23 +1,24 @@
 package contracts
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"log"
 	"math/big"
-	"sync"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/memoio/go-mefs/contracts/indexer"
-	"github.com/memoio/go-mefs/contracts/mapper"
-	"github.com/memoio/go-mefs/contracts/resolver"
+	"github.com/memoio/go-mefs/contracts/channel"
+	"github.com/memoio/go-mefs/contracts/upKeeping"
 	"github.com/memoio/go-mefs/utils"
-	"github.com/memoio/go-mefs/utils/address"
 )
 
 // EndPoint config中的ETH，在daemon中赋值
@@ -25,15 +26,37 @@ var EndPoint string
 
 const (
 	//indexerHex indexerAddress, it is well known
-	indexerHex = "0x9e4af0964ef92095ca3d2ae0c05b472837d8bd37"
+	indexerHex = "0xA36D0F4e56b76B89532eBbca8108d90d8cA006c2"
 	//InvalidAddr implements invalid contracts-address
-	InvalidAddr          = "0x0000000000000000000000000000000000000000"
-	spaceTimePayGasLimit = uint64(400000)
-	spaceTimePayGasPrice = 100
-	defaultGasPrice      = 100
+	InvalidAddr               = "0x0000000000000000000000000000000000000000"
+	spaceTimePayGasLimit      = uint64(8000000)
+	spaceTimePayGasPrice      = 2 * defaultGasPrice
+	defaultGasPrice           = 200
+	defaultGasLimit           = uint64(8000000)
+	sendTransactionRetryCount = 5
+	checkTxRetryCount         = 8
+	checkTxSleepTime          = 5
+	retryTxSleepTime          = time.Minute
+	retryGetInfoSleepTime     = time.Minute
+	waitTime                  = 3 * time.Second
+)
+
+const (
+	keeperKey   = "keeperV0"
+	providerKey = "providerV0"
+	kpMapKey    = "kpMapV0"
+
+	offerKey   = "offerV0"
+	queryKey   = "queryV0"
+	ukey       = "upKeepingV0"
+	rootKey    = "rootV0"
+	channelKey = "channelV0"
 )
 
 var (
+	ErrEmpty              = errors.New("has not addr")
+	ErrMisType            = errors.New("mistype contract")
+	ErrNotDeployedIndexer = errors.New("has not deployed indexer")
 	//ErrNotDeployedMapper the user has not deployed mapper in the specified resolver
 	ErrNotDeployedMapper = errors.New("has not deployed mapper")
 	//ErrNotDeployedResolver the provider has not deployed resolver
@@ -49,534 +72,270 @@ var (
 	// ErrNotDeployedMarket is
 	ErrNotDeployedMarket = errors.New("has not deployed query or offer")
 	// ErrNewContractInstance is
-	ErrNewContractInstance = errors.New("new contract Instace failed")
+	ErrNewContractInstance = errors.New("new contract Instance failed")
 	// ErrNotDeployedKPMap is
 	ErrNotDeployedKPMap = errors.New("has not deployed keeperProviderMap contract")
+	ErrTxFail           = errors.New("transaction fails")
+	ErrTxExecu          = errors.New("Transaction mined but execution failed")
+	ErrNotKeeper        = errors.New("addr is not a keeper")
+	ErrNotProvider      = errors.New("addr is not a provider")
+	ErrNotEnoughBalance = errors.New("balance is insufficient")
+	ErrNotRight         = errors.New("the results in the contract don't match expectations")
 )
 
-// UpKeepingItem has upkeeping information
-type UpKeepingItem struct {
-	UserID        string // 部署upkeeping的userid
-	UpKeepingAddr string // 合约地址
-	KeeperIDs     []string
-	ProviderIDs   []string
-	KeeperSLA     int32
-	ProviderSLA   int32
-	Duration      int64
-	Capacity      int64
-	Price         int64  // 部署的价格
-	StartTime     string // 部署的时间
+type LogPay struct {
+	From  common.Address
+	To    common.Address
+	Value *big.Int
 }
 
-// ChannelItem has channel information
-type ChannelItem struct {
-	UserID      string // 部署Channel的userid
-	ProID       string
-	ChannelAddr string
-	Value       *big.Int
-	Money       *big.Int
-	StartTime   string // 部署的时间
-	Duration    int64  // timeout
+type LogCloseChannel struct {
+	From  common.Address
+	Value *big.Int
 }
-
-// QueryItem has query information
-type QueryItem struct {
-	UserID       string // 部署Query的userid
-	QueryAddr    string
-	Capacity     int64
-	Duration     int64
-	Price        int64 // 合约给出的单价
-	KeeperNums   int32
-	ProviderNums int32
-	Completed    bool
-}
-
-// OfferItem has offer information
-type OfferItem struct {
-	ProviderID string // 部署Offer的providerid
-	OfferAddr  string
-	Capacity   int64
-	Duration   int64
-	Price      int64 // 合约给出的单价
-}
-
-// ProviderItem has provider's info
-type ProviderItem struct {
-	ProviderID string   // providerid
-	Capacity   int64    // MB
-	Money      *big.Int // pledge time
-	StartTime  string   // start time
-}
-
-type kpItem struct {
-	keeperIDs []string
-}
-
-var kpMap sync.Map
 
 func init() {
-	EndPoint = "http://212.64.28.207:8101"
+	EndPoint = "http://119.147.213.220:8191"
 }
 
 //GetClient get rpc-client based the endPoint
-func GetClient(endPoint string) *ethclient.Client {
+func getClient(endPoint string) *ethclient.Client {
 	client, err := rpc.Dial(endPoint)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	return ethclient.NewClient(client)
 }
 
+//MakeAuth make the transactOpts to call contract
+func makeAuth(hexSk string, moneyToContract, nonce, gasPrice *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
+	auth := &bind.TransactOpts{}
+	sk, err := crypto.HexToECDSA(hexSk)
+	if err != nil {
+		log.Println("HexToECDSA err: ", err)
+		return auth, err
+	}
+
+	auth = bind.NewKeyedTransactor(sk)
+	auth.GasPrice = gasPrice
+	auth.Value = moneyToContract //放进合约里的钱
+	auth.Nonce = nonce
+	auth.GasLimit = gasLimit
+	return auth, nil
+}
+
 //QueryBalance query the balance of account
-func QueryBalance(account string) (balance *big.Int, err error) {
+func (a *AdminOwnedInfo) QueryBalance(account string) (*big.Int, error) {
 	var result string
+
 	client, err := rpc.Dial(EndPoint)
 	if err != nil {
-		fmt.Println("rpc.dial err:", err)
-		return balance, err
-	}
-	err = client.Call(&result, "eth_getBalance", account, "latest")
-	if err != nil {
-		fmt.Println("client.call err:", err)
-		return balance, err
-	}
-	balance = utils.HexToBigInt(result)
-	return balance, nil
-}
-
-func getResolverFromIndexer(localAddress common.Address, key string) (common.Address, *resolver.Resolver, error) {
-	var resolverAddr common.Address
-	var resolverInstance *resolver.Resolver
-
-	client := GetClient(EndPoint)
-	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, client)
-	if err != nil {
-		log.Println("new Indexer err: ", err)
-		return resolverAddr, resolverInstance, err
+		log.Println("rpc.dial err:", err)
+		return big.NewInt(0), err
 	}
 
 	retryCount := 0
 	for {
 		retryCount++
-		_, resolverAddr, err := indexer.Get(&bind.CallOpts{
-			From: localAddress,
-		}, key)
+
+		err = client.Call(&result, "eth_getBalance", account, "latest")
+
 		if err != nil {
-			if retryCount > 20 {
-				return resolverAddr, resolverInstance, err
+			if retryCount > sendTransactionRetryCount {
+				return big.NewInt(0), err
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(retryGetInfoSleepTime)
 			continue
 		}
-		if len(resolverAddr) == 0 || resolverAddr.String() == InvalidAddr {
-			return resolverAddr, resolverInstance, ErrNotDeployedResolver
-		}
-		resolverInstance, err = resolver.NewResolver(resolverAddr, client)
-		if err != nil {
-			return resolverAddr, resolverInstance, err
-		}
-		return resolverAddr, resolverInstance, nil
+		balance := utils.HexToBigInt(result)
+		return balance, nil
 	}
 }
 
-func deployResolver(localAddress common.Address, hexKey, key string) (common.Address, *resolver.Resolver, error) {
-	resolverAddr, resolverInstance, err := getResolverFromIndexer(localAddress, key)
-	if err == nil {
-		return resolverAddr, resolverInstance, nil
-	}
-
-	client := GetClient(EndPoint)
-
-	indexerAddr := common.HexToAddress(indexerHex)
-	indexer, err := indexer.NewIndexer(indexerAddr, client)
+//GetLatestBlock get latest block from chain
+func (a *AdminOwnedInfo) GetLatestBlock() (*types.Block, error) {
+	client, err := ethclient.Dial(EndPoint)
 	if err != nil {
-		log.Println("new Indexer err: ", err)
-		return resolverAddr, resolverInstance, err
+		log.Println("rpc.Dial err", err)
+		return nil, err
 	}
 
-	sk, err := crypto.HexToECDSA(hexKey)
+	b, err := client.BlockByNumber(context.Background(), nil)
 	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return resolverAddr, resolverInstance, err
+		log.Println("client.call err:", err)
+		return nil, err
 	}
 
-	retryCount := 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		resolverAddr, _, resolverInstance, err = resolver.DeployResolver(auth, client)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("deploy Resolver Err:", err)
-				return resolverAddr, resolverInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		break
-	}
-
-	//将resolver地址放进indexer中,关键字key可以理解为resolverAddress的索引
-	//resolver-for-channel的key为providerAddr.string()
-	retryCount = 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = indexer.Add(auth, key, resolverAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
-				return resolverAddr, resolverInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			_, resolverAddrGetted, err := indexer.Get(&bind.CallOpts{
-				From: localAddress,
-			}, key)
-			if err != nil {
-				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
-					return resolverAddr, resolverInstance, err
-				}
-				continue
-			}
-			if resolverAddrGetted == resolverAddr { //放进去了
-				break
-			}
-		}
-		break
-	}
-	return resolverAddr, resolverInstance, nil
+	return b, nil
 }
 
-func getResolverFromResolver(localAddress, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, *resolver.Resolver, error) {
-	retryCount := 0
-	for {
-		retryCount++
-		resolverAddr, err := resolverInstance.Get(&bind.CallOpts{
-			From: localAddress,
-		}, ownerAddress)
-		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("get resolve Addr err: ", err)
-				return resolverAddr, nil, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		if len(resolverAddr) == 0 || resolverAddr.String() == InvalidAddr {
-			return resolverAddr, nil, ErrNotDeployedResolver
-		}
-
-		secondInstance, err := resolver.NewResolver(resolverAddr, GetClient(EndPoint))
-		if err != nil {
-			return resolverAddr, nil, err
-		}
-		return resolverAddr, secondInstance, nil
-	}
+// GetMemoPrice gets memo price
+func GetMemoPrice() *big.Float {
+	return big.NewFloat(utils.Memo2Dollar)
 }
 
-func deployResolverToResolver(localAddress common.Address, resolverInstance *resolver.Resolver, hexKey string) (common.Address, *resolver.Resolver, error) {
-	resolverAddr, secondInstance, err := getResolverFromResolver(localAddress, localAddress, resolverInstance)
-	if err == nil {
-		return resolverAddr, secondInstance, nil
+//CheckTx 通过交易详情检查交易是否成功
+func checkTx(tx *types.Transaction) error {
+	log.Println("Check Tx hash:", tx.Hash().Hex(), "nonce:", tx.Nonce(), "gasPrice:", tx.GasPrice())
+
+	var receipt *types.Receipt
+	for i := 0; i < 20; i++ {
+		receipt = getTransactionReceipt(tx.Hash())
+		if receipt != nil {
+			break
+		}
+		t := checkTxSleepTime * (i + 1)
+		time.Sleep(time.Duration(t) * time.Second)
 	}
 
-	client := GetClient(EndPoint)
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("HexToECDSA err: ", err)
-		return resolverAddr, nil, err
+	if receipt == nil { //245s获取不到交易信息，判定交易失败
+		return ErrTxFail
 	}
 
-	retryCount := 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		resolverAddr, _, secondInstance, err = resolver.DeployResolver(auth, client)
+	if receipt.Status == 0 { //等于0表示交易失败，等于1表示成功
+		log.Println("Transaction mined but execution failed")
+		txReceipt, err := receipt.MarshalJSON()
 		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("deploy Resolver Err:", err)
-				return resolverAddr, secondInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
+			return err
 		}
-		break
+		log.Println("TxReceipt:", string(txReceipt))
+		return ErrTxExecu
 	}
 
-	//将resolver地址放进indexer中,关键字key可以理解为resolverAddress的索引
-	//resolver-for-channel的key为providerAddr.string()
-	retryCount = 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = resolverInstance.Add(auth, resolverAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				fmt.Println("\naddResolverErr:", err)
-				return resolverAddr, secondInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
+	log.Println("GasUsed:", receipt.GasUsed, "CumulativeGasUsed:", receipt.CumulativeGasUsed)
 
-		retryCount = 0
-		//尝试从indexer中获取resolverAddr，以检测resolverAddr是否已放进indexer中
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			resolverAddrGetted, err := resolverInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			}, localAddress)
-			if err != nil {
-				if retryCount > 20 {
-					fmt.Println("add then get Resolver Err:", err)
-					return resolverAddr, secondInstance, err
-				}
-				continue
-			}
-			if resolverAddrGetted == resolverAddr { //放进去了
-				break
-			}
-		}
-		break
-	}
-	return resolverAddr, secondInstance, nil
-}
-
-// getMapperInstance 返回已经部署的Mapper，若Mapper没部署则返回err
-// 特别地，当在ChannelTimeOut()中被调用，则localAddress和ownerAddress都是userAddr；
-// 当在CloseChannel()中被调用，则localAddress为providerAddr, ownerAddress为userAddr
-func getMapperInstance(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver) (common.Address, *mapper.Mapper, error) {
-	retryCount := 0
-	for {
-		retryCount++
-		mapperAddr, err := resolverInstance.Get(&bind.CallOpts{
-			From: localAddress,
-		}, ownerAddress)
-		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("getMapperAddrErr:", err)
-				return mapperAddr, nil, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		if len(mapperAddr) == 0 || mapperAddr.String() == InvalidAddr {
-			return mapperAddr, nil, ErrNotDeployedMapper
-		}
-		mapperInstance, err := mapper.NewMapper(mapperAddr, GetClient(EndPoint))
-		if err != nil {
-			fmt.Println("newMapperErr:", err)
-			return mapperAddr, nil, err
-		}
-		return mapperAddr, mapperInstance, nil
-	}
-}
-
-// deployMapper 部署Mapper合约，若Mapper已经部署过，则返回已部署好的Mapper
-func deployMapper(localAddress common.Address, ownerAddress common.Address, resolverInstance *resolver.Resolver, hexKey string) (common.Address, *mapper.Mapper, error) {
-	//试图从resolver中取出mapper地址：mapperAddr
-	mapperAddr, mapperInstance, err := getMapperInstance(localAddress, ownerAddress, resolverInstance)
-	if err == nil {
-		return mapperAddr, mapperInstance, nil
-	}
-
-	client := GetClient(EndPoint)
-	sk, err := crypto.HexToECDSA(hexKey)
-	if err != nil {
-		log.Println("Hex To ECDSA err: ", err)
-		return mapperAddr, mapperInstance, err
-	}
-	// 部署Mapper
-	retryCount := 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		mapperAddr, _, mapperInstance, err = mapper.DeployMapper(auth, client)
-		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("deployMapperErr:", err)
-				return mapperAddr, mapperInstance, err
-			}
-			retryCount++
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		break
-	}
-
-	//把mapper放进resolver
-	retryCount = 0
-	for {
-		auth := bind.NewKeyedTransactor(sk)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err = resolverInstance.Add(auth, mapperAddr)
-		if err != nil {
-			retryCount++
-			if retryCount > 20 {
-				return mapperAddr, mapperInstance, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		retryCount = 0
-		for { //验证是否放进resolver
-			retryCount++
-			time.Sleep(30 * time.Second)
-			mapperGetted, err := resolverInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			}, ownerAddress)
-			if err != nil {
-				if retryCount > 20 {
-					return mapperAddr, mapperInstance, err
-				}
-				continue
-			}
-			if mapperGetted == mapperAddr {
-				break
-			}
-		}
-		break
-	}
-
-	return mapperAddr, mapperInstance, nil
-}
-
-func addToMapper(localAddress common.Address, mapperInstance *mapper.Mapper, addr common.Address, hexKey string) error {
-	key, _ := crypto.HexToECDSA(hexKey)
-
-	retryCount := 0
-	for {
-		retryCount++
-		auth := bind.NewKeyedTransactor(key)
-		auth.GasPrice = big.NewInt(defaultGasPrice)
-		_, err := mapperInstance.Add(auth, addr)
-		if err != nil {
-			if retryCount > 10 {
-				fmt.Println("add addr to Mapper Err:", err)
-				return err
-			}
-			time.Sleep(time.Minute)
-			continue
-		}
-
-		retryCount = 0
-		for {
-			retryCount++
-			time.Sleep(30 * time.Second)
-			addrGetted, err := mapperInstance.Get(&bind.CallOpts{
-				From: localAddress,
-			})
-			if err != nil {
-				if retryCount > 20 {
-					fmt.Println("get addr from Mapper Err:", err)
-					return err
-				}
-				continue
-			}
-			length := len(addrGetted)
-			if length != 0 && addrGetted[length-1] == addr {
-				return nil
-			}
-			if retryCount > 20 {
-				break
-			}
-		}
-		break
-	}
-	return errors.New("add address to mapper fail")
-}
-
-func getAllAddrsFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) ([]common.Address, error) {
-	var addr []common.Address
-	retryCount := 0
-	for {
-		retryCount++
-		channels, err := mapperInstance.Get(&bind.CallOpts{
-			From: localAddress,
-		})
-		if err != nil {
-			if retryCount > 20 {
-				fmt.Println("get addr from mapper:", err)
-				return addr, err
-			}
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		if len(channels) != 0 && channels[len(channels)-1].String() != InvalidAddr {
-			return channels, nil
-		}
-		return addr, errors.New("get addr from mapper error")
-	}
-}
-
-func getLatestAddrFromMapper(localAddress common.Address, mapperInstance *mapper.Mapper) (common.Address, error) {
-	var addr common.Address
-	addrs, err := getAllAddrsFromMapper(localAddress, mapperInstance)
-	if err != nil {
-		return addr, err
-	}
-	return addrs[len(addrs)-1], nil
-}
-
-// SaveKpMap saves kpmap
-func SaveKpMap(peerID string) error {
-	localAddr, err := address.GetAddressFromID(peerID)
-	if err != nil {
-		log.Println("saveKpMap GetAddressFromID() error", err)
-		return err
-	}
-	kps, err := GetAllKeeperInKPMap(localAddr)
-	if err != nil {
-		log.Println("saveKpMap GetAllKeepers() error", err)
-		return err
-	}
-
-	for _, kpaddr := range kps {
-		pids, err := GetProviderInKPMap(localAddr, kpaddr)
-		if err != nil {
-			log.Println("get provider from kpmap err:", err)
-		}
-		if len(pids) > 0 {
-			keeperID, _ := address.GetIDFromAddress(kpaddr.String())
-			kidList := []string{keeperID}
-			for _, paddr := range pids {
-				pid, _ := address.GetIDFromAddress(paddr.String())
-				res, ok := kpMap.Load(pid)
-				if ok {
-					res.(*kpItem).keeperIDs = append(res.(*kpItem).keeperIDs, keeperID)
-				} else {
-					kidres := &kpItem{
-						keeperIDs: kidList,
-					}
-					kpMap.Store(keeperID, kidres)
-				}
-			}
-		}
-	}
 	return nil
 }
 
-// GetKeepersOfPro get keepers of some provider
-func GetKeepersOfPro(peerID string) ([]string, bool) {
-	res, ok := kpMap.Load(peerID)
-	if !ok {
-		return nil, false
+//GetTransactionReceipt 通过交易hash获得交易详情
+func getTransactionReceipt(hash common.Hash) *types.Receipt {
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		log.Fatal("rpc.Dial err", err)
 	}
-	return res.(*kpItem).keeperIDs, true
+	receipt, err := client.TransactionReceipt(context.Background(), hash)
+	return receipt
+}
+
+//GetLogs filter logs according to
+func getLogs(restrictAddress []common.Address, fromBlock, toBlock *big.Int) ([]types.Log, error) {
+	log.Println("begin to filter logs in chain...")
+
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		log.Println("rpc.Dial err", err)
+		return nil, err
+	}
+
+	query := ethereum.FilterQuery{
+		FromBlock: fromBlock,
+		ToBlock:   toBlock,
+		Addresses: restrictAddress,
+	}
+
+	logs, err := client.FilterLogs(context.Background(), query)
+	if err != nil {
+		log.Println("filterLogs err:", err)
+		return nil, err
+	}
+
+	return logs, nil
+}
+
+//GetStorageIncome filter upkeeping-contract Pay-logs to calculate provider's income
+func (a *AdminOwnedInfo) GetStorageIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
+	log.Println("begin to filter upkeeping Pay logs in chain...")
+
+	totalIncome := big.NewInt(0)
+
+	logs, err := getLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
+	if err != nil {
+		return totalIncome, nil, err
+	}
+
+	contractAbi, err := abi.JSON(strings.NewReader(string(upKeeping.UpKeepingABI)))
+	if err != nil {
+		log.Println("abi json err:", err)
+		return totalIncome, nil, err
+	}
+
+	logPaySignHash := crypto.Keccak256Hash([]byte("Pay(address,address,uint256)"))
+
+	var resLogs []types.Log
+
+	for _, vLog := range logs {
+		if vLog.Topics[0].Hex() == logPaySignHash.Hex() && common.HexToAddress(vLog.Topics[2].Hex()).Hex() == providerAddr.Hex() {
+			var payLog LogPay
+			err := contractAbi.Unpack(&payLog, "Pay", vLog.Data)
+			if err != nil {
+				log.Println("unpack log err: ", err)
+				return totalIncome, nil, err
+			}
+
+			totalIncome.Add(totalIncome, payLog.Value)
+
+			resLogs = append(resLogs, vLog)
+		}
+	}
+	return totalIncome, resLogs, nil
+}
+
+//GetReadIncome filter channel-contract CloseChannel-logs to calculate provider's income
+func (a *AdminOwnedInfo) GetReadIncome(restrictAddress []common.Address, providerAddr common.Address, fromBlock, toBlock int64) (*big.Int, []types.Log, error) {
+	log.Println("begin to filter channel closeChannel logs in chain...")
+
+	totalIncome := big.NewInt(0)
+
+	logs, err := getLogs(restrictAddress, big.NewInt(fromBlock), big.NewInt(toBlock))
+	if err != nil {
+		return totalIncome, nil, err
+	}
+
+	contractAbi, err := abi.JSON(strings.NewReader(string(channel.ChannelABI)))
+	if err != nil {
+		log.Println("abi json err:", err)
+		return totalIncome, nil, err
+	}
+
+	logCloseChannelSignHash := crypto.Keccak256Hash([]byte("closeChannel(address,uint256)"))
+
+	var resLogs []types.Log
+
+	for _, vLog := range logs {
+		if vLog.Topics[0].Hex() == logCloseChannelSignHash.Hex() && common.HexToAddress(vLog.Topics[1].Hex()).Hex() == providerAddr.Hex() {
+			var channelLog LogCloseChannel
+			err := contractAbi.Unpack(&channelLog, "closeChannel", vLog.Data)
+			if err != nil {
+				log.Println("unpack log err: ", err)
+				return totalIncome, nil, err
+			}
+
+			totalIncome.Add(totalIncome, channelLog.Value)
+
+			resLogs = append(resLogs, vLog)
+		}
+	}
+	return totalIncome, resLogs, nil
+}
+
+//getBlockTime get block's timeStamp
+func getBlockTime(blockHash common.Hash) (uint64, error) {
+	client, err := ethclient.Dial(EndPoint)
+	if err != nil {
+		return 0, err
+	}
+
+	blockHeader, err := client.HeaderByHash(context.Background(), blockHash)
+	time := blockHeader.Time
+	return time, nil
+}
+
+func isToday(t int64) bool {
+	currentTime := time.Now()
+	startTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), 0, 0, 0, 0, currentTime.Location())
+	oneDay := int64(24 * 60 * 60)
+	if t >= startTime.Unix() && t <= startTime.Unix()+oneDay {
+		return true
+	}
+	return false
 }

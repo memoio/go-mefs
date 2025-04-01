@@ -1,4 +1,4 @@
-package iptbutil
+package metbutil
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 )
 
 // DockerNode is an MEFS node in a docker container controlled
-// by IPTB
+// by METB
 type DockerNode struct {
 	ImageName string
 	ID        string

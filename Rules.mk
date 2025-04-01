@@ -26,7 +26,13 @@ export IPFS_REUSEPORT=false
 #       sub-files      #
 # -------------------- #
 
-dir := cmd/mefs
+dir := cmd/mefs-user
+include $(dir)/Rules.mk
+
+dir := cmd/mefs-keeper
+include $(dir)/Rules.mk
+
+dir := cmd/mefs-provider
 include $(dir)/Rules.mk
 
 # include this file only if coverage target is executed
@@ -76,7 +82,13 @@ nofuse: GOTAGS += nofuse
 nofuse: build
 .PHONY: nofuse
 
-install: cmd/mefs-install
+user: cmd/mefs-user-install
+.PHONY: install
+
+provider: cmd/mefs-provider-install
+.PHONY: install
+
+keeper: cmd/mefs-keeper-install
 .PHONY: install
 
 uninstall:

@@ -78,7 +78,7 @@ var queryDhtCmd = &cmds.Command{
 		ctx, cancel := context.WithCancel(req.Context)
 		ctx, events := notif.RegisterForQueryEvents(ctx)
 
-		closestPeers, err := nd.Routing.(*dht.IpfsDHT).GetClosestPeers(ctx, string(id))
+		closestPeers, err := nd.Routing.(*dht.KadDHT).GetClosestPeers(ctx, string(id))
 		if err != nil {
 			cancel()
 			return err
@@ -304,7 +304,7 @@ var getValuefromDhtCmd = &cmds.Command{
 
 		go func() {
 			defer cancel()
-			val, err := nd.Routing.(*dht.IpfsDHT).CmdGetFrom(dhtkey, id)
+			val, err := nd.Routing.(*dht.KadDHT).GetFrom(ctx, dhtkey, id)
 			if err != nil {
 				notif.PublishQueryEvent(ctx, &notif.QueryEvent{
 					Type:  notif.QueryError,
@@ -380,7 +380,7 @@ var literFromDhtCmd = &cmds.Command{
 		ctx, events := notif.RegisterForQueryEvents(ctx)
 		go func() {
 			defer cancel()
-			val, err := nd.Routing.(*dht.IpfsDHT).CmdLiterFrom(prefix, id)
+			val, err := nd.Routing.(*dht.KadDHT).IterFrom(ctx, prefix, id)
 			if err != nil {
 				notif.PublishQueryEvent(ctx, &notif.QueryEvent{
 					Type:  notif.QueryError,
@@ -452,7 +452,7 @@ var literDhtCmd = &cmds.Command{
 		ctx = context.WithValue(ctx, "prefix", true) //在上下文中记录前缀查询标志
 		go func() {
 			defer cancel()
-			val, err := nd.Routing.(*dht.IpfsDHT).CmdLiterFrom(prefix, "local")
+			val, err := nd.Routing.(*dht.KadDHT).IterFrom(ctx, prefix, "local")
 			if err != nil {
 				notif.PublishQueryEvent(ctx, &notif.QueryEvent{
 					Type:  notif.QueryError,
@@ -611,7 +611,7 @@ var putValuetoDhtCmd = &cmds.Command{
 
 		go func() {
 			defer cancel()
-			err := nd.Routing.(*dht.IpfsDHT).CmdPutTo(key, data, id)
+			err := nd.Routing.(*dht.KadDHT).PutTo(ctx, key, []byte(data), nil, id)
 			if err != nil {
 				notif.PublishQueryEvent(ctx, &notif.QueryEvent{
 					Type:  notif.QueryError,
@@ -803,7 +803,7 @@ var deleteFromDhtCmd = &cmds.Command{
 		to := req.Arguments[1]
 
 		go func() {
-			_, err = nd.Routing.(*dht.IpfsDHT).SendMetaRequest(key, "", to, "deletefrom")
+			err = nd.Data.DeleteBlock(context.Background(), key, to)
 			if err != nil {
 				fmt.Println("delete block error :", err)
 				return

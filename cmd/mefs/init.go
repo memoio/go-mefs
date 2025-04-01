@@ -1,25 +1,39 @@
-package main
+package mefs
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
+	"time"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	oldcmds "github.com/memoio/go-mefs/commands"
 	config "github.com/memoio/go-mefs/config"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
 	"github.com/memoio/go-mefs/utils"
+	"github.com/memoio/go-mefs/utils/address"
 )
 
 const (
-	nBitsForKeypairDefault = 2048
+	passwordKwd  = "password"
+	secretKeyKwd = "secretKey"
+	netKeyKwd    = "netKey"
 )
 
-var initCmd = &cmds.Command{
+var (
+	errRepoExists = errors.New("mefs configuration file already exists, reinitializing would overwrite your keys")
+)
+
+// InitCmd inits
+var InitCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Initializes mefs config file.",
 		ShortDescription: `
@@ -33,11 +47,12 @@ environment variable:
 `,
 	},
 	Arguments: []cmds.Argument{
-		cmds.FileArg("default-config", false, false, "Initialize with the given configuration.").EnableStdin(),
+		cmds.StringArg("addr", false, false, "The practice user's address that you want to init as network node"),
 	},
 	Options: []cmds.Option{
-		cmds.StringOption(passwordKwd, "pwd", "the password is used to encrypt the privateKey").WithDefault(utils.DefaultPassword),
-		cmds.StringOption(secretKeyKwd, "sk", "the stored privateKey").WithDefault(""),
+		cmds.StringOption(passwordKwd, "pwd", "the password is used to load/store the PrivateKey from keyfile").WithDefault(""),
+		cmds.StringOption(secretKeyKwd, "sk", "the privateKey").WithDefault(""),
+		cmds.StringOption("keyfile", "kf", "the absolute path of keyfile").WithDefault(""),
 		cmds.StringOption(netKeyKwd, "the netKey is used to setup private network").WithDefault("dev"),
 	},
 	PreRun: func(req *cmds.Request, env cmds.Environment) error {
@@ -47,10 +62,10 @@ environment variable:
 			return err
 		}
 
-		log.Info("checking if daemon is running...")
+		log.Println("checking if daemon is running...")
 		if daemonLocked {
-			log.Debug("mefs daemon is running")
-			e := "mefs daemon is running. please stop it to run this command"
+			log.Println("mefs-user daemon is running")
+			e := "mefs-user daemon is running. please stop it to run this command"
 			return cmds.ClientError(e)
 		}
 
@@ -62,8 +77,11 @@ environment variable:
 			return cmds.Error{Message: "init must be run offline only"}
 		}
 
-		hexsk, _ := req.Options[secretKeyKwd].(string)
-		password, _ := req.Options[passwordKwd].(string)
+		err := CheckRepo(cctx.ConfigRoot)
+		if err != nil {
+			return err
+		}
+
 		netKey, _ := req.Options[netKeyKwd].(string)
 
 		var conf *config.Config
@@ -81,11 +99,109 @@ environment variable:
 			}
 		}
 
-		return doInit(os.Stdout, cctx.ConfigRoot, nBitsForKeypairDefault, password, conf, hexsk, netKey)
+		kf, ok := req.Options["keyfile"].(string)
+		if ok && kf != "" {
+			password, ok := req.Options[passwordKwd].(string)
+			if !ok || password == "" {
+				password, _ = utils.GetPassWord()
+			}
+			hexsk, err := id.GetPrivateKey("", password, kf)
+			if err != nil {
+				fmt.Println("load keyfile fails:", err)
+				return err
+			}
+			return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
+		}
+
+		hexsk, ok := req.Options[secretKeyKwd].(string)
+		if !ok || hexsk == "" {
+			fmt.Printf("input your private key manully(if you have and want to use it. Or press 'Enter' to skip this step): ")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			go func() {
+				defer cancel()
+				input := bufio.NewScanner(os.Stdin)
+				ok := input.Scan()
+				if ok {
+					hexsk = input.Text()
+				}
+			}()
+
+			select {
+			case <-ctx.Done():
+			}
+		}
+		fmt.Printf("\n")
+
+		password, ok := req.Options[passwordKwd].(string)
+		if !ok || len(password) < 8 {
+			fmt.Println("Password is too short, length should be at least 8")
+			retry := 0
+			for {
+				gotpwd, err := utils.GetPassWord()
+				if err != nil {
+					if retry > 2 {
+						return err
+					}
+					retry++
+					continue
+				}
+				password = gotpwd
+				break
+			}
+		}
+
+		if len(req.Arguments) > 0 {
+			addr := req.Arguments[0]
+			uid, err := address.GetIDFromAddress(addr)
+			if err != nil {
+				return err
+			}
+			sk, err := fsrepo.GetPrivateKeyFromKeystore(uid, password)
+			if err != nil {
+				return err
+			}
+
+			hexsk = sk
+		}
+
+		return DoInit(os.Stdout, cctx.ConfigRoot, password, conf, hexsk, netKey)
 	},
 }
 
-func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string, conf *config.Config, prikey, netKey string) error {
+func CheckRepo(repoRoot string) error {
+	if err := checkWritable(repoRoot); err != nil {
+		return err
+	}
+
+	if fsrepo.IsInitialized(repoRoot) {
+		fmt.Println(repoRoot, "already exists, reinitializing need to delete files in this directory")
+		fmt.Printf("delete (y/N): ")
+		var deleteCmd string
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		go func() {
+			defer cancel()
+			input := bufio.NewScanner(os.Stdin)
+			ok := input.Scan()
+			if ok {
+				deleteCmd = input.Text()
+			}
+		}()
+
+		select {
+		case <-ctx.Done():
+		}
+
+		if deleteCmd == "y" {
+			return os.Rename(repoRoot, repoRoot+".bak")
+			//return os.RemoveAll(repoRoot)
+		}
+		return errRepoExists
+	}
+
+	return nil
+}
+
+func DoInit(out io.Writer, repoRoot string, password string, conf *config.Config, prikey, netKey string) error {
 	if _, err := fmt.Fprintf(out, "initializing MEFS node at %s\n", repoRoot); err != nil {
 		return err
 	}
@@ -95,6 +211,19 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string
 	}
 
 	if fsrepo.IsInitialized(repoRoot) {
+		pub, err := id.GetPubByte(prikey)
+		if err != nil {
+			return err
+		}
+		pid, err := id.GetIDFromPubKey(pub)
+		if err != nil {
+			return err
+		}
+
+		err = fsrepo.PutPrivateKeyToKeystore(prikey, pid, password)
+		if err != nil {
+			return err
+		}
 		return errRepoExists
 	}
 
@@ -102,12 +231,12 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, password string
 		var err error
 		switch netKey {
 		case "testnet":
-			conf, prikey, err = config.InitTestnet(out, nBitsForKeypair, prikey)
+			conf, prikey, err = config.InitTestnet(out, prikey)
 			if err != nil {
 				return err
 			}
 		default:
-			conf, prikey, err = config.Init(out, nBitsForKeypair, prikey)
+			conf, prikey, err = config.Init(out, prikey)
 			if err != nil {
 				return err
 			}

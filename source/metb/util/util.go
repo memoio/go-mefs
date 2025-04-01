@@ -1,4 +1,4 @@
-package iptbutil
+package metbutil
 
 import (
 	"encoding/json"
@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs/go-ipfs/core/commands"
 	serial "github.com/memoio/go-mefs/config/serialize"
+	"github.com/memoio/go-mefs/core/commands"
 	"github.com/whyrusleeping/stump"
 )
 
@@ -34,7 +34,7 @@ func GetNumNodes() int {
 }
 
 func TestBedDir() (string, error) {
-	tbd := os.Getenv("IPTB_ROOT")
+	tbd := os.Getenv("METB_ROOT")
 	if len(tbd) != 0 {
 		return tbd, nil
 	}
@@ -246,7 +246,7 @@ func (ns *NodeSpec) Load() (MefsNode, error) {
 
 		return dn, nil
 	default:
-		return nil, fmt.Errorf("unrecognized iptb node type")
+		return nil, fmt.Errorf("unrecognized metb node type")
 	}
 }
 
@@ -425,7 +425,7 @@ func starBootstrap(nodes []MefsNode, icfg *InitCfg) error {
 
 		ba := fmt.Sprintf("%s/ipfs/%s", bcfg.Addresses.Swarm[0], bcfg.PeerID)
 		ba = strings.Replace(ba, "0.0.0.0", "127.0.0.1", -1)
-		// 默认使用iptb均为测试模式
+		// 默认使用metb均为测试模式
 		cfg.Test = true
 		cfg.Bootstrap = []string{ba}
 		cfg.Addresses.Gateway = []string{}
@@ -500,13 +500,13 @@ func IpfsStart(nodes []MefsNode, waitall bool, args []string) error {
 }
 
 func waitOnAPI(n MefsNode) error {
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 100; i++ {
 		err := tryAPICheck(n)
 		if err == nil {
 			return nil
 		}
 		stump.VLog("temp error waiting on API: ", err)
-		time.Sleep(time.Millisecond * 400)
+		time.Sleep(time.Millisecond * 1000)
 	}
 	return fmt.Errorf("node %s failed to come online in given time period", n.GetPeerID())
 }

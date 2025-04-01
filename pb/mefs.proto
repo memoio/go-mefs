@@ -1,0 +1,277 @@
+syntax = "proto3";
+package mefs.pb;
+
+// operation type 
+enum OpType {
+    BroadCast = 0;
+	  Put = 1;
+	  Get = 2;
+	  Append = 3;
+	  Delete = 4;
+}
+
+// meta key type indicates: operate which type of key;
+// or record which type of key
+enum KeyType {
+    Wrong = 0;
+    Role = 1;       // record node's role
+    PublicKey = 2;  // record node's public key
+	  Config = 3;     // record node's config for bls
+    LFS = 4;        // record user's LFS keepers and providers; for test users
+    Users = 5;      // record node's managed users
+	  Keepers = 6;    // record node's managed keeper
+	  Providers = 7;  // record node's managed providers
+
+    Block = 10;    // handle block data
+	  BlockPos = 11; // handle block meta: postion and length
+    ChalTime = 12; // handle query Challenge time of block
+    Pos = 13;      // handle generated data
+    Bucket = 14;   // handle and store user's lfs bucket information
+    StPaySign = 15;  // handle spacetime pay sign 
+    ProAddSign = 16; // hanle add provider sign
+    StPayShare = 17; //handle spacetime pay share
+    
+    HeartBeat = 20;  // handle user's heartBeat
+    UserInit = 21;   // handle user's lfs init request
+	  UserNotify = 22; // handle user's notify after init
+	  UserStart = 23;  // handle user's lfs start request
+	  UserStop = 24;   // handle user's lfs stop request
+    Challenge = 25;  // handle chanllenge request
+	  Repair = 26;     // handle repair request
+    ExternalAddress = 27; // handle node's ip request
+    Storage = 28;  // handle node's storage information
+    ProQuit = 29;  //handle provider quit group
+
+	  Query = 30;  // record query contract
+	  Offer = 31;
+	  UpKeeping = 32;
+	  Channel = 33;
+
+    Income = 39; // record income information
+    ChalPay = 40; // record pay information
+    LastPay = 41; // record last pay information; no need
+    PosMeta = 42; // record pos metainfomation
+    Session = 43;  // record user's session information
+    BucketStripes = 44; // record bucket and their stripes
+    MoveData = 45; //provider move data to another provider
+}
+
+// record key meta 
+message KeyMeta{
+    int32 version = 1;
+    KeyType keyType = 2; // indicates which key type
+	  string mainID = 3;     // main id = peerID or blockID
+    repeated string options = 4;
+}
+
+// value stored in localdb
+message Record {
+	bytes key = 1; // The key that references this record
+	bytes value = 2; // The actual value this record is storing	
+	bytes signature = 3; // A signature for the key+value depends on its keytype
+}
+
+message BLSKey {
+  int32 version = 1;
+  bytes pubKey = 2;
+  bytes secretKey = 3;
+}
+
+// bls12 config information 
+message UserBLS12Config{
+    int32 version = 1;
+    bytes pubkeyBls = 2;
+    bytes pubkeyG = 3;
+    repeated bytes pubkeyU = 4;
+    repeated bytes pubkeyW = 5;
+    bytes prikeyBls = 6;
+    bytes X = 7;
+    int32 count = 10;
+    int32 tagCount = 11;  
+}
+
+// bucket merkle root of bucket ops
+message BucketRoot {
+  int64 BucketID = 1;
+  int64 OpCount = 2;
+  bytes Root = 3; //merkle root
+}
+
+// lfs merkle root of buckets' merkle root
+message LfsRoot {
+  int64 CTime = 1;
+  bytes Root  = 2;
+  repeated BucketRoot BRoots = 3;
+}
+
+// lfs superBlock information
+message SuperBlockInfo {
+  int32 Version = 1;         
+  int32 MetaBackupCount = 2;
+  int64 CTime = 3;   // creation time
+  int64 NextBucketID = 4;
+  repeated LfsRoot LRoot = 7; 
+}
+
+// lfs bucket options
+message BucketOptions {
+	int32 Version = 1;
+	int32 Policy  = 2;      // reed-solomon or multi-replicas
+	int32 DataCount = 3;
+	int32 ParityCount = 4;
+	int32 TagFlag = 5;      // tag policy: default is bls12
+	int32 SegmentSize = 6;  // segment size: default is 4096 bytes
+	int32 SegmentCount = 7; // number of segments
+	int32 Encryption = 8;   // Encryption type, default is AES
+}
+
+// lfs bucket information
+message BucketInfo {
+  string Name = 1;
+  int64 BucketID = 2;
+  int64 CTime = 3;
+  BucketOptions BOpts = 4;
+  int64 Length  = 5;
+  int64 MTime = 7;
+  int64 ObjectsBlockSize = 8; // ObjectsBlock serialization size
+  bool Deletion = 9;
+  int64 NextObjectID = 10;
+  int64 NextOpID = 11;
+  bytes Root = 12;  // merkle root of ops
+}
+
+// lfs object plus part information
+message ObjectInfo{
+  Object Info = 1;
+  int64 Length = 2;
+  int64 CTime = 3; 
+  int64 MTime = 4;
+  int64 PartCount = 5;
+  string ETag = 6;
+  bool Deletion = 7;
+  repeated ObjectPart Parts = 10; //构造出来的Part序列
+}
+
+// object information
+// insert into objectInfo when create a new object
+message Object {
+  string Name = 1;                  //对象名称
+  int64 BucketID = 2;               //本对象所属的Bucket
+  int64 CTime = 3;                  //对象创建时间
+  int64 ObjectID = 4; 
+  bool Dir = 5;                     //是否为目录
+  string ContentType = 9;           //对象的类型，如文本、图片
+  map<string, string> Metadata = 10; // User可以对文件自定义一些元信息                        
+}
+
+// lfs object part informations
+// insert into objectInfo when add data to an existing object
+message ObjectPart {
+  string Name = 1;               //此分块所属的Object
+  int64 ObjectID = 2;            //此分块所属的ObjectID
+  int64 PartID = 3;              //此分块的ID
+  int64 Start = 4;               //本对象的起始
+  int64 Length = 5;              //对象长度
+  int64 CTime = 6;               //append此Part的时间
+  string ETag = 7;               //MD5
+}
+
+message DeleteObject {
+  string Name     = 1;               //删除的objectName
+  int64  ObjectID = 2;
+  int64  Time     = 3;                //删除时间
+}
+
+enum LfsOp {
+  OpErr = 0;     
+  OpAdd = 1;     //create an object; payload is Object
+  OpAppend = 2;  //add data to objec; payload is ObjectPart
+  OpDelete = 3;  //delet an object; payload is DeleteObject
+  OpCancel = 4;  //撤销前面的某个Operation，尚未实现（是否应支持撤销前面的一个撤销命令）
+}
+
+//objects元数据最终存储的格式是一串可压缩的操作记录
+message OpRecord {
+  LfsOp OpType = 1;   
+  int64 OpID = 2;       
+  bytes Payload = 3;    
+}
+
+message CancelOp {
+  LfsOp OpType = 1;     //撤销的操作类型
+  int64 OpID = 2;       //撤销的操作ID
+}
+
+// data block's option
+message BlockOptions {
+  BucketOptions Bopts = 1;
+  int32 Start = 2;
+  string UserID = 11; // for OSD
+  string QueryID = 12;
+}
+
+// share link information
+message ShareLink{
+    string UserID = 1;
+    string QueryID = 2;
+    string BucketName = 3;
+    string ObjectName = 4;
+    int64 BucketID = 5;
+    BucketOptions BOpts = 6;
+    repeated ObjectPart OParts = 7;
+    bytes DecKey = 8;
+    string KPs = 11;// keepers/providers
+}
+
+message BucketContent {
+    int32 ChunkNum = 1;
+    int32 SegSize = 2;
+    int32 SegCount = 3;
+    int64 StripeNum = 4;
+}
+
+// challenge information
+message ChalInfo{
+    string QueryID = 1;
+    string KeeperID = 2;
+    string ProviderID = 3;
+    string UserID = 4;
+    int64 ChalTime = 5;
+    int64 ChalLength = 6;
+    int64 SuccessLength = 7;
+    int64 TotalLength = 8;
+    repeated string Blocks = 9;
+    repeated string FaultBlocks = 10;
+    bytes BlsProof = 11;
+    bool Res = 12;
+    bytes keeperSign = 13;
+    bytes proSign = 14;
+    
+    string Policy = 20;
+    int64 RootTime = 21;
+    repeated BucketContent Buckets = 22;
+    bytes ChunkMap = 24;
+    bytes FailMap = 25;
+}
+
+message ChannelSign {
+  string ChannelID = 1;
+  bytes Value = 2;
+  bytes Sig = 3;    //user签名信息
+  bytes PubKey = 4; //user公钥
+}
+
+message STValue {
+  int32 Status = 1;
+  int64 Start = 2;
+  int64 Length = 3;
+  bytes Value = 4;
+  bytes Root = 5; // merkel root of proofs (ChalInfo)
+  repeated int64 Share = 6;  // keepers' money share
+  repeated bytes Sign = 7;   // keepers' sign
+} 
+
+message KVData {
+  bytes Key = 1;
+  bytes Value = 2;
+}

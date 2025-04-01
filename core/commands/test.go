@@ -8,14 +8,23 @@ package commands
 import (
 	"fmt"
 	"io"
+	"math/big"
 
+	"github.com/memoio/go-mefs/role"
+	"github.com/memoio/go-mefs/utils"
+
+	"github.com/ethereum/go-ethereum/common"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/memoio/go-mefs/contracts"
 	"github.com/memoio/go-mefs/core/commands/cmdenv"
-	"github.com/memoio/go-mefs/role/keeper"
-	"github.com/memoio/go-mefs/role/user"
+	"github.com/memoio/go-mefs/crypto/pdp"
+	"github.com/memoio/go-mefs/test"
 	"github.com/memoio/go-mefs/utils/address"
-	"github.com/memoio/go-mefs/utils/metainfo"
+)
+
+const (
+	moneyTo  = 1100000000000000000
+	multiple = 1000
 )
 
 var TestCmd = &cmds.Command{
@@ -26,32 +35,65 @@ var TestCmd = &cmds.Command{
 	},
 
 	Subcommands: map[string]*cmds.Command{
-		"helloworld":    helloWorldCmd, //命令行操作写法示例
 		"localinfo":     infoCmd,
-		"resultsummary": resultSummaryCmd,
-		"savePay":       savePayCmd,
 		"showBalance":   showBalanceCmd, //用于测试，查看自己的余额或者指定账户的余额
+		"mcl":           mclCmd,
+		"transferMoney": transferCmd, //用于给指定账户转账
 	},
 }
 
-var helloWorldCmd = &cmds.Command{
+var transferCmd = &cmds.Command{
+
 	Helptext: cmds.HelpText{
-		Tagline: "the example of command",
+		Tagline: "transfer money to the account",
 		ShortDescription: `
-		命令的示例，输入 mefs test helloword "str" 输出 str
+		'
+		mefs test transferMoney transfer money to the account
+		`,
+	},
+
+	Arguments: []cmds.Argument{},
+	Options: []cmds.Option{
+		cmds.StringOption("address", "addr", "The practice user's addressid that you want to transfer to").WithDefault(""),
+		cmds.StringOption("CodeName", "cn", "The CodeName this net used").WithDefault(""),
+	},
+	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		cn, _ := req.Options["CodeName"].(string)
+		if cn != codeName {
+			fmt.Println("CodeName is wrong, we will not transfer money")
+			return nil
+		}
+
+		toAddr, _ := req.Options["address"].(string)
+		test.TransferTo(new(big.Int).Mul(big.NewInt(moneyTo), big.NewInt(multiple)), toAddr, "http://119.147.213.220:8192", "http://119.147.213.220:8192")
+
+		a := contracts.NewCA(common.HexToAddress(toAddr), "")
+		balances, err := a.QueryBalance(toAddr)
+		if err != nil {
+			return err
+		}
+		return cmds.EmitOnce(res, balances)
+	},
+}
+
+var mclCmd = &cmds.Command{
+	Helptext: cmds.HelpText{
+		Tagline: "test mcl lib",
+		ShortDescription: `test mcl lib
 	`,
 	},
 
-	Arguments: []cmds.Argument{ //参数列表
-		cmds.StringArg("peerID", true, true, "The peerID to run the query against."),
-	},
-	Options: []cmds.Option{ //选项列表
-		cmds.BoolOption("verbose", dhtVerboseOptionName, "Print extra information."),
-	},
+	Arguments: []cmds.Argument{},
+	Options:   []cmds.Option{},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 
+		err := pdp.Init(pdp.BLS12_381)
+		if err != nil {
+			panic(err)
+		}
+
 		list := &StringList{
-			ChildLists: []string{"hello world!", "hello", "world"},
+			ChildLists: []string{"mcl is ok!"},
 		}
 		return cmds.EmitOnce(res, list)
 	},
@@ -64,7 +106,7 @@ var helloWorldCmd = &cmds.Command{
 	},
 }
 
-//当前本节点运行时相关的数据，包括节点id，转换后的只能合约id
+//当前本节点运行时相关的数据，包括节点id，转换后的智能合约id
 //TODO：添加节点角色，根据不同角色显示节点当前的关联节点（keeper管理的user，user雇佣的keeper等）
 var infoCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
@@ -81,63 +123,8 @@ var infoCmd = &cmds.Command{
 		localAddress, _ := address.GetAddressFromID(id)
 		cfg, _ := n.Repo.Config()
 		stringList := []string{"id: " + id, "address: " + localAddress.String(), "Role: " + cfg.Role}
-		switch cfg.Role {
-		case metainfo.RoleUser:
-			outmap := user.ShowInfo(id)
-			for key, value := range outmap {
-				stringList = append(stringList, key+value)
-			}
-		default:
-		}
 		list := &StringList{
 			ChildLists: stringList,
-		}
-		return cmds.EmitOnce(res, list)
-	},
-	Type: StringList{},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
-			_, err := fmt.Fprintf(w, "%s", fl)
-			return err
-		}),
-	},
-}
-
-var resultSummaryCmd = &cmds.Command{
-	Helptext: cmds.HelpText{
-		Tagline:          "test resultSummary of keeper",
-		ShortDescription: "测试时空值的计算，对某个provider的挑战数据进行计算，返回算好的时空值",
-	},
-
-	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-
-		actual := keeper.ResultSummaryTest()
-		list := &StringList{
-			ChildLists: []string{actual},
-		}
-		return cmds.EmitOnce(res, list)
-	},
-	Type: StringList{},
-	Encoders: cmds.EncoderMap{
-		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *IntList) error {
-			_, err := fmt.Fprintf(w, "%s", fl)
-			return err
-		}),
-	},
-}
-
-var savePayCmd = &cmds.Command{
-	Helptext: cmds.HelpText{
-		Tagline:          "checkLastPay->saveChalPay->checkLastPay",
-		ShortDescription: "测试支付信息的存取",
-	},
-	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
-		list := &StringList{}
-		err := keeper.SaveChalPayTest()
-		if err != nil {
-			list.ChildLists = []string{err.Error()}
-		} else {
-			list.ChildLists = []string{"Complete!"}
 		}
 		return cmds.EmitOnce(res, list)
 	},
@@ -161,7 +148,7 @@ var showBalanceCmd = &cmds.Command{
 
 	Arguments: []cmds.Argument{},
 	Options: []cmds.Option{
-		cmds.StringOption(AddressID, "addr", "The practice user's addressid that you want to exec").WithDefault(""),
+		cmds.StringOption("address", "addr", "The practice user's addressid that you want to exec").WithDefault(""),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		node, err := cmdenv.GetNode(env)
@@ -169,24 +156,30 @@ var showBalanceCmd = &cmds.Command{
 			return err
 		}
 		var userid string
-		addressid, found := req.Options[AddressID].(string)
-		if addressid == "" || !found {
+		peerAddress, found := req.Options["address"].(string)
+		if peerAddress == "" || !found {
 			userid = node.Identity.Pretty()
-			address, err := address.GetAddressFromID(userid)
-			addressid = address.String()
-			if err != nil {
-				return err
-			}
 		} else {
-			userid, err = address.GetIDFromAddress(addressid)
+			userid, err = address.GetIDFromAddress(peerAddress)
 			if err != nil {
 				return err
 			}
 		}
-		balances, err := contracts.QueryBalance(addressid)
+		balances, err := role.QueryBalance(userid)
 		if err != nil {
 			return err
 		}
-		return cmds.EmitOnce(res, balances)
+		bal := utils.FormatWei(balances)
+		list := &StringList{
+			ChildLists: []string{"balance: " + bal},
+		}
+		return cmds.EmitOnce(res, list)
+	},
+	Type: StringList{},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, fl *StringList) error {
+			_, err := fmt.Fprintf(w, "%s", fl)
+			return err
+		}),
 	},
 }

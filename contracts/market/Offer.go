@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -28,10 +27,10 @@ var (
 )
 
 // OfferABI is the input ABI used to generate the binding from.
-const OfferABI = "[{\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\"},{\"name\":\"duration\",\"type\":\"uint256\"},{\"name\":\"price\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"signature\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\",\"signature\":\"0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"data\",\"type\":\"uint256\"}],\"name\":\"LogInt\",\"type\":\"event\",\"signature\":\"0xc8fa9a7021af252bc69defe2b981f7bd7858defe2a87641768fefdb8a03a07cd\"},{\"constant\":true,\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0x6d4ce63c\"}]"
+const OfferABI = "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"addTime\",\"type\":\"uint256\"}],\"name\":\"extend\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]"
 
 // OfferBin is the compiled bytecode used for deploying new contracts.
-const OfferBin = `0x608060405234801561001057600080fd5b5060405160608061016b8339810180604052606081101561003057600080fd5b81019080805190602001909291908051906020019092919080519060200190929190505050606060405190810160405280848152602001838152602001828152506000808201518160000155602082015181600101556040820151816002015590505050505060c7806100a46000396000f3fe608060405260043610603f576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636d4ce63c146044575b600080fd5b348015604f57600080fd5b506056607a565b60405180848152602001838152602001828152602001935050505060405180910390f35b6000806000806000015460006001015460006002015492509250925090919256fea165627a7a723058206901c679355bcde89b60867d4d813e437395a1f68a2a51f5207c63ac60cd39ae0029`
+var OfferBin = "0x6080604052738026796fd7ce63eae824314aa5bacf55643e893d600560006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555034801561006557600080fd5b506040516106d33803806106d38339818101604052606081101561008857600080fd5b81019080805190602001909291908051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506000600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16634410bb056040518163ffffffff1660e01b815260040160206040518083038186803b15801561015757600080fd5b505afa15801561016b573d6000803e3d6000fd5b505050506040513d602081101561018157600080fd5b81019080805190602001909291905050509050600161ffff168161ffff1610610212576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260168152602001807f6465706c6f79206f666665722069732062616e6e65640000000000000000000081525060200191505060405180910390fd5b60405180608001604052808581526020018481526020018381526020014281525060016000820151816000015560208201518160010155604082015181600201556060820151816003015590505050505050610460806102736000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80630ca05f9f146100515780636d4ce63c146100ab578063893d20e8146100de5780639714378c14610112575b600080fd5b6100936004803603602081101561006757600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610140565b60405180821515815260200191505060405180910390f35b6100b36102df565b6040518085815260200184815260200183815260200182815260200194505050505060405180910390f35b6100e661030a565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b61013e6004803603602081101561012857600080fd5b8101908080359060200190929190505050610333565b005b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610204576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b6000806000806001600001546001800154600160020154600160030154935093509350935090919293565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146103f4576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b6000811161040157600080fd5b6000816001800154019050600180015481101561041d57600080fd5b806001800181905550505056fea26469706673582212203ba5912f5c971c48622d45a95a2512860323015c013303c63e25d5b82b779f5f64736f6c63430007030033"
 
 // DeployOffer deploys a new Ethereum contract, binding an instance of Offer to it.
 func DeployOffer(auth *bind.TransactOpts, backend bind.ContractBackend, capacity *big.Int, duration *big.Int, price *big.Int) (common.Address, *types.Transaction, *Offer, error) {
@@ -39,6 +38,7 @@ func DeployOffer(auth *bind.TransactOpts, backend bind.ContractBackend, capacity
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+
 	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(OfferBin), backend, capacity, duration, price)
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -190,39 +190,109 @@ func (_Offer *OfferTransactorRaw) Transact(opts *bind.TransactOpts, method strin
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256)
-func (_Offer *OfferCaller) Get(opts *bind.CallOpts) (*big.Int, *big.Int, *big.Int, error) {
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256)
+func (_Offer *OfferCaller) Get(opts *bind.CallOpts) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	var (
 		ret0 = new(*big.Int)
 		ret1 = new(*big.Int)
 		ret2 = new(*big.Int)
+		ret3 = new(*big.Int)
 	)
 	out := &[]interface{}{
 		ret0,
 		ret1,
 		ret2,
+		ret3,
 	}
 	err := _Offer.contract.Call(opts, out, "get")
-	return *ret0, *ret1, *ret2, err
+	return *ret0, *ret1, *ret2, *ret3, err
 }
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256)
-func (_Offer *OfferSession) Get() (*big.Int, *big.Int, *big.Int, error) {
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256)
+func (_Offer *OfferSession) Get() (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	return _Offer.Contract.Get(&_Offer.CallOpts)
 }
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256)
-func (_Offer *OfferCallerSession) Get() (*big.Int, *big.Int, *big.Int, error) {
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256)
+func (_Offer *OfferCallerSession) Get() (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	return _Offer.Contract.Get(&_Offer.CallOpts)
 }
 
-// OfferErrorIterator is returned from FilterError and is used to iterate over the raw logs and unpacked data for Error events raised by the Offer contract.
-type OfferErrorIterator struct {
-	Event *OfferError // Event containing the contract specifics and raw log
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Offer *OfferCaller) GetOwner(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _Offer.contract.Call(opts, out, "getOwner")
+	return *ret0, err
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Offer *OfferSession) GetOwner() (common.Address, error) {
+	return _Offer.Contract.GetOwner(&_Offer.CallOpts)
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Offer *OfferCallerSession) GetOwner() (common.Address, error) {
+	return _Offer.Contract.GetOwner(&_Offer.CallOpts)
+}
+
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Offer *OfferTransactor) AlterOwner(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _Offer.contract.Transact(opts, "alterOwner", newOwner)
+}
+
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Offer *OfferSession) AlterOwner(newOwner common.Address) (*types.Transaction, error) {
+	return _Offer.Contract.AlterOwner(&_Offer.TransactOpts, newOwner)
+}
+
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Offer *OfferTransactorSession) AlterOwner(newOwner common.Address) (*types.Transaction, error) {
+	return _Offer.Contract.AlterOwner(&_Offer.TransactOpts, newOwner)
+}
+
+// Extend is a paid mutator transaction binding the contract method 0x9714378c.
+//
+// Solidity: function extend(uint256 addTime) returns()
+func (_Offer *OfferTransactor) Extend(opts *bind.TransactOpts, addTime *big.Int) (*types.Transaction, error) {
+	return _Offer.contract.Transact(opts, "extend", addTime)
+}
+
+// Extend is a paid mutator transaction binding the contract method 0x9714378c.
+//
+// Solidity: function extend(uint256 addTime) returns()
+func (_Offer *OfferSession) Extend(addTime *big.Int) (*types.Transaction, error) {
+	return _Offer.Contract.Extend(&_Offer.TransactOpts, addTime)
+}
+
+// Extend is a paid mutator transaction binding the contract method 0x9714378c.
+//
+// Solidity: function extend(uint256 addTime) returns()
+func (_Offer *OfferTransactorSession) Extend(addTime *big.Int) (*types.Transaction, error) {
+	return _Offer.Contract.Extend(&_Offer.TransactOpts, addTime)
+}
+
+// OfferAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the Offer contract.
+type OfferAlterOwnerIterator struct {
+	Event *OfferAlterOwner // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -236,7 +306,7 @@ type OfferErrorIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *OfferErrorIterator) Next() bool {
+func (it *OfferAlterOwnerIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -245,7 +315,7 @@ func (it *OfferErrorIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(OfferError)
+			it.Event = new(OfferAlterOwner)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -260,7 +330,7 @@ func (it *OfferErrorIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(OfferError)
+		it.Event = new(OfferAlterOwner)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -276,41 +346,42 @@ func (it *OfferErrorIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *OfferErrorIterator) Error() error {
+func (it *OfferAlterOwnerIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *OfferErrorIterator) Close() error {
+func (it *OfferAlterOwnerIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// OfferError represents a Error event raised by the Offer contract.
-type OfferError struct {
-	Data string
+// OfferAlterOwner represents a AlterOwner event raised by the Offer contract.
+type OfferAlterOwner struct {
+	From common.Address
+	To   common.Address
 	Raw  types.Log // Blockchain specific contextual infos
 }
 
-// FilterError is a free log retrieval operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+// FilterAlterOwner is a free log retrieval operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event Error(string data)
-func (_Offer *OfferFilterer) FilterError(opts *bind.FilterOpts) (*OfferErrorIterator, error) {
+// Solidity: event AlterOwner(address from, address to)
+func (_Offer *OfferFilterer) FilterAlterOwner(opts *bind.FilterOpts) (*OfferAlterOwnerIterator, error) {
 
-	logs, sub, err := _Offer.contract.FilterLogs(opts, "Error")
+	logs, sub, err := _Offer.contract.FilterLogs(opts, "AlterOwner")
 	if err != nil {
 		return nil, err
 	}
-	return &OfferErrorIterator{contract: _Offer.contract, event: "Error", logs: logs, sub: sub}, nil
+	return &OfferAlterOwnerIterator{contract: _Offer.contract, event: "AlterOwner", logs: logs, sub: sub}, nil
 }
 
-// WatchError is a free log subscription operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+// WatchAlterOwner is a free log subscription operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event Error(string data)
-func (_Offer *OfferFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *OfferError) (event.Subscription, error) {
+// Solidity: event AlterOwner(address from, address to)
+func (_Offer *OfferFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink chan<- *OfferAlterOwner) (event.Subscription, error) {
 
-	logs, sub, err := _Offer.contract.WatchLogs(opts, "Error")
+	logs, sub, err := _Offer.contract.WatchLogs(opts, "AlterOwner")
 	if err != nil {
 		return nil, err
 	}
@@ -320,8 +391,8 @@ func (_Offer *OfferFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *Offer
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(OfferError)
-				if err := _Offer.contract.UnpackLog(event, "Error", log); err != nil {
+				event := new(OfferAlterOwner)
+				if err := _Offer.contract.UnpackLog(event, "AlterOwner", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -342,134 +413,13 @@ func (_Offer *OfferFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *Offer
 	}), nil
 }
 
-// OfferLogIntIterator is returned from FilterLogInt and is used to iterate over the raw logs and unpacked data for LogInt events raised by the Offer contract.
-type OfferLogIntIterator struct {
-	Event *OfferLogInt // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *OfferLogIntIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(OfferLogInt)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(OfferLogInt)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *OfferLogIntIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *OfferLogIntIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// OfferLogInt represents a LogInt event raised by the Offer contract.
-type OfferLogInt struct {
-	Data *big.Int
-	Raw  types.Log // Blockchain specific contextual infos
-}
-
-// FilterLogInt is a free log retrieval operation binding the contract event 0xc8fa9a7021af252bc69defe2b981f7bd7858defe2a87641768fefdb8a03a07cd.
+// ParseAlterOwner is a log parse operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event LogInt(uint256 indexed data)
-func (_Offer *OfferFilterer) FilterLogInt(opts *bind.FilterOpts, data []*big.Int) (*OfferLogIntIterator, error) {
-
-	var dataRule []interface{}
-	for _, dataItem := range data {
-		dataRule = append(dataRule, dataItem)
-	}
-
-	logs, sub, err := _Offer.contract.FilterLogs(opts, "LogInt", dataRule)
-	if err != nil {
+// Solidity: event AlterOwner(address from, address to)
+func (_Offer *OfferFilterer) ParseAlterOwner(log types.Log) (*OfferAlterOwner, error) {
+	event := new(OfferAlterOwner)
+	if err := _Offer.contract.UnpackLog(event, "AlterOwner", log); err != nil {
 		return nil, err
 	}
-	return &OfferLogIntIterator{contract: _Offer.contract, event: "LogInt", logs: logs, sub: sub}, nil
-}
-
-// WatchLogInt is a free log subscription operation binding the contract event 0xc8fa9a7021af252bc69defe2b981f7bd7858defe2a87641768fefdb8a03a07cd.
-//
-// Solidity: event LogInt(uint256 indexed data)
-func (_Offer *OfferFilterer) WatchLogInt(opts *bind.WatchOpts, sink chan<- *OfferLogInt, data []*big.Int) (event.Subscription, error) {
-
-	var dataRule []interface{}
-	for _, dataItem := range data {
-		dataRule = append(dataRule, dataItem)
-	}
-
-	logs, sub, err := _Offer.contract.WatchLogs(opts, "LogInt", dataRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(OfferLogInt)
-				if err := _Offer.contract.UnpackLog(event, "LogInt", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
+	return event, nil
 }

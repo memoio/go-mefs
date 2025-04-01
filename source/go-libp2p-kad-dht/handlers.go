@@ -5,19 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
+	"log"
+	"strings"
 
+	proto "github.com/gogo/protobuf/proto"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-
-	proto "github.com/gogo/protobuf/proto"
-	cid "github.com/ipfs/go-cid"
-	u "github.com/ipfs/go-ipfs-util"
-	recpb "github.com/libp2p/go-libp2p-record/pb"
+	id "github.com/memoio/go-mefs/crypto/identity"
+	mpb "github.com/memoio/go-mefs/pb"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	pb "github.com/memoio/go-mefs/source/go-libp2p-kad-dht/pb"
+	"github.com/memoio/go-mefs/utils/metainfo"
 )
 
 // The number of closer peers to send on requests.
@@ -26,7 +27,7 @@ var CloserPeerCount = KValue
 // dhthandler specifies the signature of functions that handle DHT messages.
 type dhtHandler func(context.Context, peer.ID, *pb.Message) (*pb.Message, error)
 
-func (dht *IpfsDHT) handlerForMsgType(t pb.Message_MessageType) dhtHandler {
+func (dht *KadDHT) handlerForMsgType(t pb.Message_MessageType) dhtHandler {
 	switch t {
 	case pb.Message_GET_VALUE:
 		return dht.handleGetValue
@@ -40,27 +41,25 @@ func (dht *IpfsDHT) handlerForMsgType(t pb.Message_MessageType) dhtHandler {
 		return dht.handleGetProviders
 	case pb.Message_PING:
 		return dht.handlePing
-	case pb.Message_GET_PREFIX:
-		return dht.handleLiter
-	case pb.Message_APPEND_VALUE:
-		return dht.handleAppendValue
 	case pb.Message_MetaInfo:
 		return dht.handleMetaInfo
-	case pb.Message_MetaBroadcast:
-		return dht.handleMetaBroadcast
 	default:
 		return nil
 	}
 }
 
-func (dht *IpfsDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, err error) {
+func (dht *KadDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, err error) {
 	ctx = logger.Start(ctx, "handleGetValue")
 	logger.SetTag(ctx, "peer", p)
 	defer func() { logger.FinishWithErr(ctx, err) }()
 	logger.Debugf("%s handleGetValue for key: %s", dht.self, pmes.GetKey())
 
+	if pmes.GetOpType() == int32(mpb.OpType_BroadCast) {
+		dht.handleMetaInfo(ctx, p, pmes)
+	}
+
 	// setup response
-	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), pmes.GetClusterLevel())
+	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), 0)
 
 	// first, is there even a key?
 	k := pmes.GetKey()
@@ -96,7 +95,7 @@ func (dht *IpfsDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 	return resp, nil
 }
 
-func (dht *IpfsDHT) checkLocalDatastore(k []byte) (*recpb.Record, error) {
+func (dht *KadDHT) checkLocalDatastore(k []byte) (*mpb.Record, error) {
 	logger.Debugf("%s handleGetValue looking into ds", dht.self)
 	dskey := convertToDsKey(k)
 	buf, err := dht.datastore.Get(dskey)
@@ -114,49 +113,21 @@ func (dht *IpfsDHT) checkLocalDatastore(k []byte) (*recpb.Record, error) {
 	// if we have the value, send it back
 	logger.Debugf("%s handleGetValue success!", dht.self)
 
-	rec := new(recpb.Record)
+	rec := new(mpb.Record)
 	err = proto.Unmarshal(buf, rec)
 	if err != nil {
 		logger.Debug("failed to unmarshal DHT record from datastore")
 		return nil, err
 	}
 
-	var recordIsBad bool
-	recvtime, err := u.ParseRFC3339(rec.GetTimeReceived())
-	if err != nil {
-		logger.Info("either no receive time set on record, or it was invalid: ", err)
-		recordIsBad = true
-	}
-
-	// remove time limit
-	if time.Since(recvtime) > MaxRecordAge {
-		logger.Debug("old record found, tossing.")
-		recordIsBad = false
-	}
-
 	// NOTE: We do not verify the record here beyond checking these timestamps.
 	// we put the burden of checking the records on the requester as checking a record
 	// may be computationally expensive
-
-	if recordIsBad {
-		err := dht.datastore.Delete(dskey)
-		if err != nil {
-			logger.Error("Failed to delete bad record from datastore: ", err)
-		}
-
-		return nil, nil // can treat this as not having the record at all
-	}
-
 	return rec, nil
 }
 
-// Cleans the record (to avoid storing arbitrary data).
-func cleanRecord(rec *recpb.Record) {
-	rec.TimeReceived = ""
-}
-
 // Store a value in this peer local storage
-func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, err error) {
+func (dht *KadDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, err error) {
 	ctx = logger.Start(ctx, "handlePutValue")
 	logger.SetTag(ctx, "peer", p)
 	defer func() { logger.FinishWithErr(ctx, err) }()
@@ -171,12 +142,34 @@ func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 		return nil, errors.New("put key doesn't match record key")
 	}
 
-	cleanRecord(rec)
-
 	// Make sure the record is valid (not expired, valid signature etc)
-	if err = dht.Validator.Validate(string(rec.GetKey()), rec.GetValue()); err != nil {
-		logger.Warningf("Bad dht record in PUT from: %s. %s", p.Pretty(), err)
-		return nil, err
+
+	if rec.GetSignature() != nil {
+		keys := strings.Split(string(rec.GetKey()), metainfo.DELIMITER)
+		if len(keys) < 3 {
+			log.Println("key is wrong for: ", string(rec.GetKey()))
+			return nil, errors.New("key is wrong")
+		}
+
+		gotID := keys[2]
+
+		km, _ := metainfo.NewKey(gotID, mpb.KeyType_PublicKey)
+		pubRecByte, err := dht.datastore.Get(ds.NewKey(km.ToString()))
+		if err != nil {
+			return nil, err
+		}
+
+		pubrec := new(mpb.Record)
+		err = proto.Unmarshal(pubRecByte, pubrec)
+		if err != nil {
+			return nil, err
+		}
+
+		ok := id.VerifySigForKey(pubrec.GetValue(), string(rec.GetKey()), rec.GetValue(), rec.GetSignature())
+		if !ok {
+			log.Println("key signature is wrong for: ", string(rec.GetKey()))
+			return nil, errors.New("key signature is wrong")
+		}
 	}
 
 	dskey := convertToDsKey(rec.GetKey())
@@ -184,26 +177,10 @@ func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 	// Make sure the new record is "better" than the record we have locally.
 	// This prevents a record with for example a lower sequence number from
 	// overwriting a record with a higher sequence number.
-	existing, err := dht.getRecordFromDatastore(dskey)
-	if err != nil {
-		return nil, err
-	}
-
-	if existing != nil {
-		recs := [][]byte{rec.GetValue(), existing.GetValue()}
-		i, err := dht.Validator.Select(string(rec.GetKey()), recs)
-		if err != nil {
-			logger.Warningf("Bad dht record in PUT from %s: %s", p.Pretty(), err)
-			return nil, err
-		}
-		if i != 0 {
-			logger.Infof("DHT record in PUT from %s is older than existing record. Ignoring", p.Pretty())
-			return nil, errors.New("old record")
-		}
-	}
-
-	// record the time we receive every record
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	//existing, err := dht.getRecordFromDatastore(dskey)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	data, err := proto.Marshal(rec)
 	if err != nil {
@@ -217,7 +194,7 @@ func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 
 // returns nil, nil when either nothing is found or the value found doesn't properly validate.
 // returns nil, some_error when there's a *datastore* error (i.e., something goes very wrong)
-func (dht *IpfsDHT) getRecordFromDatastore(dskey ds.Key) (*recpb.Record, error) {
+func (dht *KadDHT) getRecordFromDatastore(dskey ds.Key) (*mpb.Record, error) {
 	buf, err := dht.datastore.Get(dskey)
 	if err == ds.ErrNotFound {
 		return nil, nil
@@ -226,7 +203,7 @@ func (dht *IpfsDHT) getRecordFromDatastore(dskey ds.Key) (*recpb.Record, error) 
 		logger.Errorf("Got error retrieving record with key %s from datastore: %s", dskey, err)
 		return nil, err
 	}
-	rec := new(recpb.Record)
+	rec := new(mpb.Record)
 	err = proto.Unmarshal(buf, rec)
 	if err != nil {
 		// Bad data in datastore, log it but don't return an error, we'll just overwrite it
@@ -234,27 +211,19 @@ func (dht *IpfsDHT) getRecordFromDatastore(dskey ds.Key) (*recpb.Record, error) 
 		return nil, nil
 	}
 
-	err = dht.Validator.Validate(string(rec.GetKey()), rec.GetValue())
-	if err != nil {
-		// Invalid record in datastore, probably expired but don't return an error,
-		// we'll just overwrite it
-		logger.Debugf("Local record verify failed: %s (discarded)", err)
-		return nil, nil
-	}
-
 	return rec, nil
 }
 
-func (dht *IpfsDHT) handlePing(_ context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
+func (dht *KadDHT) handlePing(_ context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
 	logger.Debugf("%s Responding to ping from %s!\n", dht.self, p)
 	return pmes, nil
 }
 
-func (dht *IpfsDHT) handleFindPeer(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
+func (dht *KadDHT) handleFindPeer(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	ctx = logger.Start(ctx, "handleFindPeer")
 	defer func() { logger.FinishWithErr(ctx, _err) }()
 	logger.SetTag(ctx, "peer", p)
-	resp := pb.NewMessage(pmes.GetType(), nil, pmes.GetClusterLevel())
+	resp := pb.NewMessage(pmes.GetType(), nil, 0)
 	var closest []peer.ID
 
 	// if looking for self... special case where we send it on CloserPeers.
@@ -301,12 +270,12 @@ func (dht *IpfsDHT) handleFindPeer(ctx context.Context, p peer.ID, pmes *pb.Mess
 	return resp, nil
 }
 
-func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
+func (dht *KadDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	ctx = logger.Start(ctx, "handleGetProviders")
 	defer func() { logger.FinishWithErr(ctx, _err) }()
 	logger.SetTag(ctx, "peer", p)
 
-	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), pmes.GetClusterLevel())
+	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), 0)
 	c, err := cid.Cast([]byte(pmes.GetKey()))
 	if err != nil {
 		return nil, err
@@ -351,7 +320,7 @@ func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.
 	return resp, nil
 }
 
-func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
+func (dht *KadDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	ctx = logger.Start(ctx, "handleAddProvider")
 	defer func() { logger.FinishWithErr(ctx, _err) }()
 	logger.SetTag(ctx, "peer", p)

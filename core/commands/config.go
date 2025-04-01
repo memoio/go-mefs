@@ -58,12 +58,6 @@ Set the value of the 'Datastore.Path' key:
   $ mefs config Datastore.Path ~/.mefs/datastore
 `,
 	},
-	Subcommands: map[string]*cmds.Command{
-		"show":    configShowCmd,
-		"edit":    configEditCmd,
-		"replace": configReplaceCmd,
-		"profile": configProfileCmd,
-	},
 	Arguments: []cmds.Argument{
 		cmds.StringArg("key", true, false, "The key of the config entry (e.g. \"Addresses.API\")."),
 		cmds.StringArg("value", false, false, "The value to set the config entry to."),
@@ -101,7 +95,6 @@ Set the value of the 'Datastore.Path' key:
 				if value == "user" || value == "keeper" || value == "provider" {
 					fmt.Println("you has changed your role.if daemon is running, please restart")
 				} else {
-					log.Debug("Role can only be 'user、keeper or provider'")
 					e := "Role can only be 'user、keeper or provider'"
 					return cmds.ClientError(e)
 				}

@@ -4,13 +4,13 @@ stages:
   - golangci-lint
   - compile
   - short-test
-  - challenge-test
-  - upload-test
+  - long-test
 
 variables:
   UPCOUNT: "50"
   NETKEY: "dev"
-  ETHENDPOINT: "http://212.64.28.207:8101"
+  ETHENDPOINT: "http://119.147.213.220:8191"
+  QETHENDPOINT: "http://119.147.213.220:8194"
 
 before_script:
   - mkdir -p $GOPATH/src/github.com/memoio
@@ -26,7 +26,7 @@ role-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/role
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -35,10 +35,10 @@ bls12-golint:
   stage: golangci-lint
   when: always
   script:
-    - cd $GOPATH/src/github.com/memoio/go-mefs/bls12
+    - cd $GOPATH/src/github.com/memoio/go-mefs/crypto/bls12
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -50,7 +50,7 @@ contracts-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/contracts
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -62,7 +62,7 @@ data_format-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/data-format
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -74,7 +74,7 @@ utils-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/utils
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -86,7 +86,7 @@ mefs-golint:
     - cd $GOPATH/src/github.com/memoio/go-mefs/cmd
     - golangci-lint run --no-config --deadline=60m --disable-all --enable=govet --enable=deadcode --enable=errcheck --enable=gosimple --enable=ineffassign --enable=staticcheck --enable=structcheck --enable=typecheck --enable=unused --enable=varcheck --enable=depguard --enable=gochecknoglobals --enable=goconst --enable=gocritic --enable=gocyclo --enable=gofmt --enable=goimports --enable=golint --enable=gosec --enable=interfacer --enable=maligned --enable=misspell --enable=nakedret --enable=prealloc --enable=scopelint --enable=stylecheck --enable=unconvert --enable=unparam
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   allow_failure: true
   only:
     - master
@@ -96,18 +96,56 @@ compile:
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make user
+    - GO111MODULE=off make keeper
+    - GO111MODULE=off make provider
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
 
 unit_test:
   stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make test
+    - GO111MODULE=off make test
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
+
+role_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - echo $ETHENDPOINT
+    - GO111MODULE=off go run test/roleContract/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+  tags:
+    - "119.147.213.219"
+  only:
+    - schedules
+
+query_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - echo $ETHENDPOINT
+    - GO111MODULE=off go run test/query/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+  tags:
+    - "119.147.213.219"
+  only:
+    - schedules
+
+offer_test:
+  stage: short-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - echo $ETHENDPOINT
+    - GO111MODULE=off go run test/offer/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
+  tags:
+    - "119.147.213.219"
+  only:
+    - schedules
 
 upkeeping_test:
   stage: short-test
@@ -115,9 +153,9 @@ upkeeping_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/upkeepingTest/upkeepingTest.go -eth=$ETHENDPOINT
+    - GO111MODULE=off go run test/upkeeping/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
@@ -127,107 +165,101 @@ channel_test:
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/channelTest/channelTest.go -eth=$ETHENDPOINT
+    - GO111MODULE=off go run test/channel/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
-role_test:
+root_test:
   stage: short-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
     - echo $ETHENDPOINT
-    - go run test/unit/roleTest/roleTest.go -eth=$ETHENDPOINT
+    - GO111MODULE=off go run test/root/test.go -eth=$ETHENDPOINT -qeth=$QETHENDPOINT
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
-
-pos_test:
-  stage: short-test
-  when: always
-  script:
-    - cd $GOPATH/src/github.com/memoio/go-mefs
-    - echo $ETHENDPOINT
-    - go run test/unit/posTest/posTest.go -eth=$ETHENDPOINT
-  tags:
-    - "47.92.5.51"
-  only:
-    - schedules
-
-js_API_test:
-  stage: short-test
-  when: always
-  script:
-    - ifconfig
-    - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
-    - cd $GOPATH/mefs-http-api-test/node_modules/mefs-http-client/test/
-    - ./LfsTest.sh
-  after_script:
-    - cat ~/daemon.stdout1
-    - cat ~/daemon.stdout2
-  tags:
-    - "47.92.5.51"
-  retry:
-    max: 1
-    when: stuck_or_timeout_failure
-  only:
-    - dev
 
 lfs_test:
-  stage: short-test
+  stage: long-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 lfsTest.sh
     - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./lfsTest.sh $ETHENDPOINT $NETKEY
+    - ./lfsTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT
   after_script:
     - cat ~/daemon.stdout
+    - cat ~/.mefs/logs/info.log
+    - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
+  only:
+    - schedules
+
+share_test:
+  stage: long-test
+  when: always
+  script:
+    - cd $GOPATH/src/github.com/memoio/go-mefs
+    - GO111MODULE=off make user
+    - cd $GOPATH/src/github.com/memoio/go-mefs/bin
+    - chmod 777 shareTest.sh
+    - echo $ETHENDPOINT
+    - echo $NETKEY
+    - ./shareTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT
+  after_script:
+    - cat ~/daemon.stdout
+    - cat ~/.mefs/logs/info.log
+    - cat ~/.mefs/logs/error.log
+  tags:
+    - "119.147.213.219"
   only:
     - schedules
 
 challenge_test:
-  stage: challenge-test
+  stage: long-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 challengeTest.sh
     - echo $ETHENDPOINT
     - echo $NETKEY
-    - ./challengeTest.sh $ETHENDPOINT $NETKEY
+    - ./challengeTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT
   after_script:
     - cat ~/daemon.stdout
+    - cat ~/.mefs/logs/info.log
+    - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules
 
 upload_test:
-  stage: upload-test
+  stage: long-test
   when: always
   script:
     - cd $GOPATH/src/github.com/memoio/go-mefs
-    - make install
+    - GO111MODULE=off make user
     - cd $GOPATH/src/github.com/memoio/go-mefs/bin
     - chmod 777 uploadTest.sh
     - echo $ETHENDPOINT
     - echo $NETKEY
     - echo $UPCOUNT
-    - ./uploadTest.sh $ETHENDPOINT $NETKEY $UPCOUNT
+    - ./uploadTest.sh $NETKEY $ETHENDPOINT $QETHENDPOINT $UPCOUNT
   after_script:
     - cat ~/daemon.stdout
+    - cat ~/.mefs/logs/info.log
+    - cat ~/.mefs/logs/error.log
   tags:
-    - "47.92.5.51"
+    - "119.147.213.219"
   only:
     - schedules

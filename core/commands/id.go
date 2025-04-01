@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ipfs/go-ipfs-cmds"
+	cmds "github.com/ipfs/go-ipfs-cmds"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -15,6 +15,8 @@ import (
 	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	core "github.com/memoio/go-mefs/core"
 	cmdenv "github.com/memoio/go-mefs/core/commands/cmdenv"
+	id "github.com/memoio/go-mefs/crypto/identity"
+	"github.com/memoio/go-mefs/utils"
 	"github.com/memoio/go-mefs/utils/address"
 )
 
@@ -28,8 +30,8 @@ please run the daemon:
 `
 
 type IdOutput struct {
-	ID           string
-	PeerAddr     string
+	NetworkAddr  string
+	AccountAddr  string
 	PublicKey    string
 	Addresses    []string
 	AgentVersion string
@@ -57,11 +59,20 @@ If no peer is specified, prints out information for local peers.
 	Arguments: []cmds.Argument{
 		cmds.StringArg("peerid", false, false, "Peer.ID of node to look up."),
 	},
-	Options: []cmds.Option{},
+	Options: []cmds.Option{
+		cmds.StringOption("password", "pwd", "the password is used to encrypt the PrivateKey").WithDefault(utils.DefaultPassword),
+	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
 		n, err := cmdenv.GetNode(env)
 		if err != nil {
 			return err
+		}
+
+		if !n.OnlineMode() {
+			pwd, ok := req.Options["password"].(string)
+			if ok {
+				n.SetPassWord(pwd)
+			}
 		}
 
 		var id peer.ID
@@ -122,12 +133,12 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 	}
 
 	info := new(IdOutput)
-	info.ID = p.Pretty()
+	info.NetworkAddr = p.Pretty()
 	tmpAddr, err := address.GetAddressFromID(p.Pretty())
 	if err != nil {
 		return nil, err
 	}
-	info.PeerAddr = tmpAddr.String()
+	info.AccountAddr = tmpAddr.String()
 
 	if pk := ps.PubKey(p); pk != nil {
 		pkb, err := ic.MarshalPublicKey(pk)
@@ -153,21 +164,20 @@ func printPeer(ps pstore.Peerstore, p peer.ID) (interface{}, error) {
 // printing self is special cased as we get values differently.
 func printSelf(node *core.MefsNode) (interface{}, error) {
 	info := new(IdOutput)
-	info.ID = node.Identity.Pretty()
+	info.NetworkAddr = node.Identity.Pretty()
 	tmpAddr, err := address.GetAddressFromID(node.Identity.Pretty())
 	if err != nil {
 		return nil, err
 	}
-	info.PeerAddr = tmpAddr.String()
+	info.AccountAddr = tmpAddr.String()
 
-	if node.PrivateKey == nil {
+	if node.PrivateKey == "" {
 		if err := node.LoadPrivateKey(); err != nil {
 			return nil, err
 		}
 	}
 
-	pk := node.PrivateKey.GetPublic()
-	pkb, err := ic.MarshalPublicKey(pk)
+	pkb, err := id.GetCompressPubByte(node.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +185,7 @@ func printSelf(node *core.MefsNode) (interface{}, error) {
 
 	if node.PeerHost != nil {
 		for _, a := range node.PeerHost.Addrs() {
-			s := a.String() + "/ipfs/" + info.ID
+			s := a.String() + "/p2p/" + info.NetworkAddr
 			info.Addresses = append(info.Addresses, s)
 		}
 	}

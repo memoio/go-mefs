@@ -1,43 +1,23 @@
 package config
 
 import (
-	"encoding/base64"
-	"errors"
+	"crypto/ecdsa"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
-	"github.com/memoio/go-mefs/utils"
+	id "github.com/memoio/go-mefs/crypto/identity"
 	"github.com/memoio/go-mefs/utils/address"
-
-	ci "github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
-//CreateID create other ID, the out can be os.Stdout, nBitsForKeypair is useless, but the default is 2048 by nitsForKeypairDefault
-func CreateID(out io.Writer, nBitsForKeypair int) (identity Identity, err error) {
-	identity, err = identityConfig(out, nBitsForKeypair)
-	if err != nil {
-		return identity, err
-	}
-	return identity, nil
-}
-
 //Init init config
-func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error) {
+func Init(out io.Writer, sk string) (*Config, string, error) {
 	var identity Identity
-	var err error
-	if sk == "" {
-		identity, err = identityConfig(out, nBitsForKeypair)
-		if err != nil {
-			return nil, "", err
-		}
-	} else {
-		identity, err = identityConfigSK(out, sk)
-		if err != nil {
-			return nil, "", err
-		}
+
+	identity, err := CreateIdentity(out, sk)
+	if err != nil {
+		return nil, "", err
 	}
 
 	bootstrapPeers, err := DefaultBootstrapPeers()
@@ -72,7 +52,7 @@ func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error
 		},
 
 		IsInit: true,
-		Eth:    "http://212.64.28.207:8101",
+		Eth:    "http://119.147.213.220:8191",
 		Test:   false,
 
 		Gateway: Gateway{
@@ -99,20 +79,11 @@ func Init(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error
 	return conf, identity.PrivKey, nil
 }
 
-//Init init config
-func InitTestnet(out io.Writer, nBitsForKeypair int, sk string) (*Config, string, error) {
-	var identity Identity
-	var err error
-	if sk == "" {
-		identity, err = identityConfig(out, nBitsForKeypair)
-		if err != nil {
-			return nil, "", err
-		}
-	} else {
-		identity, err = identityConfigSK(out, sk)
-		if err != nil {
-			return nil, "", err
-		}
+//InitTestnet init config
+func InitTestnet(out io.Writer, sk string) (*Config, string, error) {
+	identity, err := CreateIdentity(out, sk)
+	if err != nil {
+		return nil, "", err
 	}
 
 	bootstrapPeers, err := DefaultBootstrapPeers()
@@ -147,7 +118,7 @@ func InitTestnet(out io.Writer, nBitsForKeypair int, sk string) (*Config, string
 		},
 
 		IsInit: true,
-		Eth:    "http://47.92.5.51:8101",
+		Eth:    "http://119.147.213.220:8191",
 		Test:   false,
 
 		Gateway: Gateway{
@@ -236,93 +207,54 @@ func DefaultDatastoreConfig() Datastore {
 	}
 }
 
-// identityConfig initializes a new identity.
-func identityConfig(out io.Writer, nbits int) (Identity, error) {
+// CreateIdentity initializes a new identity.
+func CreateIdentity(out io.Writer, hexSk string) (Identity, error) {
 	// TODO guard higher up
 	ident := Identity{}
-	if nbits < 1024 {
-		return ident, errors.New("bitsize less than 1024 is considered unsafe")
+
+	var sk *ecdsa.PrivateKey
+	if hexSk == "" {
+		fmt.Fprintf(out, "generating Secp256k1 keypair...")
+		tsk, err := id.Create()
+		if err != nil {
+			return ident, err
+		}
+		fmt.Fprintf(out, "done\n")
+		sk = tsk
+	} else {
+		tsk, err := id.ECDSAStringToSk(hexSk)
+		if err != nil {
+			return ident, err
+		}
+		sk = tsk
 	}
 
-	fmt.Fprintf(out, "generating Secp256k1 keypair...")
-	sk, pk, err := ci.GenerateKeyPair(ci.Secp256k1, nbits)
+	pk, err := id.GetPubByteFromECDSA(sk)
 	if err != nil {
 		return ident, err
 	}
-	fmt.Fprintf(out, "done\n")
 
-	// currently storing key unencrypted. in the future we need to encrypt it.
-	// TODO(security)
-	//以太坊的私钥是先将ECDSA产生的privatekey转换成2进制字节，再转换成带0x前缀的16进制字符串
-	skbytes, err := sk.Bytes()
+	pid, err := id.GetIDFromPubKey(pk)
 	if err != nil {
 		return ident, err
 	}
-	ident.PrivKey = base64.StdEncoding.EncodeToString(skbytes)
-	id, err := peer.IDFromPublicKey(pk)
-	if err != nil {
-		return ident, err
-	}
-	ident.PeerID = id.Pretty()
-	fmt.Fprintf(out, "peer identity: %s\n", ident.PeerID)
-	addr, err := address.GetAddressFromID(ident.PeerID)
+	fmt.Fprintf(out, "peer identity: %s\n", pid)
+	addr, err := address.GetAddressFromID(pid)
 	if err != nil {
 		return ident, err
 	}
 	fmt.Fprintf(out, "peer address: %s\n", addr.String())
 
-	pid, err := address.GetIDFromAddress(addr.String())
+	npid, err := address.GetIDFromAddress(addr.String())
 	if err != nil {
 		return ident, err
 	}
-	if strings.Compare(ident.PeerID, pid) != 0 {
-		fmt.Fprintf(out, "peer identity from address is: %s\n", pid)
+	if strings.Compare(pid, npid) != 0 {
+		fmt.Fprintf(out, "peer identity from address is: %s\n", npid)
 	}
-
-	return ident, nil
-}
-
-func identityConfigSK(out io.Writer, hexsk string) (Identity, error) {
-	ident := Identity{}
-
-	sk, err := utils.HexskToIPFSsk(hexsk)
-	if err != nil {
-		return ident, err
-	}
-
-	// 根据sk获取pk
-	skBytes, err := base64.StdEncoding.DecodeString(sk)
-	if err != nil {
-		return ident, err
-	}
-	prik, err := ci.UnmarshalPrivateKey(skBytes)
-	if err != nil {
-		return ident, err
-	}
-	pubk := prik.GetPublic()
-	id, err := peer.IDFromPublicKey(pubk)
-	if err != nil {
-		return ident, err
-	}
-	peerID := id.Pretty()
-	ident.PrivKey = sk
-	ident.PeerID = peerID
-	fmt.Fprintf(out, "peer identity: %s\n", ident.PeerID)
-
-	addr, err := address.GetAddressFromID(ident.PeerID)
-	if err != nil {
-		return ident, err
-	}
-	fmt.Fprintf(out, "peer address: %s\n", addr.String())
-
-	pid, err := address.GetIDFromAddress(addr.String())
-	if err != nil {
-		return ident, err
-	}
-
-	if strings.Compare(ident.PeerID, pid) != 0 {
-		fmt.Fprintf(out, "peer identity from address is: %s\n", pid)
-	}
+	ident.PeerID = pid
+	ident.PrivKey = id.ECDSAByteToString(id.ToECDSAByte(sk))
+	fmt.Fprintf(out, "peer secretKey: %s\n", ident.PrivKey)
 
 	return ident, nil
 }

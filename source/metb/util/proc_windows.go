@@ -1,6 +1,6 @@
 // +build windows
 
-package iptbutil
+package metbutil
 
 import (
 	"os/exec"

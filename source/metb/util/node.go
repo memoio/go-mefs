@@ -1,10 +1,10 @@
-package iptbutil
+package metbutil
 
 import (
 	"github.com/memoio/go-mefs/config"
 )
 
-// MefsNode defines the interface iptb requires to work
+// MefsNode defines the interface metb requires to work
 // with an MEFS node
 type MefsNode interface {
 	Init() error

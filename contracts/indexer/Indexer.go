@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -28,10 +27,10 @@ var (
 )
 
 // IndexerABI is the input ABI used to generate the binding from.
-const IndexerABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"key\",\"type\":\"string\"},{\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"add\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"key\",\"type\":\"string\"}],\"name\":\"get\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"key\",\"type\":\"string\"},{\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"alterResolver\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"key\",\"type\":\"string\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"Add\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"form\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"form\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\"}]"
+const IndexerABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"Add\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldOwner\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldResolver\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newResolver\",\"type\":\"address\"}],\"name\":\"AlterResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"add\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"alterResolver\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"}],\"name\":\"get\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"param\",\"type\":\"bool\"}],\"name\":\"setBanned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // IndexerBin is the compiled bytecode used for deploying new contracts.
-const IndexerBin = `0x608060405234801561001057600080fd5b50610ba8806100206000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80632bffc7ed14610051578063693ec85e14610114578063cbdc3fe1146101de578063f60b53e21461028d575b600080fd5b6101006004803603604081101561006757600080fd5b810190602081018135600160201b81111561008157600080fd5b82018360208201111561009357600080fd5b803590602001918460018302840111600160201b831117156100b457600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550505090356001600160a01b0316915061033c9050565b604080519115158252519081900360200190f35b6101b86004803603602081101561012a57600080fd5b810190602081018135600160201b81111561014457600080fd5b82018360208201111561015657600080fd5b803590602001918460018302840111600160201b8311171561017757600080fd5b91908080601f0160208091040260200160405190810160405280939291908181526020018383808284376000920191909152509295506105d1945050505050565b604080516001600160a01b03938416815291909216602082015281519081900390910190f35b610100600480360360408110156101f457600080fd5b810190602081018135600160201b81111561020e57600080fd5b82018360208201111561022057600080fd5b803590602001918460018302840111600160201b8311171561024157600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550505090356001600160a01b031691506106b79050565b610100600480360360408110156102a357600080fd5b810190602081018135600160201b8111156102bd57600080fd5b8201836020820111156102cf57600080fd5b803590602001918460018302840111600160201b831117156102f057600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550505090356001600160a01b031691506109419050565b6000806001600160a01b03166000846040518082805190602001908083835b6020831061037a5780518252601f19909201916020918201910161035b565b51815160209384036101000a60001901801990921691161790529201948552506040519384900301909220546001600160a01b0316929092149150610421905057604080516020808252808201527fe5b7b2e69c89e6ada4e5908de7a7b0e5afb9e5ba94e79a847265736f6c7665728183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a15060006105cb565b336000846040518082805190602001908083835b602083106104545780518252601f199092019160209182019101610435565b51815160209384036101000a6000190180199092169116179052920194855250604051938490038101842080546001600160a01b0319166001600160a01b039690961695909517909455505084518492600092879290918291908401908083835b602083106104d45780518252601f1990920191602091820191016104b5565b51815160209384036101000a600019018019909216911617905292019485525060408051948590038201852060010180546001600160a01b0319166001600160a01b039788161790553385830181905295881690850152606080855288519085015287517fec689a3871c35587e4800f14216f987ee744b924aff21741edc2e167e2dd43e8958995909450889350918291608083019187019080838360005b8381101561058b578181015183820152602001610573565b50505050905090810190601f1680156105b85780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a15060015b92915050565b6000806000836040518082805190602001908083835b602083106106065780518252601f1990920191602091820191016105e7565b51815160209384036101000a600019018019909216911617905292019485525060405193849003810184205487516001600160a01b039091169460009450889350918291908401908083835b602083106106715780518252601f199092019160209182019101610652565b51815160209384036101000a600019018019909216911617905292019485525060405193849003019092206001015492966001600160a01b039093169550919350505050565b6000336001600160a01b03166000846040518082805190602001908083835b602083106106f55780518252601f1990920191602091820191016106d6565b51815160209384036101000a60001901801990921691161790529201948552506040519384900301909220546001600160a01b031692909214915061079e9050576040805160208082526018908201527fe4bda0e4b88de698afe6ada46b6579e79a84e4b8bbe4baba00000000000000008183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a15060006105cb565b600080846040518082805190602001908083835b602083106107d15780518252601f1990920191602091820191016107b2565b51815160209384036101000a600019018019909216911617905292019485525060405193849003810184206001015488516001600160a01b039091169550879460009450899350918291908401908083835b602083106108425780518252601f199092019160209182019101610823565b51815160209384036101000a600019018019909216911617905292019485525060408051948590038201852060010180546001600160a01b0319166001600160a01b0397881617905586861685830152948816948401949094525050606080825286519082015285517f0a7047ba8be4d874e67aebc953a70ff6db03a81782549290ac646e0738ddfc04928792859288928291608083019187019080838360005b838110156108fb5781810151838201526020016108e3565b50505050905090810190601f1680156109285780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a15060019392505050565b6000336001600160a01b03166000846040518082805190602001908083835b6020831061097f5780518252601f199092019160209182019101610960565b51815160209384036101000a60001901801990921691161790529201948552506040519384900301909220546001600160a01b0316929092149150610a289050576040805160208082526018908201527fe4bda0e4b88de698afe6ada46b6579e79a84e4b8bbe4baba00000000000000008183015290517f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa9181900360600190a15060006105cb565b600080846040518082805190602001908083835b60208310610a5b5780518252601f199092019160209182019101610a3c565b51815160209384036101000a600019018019909216911617905292019485525060405193849003810184205488516001600160a01b039091169550879460009450899350918291908401908083835b60208310610ac95780518252601f199092019160209182019101610aaa565b51815160209384036101000a600019018019909216911617905292019485525060408051948590038201852080546001600160a01b0319166001600160a01b0397881617905586861685830152948816948401949094525050606080825286519082015285517f46bd035a76a8302bb74520f9226b59925d8186784298f88ad636a4ea46b85b219287928592889282916080830191870190808383600083156108fb5781810151838201526020016108e356fea165627a7a7230582014758ba178ccbaad7bc92bfd70ac7c3aa2abe53266c4389f6f8a6c394c77d7280029`
+var IndexerBin = "0x60806040526000600260006101000a81548160ff02191690831515021790555034801561002b57600080fd5b50336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506113aa8061007b6000396000f3fe608060405234801561001057600080fd5b506004361061007d5760003560e01c8063693ec85e1161005b578063693ec85e146101fd578063893d20e8146102ff578063cbdc3fe114610333578063f60b53e2146104245761007d565b80630ca05f9f146100825780632bffc7ed146100dc5780634b9c5d3b146101cd575b600080fd5b6100c46004803603602081101561009857600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610515565b60405180821515815260200191505060405180910390f35b6101b5600480360360408110156100f257600080fd5b810190808035906020019064010000000081111561010f57600080fd5b82018360208201111561012157600080fd5b8035906020019184600183028401116401000000008311171561014357600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600081840152601f19601f820116905080830192505050505050509192919290803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506106b4565b60405180821515815260200191505060405180910390f35b6101fb600480360360208110156101e357600080fd5b81019080803515159060200190929190505050610aa3565b005b6102b66004803603602081101561021357600080fd5b810190808035906020019064010000000081111561023057600080fd5b82018360208201111561024257600080fd5b8035906020019184600183028401116401000000008311171561026457600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600081840152601f19601f820116905080830192505050505050509192919290505050610b81565b604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390f35b610307610ca7565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b61040c6004803603604081101561034957600080fd5b810190808035906020019064010000000081111561036657600080fd5b82018360208201111561037857600080fd5b8035906020019184600183028401116401000000008311171561039a57600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600081840152601f19601f820116905080830192505050505050509192919290803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610cd0565b60405180821515815260200191505060405180910390f35b6104fd6004803603604081101561043a57600080fd5b810190808035906020019064010000000081111561045757600080fd5b82018360208201111561046957600080fd5b8035906020019184600183028401116401000000008311171561048b57600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600081840152601f19601f820116905080830192505050505050509192919290803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050611022565b60405180821515815260200191505060405180910390f35b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146105d9576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b6000600260009054906101000a900460ff1615610739576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260098152602001807f69732062616e6e6564000000000000000000000000000000000000000000000081525060200191505060405180910390fd5b600073ffffffffffffffffffffffffffffffffffffffff166001846040518082805190602001908083835b602083106107875780518252602082019150602081019050602083039250610764565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461086a577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa6040518080602001828103825260188152602001807f6b657920686173207265736f6c76657220616c7265616479000000000000000081525060200191505060405180910390a160009050610a9d565b336001846040518082805190602001908083835b602083106108a1578051825260208201915060208101905060208303925061087e565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550816001846040518082805190602001908083835b6020831061094c5780518252602082019150602081019050602083039250610929565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060010160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507fec689a3871c35587e4800f14216f987ee744b924aff21741edc2e167e2dd43e883338460405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018373ffffffffffffffffffffffffffffffffffffffff168152602001828103825285818151815260200191508051906020019080838360005b83811015610a5c578082015181840152602081019050610a41565b50505050905090810190601f168015610a895780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a1600190505b92915050565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610b64576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b80600260006101000a81548160ff02191690831515021790555050565b6000806001836040518082805190602001908083835b60208310610bba5780518252602082019150602081019050602083039250610b97565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff166001846040518082805190602001908083835b60208310610c475780518252602082019150602081019050602083039250610c24565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1691509150915091565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60003373ffffffffffffffffffffffffffffffffffffffff166001846040518082805190602001908083835b60208310610d1f5780518252602082019150602081019050602083039250610cfc565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614610e02577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa6040518080602001828103825260098152602001807f6e6f74206f776e6572000000000000000000000000000000000000000000000081525060200191505060405180910390a16000905061101c565b60006001846040518082805190602001908083835b60208310610e3a5780518252602082019150602081019050602083039250610e17565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826001856040518082805190602001908083835b60208310610eca5780518252602082019150602081019050602083039250610ea7565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060010160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f0a7047ba8be4d874e67aebc953a70ff6db03a81782549290ac646e0738ddfc0484828560405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018373ffffffffffffffffffffffffffffffffffffffff168152602001828103825285818151815260200191508051906020019080838360005b83811015610fda578082015181840152602081019050610fbf565b50505050905090810190601f1680156110075780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a160019150505b92915050565b60003373ffffffffffffffffffffffffffffffffffffffff166001846040518082805190602001908083835b60208310611071578051825260208201915060208101905060208303925061104e565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614611154577f08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa6040518080602001828103825260098152602001807f6e6f74206f776e6572000000000000000000000000000000000000000000000081525060200191505060405180910390a16000905061136e565b60006001846040518082805190602001908083835b6020831061118c5780518252602082019150602081019050602083039250611169565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826001856040518082805190602001908083835b6020831061121c57805182526020820191506020810190506020830392506111f9565b6001836020036101000a038019825116818451168082178552505050505050905001915050908152602001604051809103902060000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f46bd035a76a8302bb74520f9226b59925d8186784298f88ad636a4ea46b85b2184828560405180806020018473ffffffffffffffffffffffffffffffffffffffff1681526020018373ffffffffffffffffffffffffffffffffffffffff168152602001828103825285818151815260200191508051906020019080838360005b8381101561132c578082015181840152602081019050611311565b50505050905090810190601f1680156113595780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a160019150505b9291505056fea2646970667358221220195a263433a107ca5305bd876da88987cda43b8f87ba65ca066a88932d9d44f564736f6c63430007030033"
 
 // DeployIndexer deploys a new Ethereum contract, binding an instance of Indexer to it.
 func DeployIndexer(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Indexer, error) {
@@ -39,6 +38,7 @@ func DeployIndexer(auth *bind.TransactOpts, backend bind.ContractBackend) (commo
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+
 	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(IndexerBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -190,7 +190,7 @@ func (_Indexer *IndexerTransactorRaw) Transact(opts *bind.TransactOpts, method s
 
 // Get is a free data retrieval call binding the contract method 0x693ec85e.
 //
-// Solidity: function get(string key) constant returns(address, address)
+// Solidity: function get(string key) view returns(address, address)
 func (_Indexer *IndexerCaller) Get(opts *bind.CallOpts, key string) (common.Address, common.Address, error) {
 	var (
 		ret0 = new(common.Address)
@@ -206,16 +206,42 @@ func (_Indexer *IndexerCaller) Get(opts *bind.CallOpts, key string) (common.Addr
 
 // Get is a free data retrieval call binding the contract method 0x693ec85e.
 //
-// Solidity: function get(string key) constant returns(address, address)
+// Solidity: function get(string key) view returns(address, address)
 func (_Indexer *IndexerSession) Get(key string) (common.Address, common.Address, error) {
 	return _Indexer.Contract.Get(&_Indexer.CallOpts, key)
 }
 
 // Get is a free data retrieval call binding the contract method 0x693ec85e.
 //
-// Solidity: function get(string key) constant returns(address, address)
+// Solidity: function get(string key) view returns(address, address)
 func (_Indexer *IndexerCallerSession) Get(key string) (common.Address, common.Address, error) {
 	return _Indexer.Contract.Get(&_Indexer.CallOpts, key)
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Indexer *IndexerCaller) GetOwner(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _Indexer.contract.Call(opts, out, "getOwner")
+	return *ret0, err
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Indexer *IndexerSession) GetOwner() (common.Address, error) {
+	return _Indexer.Contract.GetOwner(&_Indexer.CallOpts)
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Indexer *IndexerCallerSession) GetOwner() (common.Address, error) {
+	return _Indexer.Contract.GetOwner(&_Indexer.CallOpts)
 }
 
 // Add is a paid mutator transaction binding the contract method 0x2bffc7ed.
@@ -239,25 +265,46 @@ func (_Indexer *IndexerTransactorSession) Add(key string, resolver common.Addres
 	return _Indexer.Contract.Add(&_Indexer.TransactOpts, key, resolver)
 }
 
-// AlterOwner is a paid mutator transaction binding the contract method 0xf60b53e2.
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
 //
-// Solidity: function alterOwner(string key, address owner) returns(bool)
-func (_Indexer *IndexerTransactor) AlterOwner(opts *bind.TransactOpts, key string, owner common.Address) (*types.Transaction, error) {
-	return _Indexer.contract.Transact(opts, "alterOwner", key, owner)
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Indexer *IndexerTransactor) AlterOwner(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _Indexer.contract.Transact(opts, "alterOwner", newOwner)
 }
 
-// AlterOwner is a paid mutator transaction binding the contract method 0xf60b53e2.
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
 //
-// Solidity: function alterOwner(string key, address owner) returns(bool)
-func (_Indexer *IndexerSession) AlterOwner(key string, owner common.Address) (*types.Transaction, error) {
-	return _Indexer.Contract.AlterOwner(&_Indexer.TransactOpts, key, owner)
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Indexer *IndexerSession) AlterOwner(newOwner common.Address) (*types.Transaction, error) {
+	return _Indexer.Contract.AlterOwner(&_Indexer.TransactOpts, newOwner)
 }
 
-// AlterOwner is a paid mutator transaction binding the contract method 0xf60b53e2.
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Indexer *IndexerTransactorSession) AlterOwner(newOwner common.Address) (*types.Transaction, error) {
+	return _Indexer.Contract.AlterOwner(&_Indexer.TransactOpts, newOwner)
+}
+
+// AlterOwner0 is a paid mutator transaction binding the contract method 0xf60b53e2.
 //
 // Solidity: function alterOwner(string key, address owner) returns(bool)
-func (_Indexer *IndexerTransactorSession) AlterOwner(key string, owner common.Address) (*types.Transaction, error) {
-	return _Indexer.Contract.AlterOwner(&_Indexer.TransactOpts, key, owner)
+func (_Indexer *IndexerTransactor) AlterOwner0(opts *bind.TransactOpts, key string, owner common.Address) (*types.Transaction, error) {
+	return _Indexer.contract.Transact(opts, "alterOwner0", key, owner)
+}
+
+// AlterOwner0 is a paid mutator transaction binding the contract method 0xf60b53e2.
+//
+// Solidity: function alterOwner(string key, address owner) returns(bool)
+func (_Indexer *IndexerSession) AlterOwner0(key string, owner common.Address) (*types.Transaction, error) {
+	return _Indexer.Contract.AlterOwner0(&_Indexer.TransactOpts, key, owner)
+}
+
+// AlterOwner0 is a paid mutator transaction binding the contract method 0xf60b53e2.
+//
+// Solidity: function alterOwner(string key, address owner) returns(bool)
+func (_Indexer *IndexerTransactorSession) AlterOwner0(key string, owner common.Address) (*types.Transaction, error) {
+	return _Indexer.Contract.AlterOwner0(&_Indexer.TransactOpts, key, owner)
 }
 
 // AlterResolver is a paid mutator transaction binding the contract method 0xcbdc3fe1.
@@ -279,6 +326,27 @@ func (_Indexer *IndexerSession) AlterResolver(key string, resolver common.Addres
 // Solidity: function alterResolver(string key, address resolver) returns(bool)
 func (_Indexer *IndexerTransactorSession) AlterResolver(key string, resolver common.Address) (*types.Transaction, error) {
 	return _Indexer.Contract.AlterResolver(&_Indexer.TransactOpts, key, resolver)
+}
+
+// SetBanned is a paid mutator transaction binding the contract method 0x4b9c5d3b.
+//
+// Solidity: function setBanned(bool param) returns()
+func (_Indexer *IndexerTransactor) SetBanned(opts *bind.TransactOpts, param bool) (*types.Transaction, error) {
+	return _Indexer.contract.Transact(opts, "setBanned", param)
+}
+
+// SetBanned is a paid mutator transaction binding the contract method 0x4b9c5d3b.
+//
+// Solidity: function setBanned(bool param) returns()
+func (_Indexer *IndexerSession) SetBanned(param bool) (*types.Transaction, error) {
+	return _Indexer.Contract.SetBanned(&_Indexer.TransactOpts, param)
+}
+
+// SetBanned is a paid mutator transaction binding the contract method 0x4b9c5d3b.
+//
+// Solidity: function setBanned(bool param) returns()
+func (_Indexer *IndexerTransactorSession) SetBanned(param bool) (*types.Transaction, error) {
+	return _Indexer.Contract.SetBanned(&_Indexer.TransactOpts, param)
 }
 
 // IndexerAddIterator is returned from FilterAdd and is used to iterate over the raw logs and unpacked data for Add events raised by the Indexer contract.
@@ -405,6 +473,17 @@ func (_Indexer *IndexerFilterer) WatchAdd(opts *bind.WatchOpts, sink chan<- *Ind
 	}), nil
 }
 
+// ParseAdd is a log parse operation binding the contract event 0xec689a3871c35587e4800f14216f987ee744b924aff21741edc2e167e2dd43e8.
+//
+// Solidity: event Add(string key, address owner, address resolver)
+func (_Indexer *IndexerFilterer) ParseAdd(log types.Log) (*IndexerAdd, error) {
+	event := new(IndexerAdd)
+	if err := _Indexer.contract.UnpackLog(event, "Add", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 // IndexerAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the Indexer contract.
 type IndexerAlterOwnerIterator struct {
 	Event *IndexerAlterOwner // Event containing the contract specifics and raw log
@@ -474,15 +553,15 @@ func (it *IndexerAlterOwnerIterator) Close() error {
 
 // IndexerAlterOwner represents a AlterOwner event raised by the Indexer contract.
 type IndexerAlterOwner struct {
-	Key  string
-	Form common.Address
-	To   common.Address
-	Raw  types.Log // Blockchain specific contextual infos
+	Key      string
+	OldOwner common.Address
+	NewOwner common.Address
+	Raw      types.Log // Blockchain specific contextual infos
 }
 
 // FilterAlterOwner is a free log retrieval operation binding the contract event 0x46bd035a76a8302bb74520f9226b59925d8186784298f88ad636a4ea46b85b21.
 //
-// Solidity: event AlterOwner(string key, address form, address to)
+// Solidity: event AlterOwner(string key, address oldOwner, address newOwner)
 func (_Indexer *IndexerFilterer) FilterAlterOwner(opts *bind.FilterOpts) (*IndexerAlterOwnerIterator, error) {
 
 	logs, sub, err := _Indexer.contract.FilterLogs(opts, "AlterOwner")
@@ -494,7 +573,7 @@ func (_Indexer *IndexerFilterer) FilterAlterOwner(opts *bind.FilterOpts) (*Index
 
 // WatchAlterOwner is a free log subscription operation binding the contract event 0x46bd035a76a8302bb74520f9226b59925d8186784298f88ad636a4ea46b85b21.
 //
-// Solidity: event AlterOwner(string key, address form, address to)
+// Solidity: event AlterOwner(string key, address oldOwner, address newOwner)
 func (_Indexer *IndexerFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink chan<- *IndexerAlterOwner) (event.Subscription, error) {
 
 	logs, sub, err := _Indexer.contract.WatchLogs(opts, "AlterOwner")
@@ -527,6 +606,151 @@ func (_Indexer *IndexerFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink chan
 			}
 		}
 	}), nil
+}
+
+// ParseAlterOwner is a log parse operation binding the contract event 0x46bd035a76a8302bb74520f9226b59925d8186784298f88ad636a4ea46b85b21.
+//
+// Solidity: event AlterOwner(string key, address oldOwner, address newOwner)
+func (_Indexer *IndexerFilterer) ParseAlterOwner(log types.Log) (*IndexerAlterOwner, error) {
+	event := new(IndexerAlterOwner)
+	if err := _Indexer.contract.UnpackLog(event, "AlterOwner", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
+// IndexerAlterOwner0Iterator is returned from FilterAlterOwner0 and is used to iterate over the raw logs and unpacked data for AlterOwner0 events raised by the Indexer contract.
+type IndexerAlterOwner0Iterator struct {
+	Event *IndexerAlterOwner0 // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *IndexerAlterOwner0Iterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(IndexerAlterOwner0)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(IndexerAlterOwner0)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *IndexerAlterOwner0Iterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *IndexerAlterOwner0Iterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// IndexerAlterOwner0 represents a AlterOwner0 event raised by the Indexer contract.
+type IndexerAlterOwner0 struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log // Blockchain specific contextual infos
+}
+
+// FilterAlterOwner0 is a free log retrieval operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
+//
+// Solidity: event AlterOwner(address from, address to)
+func (_Indexer *IndexerFilterer) FilterAlterOwner0(opts *bind.FilterOpts) (*IndexerAlterOwner0Iterator, error) {
+
+	logs, sub, err := _Indexer.contract.FilterLogs(opts, "AlterOwner0")
+	if err != nil {
+		return nil, err
+	}
+	return &IndexerAlterOwner0Iterator{contract: _Indexer.contract, event: "AlterOwner0", logs: logs, sub: sub}, nil
+}
+
+// WatchAlterOwner0 is a free log subscription operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
+//
+// Solidity: event AlterOwner(address from, address to)
+func (_Indexer *IndexerFilterer) WatchAlterOwner0(opts *bind.WatchOpts, sink chan<- *IndexerAlterOwner0) (event.Subscription, error) {
+
+	logs, sub, err := _Indexer.contract.WatchLogs(opts, "AlterOwner0")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(IndexerAlterOwner0)
+				if err := _Indexer.contract.UnpackLog(event, "AlterOwner0", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseAlterOwner0 is a log parse operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
+//
+// Solidity: event AlterOwner(address from, address to)
+func (_Indexer *IndexerFilterer) ParseAlterOwner0(log types.Log) (*IndexerAlterOwner0, error) {
+	event := new(IndexerAlterOwner0)
+	if err := _Indexer.contract.UnpackLog(event, "AlterOwner0", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 // IndexerAlterResolverIterator is returned from FilterAlterResolver and is used to iterate over the raw logs and unpacked data for AlterResolver events raised by the Indexer contract.
@@ -598,15 +822,15 @@ func (it *IndexerAlterResolverIterator) Close() error {
 
 // IndexerAlterResolver represents a AlterResolver event raised by the Indexer contract.
 type IndexerAlterResolver struct {
-	Key  string
-	Form common.Address
-	To   common.Address
-	Raw  types.Log // Blockchain specific contextual infos
+	Key         string
+	OldResolver common.Address
+	NewResolver common.Address
+	Raw         types.Log // Blockchain specific contextual infos
 }
 
 // FilterAlterResolver is a free log retrieval operation binding the contract event 0x0a7047ba8be4d874e67aebc953a70ff6db03a81782549290ac646e0738ddfc04.
 //
-// Solidity: event AlterResolver(string key, address form, address to)
+// Solidity: event AlterResolver(string key, address oldResolver, address newResolver)
 func (_Indexer *IndexerFilterer) FilterAlterResolver(opts *bind.FilterOpts) (*IndexerAlterResolverIterator, error) {
 
 	logs, sub, err := _Indexer.contract.FilterLogs(opts, "AlterResolver")
@@ -618,7 +842,7 @@ func (_Indexer *IndexerFilterer) FilterAlterResolver(opts *bind.FilterOpts) (*In
 
 // WatchAlterResolver is a free log subscription operation binding the contract event 0x0a7047ba8be4d874e67aebc953a70ff6db03a81782549290ac646e0738ddfc04.
 //
-// Solidity: event AlterResolver(string key, address form, address to)
+// Solidity: event AlterResolver(string key, address oldResolver, address newResolver)
 func (_Indexer *IndexerFilterer) WatchAlterResolver(opts *bind.WatchOpts, sink chan<- *IndexerAlterResolver) (event.Subscription, error) {
 
 	logs, sub, err := _Indexer.contract.WatchLogs(opts, "AlterResolver")
@@ -651,6 +875,17 @@ func (_Indexer *IndexerFilterer) WatchAlterResolver(opts *bind.WatchOpts, sink c
 			}
 		}
 	}), nil
+}
+
+// ParseAlterResolver is a log parse operation binding the contract event 0x0a7047ba8be4d874e67aebc953a70ff6db03a81782549290ac646e0738ddfc04.
+//
+// Solidity: event AlterResolver(string key, address oldResolver, address newResolver)
+func (_Indexer *IndexerFilterer) ParseAlterResolver(log types.Log) (*IndexerAlterResolver, error) {
+	event := new(IndexerAlterResolver)
+	if err := _Indexer.contract.UnpackLog(event, "AlterResolver", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 // IndexerErrorIterator is returned from FilterError and is used to iterate over the raw logs and unpacked data for Error events raised by the Indexer contract.
@@ -773,4 +1008,15 @@ func (_Indexer *IndexerFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *I
 			}
 		}
 	}), nil
+}
+
+// ParseError is a log parse operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+//
+// Solidity: event Error(string data)
+func (_Indexer *IndexerFilterer) ParseError(log types.Log) (*IndexerError, error) {
+	event := new(IndexerError)
+	if err := _Indexer.contract.UnpackLog(event, "Error", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }

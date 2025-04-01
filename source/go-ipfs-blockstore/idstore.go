@@ -18,6 +18,7 @@ func NewIdStore(bs Blockstore) Blockstore {
 }
 
 func extractContents(k cid.Cid) (bool, []byte) {
+
 	if k.Version() == 2 {
 		return false, nil
 	}
@@ -60,11 +61,6 @@ func (b *idstore) Get(k cid.Cid) (blocks.Block, error) {
 	return b.bs.Get(k)
 }
 
-func (b *idstore) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	//fmt.Println("idstore")
-	return b.bs.GetSegAndTag(k, offset)
-}
-
 func (b *idstore) Put(bl blocks.Block) error {
 	isId, _ := extractContents(bl.Cid())
 	if isId {
@@ -73,12 +69,12 @@ func (b *idstore) Put(bl blocks.Block) error {
 	return b.bs.Put(bl)
 }
 
-func (b *idstore) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
+func (b *idstore) Append(c cid.Cid, field []byte, begin, length int) error {
 	isId, _ := extractContents(c)
 	if isId {
 		return nil
 	}
-	return b.bs.Append(c, field, beginoffset, endoffset)
+	return b.bs.Append(c, field, begin, length)
 }
 
 func (b *idstore) PutMany(bs []blocks.Block) error {

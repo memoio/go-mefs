@@ -30,7 +30,7 @@ type emitter struct {
 
 func (e *emitter) Emit(evt interface{}) error {
 	if atomic.LoadInt32(&e.closed) != 0 {
-		panic("emitter is closed")
+		return fmt.Errorf("emitter is closed")
 	}
 	e.n.emit(evt)
 	return nil
@@ -38,7 +38,7 @@ func (e *emitter) Emit(evt interface{}) error {
 
 func (e *emitter) Close() error {
 	if !atomic.CompareAndSwapInt32(&e.closed, 0, 1) {
-		panic("closed an emitter more than once")
+		return fmt.Errorf("closed an emitter more than once")
 	}
 	if atomic.AddInt32(&e.n.nEmitters, -1) == 0 {
 		e.dropper(e.typ)
@@ -52,7 +52,7 @@ func NewBus() event.Bus {
 	}
 }
 
-func (b *basicBus) withNode(typ reflect.Type, cb func(*node), async func(*node)) error {
+func (b *basicBus) withNode(typ reflect.Type, cb func(*node), async func(*node)) {
 	b.lk.Lock()
 
 	n, ok := b.nodes[typ]
@@ -66,12 +66,14 @@ func (b *basicBus) withNode(typ reflect.Type, cb func(*node), async func(*node))
 
 	cb(n)
 
-	go func() {
-		defer n.lk.Unlock()
-		async(n)
-	}()
-
-	return nil
+	if async == nil {
+		n.lk.Unlock()
+	} else {
+		go func() {
+			defer n.lk.Unlock()
+			async(n)
+		}()
+	}
 }
 
 func (b *basicBus) tryDropNode(typ reflect.Type) {
@@ -105,9 +107,16 @@ func (s *sub) Out() <-chan interface{} {
 }
 
 func (s *sub) Close() error {
-	close(s.ch)
+	go func() {
+		// drain the event channel, will return when closed and drained.
+		// this is necessary to unblock publishes to this channel.
+		for range s.ch {
+		}
+	}()
+
 	for _, n := range s.nodes {
 		n.lk.Lock()
+
 		for i := 0; i < len(n.sinks); i++ {
 			if n.sinks[i] == s.ch {
 				n.sinks[i], n.sinks[len(n.sinks)-1] = n.sinks[len(n.sinks)-1], nil
@@ -115,12 +124,16 @@ func (s *sub) Close() error {
 				break
 			}
 		}
+
 		tryDrop := len(n.sinks) == 0 && atomic.LoadInt32(&n.nEmitters) == 0
+
 		n.lk.Unlock()
+
 		if tryDrop {
 			s.dropper(n.typ)
 		}
 	}
+	close(s.ch)
 	return nil
 }
 
@@ -130,7 +143,7 @@ var _ event.Subscription = (*sub)(nil)
 // publishers to get blocked. CancelFunc is guaranteed to return after last send
 // to the channel
 func (b *basicBus) Subscribe(evtTypes interface{}, opts ...event.SubscriptionOpt) (_ event.Subscription, err error) {
-	var settings subSettings
+	settings := subSettings(subSettingsDefault)
 	for _, opt := range opts {
 		if err := opt(&settings); err != nil {
 			return nil, err
@@ -149,19 +162,21 @@ func (b *basicBus) Subscribe(evtTypes interface{}, opts ...event.SubscriptionOpt
 		dropper: b.tryDropNode,
 	}
 
+	for _, etyp := range types {
+		if reflect.TypeOf(etyp).Kind() != reflect.Ptr {
+			return nil, errors.New("subscribe called with non-pointer type")
+		}
+	}
+
 	for i, etyp := range types {
 		typ := reflect.TypeOf(etyp)
 
-		if typ.Kind() != reflect.Ptr {
-			return nil, errors.New("subscribe called with non-pointer type")
-		}
-
-		err = b.withNode(typ.Elem(), func(n *node) {
+		b.withNode(typ.Elem(), func(n *node) {
 			n.sinks = append(n.sinks, out.ch)
 			out.nodes[i] = n
 		}, func(n *node) {
 			if n.keepLast {
-				l := n.last.Load()
+				l := n.last
 				if l == nil {
 					return
 				}
@@ -185,6 +200,7 @@ func (b *basicBus) Subscribe(evtTypes interface{}, opts ...event.SubscriptionOpt
 // emit(EventT{})
 func (b *basicBus) Emitter(evtType interface{}, opts ...event.EmitterOpt) (e event.Emitter, err error) {
 	var settings emitterSettings
+
 	for _, opt := range opts {
 		if err := opt(&settings); err != nil {
 			return nil, err
@@ -197,11 +213,11 @@ func (b *basicBus) Emitter(evtType interface{}, opts ...event.EmitterOpt) (e eve
 	}
 	typ = typ.Elem()
 
-	err = b.withNode(typ, func(n *node) {
+	b.withNode(typ, func(n *node) {
 		atomic.AddInt32(&n.nEmitters, 1)
 		n.keepLast = n.keepLast || settings.makeStateful
 		e = &emitter{n: n, typ: typ, dropper: b.tryDropNode}
-	}, func(_ *node) {})
+	}, nil)
 	return
 }
 
@@ -210,7 +226,7 @@ func (b *basicBus) Emitter(evtType interface{}, opts ...event.EmitterOpt) (e eve
 
 type node struct {
 	// Note: make sure to NEVER lock basicBus.lk when this lock is held
-	lk sync.RWMutex
+	lk sync.Mutex
 
 	typ reflect.Type
 
@@ -218,7 +234,7 @@ type node struct {
 	nEmitters int32
 
 	keepLast bool
-	last     atomic.Value
+	last     interface{}
 
 	sinks []chan interface{}
 }
@@ -230,18 +246,18 @@ func newNode(typ reflect.Type) *node {
 }
 
 func (n *node) emit(event interface{}) {
-	eval := reflect.ValueOf(event)
-	if eval.Type() != n.typ {
-		panic(fmt.Sprintf("Emit called with wrong type. expected: %s, got: %s", n.typ, eval.Type()))
+	typ := reflect.TypeOf(event)
+	if typ != n.typ {
+		panic(fmt.Sprintf("Emit called with wrong type. expected: %s, got: %s", n.typ, typ))
 	}
 
-	n.lk.RLock()
+	n.lk.Lock()
 	if n.keepLast {
-		n.last.Store(event)
+		n.last = event
 	}
 
 	for _, ch := range n.sinks {
 		ch <- event
 	}
-	n.lk.RUnlock()
+	n.lk.Unlock()
 }

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"io"
 
-	ds "github.com/memoio/go-mefs/source/go-datastore"
 	config "github.com/memoio/go-mefs/config"
+	ds "github.com/memoio/go-mefs/source/go-datastore"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -51,5 +51,4 @@ type Repo interface {
 // acceptable to FSRepo.
 type Datastore interface {
 	ds.Batching // should be threadsafe, just be careful
-	io.Closer
 }

@@ -2,27 +2,16 @@ package datastore_test
 
 import (
 	"bytes"
-	"math/rand"
 	"path"
 	"strings"
 	"testing"
 
-	. "github.com/go-check/check"
 	. "github.com/memoio/go-mefs/source/go-datastore"
+	. "gopkg.in/check.v1"
 )
 
 // Hook up gocheck into the "go test" runner.
 func Test(t *testing.T) { TestingT(t) }
-
-func randomString() string {
-	chars := "abcdefghijklmnopqrstuvwxyz1234567890"
-	var buf bytes.Buffer
-	l := rand.Intn(50)
-	for j := 0; j < l; j++ {
-		buf.WriteByte(chars[rand.Intn(len(chars))])
-	}
-	return buf.String()
-}
 
 type KeySuite struct{}
 
@@ -40,7 +29,7 @@ func (ks *KeySuite) SubtestKey(s string, c *C) {
 	kname := lnparts[len(lnparts)-1]
 
 	kchild := path.Clean(fixed + "/cchildd")
-	kparent := "/" + strings.Join(append(namespaces[:len(namespaces)-1]), "/")
+	kparent := "/" + strings.Join(namespaces[:len(namespaces)-1], "/")
 	kpath := path.Clean(kparent + "/" + ktype)
 	kinstance := fixed + ":" + "inst"
 

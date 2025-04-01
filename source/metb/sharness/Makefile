@@ -11,10 +11,10 @@ SHARNESSDIR = sharness
 AGGREGATE = $(LIBDIR)/$(SHARNESSDIR)/aggregate-results.sh
 
 # Binaries generated
-BINS = bin/iptb
+BINS = bin/metb
 
 # Source files location
-IPTB_SRC = ../
+METB_SRC = ../
 
 # User might want to override those on the command line
 GOFLAGS =
@@ -46,9 +46,9 @@ sharness:
 
 find_go_files = $(shell find $(1) -name "*.go")
 
-bin/iptb: $(call find_go_files, $(IPTB_SRC)) BUILD-OPTIONS
+bin/metb: $(call find_go_files, $(METB_SRC)) BUILD-OPTIONS
 	@echo "*** installing $@ ***"
-	go build $(GOFLAGS) -o $@ $(IPTB_SRC)
+	go build $(GOFLAGS) -o $@ $(METB_SRC)
 
 race:
 	make GOFLAGS=-race all

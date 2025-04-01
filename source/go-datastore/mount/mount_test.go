@@ -2,9 +2,11 @@ package mount_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/memoio/go-mefs/source/go-datastore"
+	"github.com/memoio/go-mefs/source/go-datastore/autobatch"
 	mount "github.com/memoio/go-mefs/source/go-datastore/mount"
 	"github.com/memoio/go-mefs/source/go-datastore/query"
 	dstest "github.com/memoio/go-mefs/source/go-datastore/test"
@@ -170,8 +172,8 @@ func TestDeleteNotFound(t *testing.T) {
 	})
 
 	err := m.Delete(datastore.NewKey("/quux/thud"))
-	if g, e := err, datastore.ErrNotFound; g != e {
-		t.Fatalf("expected ErrNotFound, got: %v\n", g)
+	if err != nil {
+		t.Fatalf("expected nil, got: %v\n", err)
 	}
 }
 
@@ -238,7 +240,7 @@ func TestQuerySimple(t *testing.T) {
 	}
 }
 
-func TestQueryCross(t *testing.T) {
+func TestQueryAcrossMounts(t *testing.T) {
 	mapds0 := datastore.NewMapDatastore()
 	mapds1 := datastore.NewMapDatastore()
 	mapds2 := datastore.NewMapDatastore()
@@ -250,11 +252,21 @@ func TestQueryCross(t *testing.T) {
 		{Prefix: datastore.NewKey("/"), Datastore: mapds0},
 	})
 
-	m.Put(datastore.NewKey("/foo/lorem"), []byte("123"))
-	m.Put(datastore.NewKey("/bar/ipsum"), []byte("234"))
-	m.Put(datastore.NewKey("/bar/dolor"), []byte("345"))
-	m.Put(datastore.NewKey("/baz/sit"), []byte("456"))
-	m.Put(datastore.NewKey("/banana"), []byte("567"))
+	if err := m.Put(datastore.NewKey("/foo/lorem"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/bar/ipsum"), []byte("234")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/bar/dolor"), []byte("345")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/baz/sit"), []byte("456")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/banana"), []byte("567")); err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := m.Query(query.Query{Prefix: "/ba"})
 	if err != nil {
@@ -262,6 +274,10 @@ func TestQueryCross(t *testing.T) {
 	}
 	entries, err := res.Rest()
 	if err != nil {
+		err = res.Close()
+		if err != nil {
+			t.Errorf("result.Close failed %d", err)
+		}
 		t.Fatalf("Query Results.Rest fail: %v\n", err)
 	}
 	seen := 0
@@ -297,6 +313,368 @@ func TestQueryCross(t *testing.T) {
 	}
 }
 
+func TestQueryAcrossMountsWithSort(t *testing.T) {
+	mapds0 := datastore.NewMapDatastore()
+	mapds1 := datastore.NewMapDatastore()
+	mapds2 := datastore.NewMapDatastore()
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/boo/5"), Datastore: mapds2},
+		{Prefix: datastore.NewKey("/boo"), Datastore: mapds0},
+	})
+
+	if err := m.Put(datastore.NewKey("/zoo/0"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/1"), []byte("234")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/boo/9"), []byte("345")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/boo/3"), []byte("456")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/boo/5/hello"), []byte("789")); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := m.Query(query.Query{Orders: []query.Order{query.OrderByKey{}}})
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{
+		"/boo/3",
+		"/boo/5/hello",
+		"/boo/9",
+		"/zoo/0",
+		"/zoo/1",
+	}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	for i, e := range expect {
+		if e != entries[i].Key {
+			t.Errorf("expected key %s, but got %s", e, entries[i].Key)
+		}
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
+func TestQueryLimitAcrossMountsWithSort(t *testing.T) {
+	mapds1 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds2 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds3 := sync.MutexWrap(datastore.NewMapDatastore())
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/rok"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds2},
+		{Prefix: datastore.NewKey("/noop"), Datastore: mapds3},
+	})
+
+	if err := m.Put(datastore.NewKey("/rok/0"), []byte("ghi")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/0"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/1"), []byte("def")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/1"), []byte("167")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/2"), []byte("345")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/3"), []byte("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/3"), []byte("456")); err != nil {
+		t.Fatal(err)
+	}
+
+	q := query.Query{Limit: 2, Orders: []query.Order{query.OrderByKeyDescending{}}}
+	res, err := m.Query(q)
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{
+		"/zoo/3",
+		"/zoo/2",
+	}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	for i, e := range expect {
+		if e != entries[i].Key {
+			t.Errorf("expected key %s, but got %s", e, entries[i].Key)
+		}
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
+func TestQueryLimitAndOffsetAcrossMountsWithSort(t *testing.T) {
+	mapds1 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds2 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds3 := sync.MutexWrap(datastore.NewMapDatastore())
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/rok"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds2},
+		{Prefix: datastore.NewKey("/noop"), Datastore: mapds3},
+	})
+
+	if err := m.Put(datastore.NewKey("/rok/0"), []byte("ghi")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/0"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/1"), []byte("def")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/1"), []byte("167")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/2"), []byte("345")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/3"), []byte("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/3"), []byte("456")); err != nil {
+		t.Fatal(err)
+	}
+
+	q := query.Query{Limit: 3, Offset: 2, Orders: []query.Order{query.OrderByKey{}}}
+	res, err := m.Query(q)
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{
+		"/rok/3",
+		"/zoo/0",
+		"/zoo/1",
+	}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	for i, e := range expect {
+		if e != entries[i].Key {
+			t.Errorf("expected key %s, but got %s", e, entries[i].Key)
+		}
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
+func TestQueryFilterAcrossMountsWithSort(t *testing.T) {
+	mapds1 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds2 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds3 := sync.MutexWrap(datastore.NewMapDatastore())
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/rok"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds2},
+		{Prefix: datastore.NewKey("/noop"), Datastore: mapds3},
+	})
+
+	if err := m.Put(datastore.NewKey("/rok/0"), []byte("ghi")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/0"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/1"), []byte("def")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/1"), []byte("167")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/2"), []byte("345")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/3"), []byte("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/zoo/3"), []byte("456")); err != nil {
+		t.Fatal(err)
+	}
+
+	f := &query.FilterKeyCompare{Op: query.Equal, Key: "/rok/3"}
+	q := query.Query{Filters: []query.Filter{f}}
+	res, err := m.Query(q)
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{
+		"/rok/3",
+	}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	for i, e := range expect {
+		if e != entries[i].Key {
+			t.Errorf("expected key %s, but got %s", e, entries[i].Key)
+		}
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
+func TestQueryLimitAndOffsetWithNoData(t *testing.T) {
+	mapds1 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds2 := sync.MutexWrap(datastore.NewMapDatastore())
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/rok"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds2},
+	})
+
+	q := query.Query{Limit: 4, Offset: 3}
+	res, err := m.Query(q)
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
+func TestQueryLimitWithNotEnoughData(t *testing.T) {
+	mapds1 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds2 := sync.MutexWrap(datastore.NewMapDatastore())
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/rok"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds2},
+	})
+
+	if err := m.Put(datastore.NewKey("/zoo/0"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/1"), []byte("167")); err != nil {
+		t.Fatal(err)
+	}
+
+	q := query.Query{Limit: 4}
+	res, err := m.Query(q)
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{
+		"/zoo/0",
+		"/rok/1",
+	}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
+func TestQueryOffsetWithNotEnoughData(t *testing.T) {
+	mapds1 := sync.MutexWrap(datastore.NewMapDatastore())
+	mapds2 := sync.MutexWrap(datastore.NewMapDatastore())
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/rok"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/zoo"), Datastore: mapds2},
+	})
+
+	if err := m.Put(datastore.NewKey("/zoo/0"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/rok/1"), []byte("167")); err != nil {
+		t.Fatal(err)
+	}
+
+	q := query.Query{Offset: 4}
+	res, err := m.Query(q)
+	if err != nil {
+		t.Fatalf("Query fail: %v\n", err)
+	}
+
+	entries, err := res.Rest()
+	if err != nil {
+		t.Fatalf("Query Results.Rest fail: %v\n", err)
+	}
+
+	expect := []string{}
+
+	if len(entries) != len(expect) {
+		t.Fatalf("expected %d entries, but got %d", len(expect), len(entries))
+	}
+
+	err = res.Close()
+	if err != nil {
+		t.Errorf("result.Close failed %d", err)
+	}
+}
+
 func TestLookupPrio(t *testing.T) {
 	mapds0 := datastore.NewMapDatastore()
 	mapds1 := datastore.NewMapDatastore()
@@ -306,8 +684,12 @@ func TestLookupPrio(t *testing.T) {
 		{Prefix: datastore.NewKey("/foo"), Datastore: mapds1},
 	})
 
-	m.Put(datastore.NewKey("/foo/bar"), []byte("123"))
-	m.Put(datastore.NewKey("/baz"), []byte("234"))
+	if err := m.Put(datastore.NewKey("/foo/bar"), []byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(datastore.NewKey("/baz"), []byte("234")); err != nil {
+		t.Fatal(err)
+	}
 
 	found, err := mapds0.Has(datastore.NewKey("/baz"))
 	if err != nil {
@@ -334,6 +716,70 @@ func TestLookupPrio(t *testing.T) {
 	}
 }
 
+func TestNestedMountSync(t *testing.T) {
+	internalDSRoot := datastore.NewMapDatastore()
+	internalDSFoo := datastore.NewMapDatastore()
+	internalDSFooBar := datastore.NewMapDatastore()
+
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/foo"), Datastore: autobatch.NewAutoBatching(internalDSFoo, 10)},
+		{Prefix: datastore.NewKey("/foo/bar"), Datastore: autobatch.NewAutoBatching(internalDSFooBar, 10)},
+		{Prefix: datastore.NewKey("/"), Datastore: autobatch.NewAutoBatching(internalDSRoot, 10)},
+	})
+
+	// Testing scenarios
+	// 1) Make sure child(ren) sync
+	// 2) Make sure parent syncs
+	// 3) Make sure parent only syncs the relevant subtree (instead of fully syncing)
+
+	addToDS := func(str string) {
+		t.Helper()
+		if err := m.Put(datastore.NewKey(str), []byte(str)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	checkVal := func(d datastore.Datastore, str string, expectFound bool) {
+		t.Helper()
+		res, err := d.Has(datastore.NewKey(str))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res != expectFound {
+			if expectFound {
+				t.Fatal("datastore is missing key")
+			}
+			t.Fatal("datastore has key it should not have")
+		}
+	}
+
+	// Add /foo/bar/0, Add /foo/bar/0/1, Add /foo/baz, Add /beep/bop, Sync /foo: all added except last - checks 1 and 2
+	addToDS("/foo/bar/0")
+	addToDS("/foo/bar/1")
+	addToDS("/foo/baz")
+	addToDS("/beep/bop")
+
+	if err := m.Sync(datastore.NewKey("/foo")); err != nil {
+		t.Fatal(err)
+	}
+
+	checkVal(internalDSFooBar, "/0", true)
+	checkVal(internalDSFooBar, "/1", true)
+	checkVal(internalDSFoo, "/baz", true)
+	checkVal(internalDSRoot, "/beep/bop", false)
+
+	// Add /fwop Add /bloop Sync /fwop, both added - checks 3
+	addToDS("/fwop")
+	addToDS("/bloop")
+
+	if err := m.Sync(datastore.NewKey("/fwop")); err != nil {
+		t.Fatal(err)
+	}
+
+	checkVal(internalDSRoot, "/fwop", true)
+	checkVal(internalDSRoot, "/bloop", false)
+}
+
 type errQueryDS struct {
 	datastore.NullDatastore
 }
@@ -351,16 +797,14 @@ func TestErrQueryClose(t *testing.T) {
 		{Prefix: datastore.NewKey("/foo"), Datastore: eqds},
 	})
 
-	m.Put(datastore.NewKey("/baz"), []byte("123"))
-
-	qr, err := m.Query(query.Query{})
-	if err != nil {
-		t.Fatalf("Query error: %v", err)
+	if err := m.Put(datastore.NewKey("/baz"), []byte("123")); err != nil {
+		t.Fatal(err)
 	}
 
-	e, ok := qr.NextSync()
-	if ok != false || e.Error == nil {
-		t.Errorf("Query was ok or q.Error was nil")
+	_, err := m.Query(query.Query{})
+	if err == nil {
+		t.Fatal("expected query to fail")
+		return
 	}
 }
 
@@ -381,4 +825,18 @@ func TestMaintenanceFunctions(t *testing.T) {
 	if err := m.Scrub(); err.Error() != "scrubbing datastore at /: test error" {
 		t.Errorf("Unexpected Scrub() error: %s", err)
 	}
+}
+
+func TestSuite(t *testing.T) {
+	mapds0 := datastore.NewMapDatastore()
+	mapds1 := datastore.NewMapDatastore()
+	mapds2 := datastore.NewMapDatastore()
+	mapds3 := datastore.NewMapDatastore()
+	m := mount.New([]mount.Mount{
+		{Prefix: datastore.NewKey("/foo"), Datastore: mapds1},
+		{Prefix: datastore.NewKey("/bar"), Datastore: mapds2},
+		{Prefix: datastore.NewKey("/baz"), Datastore: mapds3},
+		{Prefix: datastore.NewKey("/"), Datastore: mapds0},
+	})
+	dstest.SubtestAll(t, m)
 }

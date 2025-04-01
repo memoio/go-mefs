@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
+	u "github.com/ipfs/go-ipfs-util"
 	"github.com/libp2p/go-libp2p-core/peer"
-
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	dsq "github.com/memoio/go-mefs/source/go-datastore/query"
 	dssync "github.com/memoio/go-mefs/source/go-datastore/sync"
-	u "github.com/ipfs/go-ipfs-util"
 	//
 	// used by TestLargeProvidersSet: do not remove
 	// lds "github.com/ipfs/go-ds-leveldb"

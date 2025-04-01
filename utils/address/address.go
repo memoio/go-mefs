@@ -1,15 +1,11 @@
 package address
 
 import (
-	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -17,6 +13,26 @@ import (
 const AddressLength = 20
 
 var errLength = errors.New("the length of address from hexString is wrong")
+
+// GetNodeIDFromID gets
+func GetNodeIDFromID(id string) (uint64, error) {
+	ID, err := peer.IDB58Decode(id)
+	if err != nil {
+		return uint64(0), err
+	}
+
+	return binary.LittleEndian.Uint64([]byte(ID)[2:]), nil
+}
+
+// GetNodeIDFromAddr gets
+func GetNodeIDFromAddr(addr string) (uint64, error) {
+	addressByte, err := decodeHex(addr)
+	if err != nil {
+		return uint64(0), err
+	}
+
+	return binary.LittleEndian.Uint64(addressByte), nil
+}
 
 //GetAddressFromID used to call smartContract, id: ipfsnode.Identity.Pretty()
 //eg: id:8MJbWXudu7hwLa2q7vuJLW9UK4Lxuo ——>  address:0xb6BACd2625155dd0B65FAb00aA96aE5a669B77Da
@@ -66,30 +82,4 @@ func decodeHex(hexStr string) (addressByte []byte, err error) {
 		return addressByte, errLength
 	}
 	return addressByte, nil
-}
-
-//GetAdressFromSk get address from private key in ethereum format
-//eg: sk:0x5af8f531d9292ad04d6ff3835bf790959ada0f86f36a3d3ed9d0b8d32aa3ed11 ——>  address:0xb6BACd2625155dd0B65FAb00aA96aE5a669B77Da
-func GetAdressFromSk(sk string) (string, error) {
-	sk = strings.TrimPrefix(sk, "0x")
-	privateKey, err := ethcrypto.HexToECDSA(sk)
-	if err != nil {
-		return "", err
-	}
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return "", errors.New("error casting public key to ECDSA")
-	}
-	address := ethcrypto.PubkeyToAddress(*publicKeyECDSA)
-	return address.Hex(), nil
-}
-
-func SkByteToString(sk []byte) string {
-	pk := crypto.ToECDSAUnsafe(sk)
-	pkByte := math.PaddedBigBytes(pk.D, pk.Params().BitSize/8)
-	enc := make([]byte, len(pkByte)*2)
-	//对私钥进行十六进制编码，此处不加上"0x"前缀
-	hex.Encode(enc, pkByte)
-	return string(enc)
 }

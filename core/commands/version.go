@@ -1,14 +1,24 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"runtime"
 
 	cmds "github.com/ipfs/go-ipfs-cmds"
+	logging "github.com/ipfs/go-log"
 	version "github.com/memoio/go-mefs"
 	fsrepo "github.com/memoio/go-mefs/repo/fsrepo"
 )
+
+var log = logging.Logger("core/commands")
+
+var ErrNotOnline = errors.New("this command must be run in online mode. Try running 'mefs daemon' first")
+
+type MessageOutput struct {
+	Message string
+}
 
 type VersionOutput struct {
 	Version string

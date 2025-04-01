@@ -6,7 +6,7 @@
 
 ```go
 type MetaMessageHandler interface {
-	HandleMetaMessage(MetaMessageType, string, string, string) (string, error)
+	HandleMetaMessage(int, string, []byte, string) (string, error)
 	GetRole() (string, error)
 }
 
@@ -40,9 +40,9 @@ type keeperHandler struct {
 	Role string
 }
 
-func (keeper *keeperHandler) HandleMetaMessage(typ meta.MetaMessageType, metaKey, metaValue, from string) (string, error) { //from即发来这个请求的节点ID，可以做一点最基本的检查
+func (keeper *keeperHandler) HandleMetaMessage(opType int, metaKey string, metaValue []byte, from string) (string, error) { //from即发来这个请求的节点ID，可以做一点最基本的检查
     if keeper == nil {
-		return meta.MetaHandleError, ErrKeeperServiceNotReady
+		return meta.MetaHandleError, errKeeperServiceNotReady
 	}
     switch typ {
         //根据不同类型操作
@@ -51,7 +51,7 @@ func (keeper *keeperHandler) HandleMetaMessage(typ meta.MetaMessageType, metaKey
 
 func (keeper *keeperHandler) GetRole() (string, error) {
 	if keeper == nil {
-		return "", ErrKeeperServiceNotReady
+		return "", errKeeperServiceNotReady
 	}
 	return keeper.Role, nil
 }
@@ -81,7 +81,7 @@ MetaDeleteBlock(metaKey, metaValue, to string) (string, error)     //通知provi
 
   启动keeper服务
 
-+ `func SearchAllKeepersAndProviders(ctx context.Context) error`
++ `func searchAllKeepersAndProviders(ctx context.Context) error`
 
   不断搜索全网的keeper和provider，并将其加入PeersInfo，全局搜索是用下面的协程
 

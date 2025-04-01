@@ -18,9 +18,9 @@
 ### 具体操作以及信息汇总
   +  初始化流程
      +  keytype:`"init_req"`/`"init_res"`/`"init_notif"`/`user_init_notif_res`
-     +  user： key:`UserID/"init_req"/keepercount/providercount` value:无
-     +  keeper： key:`UserID/"init_res"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
-     +  user： key:`UserID/"init_notif"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
+     +  user： key:`userid/"init_req"/keepercount/providercount` value:无
+     +  keeper： key:`userid/"init_res"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
+     +  user： key:`userid/"init_notif"/keepercount/providercount` value:`kid1kid2.../pid1pid2....`
      +  keeper: key:`PeerID/"user_init_notif_res"/"bft"` value:`"simple"`或`IP:p2pport/IP:rpcport`
   + 元数据同步
     + keytype:`"sync"`，第一个操作数表示是哪一类数据
@@ -87,11 +87,11 @@
     dht层 handlers.go `handleMetaInfo()`用于数据接受，收到的数据传入角色层，根据不同角色的回调函数进行处理
   + 数据结构的构造
     ```go
-    km.err := metainfo.NewKeyMeta(mainID string, keyType MetaKeyType, listOptions ...string)
+    km.err := metainfo.NewKey(mainID string, keyType MetaKeyType, listOptions ...string)
     ```
     这个函数会检查输入的参数是否满足keytype的要求，不满足会报错，想要构造字符串信息，先构造keymeta结构，然后`km.ToString()`
     ```go
-    km,err := metainfo.GetKeyMeta(key string)
+    km,err := metainfo.NewKeyFromString(key string)
     ```
     这个函数从字符串构造keymeta，同样会根据keytype查错
   + 信息类别的添加

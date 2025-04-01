@@ -62,6 +62,7 @@ const (
 
 	DagProtobuf = 0x70
 	DagCBOR     = 0x71
+	Libp2pKey   = 0x72
 
 	GitRaw = 0x78
 
@@ -90,6 +91,7 @@ var Codecs = map[string]uint64{
 	"raw":                  Raw,
 	"protobuf":             DagProtobuf,
 	"cbor":                 DagCBOR,
+	"libp2p-key":           Libp2pKey,
 	"git-raw":              GitRaw,
 	"eth-block":            EthBlock,
 	"eth-block-list":       EthBlockList,
@@ -135,25 +137,39 @@ var CodecToStr = map[uint64]string{
 	DashTx:             "dash-tx",
 }
 
-// NewCidV0 returns a Cid-wrapped multihash.
-// They exist to allow IPFS to work with Cids while keeping
-// compatibility with the plain-multihash format used used in IPFS.
-// NewCidV1 should be used preferentially.
-func NewCidV0(mhash mh.Multihash) Cid {
+// tryNewCidV0 tries to convert a multihash into a CIDv0 CID and returns an
+// error on failure.
+func tryNewCidV0(mhash mh.Multihash) (Cid, error) {
 	// Need to make sure hash is valid for CidV0 otherwise we will
 	// incorrectly detect it as CidV1 in the Version() method
 	dec, err := mh.Decode(mhash)
 	if err != nil {
-		panic(err)
+		return Undef, err
 	}
 	if dec.Code != mh.SHA2_256 || dec.Length != 32 {
-		panic("invalid hash for cidv0")
+		return Undef, fmt.Errorf("invalid hash for cidv0 %d-%d", dec.Code, dec.Length)
 	}
-	return Cid{string(mhash)}
+	return Cid{string(mhash)}, nil
+}
+
+// NewCidV0 returns a Cid-wrapped multihash.
+// They exist to allow IPFS to work with Cids while keeping
+// compatibility with the plain-multihash format used used in IPFS.
+// NewCidV1 should be used preferentially.
+//
+// Panics if the multihash isn't sha2-256.
+func NewCidV0(mhash mh.Multihash) Cid {
+	c, err := tryNewCidV0(mhash)
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // NewCidV1 returns a new Cid using the given multicodec-packed
 // content type.
+//
+// Panics if the multihash is invalid.
 func NewCidV1(codecType uint64, mhash mh.Multihash) Cid {
 	hashlen := len(mhash)
 	// two 8 bytes (max) numbers plus hash
@@ -201,7 +217,7 @@ func Parse(v interface{}) (Cid, error) {
 	case []byte:
 		return Cast(v2)
 	case mh.Multihash:
-		return NewCidV0(v2), nil
+		return tryNewCidV0(v2)
 	case Cid:
 		return v2, nil
 	default:
@@ -232,7 +248,7 @@ func Decode(v string) (Cid, error) {
 			return Undef, err
 		}
 
-		return NewCidV0(hash), nil
+		return tryNewCidV0(hash)
 	}
 
 	_, data, err := mbase.Decode(v)
@@ -288,36 +304,16 @@ func uvError(read int) error {
 // Please use decode when parsing a regular Cid string, as Cast does not
 // expect multibase-encoded data. Cast accepts the output of Cid.Bytes().
 func Cast(data []byte) (Cid, error) {
-	if len(data) == 34 && data[0] == 18 && data[1] == 32 {
-		h, err := mh.Cast(data)
-		if err != nil {
-			return Undef, err
-		}
-
-		return NewCidV0(h), nil
-	}
-
-	vers, n := binary.Uvarint(data)
-	if err := uvError(n); err != nil {
-		return Undef, err
-	}
-
-	if vers != 1 {
-		return Undef, fmt.Errorf("expected 1 as the cid version number, got: %d", vers)
-	}
-
-	_, cn := binary.Uvarint(data[n:])
-	if err := uvError(cn); err != nil {
-		return Undef, err
-	}
-
-	rest := data[n+cn:]
-	h, err := mh.Cast(rest)
+	nr, c, err := CidFromBytes(data)
 	if err != nil {
 		return Undef, err
 	}
 
-	return Cid{string(data[0 : n+cn+len(h)])}, nil
+	if nr != len(data) {
+		return Undef, fmt.Errorf("trailing bytes in data buffer passed to cid Cast")
+	}
+
+	return c, nil
 }
 
 // UnmarshalBinary is equivalent to Cast(). It implements the
@@ -541,6 +537,12 @@ func (p Prefix) Sum(data []byte) (Cid, error) {
 		length = -1
 	}
 
+	if p.Version == 0 && (p.MhType != mh.SHA2_256 ||
+		(p.MhLength != 32 && p.MhLength != -1)) {
+
+		return Undef, fmt.Errorf("invalid v0 prefix")
+	}
+
 	hash, err := mh.Sum(data, p.MhType, length)
 	if err != nil {
 		return Undef, err
@@ -598,4 +600,42 @@ func PrefixFromBytes(buf []byte) (Prefix, error) {
 		MhType:   mhtype,
 		MhLength: int(mhlen),
 	}, nil
+}
+
+func CidFromBytes(data []byte) (int, Cid, error) {
+	if len(data) > 2 && data[0] == mh.SHA2_256 && data[1] == 32 {
+		if len(data) < 34 {
+			return 0, Undef, fmt.Errorf("not enough bytes for cid v0")
+		}
+
+		h, err := mh.Cast(data[:34])
+		if err != nil {
+			return 0, Undef, err
+		}
+
+		return 34, Cid{string(h)}, nil
+	}
+
+	vers, n := binary.Uvarint(data)
+	if err := uvError(n); err != nil {
+		return 0, Undef, err
+	}
+
+	if vers != 1 {
+		return 0, Undef, fmt.Errorf("expected 1 as the cid version number, got: %d", vers)
+	}
+
+	_, cn := binary.Uvarint(data[n:])
+	if err := uvError(cn); err != nil {
+		return 0, Undef, err
+	}
+
+	mhnr, _, err := mh.MHFromBytes(data[n+cn:])
+	if err != nil {
+		return 0, Undef, err
+	}
+
+	l := n + cn + mhnr
+
+	return l, Cid{string(data[0:l])}, nil
 }

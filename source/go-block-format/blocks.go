@@ -6,21 +6,18 @@ package blocks
 import (
 	"errors"
 	"fmt"
+	"log"
 
-	cid "github.com/memoio/go-mefs/source/go-cid"
-
+	proto "github.com/gogo/protobuf/proto"
 	u "github.com/ipfs/go-ipfs-util"
-
+	mpb "github.com/memoio/go-mefs/pb"
+	cid "github.com/memoio/go-mefs/source/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
 // ErrWrongHash is returned when the Cid of a block is not the expected
 // according to the contents. It is currently used only when debugging.
 var ErrWrongHash = errors.New("data did not match given hash")
-
-//identify current block check method, default is 1(CRC32)
-const defaultFlag int32 = 1
-const checkSize = 4 * 1024 //(4k)
 
 // Block provides abstraction for blocks implementations.
 type Block interface {
@@ -85,4 +82,55 @@ func (b *BasicBlock) Loggable() map[string]interface{} {
 	return map[string]interface{}{
 		"block": b.Cid().String(),
 	}
+}
+
+func (b *BasicBlock) Prefix() (*mpb.BlockOptions, int, error) {
+	return PrefixDecode(b.RawData())
+}
+
+func PrefixLen(data []byte) (int, int, error) {
+	len, n := proto.DecodeVarint(data[:10])
+	if n <= 0 {
+		return 0, 0, errors.New("wrong proto prefix message")
+	}
+
+	return int(len), n + int(len), nil
+}
+
+func PrefixDecode(data []byte) (*mpb.BlockOptions, int, error) {
+	if len(data) < 10 {
+		log.Println("wrong proto prefix len")
+		return nil, 0, errors.New("wrong proto prefix length")
+	}
+	x, n := proto.DecodeVarint(data[:10])
+	if n <= 0 || x == 0 {
+		log.Println("wrong proto prefix message:", x, n)
+		return nil, 0, errors.New("wrong proto prefix message")
+	}
+
+	if n+int(x) > len(data) {
+		log.Println("short proto prefix message:", x, n)
+		return nil, 0, errors.New("short proto prefix message")
+	}
+
+	pre := new(mpb.BlockOptions)
+	err := proto.Unmarshal(data[n:n+int(x)], pre)
+	if err != nil {
+		return nil, 0, err
+	}
+	return pre, n + int(x), nil
+}
+
+func PrefixEncode(pre *mpb.BlockOptions) ([]byte, int, error) {
+	preData, err := proto.Marshal(pre)
+	if err != nil {
+		fmt.Println(err)
+		return nil, 0, err
+	}
+
+	buf := proto.EncodeVarint(uint64(len(preData)))
+
+	buf = append(buf, preData...)
+
+	return buf, len(buf), nil
 }

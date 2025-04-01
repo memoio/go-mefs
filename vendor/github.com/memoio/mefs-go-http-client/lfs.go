@@ -3,7 +3,6 @@ package shell
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strconv"
 )
 
@@ -89,9 +88,16 @@ func SetParityCount(parityCount int) LfsOpts {
 	}
 }
 
-func NeedAvailTime(enabled bool) LfsOpts {
+func SetCrypto(crypto bool) LfsOpts {
 	return func(rb *RequestBuilder) error {
-		rb.Option("Avail", enabled)
+		rb.Option("encryption", crypto)
+		return nil
+	}
+}
+
+func SetAvailTime(enabled bool) LfsOpts {
+	return func(rb *RequestBuilder) error {
+		rb.Option("availTime", enabled)
 		return nil
 	}
 }
@@ -252,7 +258,6 @@ func (s *Shell) GetFrom(key, id string, options ...LfsOpts) (*queryEvent, error)
 }
 
 func (s *Shell) GetBlockFrom(key, id string, options ...LfsOpts) (string, error) {
-	fmt.Println("in GetBlockFrom")
 	var res string
 	rb := s.Request("block/getfrom", key, id)
 	for _, option := range options {
@@ -263,4 +268,16 @@ func (s *Shell) GetBlockFrom(key, id string, options ...LfsOpts) (string, error)
 		return "", err
 	}
 	return res, nil
+}
+
+func (s *Shell) Kill(addr string, options ...LfsOpts) (*StringList, error) {
+	var strlist StringList
+	rb := s.Request("lfs/kill", addr)
+	for _, option := range options {
+		option(rb)
+	}
+	if err := rb.Exec(context.Background(), &strlist); err != nil {
+		return nil, err
+	}
+	return &strlist, nil
 }

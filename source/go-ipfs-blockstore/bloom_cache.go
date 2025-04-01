@@ -7,9 +7,9 @@ import (
 	"time"
 
 	bloom "github.com/ipfs/bbloom"
+	metrics "github.com/ipfs/go-metrics-interface"
 	blocks "github.com/memoio/go-mefs/source/go-block-format"
 	cid "github.com/memoio/go-mefs/source/go-cid"
-	metrics "github.com/ipfs/go-metrics-interface"
 )
 
 // bloomCached returns a Blockstore that caches Has requests using a Bloom
@@ -113,7 +113,7 @@ func (b *bloomcache) build(ctx context.Context) error {
 
 func (b *bloomcache) DeleteBlock(k cid.Cid) error {
 	if has, ok := b.hasCached(k); ok && !has {
-		return ErrNotFound
+		return nil
 	}
 
 	return b.blockstore.DeleteBlock(k)
@@ -159,14 +159,6 @@ func (b *bloomcache) Get(k cid.Cid) (blocks.Block, error) {
 	return b.blockstore.Get(k)
 }
 
-func (b *bloomcache) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	if has, ok := b.hasCached(k); ok && !has {
-		return nil, nil, ErrNotFound
-	}
-
-	return b.blockstore.GetSegAndTag(k, offset)
-}
-
 func (b *bloomcache) Put(bl blocks.Block) error {
 	// See comment in PutMany
 	err := b.blockstore.Put(bl)
@@ -176,8 +168,8 @@ func (b *bloomcache) Put(bl blocks.Block) error {
 	return err
 }
 
-func (b *bloomcache) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
-	err := b.blockstore.Append(c, field, beginoffset, endoffset)
+func (b *bloomcache) Append(c cid.Cid, field []byte, begin, length int) error {
+	err := b.blockstore.Append(c, field, begin, length)
 	if err == nil {
 		b.bloom.AddTS(c.Bytes())
 	}

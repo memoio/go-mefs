@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -28,10 +27,10 @@ var (
 )
 
 // QueryABI is the input ABI used to generate the binding from.
-const QueryABI = "[{\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\"},{\"name\":\"duration\",\"type\":\"uint256\"},{\"name\":\"price\",\"type\":\"uint256\"},{\"name\":\"ks\",\"type\":\"uint256\"},{\"name\":\"ps\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"signature\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"data\",\"type\":\"string\"}],\"name\":\"Error\",\"type\":\"event\",\"signature\":\"0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"data\",\"type\":\"uint256\"}],\"name\":\"LogInt\",\"type\":\"event\",\"signature\":\"0xc8fa9a7021af252bc69defe2b981f7bd7858defe2a87641768fefdb8a03a07cd\"},{\"constant\":true,\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\",\"signature\":\"0x6d4ce63c\"},{\"constant\":false,\"inputs\":[],\"name\":\"setCompleted\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"signature\":\"0x2e5295ee\"}]"
+const QueryABI = "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"ks\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"ps\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"AlterOwner\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"alterOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"setCompleted\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // QueryBin is the compiled bytecode used for deploying new contracts.
-const QueryBin = `0x608060405234801561001057600080fd5b5060405160a0806102b0833981018060405260a081101561003057600080fd5b81019080805190602001909291908051906020019092919080519060200190929190805190602001909291908051906020019092919050505060c060405190810160405280868152602001858152602001848152602001602060405190810160405280858152508152602001602060405190810160405280848152508152602001600015158152506000808201518160000155602082015181600101556040820151816002015560608201518160030160008201518160000155505060808201518160040160008201518160000155505060a08201518160050160006101000a81548160ff0219169083151502179055509050505050505050610178806101386000396000f3fe60806040526004361061004c576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680632e5295ee146100515780636d4ce63c14610080575b600080fd5b34801561005d57600080fd5b506100666100d2565b604051808215151515815260200191505060405180910390f35b34801561008c57600080fd5b506100956100f9565b6040518087815260200186815260200185815260200184815260200183815260200182151515158152602001965050505050505060405180910390f35b60006001600060050160006101000a81548160ff0219169083151502179055506001905090565b6000806000806000806000800154600060010154600060020154600060030160000154600060040160000154600060050160009054906101000a900460ff1695509550955095509550955090919293949556fea165627a7a72305820915ec0079af3803174b557701e8782aa7859b50cda0fc6bab210a2d2f9be077f0029`
+var QueryBin = "0x6080604052738026796fd7ce63eae824314aa5bacf55643e893d600760006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555034801561006557600080fd5b5060405161076f38038061076f833981810160405260a081101561008857600080fd5b810190808051906020019092919080519060200190929190805190602001909291908051906020019092919080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506000600760009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663f49ded5a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561016b57600080fd5b505afa15801561017f573d6000803e3d6000fd5b505050506040513d602081101561019557600080fd5b81019080805190602001909291905050509050600161ffff168161ffff1610610226576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260198152602001807f6465706c6f79696e672071756572792069732062616e6e65640000000000000081525060200191505060405180910390fd5b6040518060c001604052808781526020018681526020018581526020016040518060200160405280868152508152602001604051806020016040528085815250815260200160001515815250600160008201518160000155602082015181600101556040820151816002015560608201518160030160008201518160000155505060808201518160040160008201518160000155505060a08201518160050160006101000a81548160ff02191690831515021790555090505050505050505061047b806102f46000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80630ca05f9f146100515780632e5295ee146100ab5780636d4ce63c146100cb578063893d20e81461010e575b600080fd5b6100936004803603602081101561006757600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610142565b60405180821515815260200191505060405180910390f35b6100b36102e1565b60405180821515815260200191505060405180910390f35b6100d36103c9565b604051808781526020018681526020018581526020018481526020018381526020018215158152602001965050505050505060405180910390f35b61011661041c565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610206576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050826000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055507f8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e908184604051808373ffffffffffffffffffffffffffffffffffffffff1681526020018273ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a16001915050919050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146103a5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f6f6e6c79206f776e65722063616e2063616c6c0000000000000000000000000081525060200191505060405180910390fd5b60018060050160006101000a81548160ff0219169083151502179055506001905090565b6000806000806000806001600001546001800154600160020154600160030160000154600160040160000154600160050160009054906101000a900460ff16955095509550955095509550909192939495565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690509056fea2646970667358221220e71a1ba99ba8cd4f8c85c01fb8662c747718a852de9072d9dbc5c4b9c6d786f164736f6c63430007030033"
 
 // DeployQuery deploys a new Ethereum contract, binding an instance of Query to it.
 func DeployQuery(auth *bind.TransactOpts, backend bind.ContractBackend, capacity *big.Int, duration *big.Int, price *big.Int, ks *big.Int, ps *big.Int) (common.Address, *types.Transaction, *Query, error) {
@@ -39,6 +38,7 @@ func DeployQuery(auth *bind.TransactOpts, backend bind.ContractBackend, capacity
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+
 	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(QueryBin), backend, capacity, duration, price, ks, ps)
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -190,7 +190,7 @@ func (_Query *QueryTransactorRaw) Transact(opts *bind.TransactOpts, method strin
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256, uint256, uint256, bool)
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256, uint256, bool)
 func (_Query *QueryCaller) Get(opts *bind.CallOpts) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	var (
 		ret0 = new(*big.Int)
@@ -214,16 +214,63 @@ func (_Query *QueryCaller) Get(opts *bind.CallOpts) (*big.Int, *big.Int, *big.In
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256, uint256, uint256, bool)
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256, uint256, bool)
 func (_Query *QuerySession) Get() (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	return _Query.Contract.Get(&_Query.CallOpts)
 }
 
 // Get is a free data retrieval call binding the contract method 0x6d4ce63c.
 //
-// Solidity: function get() constant returns(uint256, uint256, uint256, uint256, uint256, bool)
+// Solidity: function get() view returns(uint256, uint256, uint256, uint256, uint256, bool)
 func (_Query *QueryCallerSession) Get() (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, bool, error) {
 	return _Query.Contract.Get(&_Query.CallOpts)
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Query *QueryCaller) GetOwner(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _Query.contract.Call(opts, out, "getOwner")
+	return *ret0, err
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Query *QuerySession) GetOwner() (common.Address, error) {
+	return _Query.Contract.GetOwner(&_Query.CallOpts)
+}
+
+// GetOwner is a free data retrieval call binding the contract method 0x893d20e8.
+//
+// Solidity: function getOwner() view returns(address)
+func (_Query *QueryCallerSession) GetOwner() (common.Address, error) {
+	return _Query.Contract.GetOwner(&_Query.CallOpts)
+}
+
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Query *QueryTransactor) AlterOwner(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _Query.contract.Transact(opts, "alterOwner", newOwner)
+}
+
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Query *QuerySession) AlterOwner(newOwner common.Address) (*types.Transaction, error) {
+	return _Query.Contract.AlterOwner(&_Query.TransactOpts, newOwner)
+}
+
+// AlterOwner is a paid mutator transaction binding the contract method 0x0ca05f9f.
+//
+// Solidity: function alterOwner(address newOwner) returns(bool)
+func (_Query *QueryTransactorSession) AlterOwner(newOwner common.Address) (*types.Transaction, error) {
+	return _Query.Contract.AlterOwner(&_Query.TransactOpts, newOwner)
 }
 
 // SetCompleted is a paid mutator transaction binding the contract method 0x2e5295ee.
@@ -247,9 +294,9 @@ func (_Query *QueryTransactorSession) SetCompleted() (*types.Transaction, error)
 	return _Query.Contract.SetCompleted(&_Query.TransactOpts)
 }
 
-// QueryErrorIterator is returned from FilterError and is used to iterate over the raw logs and unpacked data for Error events raised by the Query contract.
-type QueryErrorIterator struct {
-	Event *QueryError // Event containing the contract specifics and raw log
+// QueryAlterOwnerIterator is returned from FilterAlterOwner and is used to iterate over the raw logs and unpacked data for AlterOwner events raised by the Query contract.
+type QueryAlterOwnerIterator struct {
+	Event *QueryAlterOwner // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -263,7 +310,7 @@ type QueryErrorIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *QueryErrorIterator) Next() bool {
+func (it *QueryAlterOwnerIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -272,7 +319,7 @@ func (it *QueryErrorIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(QueryError)
+			it.Event = new(QueryAlterOwner)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -287,7 +334,7 @@ func (it *QueryErrorIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(QueryError)
+		it.Event = new(QueryAlterOwner)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -303,41 +350,42 @@ func (it *QueryErrorIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *QueryErrorIterator) Error() error {
+func (it *QueryAlterOwnerIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *QueryErrorIterator) Close() error {
+func (it *QueryAlterOwnerIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// QueryError represents a Error event raised by the Query contract.
-type QueryError struct {
-	Data string
+// QueryAlterOwner represents a AlterOwner event raised by the Query contract.
+type QueryAlterOwner struct {
+	From common.Address
+	To   common.Address
 	Raw  types.Log // Blockchain specific contextual infos
 }
 
-// FilterError is a free log retrieval operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+// FilterAlterOwner is a free log retrieval operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event Error(string data)
-func (_Query *QueryFilterer) FilterError(opts *bind.FilterOpts) (*QueryErrorIterator, error) {
+// Solidity: event AlterOwner(address from, address to)
+func (_Query *QueryFilterer) FilterAlterOwner(opts *bind.FilterOpts) (*QueryAlterOwnerIterator, error) {
 
-	logs, sub, err := _Query.contract.FilterLogs(opts, "Error")
+	logs, sub, err := _Query.contract.FilterLogs(opts, "AlterOwner")
 	if err != nil {
 		return nil, err
 	}
-	return &QueryErrorIterator{contract: _Query.contract, event: "Error", logs: logs, sub: sub}, nil
+	return &QueryAlterOwnerIterator{contract: _Query.contract, event: "AlterOwner", logs: logs, sub: sub}, nil
 }
 
-// WatchError is a free log subscription operation binding the contract event 0x08c379a0afcc32b1a39302f7cb8073359698411ab5fd6e3edb2c02c0b5fba8aa.
+// WatchAlterOwner is a free log subscription operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event Error(string data)
-func (_Query *QueryFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *QueryError) (event.Subscription, error) {
+// Solidity: event AlterOwner(address from, address to)
+func (_Query *QueryFilterer) WatchAlterOwner(opts *bind.WatchOpts, sink chan<- *QueryAlterOwner) (event.Subscription, error) {
 
-	logs, sub, err := _Query.contract.WatchLogs(opts, "Error")
+	logs, sub, err := _Query.contract.WatchLogs(opts, "AlterOwner")
 	if err != nil {
 		return nil, err
 	}
@@ -347,8 +395,8 @@ func (_Query *QueryFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *Query
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(QueryError)
-				if err := _Query.contract.UnpackLog(event, "Error", log); err != nil {
+				event := new(QueryAlterOwner)
+				if err := _Query.contract.UnpackLog(event, "AlterOwner", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -369,134 +417,13 @@ func (_Query *QueryFilterer) WatchError(opts *bind.WatchOpts, sink chan<- *Query
 	}), nil
 }
 
-// QueryLogIntIterator is returned from FilterLogInt and is used to iterate over the raw logs and unpacked data for LogInt events raised by the Query contract.
-type QueryLogIntIterator struct {
-	Event *QueryLogInt // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *QueryLogIntIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(QueryLogInt)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(QueryLogInt)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *QueryLogIntIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *QueryLogIntIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// QueryLogInt represents a LogInt event raised by the Query contract.
-type QueryLogInt struct {
-	Data *big.Int
-	Raw  types.Log // Blockchain specific contextual infos
-}
-
-// FilterLogInt is a free log retrieval operation binding the contract event 0xc8fa9a7021af252bc69defe2b981f7bd7858defe2a87641768fefdb8a03a07cd.
+// ParseAlterOwner is a log parse operation binding the contract event 0x8c153ecee6895f15da72e646b4029e0ef7cbf971986d8d9cfe48c5563d368e90.
 //
-// Solidity: event LogInt(uint256 indexed data)
-func (_Query *QueryFilterer) FilterLogInt(opts *bind.FilterOpts, data []*big.Int) (*QueryLogIntIterator, error) {
-
-	var dataRule []interface{}
-	for _, dataItem := range data {
-		dataRule = append(dataRule, dataItem)
-	}
-
-	logs, sub, err := _Query.contract.FilterLogs(opts, "LogInt", dataRule)
-	if err != nil {
+// Solidity: event AlterOwner(address from, address to)
+func (_Query *QueryFilterer) ParseAlterOwner(log types.Log) (*QueryAlterOwner, error) {
+	event := new(QueryAlterOwner)
+	if err := _Query.contract.UnpackLog(event, "AlterOwner", log); err != nil {
 		return nil, err
 	}
-	return &QueryLogIntIterator{contract: _Query.contract, event: "LogInt", logs: logs, sub: sub}, nil
-}
-
-// WatchLogInt is a free log subscription operation binding the contract event 0xc8fa9a7021af252bc69defe2b981f7bd7858defe2a87641768fefdb8a03a07cd.
-//
-// Solidity: event LogInt(uint256 indexed data)
-func (_Query *QueryFilterer) WatchLogInt(opts *bind.WatchOpts, sink chan<- *QueryLogInt, data []*big.Int) (event.Subscription, error) {
-
-	var dataRule []interface{}
-	for _, dataItem := range data {
-		dataRule = append(dataRule, dataItem)
-	}
-
-	logs, sub, err := _Query.contract.WatchLogs(opts, "LogInt", dataRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(QueryLogInt)
-				if err := _Query.contract.UnpackLog(event, "LogInt", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
+	return event, nil
 }

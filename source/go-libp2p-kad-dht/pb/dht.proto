@@ -10,7 +10,8 @@
 syntax = "proto3";
 package dht.pb;
 
-import "github.com/libp2p/go-libp2p-record/pb/record.proto";
+import "github.com/memoio/go-mefs/pb/mefs.proto";
+
 
 message Message {
 	enum MessageType {
@@ -20,10 +21,7 @@ message Message {
 		GET_PROVIDERS = 3;
 		FIND_NODE = 4;
 		PING = 5;
-		GET_PREFIX= 6;
-		APPEND_VALUE = 7;
-		MetaInfo = 8;
-		MetaBroadcast = 9;
+		MetaInfo = 6;
 	}
 
 	enum ConnectionType {
@@ -55,17 +53,17 @@ message Message {
 	// defines what type of message it is.
 	MessageType type = 1;
 
-	// defines what coral cluster level this query/response belongs to.
-	// in case we want to implement coral's cluster rings in the future.
-	int32 clusterLevelRaw = 10;
+	int32 opType = 2;
 
 	// Used to specify the key associated with this message.
 	// PUT_VALUE, GET_VALUE, ADD_PROVIDER, GET_PROVIDERS
-	bytes key = 2;
+	bytes key = 3;
 
 	// Used to return a value
 	// PUT_VALUE, GET_VALUE
-	record.pb.Record record = 3;
+	mefs.pb.Record record = 4;
+
+	bool errMsg = 5;
 
 	// Used to return peers closer to a key in a query
 	// GET_VALUE, GET_PROVIDERS, FIND_NODE

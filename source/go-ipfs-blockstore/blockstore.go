@@ -29,9 +29,6 @@ var ErrHashMismatch = errors.New("block in storage has different hash than reque
 // ErrNotFound is an error returned when a block is not found.
 var ErrNotFound = errors.New("blockstore: block not found")
 
-// ErrNotExist is an error returned when a block not exists.
-//var ErrNotExist = errors.New("blockstore: block not exists")
-
 // Blockstore wraps a Datastore block-centered methods and provides a layer
 // of abstraction which allows to add different caching strategies.
 type Blockstore interface {
@@ -46,10 +43,7 @@ type Blockstore interface {
 	Put(blocks.Block) error
 
 	// Append appends
-	Append(c cid.Cid, field []byte, beginoffset, endoffset int) error
-
-	// GetSegAndTag
-	GetSegAndTag(cid.Cid, uint64) ([]byte, []byte, error)
+	Append(c cid.Cid, field []byte, begin, length int) error
 
 	// PutMany puts a slice of blocks at the same time using batching
 	// capabilities of the underlying datastore whenever possible.
@@ -151,38 +145,22 @@ func (bs *blockstore) Get(k cid.Cid) (blocks.Block, error) {
 	return blocks.NewBlockWithCid(bdata, k)
 }
 
-func (bs *blockstore) GetSegAndTag(k cid.Cid, offset uint64) ([]byte, []byte, error) {
-	if !k.Defined() {
-		log.Error("undefined cid in blockstore")
-		return nil, nil, ErrNotFound
-	}
-
-	segment, tag, err := bs.datastore.GetSegAndTag(dshelp.CidToDsKey(k), offset)
-	if err == ds.ErrNotFound {
-		return nil, nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	return segment, tag, nil
-}
-
 func (bs *blockstore) Put(block blocks.Block) error {
 	k := dshelp.CidToDsKey(block.Cid())
 
-	// Has is cheaper than Put, so see if we already have it
-	exists, err := bs.datastore.Has(k)
-	if err == nil && exists {
-		return nil // already stored.
-	}
+	// // Has is cheaper than Put, so see if we already have it
+	// exists, err := bs.datastore.Has(k)
+	// if err == nil && exists {
+	// 	return nil // already stored.
+	// }
 	return bs.datastore.Put(k, block.RawData())
 }
 
-func (bs *blockstore) Append(c cid.Cid, field []byte, beginoffset, endoffset int) error {
+func (bs *blockstore) Append(c cid.Cid, field []byte, begin, length int) error {
 	k := dshelp.CidToDsKey(c)
 
 	//we can append only when the block exists
-	return bs.datastore.Append(k, field, beginoffset, endoffset)
+	return bs.datastore.Append(k, field, begin, length)
 }
 
 func (bs *blockstore) PutMany(blocks []blocks.Block) error {
@@ -218,11 +196,7 @@ func (bs *blockstore) GetSize(k cid.Cid) (int, error) {
 }
 
 func (bs *blockstore) DeleteBlock(k cid.Cid) error {
-	err := bs.datastore.Delete(dshelp.CidToDsKey(k))
-	if err == ds.ErrNotFound {
-		return ErrNotFound
-	}
-	return err
+	return bs.datastore.Delete(dshelp.CidToDsKey(k))
 }
 
 // AllKeysChan runs a query for keys from the blockstore.

@@ -68,7 +68,7 @@ message ObjectInfo {
 
 对于元数据块，元数据块默认为多副本模式,其规定如下：
 
-+ SuperBlock，占据UID_0_0_0...UID_0_m_n这个CID（故用户可获取的BucketID是从1开始的），不过目前SuperBlock存的东西略少，是否可以存一些User自己的config放里面。
++ superBlock，占据UID_0_0_0...UID_0_m_n这个CID（故用户可获取的BucketID是从1开始的），不过目前SuperBlock存的东西略少，是否可以存一些User自己的config放里面。
 + BucketInfo，占据UID_ -BucketID_ 0_0...UID_ -BucketID_ 0_n（副本数），BucketInfo大小受限，不会超过一个Block大小（目前为1M），故只留了一个Block的位置。
 + ObjectInfo，占据UID_ -BucketID_ 1_0...UID_ -BucketID_ m_n，即负数的BucketID，以及从1开始的Stripe号，object可以随意累加。
 
@@ -77,12 +77,12 @@ LFS全局维护一个Log信息，即LFS的全局元数据。
 ```protobuf
 type Logs struct {
 	node         *core.MefsNode
-	Sb           *pb.SuperBlock
-	Dirty   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
-	BucketByName map[string]*pb.BucketInfo           //通过BucketName找到Bucket信息
-	BucketByID   map[int32]*pb.BucketInfo            //通过BucketID知道到Bucket信息
-	Entries      map[int32]map[string]*pb.ObjectInfo //通过BucketID检索Bucket下文件
-	Dirty        map[int32]bool                      //通过BucketID确定一个Bucket是不是脏
+	sb           *pb.SuperBlock
+	dirty   bool                                //看看superBlock是否需要更新（仅在新创建Bucket时需要）
+	BucketByName map[string]*mpb.BucketInfo           //通过BucketName找到Bucket信息
+	bucketByID   map[int32]*mpb.BucketInfo            //通过BucketID知道到Bucket信息
+	Entries      map[int32]map[string]*mpb.ObjectInfo //通过BucketID检索Bucket下文件
+	dirty        map[int32]bool                      //通过BucketID确定一个Bucket是不是脏
 }
 ```
 
@@ -161,11 +161,16 @@ DELETE Object
 
 下面的命令可以直接复制到命令行批量运行
 
+安装metb
+
+cd $GOPATH/github.com/memoio/go-mefs/source/metb-plugins/metb
+go install .
+
 1. 首先Init节点
 
 ```shell
 
-metb init -n 13
+metb auto -type localmefs -count 13
 
 y
 
@@ -178,7 +183,7 @@ y
 
 metb start
 
-metb for-each mefs config Test true --json
+metb run -- mefs config Test true --json
 
 metb run 2 mefs config Role keeper
 
@@ -298,11 +303,11 @@ mefs lfs list_objects
 
 ```shell
 
-metb kill 0
+metb stop 0
 
-metb kill 1
+metb stop 1
 
-metb kill
+metb stop
 ```
 
 ### 5.3 HTTP curl模拟测试

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	. "github.com/go-check/check"
+	. "gopkg.in/check.v1"
 
 	ds "github.com/memoio/go-mefs/source/go-datastore"
 	ns "github.com/memoio/go-mefs/source/go-datastore/namespace"
@@ -101,9 +101,9 @@ func (ks *DSSuite) TestQuery(c *C) {
 	c.Check(err, Equals, nil)
 
 	expect := []dsq.Entry{
-		{Key: "/bar", Value: []byte("/foo/bar")},
-		{Key: "/bar/baz", Value: []byte("/foo/bar/baz")},
-		{Key: "/baz/abc", Value: []byte("/foo/baz/abc")},
+		{Key: "/bar", Size: len([]byte("/foo/bar")), Value: []byte("/foo/bar")},
+		{Key: "/bar/baz", Size: len([]byte("/foo/bar/baz")), Value: []byte("/foo/bar/baz")},
+		{Key: "/baz/abc", Size: len([]byte("/foo/baz/abc")), Value: []byte("/foo/baz/abc")},
 	}
 
 	results, err := qres.Rest()
@@ -122,8 +122,8 @@ func (ks *DSSuite) TestQuery(c *C) {
 	c.Check(err, Equals, nil)
 
 	expect = []dsq.Entry{
-		{Key: "/bar", Value: []byte("/foo/bar")},
-		{Key: "/bar/baz", Value: []byte("/foo/bar/baz")},
+		{Key: "/bar", Size: len([]byte("/foo/bar")), Value: []byte("/foo/bar")},
+		{Key: "/bar/baz", Size: len([]byte("/foo/bar/baz")), Value: []byte("/foo/bar/baz")},
 	}
 
 	results, err = qres.Rest()
@@ -135,15 +135,15 @@ func (ks *DSSuite) TestQuery(c *C) {
 		c.Check(string(ent.Value), Equals, string(expect[i].Value))
 	}
 
-	if err := nsds.Datastore.(ds.CheckedDatastore).Check(); err != dstest.TestError {
+	if err := nsds.Check(); err != dstest.TestError {
 		c.Errorf("Unexpected Check() error: %s", err)
 	}
 
-	if err := nsds.Datastore.(ds.GCDatastore).CollectGarbage(); err != dstest.TestError {
+	if err := nsds.CollectGarbage(); err != dstest.TestError {
 		c.Errorf("Unexpected CollectGarbage() error: %s", err)
 	}
 
-	if err := nsds.Datastore.(ds.ScrubbedDatastore).Scrub(); err != dstest.TestError {
+	if err := nsds.Scrub(); err != dstest.TestError {
 		c.Errorf("Unexpected Scrub() error: %s", err)
 	}
 }
@@ -154,4 +154,10 @@ func strsToKeys(strs []string) []ds.Key {
 		keys[i] = ds.NewKey(s)
 	}
 	return keys
+}
+
+func TestSuite(t *testing.T) {
+	mpds := dstest.NewTestDatastore(true)
+	nsds := ns.Wrap(mpds, ds.NewKey("/foo"))
+	dstest.SubtestAll(t, nsds)
 }

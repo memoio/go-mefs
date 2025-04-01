@@ -61,7 +61,6 @@ the event log.
 		}
 
 		s := fmt.Sprintf("Changed log level of '%s' to '%s'\n", subsystem, level)
-		log.Info(s)
 
 		return cmds.EmitOnce(res, &MessageOutput{s})
 	},
